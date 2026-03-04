@@ -86,8 +86,8 @@ async function fetchPersonMetrics(jiraRequest, jiraDisplayName, options = {}) {
   // Escape the name for JQL (double-quote wrapping handles apostrophes)
   const escapedName = jiraDisplayName.replace(/"/g, '\\"');
 
-  const resolvedJql = `project = RHOAIENG AND assignee = "${escapedName}" AND resolved >= -${lookbackDays}d AND issuetype in (Story, Bug, Task)`;
-  const inProgressJql = `project = RHOAIENG AND assignee = "${escapedName}" AND status in ("In Progress", "Code Review") AND issuetype in (Story, Bug, Task)`;
+  const resolvedJql = `project = RHOAIENG AND assignee = "${escapedName}" AND resolved >= -${lookbackDays}d AND issuetype in (Story, Bug, Task, Vulnerability, Weakness)`;
+  const inProgressJql = `project = RHOAIENG AND assignee = "${escapedName}" AND status in ("In Progress", "Code Review") AND issuetype in (Story, Bug, Task, Vulnerability, Weakness)`;
 
   const [resolvedIssues, inProgressIssues] = await Promise.all([
     fetchAllJqlResults(jiraRequest, resolvedJql, FIELDS),
