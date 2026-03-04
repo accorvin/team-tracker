@@ -58,6 +58,20 @@
       />
     </div>
 
+    <!-- Export -->
+    <div class="flex justify-end mb-3">
+      <button
+        @click="exportCsv"
+        :disabled="!teamMetrics"
+        class="px-3 py-1.5 text-sm bg-white text-gray-700 border border-gray-300 rounded-md font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+      >
+        <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        Export CSV
+      </button>
+    </div>
+
     <!-- Content -->
     <div v-if="viewPref === 'cards'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       <PersonCard
@@ -143,6 +157,37 @@ const uniqueMembers = computed(() => {
 })
 
 const uniqueCount = computed(() => uniqueMembers.value.length)
+
+function exportCsv() {
+  const headers = ['Name', 'Specialty', 'Issues Resolved', 'Story Points', 'Avg Cycle Time (days)', 'In Progress', 'Teams']
+  const rows = uniqueMembers.value.map(member => {
+    const metrics = memberMetricsMap.value.get(member.jiraDisplayName)
+    const teamCount = getTeamsForPerson(member.jiraDisplayName).length
+    return [
+      member.name,
+      member.specialty || '',
+      metrics?.resolvedCount ?? '',
+      metrics?.resolvedPoints ?? '',
+      metrics?.avgCycleTimeDays ?? '',
+      metrics?.inProgressCount ?? '',
+      teamCount
+    ]
+  })
+
+  const csvContent = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+
+  const blob = new Blob([csvContent], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  const teamSlug = props.team.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+  const date = new Date().toISOString().slice(0, 10)
+  a.download = `${teamSlug}-${date}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 async function handleRefresh() {
   isRefreshing.value = true
