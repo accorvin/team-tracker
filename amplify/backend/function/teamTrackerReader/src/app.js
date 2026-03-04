@@ -140,6 +140,21 @@ app.use(async function (req, res, next) {
   next();
 });
 
+// ─── Jira Name Resolution Cache ───
+
+let jiraNameCache = null;
+
+async function getNameCache() {
+  if (jiraNameCache === null) {
+    jiraNameCache = await readFromS3('jira-name-map.json') || {};
+  }
+  return jiraNameCache;
+}
+
+async function persistNameCache() {
+  await writeToS3('jira-name-map.json', jiraNameCache || {});
+}
+
 // ─── Routes: Roster & Person Metrics ───
 
 app.get('/roster', async function (req, res) {
@@ -174,7 +189,12 @@ app.get('/person/:jiraDisplayName/metrics', async function (req, res) {
     }
 
     // Fetch from Jira inline (2 parallel JQL queries, well within 25s timeout)
-    const metrics = await fetchPersonMetrics(jiraRequest, name);
+    const nameCache = await getNameCache();
+    const metrics = await fetchPersonMetrics(jiraRequest, name, { nameCache });
+    if (metrics._resolvedName) {
+      await persistNameCache();
+      delete metrics._resolvedName;
+    }
     await writeToS3(cachePath, metrics);
     res.json(metrics);
   } catch (error) {
@@ -335,6 +355,12 @@ app.post('/team/:teamKey/refresh', async function (req, res) {
     console.error(`Team refresh error (${req.params.teamKey}):`, error);
     res.status(500).json({ error: error.message });
   }
+});
+
+app.delete('/jira-name-cache', async function (req, res) {
+  jiraNameCache = {};
+  await writeToS3('jira-name-map.json', {});
+  res.json({ success: true });
 });
 
 // ─── Routes: Annotations ───

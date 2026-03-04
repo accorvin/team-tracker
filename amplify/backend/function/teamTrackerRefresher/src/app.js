@@ -16,6 +16,9 @@ function sanitizeFilename(name) {
 async function refreshPersonMetrics({ jiraToken, members }) {
   console.log(`Starting person metrics refresh for ${members.length} members`);
 
+  // Load name resolution cache
+  const nameCache = await readFromS3('jira-name-map.json') || {};
+
   async function jiraRequest(path) {
     const MAX_RETRIES = 3;
 
@@ -54,7 +57,10 @@ async function refreshPersonMetrics({ jiraToken, members }) {
       const memberName = members[index++];
       try {
         console.log(`[refresh] Fetching metrics for ${memberName} (${completed + failed + 1}/${members.length})`);
-        const metrics = await fetchPersonMetrics(jiraRequest, memberName);
+        const metrics = await fetchPersonMetrics(jiraRequest, memberName, { nameCache });
+        if (metrics._resolvedName) {
+          delete metrics._resolvedName;
+        }
         const key = sanitizeFilename(memberName);
         await writeToS3(`people/${key}.json`, metrics);
         completed++;
@@ -70,6 +76,9 @@ async function refreshPersonMetrics({ jiraToken, members }) {
     workers.push(worker());
   }
   await Promise.all(workers);
+
+  // Persist name cache after all refreshes
+  await writeToS3('jira-name-map.json', nameCache);
 
   console.log(`[refresh] Complete: ${completed} succeeded, ${failed} failed out of ${members.length}`);
   return { completed, failed };
