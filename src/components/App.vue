@@ -5,7 +5,7 @@
         <div class="container mx-auto px-6 py-2 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <img src="/redhat-logo.svg" alt="Red Hat" class="h-8" />
-            <h1 class="text-xl font-bold cursor-pointer" @click="navigateToDashboard">AI Platform Team Tracker</h1>
+            <h1 class="text-xl font-bold cursor-pointer" @click="navigateToDashboard">AI Engineering Team Tracker</h1>
           </div>
           <div class="flex items-center gap-4">
             <!-- User Avatar and Sign Out -->
@@ -130,6 +130,7 @@ import ReportsView from './ReportsView.vue'
 import UserManagement from './UserManagement.vue'
 import { useAuth } from '../composables/useAuth'
 import { useRoster } from '../composables/useRoster'
+import { useGithubStats } from '../composables/useGithubStats'
 
 export default {
   name: 'App',
@@ -146,10 +147,12 @@ export default {
   setup() {
     const { user: authUser, signOut } = useAuth()
     const { loadRoster, loading: rosterLoading } = useRoster()
+    const { loadGithubStats } = useGithubStats()
     return {
       authUser,
       signOut,
       loadRoster,
+      loadGithubStats,
       rosterLoading
     }
   },
@@ -190,7 +193,10 @@ export default {
     async loadInitialData() {
       this.isLoading = true
       try {
-        await this.loadRoster()
+        await Promise.all([
+          this.loadRoster(),
+          this.loadGithubStats()
+        ])
       } catch (error) {
         console.error('Failed to load initial data:', error)
       } finally {

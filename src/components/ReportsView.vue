@@ -80,11 +80,13 @@ import ReportsTeamSelector from './ReportsTeamSelector.vue'
 import ReportsMetricSelector from './ReportsMetricSelector.vue'
 import ReportsChartTypeSelector from './ReportsChartTypeSelector.vue'
 import { useRoster } from '../composables/useRoster'
+import { useGithubStats } from '../composables/useGithubStats'
 import { getTeamMetrics } from '../services/api'
 
 defineEmits(['back'])
 
 const { orgs, teams, selectedOrgKey, selectOrg } = useRoster()
+const { getContributions } = useGithubStats()
 
 const selectedTeamKeys = ref([])
 const selectedMetrics = ref([])
@@ -122,6 +124,11 @@ const METRIC_DEFS = {
       const members = d.memberCount ?? 0
       return members > 0 ? Math.round((count / members) * 10) / 10 : 0
     }
+  },
+  githubContributions: {
+    label: 'GitHub Contributions (1yr)',
+    unit: '',
+    extract: null // handled specially in generate()
   }
 }
 
@@ -160,12 +167,25 @@ async function generate() {
     const activeKeys = selectedTeamKeys.value.filter(k => metricsData.value[k])
     charts.value = selectedMetrics.value.map(metricKey => {
       const def = METRIC_DEFS[metricKey]
+      let data
+      if (metricKey === 'githubContributions') {
+        data = activeKeys.map(k => {
+          const team = teamLookup[k]
+          if (!team?.members) return 0
+          return team.members.reduce((sum, m) => {
+            const c = m.githubUsername ? getContributions(m.githubUsername) : null
+            return sum + (c?.totalContributions ?? 0)
+          }, 0)
+        })
+      } else {
+        data = activeKeys.map(k => def.extract(metricsData.value[k]))
+      }
       return {
         metricKey,
         title: def.label,
         unit: def.unit,
         labels: activeKeys.map(k => teamLookup[k]?.displayName ?? k),
-        data: activeKeys.map(k => def.extract(metricsData.value[k]))
+        data
       }
     })
   } finally {

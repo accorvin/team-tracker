@@ -850,6 +850,83 @@ app.delete('/api/jira-name-cache', function(req, res) {
   res.json({ success: true });
 });
 
+// ─── Routes: GitHub Contributions ───
+
+const { fetchContributions } = require('./github/contributions');
+
+const GITHUB_CACHE_PATH = 'github-contributions.json';
+const GITHUB_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+function readGithubCache() {
+  return readFromStorage(GITHUB_CACHE_PATH) || { users: {}, fetchedAt: null };
+}
+
+app.get('/api/github/contributions', function(req, res) {
+  try {
+    const cache = readGithubCache();
+    res.json(cache);
+  } catch (error) {
+    console.error('Read GitHub contributions error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/github/contributions/:username', function(req, res) {
+  try {
+    const username = decodeURIComponent(req.params.username);
+    const cache = readGithubCache();
+    const data = cache.users[username] || null;
+    res.json(data);
+  } catch (error) {
+    console.error('Read GitHub contribution error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/github/refresh', function(req, res) {
+  try {
+    const roster = deriveRoster();
+
+    // Collect all unique GitHub usernames across all orgs
+    const usernameMap = {}; // githubUsername -> person name
+    for (const org of roster.orgs) {
+      for (const team of Object.values(org.teams)) {
+        for (const member of team.members) {
+          if (member.githubUsername && !usernameMap[member.githubUsername]) {
+            usernameMap[member.githubUsername] = member.name;
+          }
+        }
+      }
+    }
+
+    const usernames = Object.keys(usernameMap);
+    res.json({ status: 'started', usernameCount: usernames.length });
+
+    // Fetch in background
+    setImmediate(() => {
+      try {
+        const results = fetchContributions(usernames);
+        const cache = readGithubCache();
+
+        for (const [username, data] of Object.entries(results)) {
+          if (data) {
+            cache.users[username] = data;
+          }
+        }
+        cache.fetchedAt = new Date().toISOString();
+
+        writeToStorage(GITHUB_CACHE_PATH, cache);
+        console.log(`[github] Refresh complete. ${Object.keys(results).length} users processed.`);
+      } catch (err) {
+        console.error('[github] Refresh failed:', err.message);
+      }
+    });
+  } catch (error) {
+    console.error('GitHub refresh error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ─── Routes: Annotations ───
 
 app.get('/api/sprints/:sprintId/annotations', function(req, res) {

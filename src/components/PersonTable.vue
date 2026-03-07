@@ -46,6 +46,11 @@
           <td class="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
             {{ getMemberMetric(member, 'avgCycleTimeDays') != null ? getMemberMetric(member, 'avgCycleTimeDays') + 'd' : '—' }}
           </td>
+          <td class="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
+            <template v-if="getGithubContribCount(member) != null">{{ getGithubContribCount(member) }}</template>
+            <span v-else-if="member.githubUsername" class="text-gray-300">—</span>
+            <span v-else class="text-gray-300 italic">—</span>
+          </td>
           <td class="px-4 py-2 text-sm whitespace-nowrap">
             <span
               v-if="getTeamCount(member) > 1"
@@ -64,6 +69,9 @@
 <script setup>
 import { ref, computed } from 'vue'
 import SpecialtyBadge from './SpecialtyBadge.vue'
+import { useGithubStats } from '../composables/useGithubStats'
+
+const { getContributions } = useGithubStats()
 
 const props = defineProps({
   members: { type: Array, required: true },
@@ -81,6 +89,7 @@ const columns = [
   { key: 'resolved', label: 'Resolved (90d)' },
   { key: 'points', label: 'Points (90d)' },
   { key: 'cycleTime', label: 'Cycle Time' },
+  { key: 'github', label: 'GitHub (1yr)' },
   { key: 'teams', label: 'Teams' }
 ]
 
@@ -105,6 +114,11 @@ function getMemberMetric(member, field) {
   return m?.[field] ?? null
 }
 
+function getGithubContribCount(member) {
+  if (!member.githubUsername) return null
+  return getContributions(member.githubUsername)?.totalContributions ?? null
+}
+
 const sortedMembers = computed(() => {
   const key = sortKey.value
   const asc = sortAsc.value ? 1 : -1
@@ -123,6 +137,9 @@ const sortedMembers = computed(() => {
     } else if (key === 'cycleTime') {
       va = getMemberMetric(a, 'avgCycleTimeDays') ?? -1
       vb = getMemberMetric(b, 'avgCycleTimeDays') ?? -1
+    } else if (key === 'github') {
+      va = getGithubContribCount(a) ?? -1
+      vb = getGithubContribCount(b) ?? -1
     } else {
       va = (a[key] || '').toLowerCase()
       vb = (b[key] || '').toLowerCase()

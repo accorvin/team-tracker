@@ -28,17 +28,28 @@
         <span class="mx-1 text-gray-300">·</span>
         <span class="text-gray-400">Points:</span> {{ metrics.resolvedPoints ?? '--' }}
       </p>
+      <p class="truncate">
+        <span class="text-gray-400">GitHub:</span>
+        <template v-if="githubContributions != null">{{ githubContributions.totalContributions }} contributions</template>
+        <span v-else-if="member.githubUsername" class="text-gray-300">—</span>
+        <span v-else class="text-gray-300 italic">no username</span>
+      </p>
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import SpecialtyBadge from './SpecialtyBadge.vue'
+import { useGithubStats } from '../composables/useGithubStats'
 
-defineProps({
+const props = defineProps({
   member: { type: Object, required: true },
   teamCount: { type: Number, default: 1 },
   metrics: { type: Object, default: null }
 })
 defineEmits(['select'])
+
+const { getContributions } = useGithubStats()
+const githubContributions = computed(() => getContributions(props.member.githubUsername))
 </script>

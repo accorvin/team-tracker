@@ -94,6 +94,19 @@ export async function refreshTeamMetrics(teamKey) {
   })
 }
 
+// ─── GitHub Contributions ───
+
+export async function getGithubContributions() {
+  return apiRequest('/github/contributions')
+}
+
+export async function refreshGithubContributions() {
+  return apiRequest('/github/refresh', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
+}
+
 // ─── Annotations ───
 
 export async function getSprintAnnotations(sprintId) {

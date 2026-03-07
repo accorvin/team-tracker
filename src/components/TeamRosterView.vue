@@ -112,6 +112,7 @@ import MetricCard from './MetricCard.vue'
 import ResolvedIssuesModal from './ResolvedIssuesModal.vue'
 import { useViewPreference } from '../composables/useViewPreference'
 import { useRoster } from '../composables/useRoster'
+import { useGithubStats } from '../composables/useGithubStats'
 import { refreshTeamMetrics, getTeamMetrics } from '../services/api'
 
 const props = defineProps({
@@ -121,6 +122,7 @@ defineEmits(['back', 'select-person'])
 
 const { viewPreference: viewPref } = useViewPreference()
 const { multiTeamMembers, getTeamsForPerson } = useRoster()
+const { getContributions } = useGithubStats()
 const isRefreshing = ref(false)
 const teamMetrics = ref(null)
 const showResolvedIssues = ref(false)
@@ -159,10 +161,11 @@ const uniqueMembers = computed(() => {
 const uniqueCount = computed(() => uniqueMembers.value.length)
 
 function exportCsv() {
-  const headers = ['Name', 'Specialty', 'Issues Resolved', 'Story Points', 'Avg Cycle Time (days)', 'In Progress', 'Teams']
+  const headers = ['Name', 'Specialty', 'Issues Resolved', 'Story Points', 'Avg Cycle Time (days)', 'In Progress', 'GitHub Contributions (1yr)', 'Teams']
   const rows = uniqueMembers.value.map(member => {
     const metrics = memberMetricsMap.value.get(member.jiraDisplayName)
     const teamCount = getTeamsForPerson(member.jiraDisplayName).length
+    const ghContribs = getContributions(member.githubUsername)
     return [
       member.name,
       member.specialty || '',
@@ -170,6 +173,7 @@ function exportCsv() {
       metrics?.resolvedPoints ?? '',
       metrics?.avgCycleTimeDays ?? '',
       metrics?.inProgressCount ?? '',
+      ghContribs?.totalContributions ?? '',
       teamCount
     ]
   })
