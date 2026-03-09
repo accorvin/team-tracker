@@ -175,12 +175,12 @@ async function tryUserSearch(jiraRequest, query, lastName) {
  * @param {Function} jiraRequest - The authenticated Jira HTTP request function
  * @param {string} jiraDisplayName - Exact Jira display name (from roster)
  * @param {object} [options]
- * @param {number} [options.lookbackDays=90] - How far back to look for resolved issues
+ * @param {number} [options.lookbackDays=365] - How far back to look for resolved issues
  * @param {object} [options.nameCache] - Mutable name resolution cache
  * @returns {Promise<object>} Person metrics object
  */
 async function fetchPersonMetrics(jiraRequest, jiraDisplayName, options = {}) {
-  const lookbackDays = options.lookbackDays || 90;
+  const lookbackDays = options.lookbackDays || 365;
   const nameCache = options.nameCache || null;
 
   // Resolve the roster name to the actual Jira display name
