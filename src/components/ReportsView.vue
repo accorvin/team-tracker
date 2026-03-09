@@ -56,8 +56,8 @@
           <p class="text-lg">Select teams and metrics, then click Generate</p>
         </div>
         <div
-          v-for="chart in charts"
-          :key="chart.metricKey"
+          v-for="(chart, idx) in charts"
+          :key="chart.metricKey + '-' + idx"
           class="bg-white rounded-lg shadow p-4"
         >
           <ReportChart
@@ -129,6 +129,11 @@ const METRIC_DEFS = {
     label: 'GitHub Contributions (1yr)',
     unit: '',
     extract: null // handled specially in generate()
+  },
+  githubPerMember: {
+    label: 'Avg GitHub Contributions per Member (1yr)',
+    unit: '',
+    extract: null // handled specially in generate()
   }
 }
 
@@ -165,29 +170,54 @@ async function generate() {
     }
 
     const activeKeys = selectedTeamKeys.value.filter(k => metricsData.value[k])
-    charts.value = selectedMetrics.value.map(metricKey => {
+    const newCharts = []
+
+    for (const metricKey of selectedMetrics.value) {
       const def = METRIC_DEFS[metricKey]
-      let data
-      if (metricKey === 'githubContributions') {
-        data = activeKeys.map(k => {
-          const team = teamLookup[k]
-          if (!team?.members) return 0
-          return team.members.reduce((sum, m) => {
-            const c = m.githubUsername ? getContributions(m.githubUsername) : null
-            return sum + (c?.totalContributions ?? 0)
-          }, 0)
+
+      if (metricKey === 'githubPerMember') {
+        newCharts.push({
+          metricKey,
+          title: def.label,
+          unit: '',
+          labels: activeKeys.map(k => teamLookup[k]?.displayName ?? k),
+          data: activeKeys.map(k => {
+            const team = teamLookup[k]
+            if (!team?.members?.length) return 0
+            const total = team.members.reduce((sum, m) => {
+              const c = m.githubUsername ? getContributions(m.githubUsername) : null
+              return sum + (c?.totalContributions ?? 0)
+            }, 0)
+            return Math.round((total / team.members.length) * 10) / 10
+          })
+        })
+      } else if (metricKey === 'githubContributions') {
+        newCharts.push({
+          metricKey,
+          title: def.label,
+          unit: def.unit,
+          labels: activeKeys.map(k => teamLookup[k]?.displayName ?? k),
+          data: activeKeys.map(k => {
+            const team = teamLookup[k]
+            if (!team?.members) return 0
+            return team.members.reduce((sum, m) => {
+              const c = m.githubUsername ? getContributions(m.githubUsername) : null
+              return sum + (c?.totalContributions ?? 0)
+            }, 0)
+          })
         })
       } else {
-        data = activeKeys.map(k => def.extract(metricsData.value[k]))
+        newCharts.push({
+          metricKey,
+          title: def.label,
+          unit: def.unit,
+          labels: activeKeys.map(k => teamLookup[k]?.displayName ?? k),
+          data: activeKeys.map(k => def.extract(metricsData.value[k]))
+        })
       }
-      return {
-        metricKey,
-        title: def.label,
-        unit: def.unit,
-        labels: activeKeys.map(k => teamLookup[k]?.displayName ?? k),
-        data
-      }
-    })
+    }
+
+    charts.value = newCharts
   } finally {
     loading.value = false
   }

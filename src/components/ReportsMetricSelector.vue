@@ -27,7 +27,8 @@ const metrics = [
   { key: 'avgCycleTime', label: 'Avg Cycle Time' },
   { key: 'inProgressCount', label: 'In Progress' },
   { key: 'resolvedPerMember', label: 'Issues Resolved per Member (90d)' },
-  { key: 'githubContributions', label: 'GitHub Contributions (1yr)' }
+  { key: 'githubContributions', label: 'GitHub Contributions (1yr)' },
+  { key: 'githubPerMember', label: 'Avg GitHub Contributions per Member (1yr)' }
 ]
 
 const props = defineProps({

@@ -33,7 +33,7 @@
     </div>
 
     <!-- Team Metrics -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
       <MetricCard
         label="Issues Resolved"
         :value="teamMetrics?.aggregate?.resolvedCount"
@@ -55,6 +55,11 @@
         label="Avg Cycle Time"
         :value="teamMetrics?.aggregate?.avgCycleTimeDays"
         unit="days"
+      />
+      <MetricCard
+        label="GitHub Contributions"
+        :value="teamGithubTotal"
+        subtitle="Last year"
       />
     </div>
 
@@ -159,6 +164,13 @@ const uniqueMembers = computed(() => {
 })
 
 const uniqueCount = computed(() => uniqueMembers.value.length)
+
+const teamGithubTotal = computed(() => {
+  return uniqueMembers.value.reduce((sum, m) => {
+    const c = m.githubUsername ? getContributions(m.githubUsername) : null
+    return sum + (c?.totalContributions ?? 0)
+  }, 0)
+})
 
 function exportCsv() {
   const headers = ['Name', 'Specialty', 'Issues Resolved', 'Story Points', 'Avg Cycle Time (days)', 'In Progress', 'GitHub Contributions (1yr)', 'Teams']

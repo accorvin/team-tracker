@@ -89,7 +89,7 @@
         <PersonDetail
           :person="selectedPerson"
           :teamName="selectedTeam?.displayName || ''"
-          @back="currentView = 'team-roster'"
+          @back="handleBackFromPerson"
           @go-dashboard="navigateToDashboard"
         />
       </main>
@@ -146,14 +146,17 @@ export default {
   },
   setup() {
     const { user: authUser, signOut } = useAuth()
-    const { loadRoster, loading: rosterLoading } = useRoster()
+    const { loadRoster, teams, selectedOrgKey, selectOrg, loading: rosterLoading } = useRoster()
     const { loadGithubStats } = useGithubStats()
     return {
       authUser,
       signOut,
       loadRoster,
       loadGithubStats,
-      rosterLoading
+      rosterLoading,
+      rosterTeams: teams,
+      selectedOrgKey,
+      selectOrg
     }
   },
   data() {
@@ -182,12 +185,14 @@ export default {
   },
   mounted() {
     document.addEventListener('click', this.handleClickOutside)
+    window.addEventListener('hashchange', this.onHashChange)
     if (this.authUser) {
       this.loadInitialData()
     }
   },
   beforeUnmount() {
     document.removeEventListener('click', this.handleClickOutside)
+    window.removeEventListener('hashchange', this.onHashChange)
   },
   methods: {
     async loadInitialData() {
@@ -197,6 +202,7 @@ export default {
           this.loadRoster(),
           this.loadGithubStats()
         ])
+        this.restoreFromHash()
       } catch (error) {
         console.error('Failed to load initial data:', error)
       } finally {
@@ -204,10 +210,71 @@ export default {
       }
     },
 
+    updateHash() {
+      let hash = '#/'
+      if (this.currentView === 'team-roster' && this.selectedTeam) {
+        hash = `#/team/${encodeURIComponent(this.selectedTeam.key)}`
+      } else if (this.currentView === 'person-detail' && this.selectedTeam && this.selectedPerson) {
+        hash = `#/team/${encodeURIComponent(this.selectedTeam.key)}/person/${encodeURIComponent(this.selectedPerson.jiraDisplayName || this.selectedPerson.name)}`
+      } else if (this.currentView === 'reports') {
+        hash = '#/reports'
+      } else if (this.currentView === 'user-management') {
+        hash = '#/users'
+      }
+      if (window.location.hash !== hash) {
+        window.location.hash = hash
+      }
+    },
+
+    restoreFromHash() {
+      const hash = window.location.hash || '#/'
+      const parts = hash.slice(2).split('/').map(decodeURIComponent)
+
+      if (parts[0] === 'team' && parts[1]) {
+        const teamKey = parts[1]
+        // Select the right org
+        const orgKey = teamKey.split('::')[0]
+        if (orgKey && this.selectedOrgKey !== orgKey) {
+          this.selectOrg(orgKey)
+        }
+        const team = this.rosterTeams.find(t => t.key === teamKey)
+        if (team) {
+          this.selectedTeam = team
+          if (parts[2] === 'person' && parts[3]) {
+            const personName = parts[3]
+            const person = team.members.find(m => (m.jiraDisplayName || m.name) === personName)
+            if (person) {
+              this.selectedPerson = person
+              this.currentView = 'person-detail'
+              return
+            }
+          }
+          this.selectedPerson = null
+          this.currentView = 'team-roster'
+          return
+        }
+      } else if (parts[0] === 'reports') {
+        this.currentView = 'reports'
+        return
+      } else if (parts[0] === 'users') {
+        this.currentView = 'user-management'
+        return
+      }
+
+      this.currentView = 'dashboard'
+      this.selectedTeam = null
+      this.selectedPerson = null
+    },
+
+    onHashChange() {
+      this.restoreFromHash()
+    },
+
     navigateToDashboard() {
       this.currentView = 'dashboard'
       this.selectedTeam = null
       this.selectedPerson = null
+      this.updateHash()
     },
 
     navigateToTab(view) {
@@ -215,6 +282,7 @@ export default {
         this.navigateToDashboard()
       } else {
         this.currentView = view
+        this.updateHash()
       }
     },
 
@@ -229,11 +297,19 @@ export default {
       this.selectedTeam = team
       this.selectedPerson = null
       this.currentView = 'team-roster'
+      this.updateHash()
     },
 
     handleSelectPerson(member) {
       this.selectedPerson = member
       this.currentView = 'person-detail'
+      this.updateHash()
+    },
+
+    handleBackFromPerson() {
+      this.currentView = 'team-roster'
+      this.selectedPerson = null
+      this.updateHash()
     },
 
     async handleSignOut() {

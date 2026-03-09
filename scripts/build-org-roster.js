@@ -172,11 +172,16 @@ function traverseOrg(rootUid, allPeople, depth = 0) {
 
 function validateGithubUsername(username) {
   try {
-    execSync(`gh api users/${encodeURIComponent(username)} --silent`, {
+    const raw = execSync(`gh api users/${encodeURIComponent(username)} --jq '.type'`, {
       encoding: 'utf8',
       timeout: 10000,
       stdio: ['pipe', 'pipe', 'pipe']
     })
+    const type = raw.trim()
+    if (type !== 'User') {
+      console.log(`  REJECTED: ${username} is a ${type}, not a User`)
+      return false
+    }
     return true
   } catch {
     return false

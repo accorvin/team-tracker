@@ -7,7 +7,7 @@
 
 const { execSync } = require('child_process');
 
-const BATCH_SIZE = 50;
+const BATCH_SIZE = 10;
 
 /**
  * Fetch yearly contribution counts for a list of GitHub usernames.

@@ -68,8 +68,10 @@ import { ref } from 'vue'
 import OrgTeamCard from './OrgTeamCard.vue'
 import { useRoster } from '../composables/useRoster'
 import { refreshAllMetrics } from '../services/api'
+import { useGithubStats } from '../composables/useGithubStats'
 
 const { orgs, teams, loading, error, uniqueMemberCount, selectedOrgKey, selectOrg } = useRoster()
+const { refreshStats } = useGithubStats()
 
 defineEmits(['select-team'])
 
@@ -78,7 +80,10 @@ const isRefreshing = ref(false)
 async function handleRefreshAll() {
   isRefreshing.value = true
   try {
-    const result = await refreshAllMetrics()
+    const [result] = await Promise.all([
+      refreshAllMetrics(),
+      refreshStats()
+    ])
     console.log(`Refresh started for ${result.memberCount} members`)
   } catch (err) {
     console.error('Failed to start refresh:', err)
