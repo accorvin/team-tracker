@@ -8,6 +8,18 @@
             <h1 class="text-xl font-bold cursor-pointer" @click="navigateToDashboard">AI Engineering Team Tracker</h1>
           </div>
           <div class="flex items-center gap-4">
+            <!-- Refresh All -->
+            <button
+              v-if="authUser"
+              @click="handleRefreshAll"
+              :disabled="isRefreshing"
+              class="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md font-medium hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 border border-primary-400"
+            >
+              <svg class="h-4 w-4" :class="{ 'animate-spin': isRefreshing }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {{ isRefreshing ? 'Refreshing...' : 'Refresh All' }}
+            </button>
             <!-- User Avatar and Sign Out -->
             <div class="relative" v-if="authUser">
               <button
@@ -143,6 +155,7 @@ import UserManagement from './UserManagement.vue'
 import { useAuth } from '../composables/useAuth'
 import { useRoster } from '../composables/useRoster'
 import { useGithubStats } from '../composables/useGithubStats'
+import { refreshAllMetrics, refreshTrendsGithub } from '../services/api'
 
 export default {
   name: 'App',
@@ -161,12 +174,13 @@ export default {
   setup() {
     const { user: authUser, signOut } = useAuth()
     const { loadRoster, teams, selectedOrgKey, selectOrg, loading: rosterLoading } = useRoster()
-    const { loadGithubStats } = useGithubStats()
+    const { loadGithubStats, refreshStats } = useGithubStats()
     return {
       authUser,
       signOut,
       loadRoster,
       loadGithubStats,
+      refreshStats,
       rosterLoading,
       rosterTeams: teams,
       selectedOrgKey,
@@ -179,6 +193,7 @@ export default {
       selectedTeam: null,
       selectedPerson: null,
       isLoading: false,
+      isRefreshing: false,
       showUserMenu: false,
       avatarLoadError: false,
       toasts: [],
@@ -336,6 +351,25 @@ export default {
       this.currentView = 'team-roster'
       this.selectedPerson = null
       this.updateHash()
+    },
+
+    async handleRefreshAll() {
+      this.isRefreshing = true
+      try {
+        await Promise.all([
+          refreshAllMetrics(),
+          this.refreshStats(),
+          refreshTrendsGithub()
+        ])
+        this.showToast('Refresh started — data will update shortly')
+      } catch (err) {
+        console.error('Failed to start refresh:', err)
+        this.showToast('Failed to start refresh', 'error')
+      } finally {
+        setTimeout(() => {
+          this.isRefreshing = false
+        }, 5000)
+      }
     },
 
     async handleSignOut() {

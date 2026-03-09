@@ -1,23 +1,9 @@
 <template>
   <div class="container mx-auto px-6 py-6">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h2 class="text-xl font-bold text-gray-900">Trends</h2>
-        <p class="text-sm text-gray-500">Productivity over time</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <button
-          @click="refreshData"
-          :disabled="refreshing"
-          class="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
-        >
-          <svg class="h-4 w-4" :class="{ 'animate-spin': refreshing }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          {{ refreshing ? 'Refreshing...' : 'Refresh Data (365d)' }}
-        </button>
-      </div>
+    <div class="mb-6">
+      <h2 class="text-xl font-bold text-gray-900">Trends</h2>
+      <p class="text-sm text-gray-500">Productivity over time</p>
     </div>
 
     <!-- Filters -->
@@ -146,13 +132,12 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import TrendChart from './TrendChart.vue'
 import { useRoster } from '../composables/useRoster'
-import { getTrends, refreshTrendsJira, refreshTrendsGithub } from '../services/api'
+import { getTrends } from '../services/api'
 
 const { orgs } = useRoster()
 
 const trendsData = ref(null)
 const loading = ref(false)
-const refreshing = ref(false)
 const selectedOrgKeys = ref([])
 const selectedTeamKeys = ref([])
 const compareMode = ref('compare')
@@ -376,23 +361,6 @@ async function loadTrends() {
     console.error('Failed to load trends:', err)
   } finally {
     loading.value = false
-  }
-}
-
-async function refreshData() {
-  refreshing.value = true
-  try {
-    await Promise.all([
-      refreshTrendsJira(),
-      refreshTrendsGithub()
-    ])
-    setTimeout(async () => {
-      await loadTrends()
-      refreshing.value = false
-    }, 5000)
-  } catch (err) {
-    console.error('Failed to refresh trends:', err)
-    refreshing.value = false
   }
 }
 
