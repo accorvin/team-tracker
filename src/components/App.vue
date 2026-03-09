@@ -357,11 +357,16 @@ export default {
       const force = event?.shiftKey || false
       this.isRefreshing = true
       try {
-        await Promise.all([
+        // Jira refresh is the primary action; GitHub refreshes are best-effort
+        const results = await Promise.allSettled([
           refreshAllMetrics({ force }),
           this.refreshStats(),
           refreshTrendsGithub()
         ])
+        const failed = results.filter(r => r.status === 'rejected')
+        if (failed.length === results.length) {
+          throw failed[0].reason
+        }
         this.showToast(force ? 'Hard refresh started — ignoring cache' : 'Refresh started — data will update shortly')
       } catch (err) {
         console.error('Failed to start refresh:', err)
