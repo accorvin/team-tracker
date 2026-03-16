@@ -1,5 +1,4 @@
 <template>
-  <AuthGuard>
     <div id="app" class="min-h-screen bg-gray-50">
       <header class="bg-primary-700 text-white shadow-lg">
         <div class="container mx-auto px-6 py-2 flex items-center justify-between">
@@ -21,45 +20,14 @@
               </svg>
               {{ isRefreshing ? 'Refreshing...' : 'Refresh All' }}
             </button>
-            <!-- User Avatar and Sign Out -->
-            <div class="relative" v-if="authUser">
-              <button
-                @click="showUserMenu = !showUserMenu"
-                class="flex items-center gap-2 hover:bg-primary-600 rounded-full p-1 transition-colors"
-              >
-                <div
-                  v-if="!authUser.photoURL || avatarLoadError"
-                  class="h-8 w-8 rounded-full border-2 border-white bg-white text-primary-700 flex items-center justify-center font-bold text-xs"
-                >
-                  {{ getUserInitials(authUser) }}
-                </div>
-                <img
-                  v-else
-                  :src="authUser.photoURL"
-                  :alt="authUser.displayName || authUser.email"
-                  class="h-8 w-8 rounded-full border-2 border-white"
-                  @error="avatarLoadError = true"
-                />
-              </button>
-
+            <!-- User Info -->
+            <div v-if="authUser" class="flex items-center gap-2">
               <div
-                v-if="showUserMenu"
-                class="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg py-1 z-10"
+                class="h-8 w-8 rounded-full border-2 border-white bg-white text-primary-700 flex items-center justify-center font-bold text-xs"
               >
-                <div class="px-4 py-2 border-b border-gray-200">
-                  <p class="text-sm font-medium text-gray-900">{{ authUser.displayName }}</p>
-                  <p class="text-xs text-gray-500 truncate">{{ authUser.email }}</p>
-                </div>
-                <button
-                  @click="handleSignOut"
-                  class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                >
-                  <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  Sign Out
-                </button>
+                {{ getUserInitials(authUser) }}
               </div>
+              <span class="text-sm text-primary-100 hidden sm:inline">{{ authUser.displayName || authUser.email }}</span>
             </div>
           </div>
         </div>
@@ -139,11 +107,9 @@
         @close="removeToast(toast.id)"
       />
     </div>
-  </AuthGuard>
 </template>
 
 <script>
-import AuthGuard from './AuthGuard.vue'
 import Dashboard from './Dashboard.vue'
 import LoadingOverlay from './LoadingOverlay.vue'
 import PersonDetail from './PersonDetail.vue'
@@ -161,7 +127,6 @@ import { refreshAllMetrics, refreshTrendsGithub } from '../services/api'
 export default {
   name: 'App',
   components: {
-    AuthGuard,
     Dashboard,
     LoadingOverlay,
     PeopleView,
@@ -173,12 +138,11 @@ export default {
     UserManagement
   },
   setup() {
-    const { user: authUser, signOut } = useAuth()
+    const { user: authUser } = useAuth()
     const { loadRoster, teams, selectedOrgKey, selectOrg, loading: rosterLoading } = useRoster()
     const { loadGithubStats, refreshStats } = useGithubStats()
     return {
       authUser,
-      signOut,
       loadRoster,
       loadGithubStats,
       refreshStats,
@@ -195,8 +159,6 @@ export default {
       selectedPerson: null,
       isLoading: false,
       isRefreshing: false,
-      showUserMenu: false,
-      avatarLoadError: false,
       toasts: [],
       navTabs: [
         { view: 'dashboard', label: 'Teams' },
@@ -209,21 +171,18 @@ export default {
   },
   watch: {
     authUser(newUser, oldUser) {
-      this.avatarLoadError = false
       if (newUser && !oldUser) {
         this.loadInitialData()
       }
     }
   },
   mounted() {
-    document.addEventListener('click', this.handleClickOutside)
     window.addEventListener('hashchange', this.onHashChange)
     if (this.authUser) {
       this.loadInitialData()
     }
   },
   beforeUnmount() {
-    document.removeEventListener('click', this.handleClickOutside)
     window.removeEventListener('hashchange', this.onHashChange)
   },
   methods: {
@@ -376,17 +335,6 @@ export default {
         setTimeout(() => {
           this.isRefreshing = false
         }, 5000)
-      }
-    },
-
-    async handleSignOut() {
-      this.showUserMenu = false
-      await this.signOut()
-    },
-
-    handleClickOutside(event) {
-      if (!event.target.closest('.relative')) {
-        this.showUserMenu = false
       }
     },
 

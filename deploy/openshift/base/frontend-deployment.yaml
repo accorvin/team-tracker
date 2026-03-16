@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: team-tracker
+    component: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: team-tracker
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: team-tracker
+        component: frontend
+    spec:
+      serviceAccountName: frontend-proxy
+      containers:
+        - name: oauth-proxy
+          image: quay.io/openshift/origin-oauth-proxy:4.16
+          ports:
+            - containerPort: 4180
+              name: proxy
+              protocol: TCP
+          args:
+            - --https-address=:4180
+            - --provider=openshift
+            - --openshift-service-account=frontend-proxy
+            - --upstream=http://localhost:8080
+            - --tls-cert=/etc/tls/private/tls.crt
+            - --tls-key=/etc/tls/private/tls.key
+            - --cookie-secret-file=/etc/proxy/cookie-secret/session_secret
+            - --pass-user-headers=true
+            - --email-domain=*
+          volumeMounts:
+            - name: proxy-tls
+              mountPath: /etc/tls/private
+              readOnly: true
+            - name: cookie-secret
+              mountPath: /etc/proxy/cookie-secret
+              readOnly: true
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
+        - name: nginx
+          image: quay.io/accorvin/team-tracker-frontend:latest
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
+      volumes:
+        - name: proxy-tls
+          secret:
+            secretName: frontend-proxy-tls
+        - name: cookie-secret
+          secret:
+            secretName: frontend-proxy-cookie

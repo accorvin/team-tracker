@@ -1,11 +1,11 @@
 /**
  * API Service
  * Handles communication with the backend
- * Automatically includes Firebase ID token in requests
  * Uses localStorage for stale-while-revalidate caching
+ *
+ * Authentication is handled by the OpenShift OAuth proxy —
+ * no client-side token management needed.
  */
-
-import { useAuth } from '../composables/useAuth'
 
 const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '/api'
 const CACHE_PREFIX = 'tt_cache:'
@@ -67,44 +67,8 @@ export function clearApiCache() {
   }
 }
 
-/**
- * Get Firebase ID token for authentication
- */
-async function getAuthToken() {
-  const { getIdToken, loading } = useAuth()
-
-  if (loading.value) {
-    await new Promise((resolve) => {
-      const checkLoading = setInterval(() => {
-        if (!loading.value) {
-          clearInterval(checkLoading)
-          resolve()
-        }
-      }, 50)
-      setTimeout(() => {
-        clearInterval(checkLoading)
-        resolve()
-      }, 10000)
-    })
-  }
-
-  try {
-    return await getIdToken()
-  } catch (error) {
-    console.error('Failed to get auth token:', error)
-    throw new Error('Authentication required. Please sign in again.', { cause: error })
-  }
-}
-
 async function apiRequest(path, options = {}) {
-  const token = await getAuthToken()
-  const response = await fetch(`${API_ENDPOINT}${path}`, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      ...options.headers
-    }
-  })
+  const response = await fetch(`${API_ENDPOINT}${path}`, options)
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))

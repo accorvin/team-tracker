@@ -1,11 +1,11 @@
 /**
- * Local development server
+ * Team Tracker API server
  *
  * Combines fetcher and reader Express routes into a single
- * server, using local file storage instead of S3.
+ * server, using local file storage.
  *
  * Usage:
- *   JIRA_TOKEN=your-token node server/dev-server.js
+ *   JIRA_EMAIL=you@redhat.com JIRA_TOKEN=your-token node server/dev-server.js
  *
  * Or with a .env file:
  *   node -r dotenv/config server/dev-server.js
@@ -24,16 +24,7 @@ const { discoverBoards, performRefresh } = require('./jira/orchestration');
 const { fetchPersonMetrics } = require('./jira/person-metrics');
 
 if (DEMO_MODE) {
-  console.log('🎭 Running in DEMO MODE - using fixture data, Jira/GitHub APIs disabled');
-}
-
-// Firebase Admin for production token verification
-let firebaseAdmin = null;
-if (process.env.NODE_ENV === 'production' || process.env.FIREBASE_AUTH === 'true') {
-  firebaseAdmin = require('firebase-admin');
-  if (!firebaseAdmin.apps.length) {
-    firebaseAdmin.initializeApp();
-  }
+  console.log('Running in DEMO MODE - using fixture data, Jira/GitHub APIs disabled');
 }
 
 const app = express();
@@ -88,30 +79,26 @@ function seedAllowlist() {
   console.log(`Allowlist: seeded with ${emails.length} email(s) from ADMIN_EMAILS`);
 }
 
+// ─── Health check (before auth) ───
+
+app.get('/healthz', function(req, res) {
+  res.json({ status: 'ok' });
+});
+
 // ─── Auth middleware ───
+// In production, the OpenShift OAuth proxy sets X-Forwarded-Email/X-Forwarded-User headers.
+// In local dev, fall back to a hardcoded email.
 
 async function authMiddleware(req, res, next) {
   // Skip CORS preflight
   if (req.method === 'OPTIONS') return next();
 
-  // Determine user email
-  if (firebaseAdmin) {
-    // Production: verify Firebase ID token
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid authorization header' });
-    }
-    try {
-      const token = authHeader.split('Bearer ')[1];
-      const decoded = await firebaseAdmin.auth().verifyIdToken(token);
-      req.userEmail = decoded.email.toLowerCase();
-    } catch (err) {
-      console.error('[auth] Token verification failed:', err.message);
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
+  const email = req.headers['x-forwarded-email'];
+  if (email) {
+    req.userEmail = email.toLowerCase();
   } else {
-    // Local dev: use hardcoded email
-    req.userEmail = 'local-dev@redhat.com';
+    // Local dev: use env-configured or hardcoded email
+    req.userEmail = (process.env.ADMIN_EMAILS || 'local-dev@redhat.com').split(',')[0].trim().toLowerCase();
   }
 
   // Check allowlist
@@ -122,6 +109,19 @@ async function authMiddleware(req, res, next) {
 
   next();
 }
+
+// Whoami endpoint — returns current user info
+app.get('/whoami', function(req, res) {
+  const email = req.headers['x-forwarded-email'];
+  const displayName = req.headers['x-forwarded-preferred-username'] || req.headers['x-forwarded-user'] || email;
+  if (email) {
+    res.json({ email, displayName });
+  } else {
+    // Local dev fallback
+    const devEmail = (process.env.ADMIN_EMAILS || 'local-dev@redhat.com').split(',')[0].trim();
+    res.json({ email: devEmail, displayName: devEmail.split('@')[0] });
+  }
+});
 
 app.use(authMiddleware);
 

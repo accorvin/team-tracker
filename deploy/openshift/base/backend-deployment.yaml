@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app: team-tracker
+    component: backend
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: team-tracker
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: team-tracker
+        component: backend
+    spec:
+      containers:
+        - name: backend
+          image: quay.io/accorvin/team-tracker-backend:latest
+          ports:
+            - containerPort: 3001
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: team-tracker-config
+          env:
+            - name: JIRA_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: team-tracker-secrets
+                  key: JIRA_EMAIL
+            - name: JIRA_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: team-tracker-secrets
+                  key: JIRA_TOKEN
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: team-tracker-data

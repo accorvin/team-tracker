@@ -1,0 +1,8 @@
+node_modules
+data
+.env
+.git
+.claude
+dist
+deploy/openshift
+*.md

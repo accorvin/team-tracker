@@ -1,0 +1,39 @@
+- op: replace
+  path: /spec/template/spec/serviceAccountName
+  value: ""
+- op: add
+  path: /spec/template/spec/automountServiceAccountToken
+  value: false
+# Replace containers list with just nginx (removes OAuth proxy)
+- op: replace
+  path: /spec/template/spec/containers
+  value:
+    - name: nginx
+      image: quay.io/accorvin/team-tracker-frontend:latest
+      imagePullPolicy: Never
+      ports:
+        - containerPort: 8080
+          protocol: TCP
+      readinessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        initialDelaySeconds: 3
+        periodSeconds: 10
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 30
+      resources:
+        requests:
+          memory: "32Mi"
+          cpu: "10m"
+        limits:
+          memory: "64Mi"
+          cpu: "50m"
+# Remove OAuth proxy volumes
+- op: replace
+  path: /spec/template/spec/volumes
+  value: []

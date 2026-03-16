@@ -3,11 +3,11 @@
 ## Architecture
 
 - **Frontend**: Vue 3 SPA with Composition API (`<script setup>`), Vite 6, Tailwind CSS 3
-- **Backend**: Express API server (port 3001) for local dev, AWS Lambda in production
+- **Backend**: Express API server (port 3001), single `server/dev-server.js` for both local dev and production
 - **Charts**: Chart.js 4 + vue-chartjs 5
-- **Auth**: Firebase Google OAuth (restricted to @redhat.com)
-- **Storage**: Local filesystem (`./data/`) in dev, S3 (`acorvin-team-tracker-data-prod`) in production
-- **Hosting**: AWS Amplify (auto-deploys frontend on git push to main)
+- **Auth**: OpenShift OAuth proxy in production; no auth in local dev (uses `ADMIN_EMAILS` env var)
+- **Storage**: Local filesystem (`./data/`), mounted as PVC in OpenShift
+- **Hosting**: OpenShift (frontend nginx + backend Express), deployed via ArgoCD
 
 ## Key Concepts
 
@@ -17,12 +17,6 @@
 - **GitHub contributions**: `data/github-contributions.json` stores contribution counts per user. `data/github-history.json` stores monthly history.
 - **Trends**: Built dynamically from person metric files by bucketing resolved issues by month, with org/team breakdowns.
 - **Composite keys**: Teams are identified by `orgKey::teamName` (e.g., `shgriffi::Model Serving`).
-
-### Three Copies of person-metrics.js
-The Jira metrics logic exists in three places that must be kept in sync:
-1. `server/jira/person-metrics.js` — local dev server
-2. `amplify/backend/function/teamTrackerReader/src/person-metrics.js` — Lambda reader
-3. `amplify/backend/function/teamTrackerRefresher/src/person-metrics.js` — Lambda refresher
 
 ### Jira Integration (Jira Cloud — redhat.atlassian.net)
 - Auth: Basic auth with `JIRA_EMAIL` + `JIRA_TOKEN` (API token), base64-encoded
@@ -39,20 +33,19 @@ The Jira metrics logic exists in three places that must be kept in sync:
 
 ## Deployment
 
-There are three separate deployment targets:
+Deployed to OpenShift via ArgoCD. Kustomize manifests in `deploy/openshift/`.
 
-| What | How | When |
-|------|-----|------|
-| Frontend (Vue SPA) | `git push` to main | Amplify auto-builds and deploys |
-| Lambda functions + API Gateway | `amplify push --yes` (use `--force` if no changes detected) | After modifying Lambda code or API routes |
-| Data files | `aws s3 sync data/ s3://acorvin-team-tracker-data-prod/` | After modifying roster or data files |
+| Component | Image | Details |
+|-----------|-------|---------|
+| Frontend | `quay.io/accorvin/team-tracker-frontend` | nginx serving Vue SPA, proxies /api to backend |
+| Backend | `quay.io/accorvin/team-tracker-backend` | Express server with PVC-mounted data directory |
+| OAuth Proxy | `quay.io/openshift/origin-oauth-proxy:4.16` | Sidecar on frontend pod |
 
-All AWS CLI commands require the SAML login prefix:
-```
-rh-aws-saml-login iaps-rhods-odh-dev/585132637328-rhoai-dev -- <command>
-```
+Overlays: `deploy/openshift/overlays/dev/` (namespace: `team-tracker`) and `deploy/openshift/overlays/prod/` (namespace: `ambient-code--team-tracker`).
 
-Amplify app ID: `d3ofiswnhr3rov`
+Secrets (created manually on cluster, not in git):
+- `team-tracker-secrets`: `JIRA_EMAIL`, `JIRA_TOKEN`
+- `frontend-proxy-cookie`: `session_secret`
 
 ## Commands
 
@@ -66,26 +59,27 @@ Amplify app ID: `d3ofiswnhr3rov`
 
 ```
 src/
-  components/       # 35 Vue components (App.vue is the root with hash routing)
+  components/       # Vue components (App.vue is the root with hash routing)
   composables/      # Shared state (useRoster, useAuth, useGithubStats, useAllowlist, useViewPreference)
-  services/api.js   # API client with auth + caching
+  services/api.js   # API client with caching
   utils/metrics.js  # Metric calculations
-  config/firebase.js
   __tests__/        # Frontend tests
 
 server/
-  dev-server.js     # Express server for local dev (combines reader + refresher)
+  dev-server.js     # Express server (local dev + production)
   storage.js        # Local file storage abstraction
   jira/             # Jira API integration (client, sprint-report, person-metrics, orchestration)
   github/           # GitHub contribution fetching
   jira/__tests__/   # Backend tests
 
-amplify/backend/function/
-  teamTrackerReader/    # Lambda: serves data from S3 (GET endpoints)
-  teamTrackerRefresher/ # Lambda: fetches fresh data from Jira (POST refresh endpoints)
-
-amplify/backend/api/teamTrackerApi/
-  cli-inputs.json   # API Gateway route definitions
+deploy/
+  backend.Dockerfile    # Backend container image
+  frontend.Dockerfile   # Frontend container image (multi-stage Vite build → nginx)
+  nginx.conf            # nginx config for SPA + API proxy
+  openshift/
+    base/               # Kustomize base manifests
+    overlays/dev/       # Dev cluster overlay (namespace: team-tracker)
+    overlays/prod/      # Prod cluster overlay (namespace: ambient-code--team-tracker)
 
 scripts/            # Utility scripts for roster building and data management
 data/               # Local dev data (gitignored)
@@ -94,7 +88,7 @@ data/               # Local dev data (gitignored)
 ## Code Style
 
 - Use `<script setup>` for new Vue components
-- CommonJS (`require`) for server-side code (Lambda + Express)
+- CommonJS (`require`) for server-side code
 - ES modules (`import`) for frontend code
 - No TypeScript — plain JavaScript throughout
 - Prefer composables (`src/composables/`) for shared state logic
@@ -108,9 +102,11 @@ data/               # Local dev data (gitignored)
 
 ## API Routes
 
-All routes are authenticated via Firebase ID token in the Authorization header.
+In production, all routes are authenticated via OpenShift OAuth proxy. The proxy sets `X-Forwarded-Email` and `X-Forwarded-User` headers.
 
-**GET (Reader Lambda):**
+**GET:**
+- `/healthz` — health check (no auth)
+- `/whoami` — current user info (no auth)
 - `/roster` — org/team structure with members
 - `/team/:teamKey/metrics` — team member metrics (teamKey = `orgKey::teamName`)
 - `/person/:name/metrics` — individual person metrics
@@ -119,7 +115,7 @@ All routes are authenticated via Firebase ID token in the Authorization header.
 - `/trends` — monthly Jira + GitHub trend data
 - `/allowlist` — authorized email list
 
-**POST (Refresher Lambda):**
+**POST:**
 - `/roster/refresh` — refresh all person metrics from Jira
 - `/team/:teamKey/refresh` — refresh metrics for one team
 - `/person/:name/metrics?refresh=true` — refresh single person
