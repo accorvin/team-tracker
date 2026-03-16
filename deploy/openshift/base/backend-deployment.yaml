@@ -39,6 +39,12 @@ spec:
                 secretKeyRef:
                   name: team-tracker-secrets
                   key: JIRA_TOKEN
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: team-tracker-secrets
+                  key: GITHUB_TOKEN
+                  optional: true
           volumeMounts:
             - name: data
               mountPath: /app/data

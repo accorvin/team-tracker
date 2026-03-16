@@ -1,20 +1,52 @@
 /**
  * Fetch GitHub contribution stats via GraphQL API.
  *
- * Uses `gh api graphql` CLI for authentication.
- * Batches users into groups of 50 to minimize API calls.
+ * Uses GITHUB_TOKEN env var for authentication.
+ * Batches users into groups to minimize API calls.
  */
 
-const { execSync } = require('child_process');
+const fetch = require('node-fetch');
 
+const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
 const BATCH_SIZE = 10;
+const BATCH_DELAY_MS = 2000;
+
+function delay(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
+}
+
+function getToken() {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    throw new Error('GITHUB_TOKEN environment variable is not set');
+  }
+  return token;
+}
+
+async function graphqlRequest(query) {
+  const response = await fetch(GITHUB_GRAPHQL_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `bearer ${getToken()}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'team-tracker'
+    },
+    body: JSON.stringify({ query })
+  });
+
+  if (!response.ok) {
+    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
 
 /**
  * Fetch yearly contribution counts for a list of GitHub usernames.
  * @param {string[]} usernames - GitHub usernames to query
  * @returns {Object} Map of username -> { totalContributions, fetchedAt } or null if user not found
  */
-function fetchContributions(usernames) {
+async function fetchContributions(usernames) {
   const results = {};
   const batches = [];
 
@@ -26,7 +58,7 @@ function fetchContributions(usernames) {
 
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
-    const aliases = batch.map((username, i) => {
+    const aliases = batch.map(function(username, i) {
       const safeAlias = `u${i}`;
       return `${safeAlias}: user(login: ${JSON.stringify(username)}) { contributionsCollection { contributionCalendar { totalContributions } } }`;
     });
@@ -34,12 +66,7 @@ function fetchContributions(usernames) {
     const query = `query { ${aliases.join(' ')} }`;
 
     try {
-      const raw = execSync(
-        `gh api graphql -f query=${JSON.stringify(query)}`,
-        { encoding: 'utf8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }
-      );
-
-      const response = JSON.parse(raw);
+      const response = await graphqlRequest(query);
       const now = new Date().toISOString();
 
       for (let i = 0; i < batch.length; i++) {
@@ -55,7 +82,6 @@ function fetchContributions(usernames) {
         }
       }
 
-      // Check for errors on individual users
       if (response.errors) {
         for (const err of response.errors) {
           const match = err.path?.[0]?.match(/^u(\d+)$/);
@@ -72,12 +98,15 @@ function fetchContributions(usernames) {
       console.log(`[github] Batch ${batchIdx + 1}/${batches.length} complete (${batch.length} users)`);
     } catch (err) {
       console.error(`[github] Batch ${batchIdx + 1} failed:`, err.message);
-      // Mark all users in failed batch as null
       for (const username of batch) {
         if (!(username in results)) {
           results[username] = null;
         }
       }
+    }
+
+    if (batchIdx < batches.length - 1) {
+      await delay(BATCH_DELAY_MS);
     }
   }
 
@@ -90,9 +119,9 @@ function fetchContributions(usernames) {
  * @param {string[]} usernames - GitHub usernames to query
  * @returns {Object} Map of username -> { months: { "YYYY-MM": count }, fetchedAt } or null
  */
-function fetchContributionHistory(usernames) {
+async function fetchContributionHistory(usernames) {
   const results = {};
-  const HISTORY_BATCH = 5; // smaller batches since weekly data is much larger
+  const HISTORY_BATCH = 5;
   const batches = [];
 
   for (let i = 0; i < usernames.length; i += HISTORY_BATCH) {
@@ -103,7 +132,7 @@ function fetchContributionHistory(usernames) {
 
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
-    const aliases = batch.map((username, i) => {
+    const aliases = batch.map(function(username, i) {
       const safeAlias = `u${i}`;
       return `${safeAlias}: user(login: ${JSON.stringify(username)}) { contributionsCollection { contributionCalendar { weeks { contributionDays { date contributionCount } } } } }`;
     });
@@ -111,12 +140,7 @@ function fetchContributionHistory(usernames) {
     const query = `query { ${aliases.join(' ')} }`;
 
     try {
-      const raw = execSync(
-        `gh api graphql -f query=${JSON.stringify(query)}`,
-        { encoding: 'utf8', timeout: 60000, stdio: ['pipe', 'pipe', 'pipe'] }
-      );
-
-      const response = JSON.parse(raw);
+      const response = await graphqlRequest(query);
       const now = new Date().toISOString();
 
       for (let i = 0; i < batch.length; i++) {
@@ -127,7 +151,7 @@ function fetchContributionHistory(usernames) {
           const weeks = userData.contributionsCollection.contributionCalendar.weeks || [];
           for (const week of weeks) {
             for (const day of week.contributionDays || []) {
-              const monthKey = day.date.slice(0, 7); // "YYYY-MM"
+              const monthKey = day.date.slice(0, 7);
               months[monthKey] = (months[monthKey] || 0) + day.contributionCount;
             }
           }
@@ -158,6 +182,10 @@ function fetchContributionHistory(usernames) {
           results[username] = null;
         }
       }
+    }
+
+    if (batchIdx < batches.length - 1) {
+      await delay(BATCH_DELAY_MS);
     }
   }
 

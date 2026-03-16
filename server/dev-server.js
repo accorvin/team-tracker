@@ -948,10 +948,10 @@ app.get('/api/github/contributions/:username', function(req, res) {
   }
 });
 
-app.post('/api/github/contributions/:username/refresh', function(req, res) {
+app.post('/api/github/contributions/:username/refresh', async function(req, res) {
   try {
     const username = decodeURIComponent(req.params.username);
-    const results = fetchContributions([username]);
+    const results = await fetchContributions([username]);
     const cache = readGithubCache();
 
     if (results[username]) {
@@ -986,23 +986,20 @@ app.post('/api/github/refresh', function(req, res) {
     res.json({ status: 'started', usernameCount: usernames.length });
 
     // Fetch in background
-    setImmediate(() => {
-      try {
-        const results = fetchContributions(usernames);
-        const cache = readGithubCache();
+    fetchContributions(usernames).then(function(results) {
+      const cache = readGithubCache();
 
-        for (const [username, data] of Object.entries(results)) {
-          if (data) {
-            cache.users[username] = data;
-          }
+      for (const [username, data] of Object.entries(results)) {
+        if (data) {
+          cache.users[username] = data;
         }
-        cache.fetchedAt = new Date().toISOString();
-
-        writeToStorage(GITHUB_CACHE_PATH, cache);
-        console.log(`[github] Refresh complete. ${Object.keys(results).length} users processed.`);
-      } catch (err) {
-        console.error('[github] Refresh failed:', err.message);
       }
+      cache.fetchedAt = new Date().toISOString();
+
+      writeToStorage(GITHUB_CACHE_PATH, cache);
+      console.log(`[github] Refresh complete. ${Object.keys(results).length} users processed.`);
+    }).catch(function(err) {
+      console.error('[github] Refresh failed:', err.message);
     });
   } catch (error) {
     console.error('GitHub refresh error:', error);
@@ -1219,21 +1216,18 @@ app.post('/api/trends/github/refresh', function(req, res) {
 
     res.json({ status: 'started', usernameCount: usernames.length });
 
-    setImmediate(() => {
-      try {
-        const results = fetchContributionHistory(usernames);
-        const cache = readGithubHistoryCache();
-        for (const [username, data] of Object.entries(results)) {
-          if (data) {
-            cache.users[username] = data;
-          }
+    fetchContributionHistory(usernames).then(function(results) {
+      const cache = readGithubHistoryCache();
+      for (const [username, data] of Object.entries(results)) {
+        if (data) {
+          cache.users[username] = data;
         }
-        cache.fetchedAt = new Date().toISOString();
-        writeToStorage(GITHUB_HISTORY_CACHE_PATH, cache);
-        console.log(`[github] History refresh complete. ${Object.keys(results).length} users processed.`);
-      } catch (err) {
-        console.error('[github] History refresh failed:', err.message);
       }
+      cache.fetchedAt = new Date().toISOString();
+      writeToStorage(GITHUB_HISTORY_CACHE_PATH, cache);
+      console.log(`[github] History refresh complete. ${Object.keys(results).length} users processed.`);
+    }).catch(function(err) {
+      console.error('[github] History refresh failed:', err.message);
     });
   } catch (error) {
     console.error('GitHub history refresh error:', error);
