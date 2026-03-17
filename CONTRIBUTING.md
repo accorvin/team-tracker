@@ -76,7 +76,7 @@ server/
   storage.js          # Local file storage abstraction
   demo-storage.js     # Demo mode fixture storage
   jira/               # Jira Cloud API integration
-    client.js         # HTTP client (basic auth, Jira Cloud endpoints)
+    jira-client.js    # HTTP client (basic auth, Jira Cloud endpoints)
     person-metrics.js # Per-person JQL metrics
     sprint-report.js  # Sprint report API
     __tests__/        # Server-side tests
@@ -100,7 +100,6 @@ deploy/
     overlays/prod/      # Prod cluster overlay
 
 fixtures/             # Demo mode fixture data
-scripts/              # Utility scripts
 data/                 # Local dev data (gitignored)
 secrets/              # Service account keys (gitignored)
 ```

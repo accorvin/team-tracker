@@ -125,7 +125,6 @@ deploy/
     overlays/dev/       # Dev cluster overlay (namespace: team-tracker)
     overlays/prod/      # Prod cluster overlay (namespace: ambient-code--team-tracker)
 
-scripts/            # Utility scripts
 data/               # Local dev data (gitignored)
 secrets/            # Service account keys (gitignored)
 ```
