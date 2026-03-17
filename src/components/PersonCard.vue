@@ -38,7 +38,7 @@
         <span class="text-gray-400">GitLab:</span>
         <template v-if="gitlabContributions != null">{{ gitlabContributions.totalContributions }} contributions</template>
         <span v-else-if="member.gitlabUsername" class="text-gray-300">—</span>
-        <span v-else class="text-gray-300 italic">no username</span>
+        <span v-else class="text-gray-300 italic text-xs" title="GitLab username not configured">no GitLab</span>
       </p>
     </div>
   </div>

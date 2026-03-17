@@ -54,7 +54,7 @@
           <td class="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
             <template v-if="getGitlabContribCount(member) != null">{{ getGitlabContribCount(member) }}</template>
             <span v-else-if="member.gitlabUsername" class="text-gray-300">—</span>
-            <span v-else class="text-gray-300 italic">—</span>
+            <span v-else class="text-gray-300 italic text-xs" title="GitLab username not configured">no GitLab</span>
           </td>
           <td class="px-4 py-2 text-sm whitespace-nowrap">
             <span

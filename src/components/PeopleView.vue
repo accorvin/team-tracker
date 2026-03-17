@@ -141,7 +141,9 @@
               {{ person.githubContributions != null ? person.githubContributions : '—' }}
             </td>
             <td class="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
-              {{ person.gitlabContributions != null ? person.gitlabContributions : '—' }}
+              <template v-if="person.gitlabContributions != null">{{ person.gitlabContributions }}</template>
+              <span v-else-if="person.gitlabUsername" class="text-gray-300">—</span>
+              <span v-else class="text-gray-300 italic text-xs" title="GitLab username not configured">no GitLab</span>
             </td>
           </tr>
         </tbody>
