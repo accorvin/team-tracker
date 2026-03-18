@@ -23,7 +23,10 @@
       <p v-if="member.jiraComponent" class="truncate">
         <span class="text-gray-400">Component:</span> {{ member.jiraComponent }}
       </p>
-      <p v-if="metrics" class="truncate">
+      <p v-if="metrics?.nameNotFound" class="truncate">
+        <span class="text-gray-400 italic">no Jira user</span>
+      </p>
+      <p v-else-if="metrics" class="truncate">
         <span class="text-gray-400">Resolved (90d):</span> {{ metrics.resolvedCount ?? '--' }}
         <span class="mx-1 text-gray-300">·</span>
         <span class="text-gray-400">Points:</span> {{ metrics.resolvedPoints ?? '--' }}

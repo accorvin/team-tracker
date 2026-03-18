@@ -332,7 +332,8 @@ app.get('/team/:teamKey/metrics', async function (req, res) {
           resolvedCount: cached.resolved?.count || 0,
           resolvedPoints: cached.resolved?.storyPoints || 0,
           inProgressCount: cached.inProgress?.count || 0,
-          avgCycleTimeDays: cached.cycleTime?.avgDays
+          avgCycleTimeDays: cached.cycleTime?.avgDays,
+          ...(cached._nameNotFound ? { nameNotFound: true } : {})
         };
         resolvedCount += cached.resolved?.count || 0;
         resolvedPoints += cached.resolved?.storyPoints || 0;
@@ -483,7 +484,8 @@ app.get('/people/metrics', async function (req, res) {
           resolvedPoints: cached.resolved?.storyPoints || 0,
           inProgressCount: cached.inProgress?.count || 0,
           avgCycleTimeDays: cached.cycleTime?.avgDays ?? null,
-          fetchedAt: cached.fetchedAt
+          fetchedAt: cached.fetchedAt,
+          ...(cached._nameNotFound ? { nameNotFound: true } : {})
         };
       }
     }
