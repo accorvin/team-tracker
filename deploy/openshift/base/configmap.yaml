@@ -6,4 +6,4 @@ data:
   NODE_ENV: "production"
   API_PORT: "3001"
   JIRA_HOST: "https://redhat.atlassian.net"
-  ADMIN_EMAILS: "acorvin@redhat.com"
+  ADMIN_EMAILS: "acorvin@redhat.com,acorvin@cluster.local"
