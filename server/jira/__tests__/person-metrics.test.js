@@ -246,24 +246,6 @@ describe('fetchPersonMetrics', () => {
     expect(nameCache).toEqual({})
   })
 
-  it('does not match Chris to Christopher (exact first-name match only)', async () => {
-    const nameCache = {}
-    const mockJiraRequest = vi.fn(async (url) => {
-      if (url.includes('/rest/api/2/user/search')) {
-        return [
-          { displayName: 'Christopher Smith', name: 'csmith' },
-          { displayName: 'Christopher Prahl', name: 'cprahl' }
-        ]
-      }
-      return { issues: [], total: 0 }
-    })
-
-    const result = await fetchPersonMetrics(mockJiraRequest, 'Chris Prahl', { nameCache })
-
-    expect(nameCache['Chris Prahl']).toBeUndefined()
-    expect(result._nameNotFound).toBe(true)
-  })
-
   it('does not match when first name differs even with single user-search result', async () => {
     const nameCache = {}
     const mockJiraRequest = vi.fn(async (url) => {
@@ -341,6 +323,99 @@ describe('fetchPersonMetrics', () => {
 
     expect(nameCache['John Smith']).toBeUndefined()
     expect(result._nameNotFound).toBe(true)
+  })
+
+  it('matches Chris to Christopher via nickname mapping', async () => {
+    const nameCache = {}
+    const mockJiraRequest = vi.fn(async (url) => {
+      if (url.includes('/rest/api/2/user/search')) {
+        return [
+          { displayName: 'Christopher Smith', name: 'csmith' },
+          { displayName: 'Christopher Prahl', name: 'cprahl' }
+        ]
+      }
+      return { issues: [], total: 0 }
+    })
+
+    const result = await fetchPersonMetrics(mockJiraRequest, 'Chris Prahl', { nameCache })
+
+    expect(nameCache['Chris Prahl']).toBe('Christopher Prahl')
+    expect(result._resolvedName).toBe('Christopher Prahl')
+  })
+
+  it('matches Christopher to Chris (reverse nickname)', async () => {
+    const nameCache = {}
+    const mockJiraRequest = vi.fn(async (url) => {
+      if (url.includes('/rest/api/2/user/search')) {
+        return [{ displayName: 'Chris Prahl', name: 'cprahl' }]
+      }
+      return { issues: [], total: 0 }
+    })
+
+    await fetchPersonMetrics(mockJiraRequest, 'Christopher Prahl', { nameCache })
+
+    expect(nameCache['Christopher Prahl']).toBe('Chris Prahl')
+  })
+
+  it('matches Bob to Robert via nickname mapping', async () => {
+    const nameCache = {}
+    const mockJiraRequest = vi.fn(async (url) => {
+      if (url.includes('/rest/api/2/user/search')) {
+        return [{ displayName: 'Robert Smith', name: 'rsmith' }]
+      }
+      return { issues: [], total: 0 }
+    })
+
+    await fetchPersonMetrics(mockJiraRequest, 'Bob Smith', { nameCache })
+
+    expect(nameCache['Bob Smith']).toBe('Robert Smith')
+  })
+
+  it('does not match Tim to Tom (timothy != thomas)', async () => {
+    const nameCache = {}
+    const mockJiraRequest = vi.fn(async (url) => {
+      if (url.includes('/rest/api/2/user/search')) {
+        return [{ displayName: 'Tom Smith', name: 'tsmith' }]
+      }
+      return { issues: [], total: 0 }
+    })
+
+    const result = await fetchPersonMetrics(mockJiraRequest, 'Tim Smith', { nameCache })
+
+    expect(nameCache['Tim Smith']).toBeUndefined()
+    expect(result._nameNotFound).toBe(true)
+  })
+
+  it('returns null when nickname matching produces multiple candidates', async () => {
+    const nameCache = {}
+    const mockJiraRequest = vi.fn(async (url) => {
+      if (url.includes('/rest/api/2/user/search')) {
+        return [
+          { displayName: 'Patricia Johnson', name: 'pjohnson' },
+          { displayName: 'Patrick Johnson', name: 'pajohnson' }
+        ]
+      }
+      return { issues: [], total: 0 }
+    })
+
+    const result = await fetchPersonMetrics(mockJiraRequest, 'Pat Johnson', { nameCache })
+
+    expect(nameCache['Pat Johnson']).toBeUndefined()
+    expect(result._nameNotFound).toBe(true)
+  })
+
+  it('matches Sasha to Aleksandr via international supplement', async () => {
+    const nameCache = {}
+    const mockJiraRequest = vi.fn(async (url) => {
+      if (url.includes('/rest/api/2/user/search')) {
+        return [{ displayName: 'Aleksandr Petrov', name: 'apetrov' }]
+      }
+      return { issues: [], total: 0 }
+    })
+
+    await fetchPersonMetrics(mockJiraRequest, 'Sasha Petrov', { nameCache })
+
+    expect(nameCache['Sasha Petrov']).toBe('Aleksandr Petrov')
   })
 
   it('skips name resolution when nameCache is not provided', async () => {

@@ -5,6 +5,8 @@
  * then computes aggregate metrics (counts, story points, cycle time).
  */
 
+const NICKNAME_MAP = require('./nickname-map.json');
+
 const STORY_POINTS_FIELD = process.env.JIRA_STORY_POINTS_FIELD || 'customfield_12310243';
 
 const FIELDS = `summary,issuetype,status,assignee,resolutiondate,created,components,${STORY_POINTS_FIELD}`;
@@ -155,6 +157,14 @@ async function resolveJiraDisplayName(jiraRequest, rosterName, nameCache) {
   return rosterName;
 }
 
+function areNameVariations(name1, name2) {
+  const a = name1.toLowerCase();
+  const b = name2.toLowerCase();
+  if (a === b) return true;
+  const group = NICKNAME_MAP[a];
+  return group ? group.includes(b) : false;
+}
+
 async function tryUserSearch(jiraRequest, query, lastName, firstName) {
   try {
     const users = await jiraRequest(`/rest/api/2/user/search?username=${encodeURIComponent(query)}`);
@@ -167,11 +177,10 @@ async function tryUserSearch(jiraRequest, query, lastName, firstName) {
     );
     if (lastNameCandidates.length === 0) return null;
 
-    // Further filter by first name (first word of displayName must match exactly)
-    const firstNameLower = firstName.toLowerCase();
+    // Further filter by first name (first word of displayName must match or be a nickname variation)
     const matches = lastNameCandidates.filter(u => {
       const candidateFirst = u.displayName?.split(/\s+/)[0] || '';
-      return candidateFirst.toLowerCase() === firstNameLower;
+      return areNameVariations(firstName, candidateFirst);
     });
 
     // Exactly one match — return it. Zero or multiple — refuse to guess
