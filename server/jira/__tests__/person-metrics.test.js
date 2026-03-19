@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { computeCycleTimeDays, findWorkStartDate, fetchPersonMetrics } from '../person-metrics'
+import { computeCycleTimeDays, findWorkStartDate, fetchPersonMetrics, mergeResolvedIssues, needsFullRefresh, FIELDS_VERSION } from '../person-metrics'
 
 function makeIssue({ created, resolutiondate, histories }) {
   return {
@@ -330,5 +330,169 @@ describe('fetchPersonMetrics', () => {
       accountId: 'acc-mprahl-123',
       displayName: 'Matthew Prahl'
     })
+  })
+})
+
+describe('needsFullRefresh', () => {
+  it('returns true when existingData is null', () => {
+    expect(needsFullRefresh(null)).toBe(true)
+  })
+
+  it('returns true when existingData has no fetchedAt', () => {
+    expect(needsFullRefresh({ fieldsVersion: FIELDS_VERSION })).toBe(true)
+  })
+
+  it('returns true when fieldsVersion does not match', () => {
+    expect(needsFullRefresh({
+      fetchedAt: new Date().toISOString(),
+      fieldsVersion: 'v0-old',
+      lastFullRefreshAt: new Date().toISOString()
+    })).toBe(true)
+  })
+
+  it('returns true when lastFullRefreshAt is older than 7 days', () => {
+    const eightDaysAgo = new Date()
+    eightDaysAgo.setDate(eightDaysAgo.getDate() - 8)
+    expect(needsFullRefresh({
+      fetchedAt: new Date().toISOString(),
+      fieldsVersion: FIELDS_VERSION,
+      lastFullRefreshAt: eightDaysAgo.toISOString()
+    })).toBe(true)
+  })
+
+  it('returns false when data is fresh and version matches', () => {
+    const now = new Date().toISOString()
+    expect(needsFullRefresh({
+      fetchedAt: now,
+      fieldsVersion: FIELDS_VERSION,
+      lastFullRefreshAt: now
+    })).toBe(false)
+  })
+
+  it('uses fetchedAt as fallback when lastFullRefreshAt is missing', () => {
+    const sixDaysAgo = new Date()
+    sixDaysAgo.setDate(sixDaysAgo.getDate() - 6)
+    expect(needsFullRefresh({
+      fetchedAt: sixDaysAgo.toISOString(),
+      fieldsVersion: FIELDS_VERSION
+    })).toBe(false)
+  })
+})
+
+describe('mergeResolvedIssues', () => {
+  it('deduplicates by issue key, preferring fresh data', () => {
+    const existing = [
+      { key: 'KEY-1', resolutionDate: '2026-03-01T00:00:00Z', storyPoints: 3 },
+      { key: 'KEY-2', resolutionDate: '2026-03-02T00:00:00Z', storyPoints: 5 }
+    ]
+    const fresh = [
+      { key: 'KEY-2', resolutionDate: '2026-03-02T00:00:00Z', storyPoints: 8 },
+      { key: 'KEY-3', resolutionDate: '2026-03-10T00:00:00Z', storyPoints: 2 }
+    ]
+    const result = mergeResolvedIssues(existing, fresh, 365)
+    expect(result).toHaveLength(3)
+    const key2 = result.find(i => i.key === 'KEY-2')
+    expect(key2.storyPoints).toBe(8)
+  })
+
+  it('removes issues older than the lookback window', () => {
+    const oldDate = new Date()
+    oldDate.setDate(oldDate.getDate() - 400)
+    const recentDate = new Date()
+    recentDate.setDate(recentDate.getDate() - 10)
+
+    const existing = [
+      { key: 'OLD-1', resolutionDate: oldDate.toISOString() },
+      { key: 'NEW-1', resolutionDate: recentDate.toISOString() }
+    ]
+    const result = mergeResolvedIssues(existing, [], 365)
+    expect(result).toHaveLength(1)
+    expect(result[0].key).toBe('NEW-1')
+  })
+
+  it('keeps issues with no resolutionDate (in-progress edge case)', () => {
+    const existing = [
+      { key: 'KEY-1', resolutionDate: null }
+    ]
+    const result = mergeResolvedIssues(existing, [], 365)
+    expect(result).toHaveLength(1)
+  })
+
+  it('handles empty existing and fresh arrays', () => {
+    expect(mergeResolvedIssues([], [], 365)).toEqual([])
+  })
+})
+
+describe('fetchPersonMetrics incremental mode', () => {
+  function createMockJiraRequest(handlers = {}) {
+    return vi.fn(async (url) => {
+      if (url.startsWith('/rest/api/3/search/jql')) {
+        const jql = new URL(`https://jira${url}`).searchParams.get('jql') || ''
+        if (handlers.search) return handlers.search(jql)
+        return { issues: [], isLast: true }
+      }
+      if (url.includes('/rest/api/2/user/search')) {
+        if (handlers.userSearch) return handlers.userSearch(url)
+        return []
+      }
+      return { issues: [], isLast: true }
+    })
+  }
+
+  it('uses incremental query when existingData is recent', async () => {
+    const capturedJqls = []
+    const now = new Date()
+    const twoDaysAgo = new Date(now)
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
+
+    const mockJiraRequest = createMockJiraRequest({
+      search: (jql) => {
+        capturedJqls.push(jql)
+        return { issues: [], isLast: true }
+      },
+      userSearch: () => [{ displayName: 'Test User', accountId: 'abc123' }]
+    })
+
+    await fetchPersonMetrics(mockJiraRequest, 'Test User', {
+      nameCache: {},
+      existingData: {
+        fetchedAt: twoDaysAgo.toISOString(),
+        fieldsVersion: FIELDS_VERSION,
+        lastFullRefreshAt: now.toISOString(),
+        resolved: { count: 0, storyPoints: 0, issues: [] },
+        inProgress: { count: 0, storyPoints: 0, issues: [] }
+      }
+    })
+
+    // Should use date-bounded resolved query, not -365d
+    const resolvedJql = capturedJqls.find(jql => jql.includes('resolved >='))
+    expect(resolvedJql).toBeDefined()
+    expect(resolvedJql).not.toContain('-365d')
+    expect(resolvedJql).toMatch(/resolved >= "\d{4}-\d{2}-\d{2}"/)
+  })
+
+  it('does full refresh when fieldsVersion does not match', async () => {
+    const capturedJqls = []
+    const mockJiraRequest = createMockJiraRequest({
+      search: (jql) => {
+        capturedJqls.push(jql)
+        return { issues: [], isLast: true }
+      },
+      userSearch: () => [{ displayName: 'Test User', accountId: 'abc123' }]
+    })
+
+    await fetchPersonMetrics(mockJiraRequest, 'Test User', {
+      nameCache: {},
+      existingData: {
+        fetchedAt: new Date().toISOString(),
+        fieldsVersion: 'v0-outdated',
+        lastFullRefreshAt: new Date().toISOString(),
+        resolved: { count: 0, storyPoints: 0, issues: [] }
+      }
+    })
+
+    // Should use full lookback query
+    const resolvedJql = capturedJqls.find(jql => jql.includes('resolved >='))
+    expect(resolvedJql).toContain('-365d')
   })
 })

@@ -381,7 +381,7 @@ app.post('/api/refresh', requireAdmin, async function(req, res) {
         });
         if (metrics._resolvedName) delete metrics._resolvedName;
         writeToStorage(`people/${sanitizeFilename(member.jiraDisplayName)}.json`, metrics);
-        refreshState.progress.completed++;
+        if (refreshState.sources.jira) refreshState.sources.jira.completed++;
       } catch (err) {
         console.error(`[refresh] Jira failed for ${member.jiraDisplayName}:`, err.message);
         refreshState.progress.errors++;
@@ -506,11 +506,11 @@ app.post('/api/refresh', requireAdmin, async function(req, res) {
   refreshState.running = true;
   refreshState.scope = scope;
   refreshState.startedAt = new Date().toISOString();
-  refreshState.progress = { completed: 0, total: members.length, errors: 0 };
+  refreshState.progress = { errors: 0 };
   refreshState.sources = {
-    jira: sources.jira ? 'pending' : 'skipped',
-    github: sources.github ? 'pending' : 'skipped',
-    gitlab: sources.gitlab ? 'pending' : 'skipped'
+    jira: sources.jira ? { status: 'pending', completed: 0, total: members.length } : { status: 'skipped' },
+    github: sources.github ? { status: 'pending', completed: 0, total: githubUsernames.length } : { status: 'skipped' },
+    gitlab: sources.gitlab ? { status: 'pending', completed: 0, total: gitlabUsernames.length } : { status: 'skipped' }
   };
 
   res.json({ status: 'started', memberCount: members.length });
@@ -521,34 +521,34 @@ app.post('/api/refresh', requireAdmin, async function(req, res) {
       await Promise.allSettled([
         (async () => {
           if (!sources.jira) return;
-          refreshState.sources.jira = 'running';
+          refreshState.sources.jira.status = 'running';
           try {
             await refreshJiraMembers(members);
-            refreshState.sources.jira = 'done';
+            refreshState.sources.jira.status = 'done';
           } catch (err) {
-            refreshState.sources.jira = 'error';
+            refreshState.sources.jira.status = 'error';
             console.error('[refresh] Jira source error:', err.message);
           }
         })(),
         (async () => {
           if (!sources.github || githubUsernames.length === 0) return;
-          refreshState.sources.github = 'running';
+          refreshState.sources.github.status = 'running';
           try {
             await refreshGithubUsers(githubUsernames);
-            refreshState.sources.github = 'done';
+            refreshState.sources.github.status = 'done';
           } catch (err) {
-            refreshState.sources.github = 'error';
+            refreshState.sources.github.status = 'error';
             console.error('[refresh] GitHub source error:', err.message);
           }
         })(),
         (async () => {
           if (!sources.gitlab || gitlabUsernames.length === 0) return;
-          refreshState.sources.gitlab = 'running';
+          refreshState.sources.gitlab.status = 'running';
           try {
             await refreshGitlabUsers(gitlabUsernames);
-            refreshState.sources.gitlab = 'done';
+            refreshState.sources.gitlab.status = 'done';
           } catch (err) {
-            refreshState.sources.gitlab = 'error';
+            refreshState.sources.gitlab.status = 'error';
             console.error('[refresh] GitLab source error:', err.message);
           }
         })()

@@ -116,14 +116,28 @@ function bucketByMonth(events) {
 
 /**
  * Merge incremental monthly data into existing monthly data.
- * For the month that overlaps the fetch boundary, replaces the count
- * (since we can't know which specific events are new within a month).
- * For newer months, uses the fresh data.
+ * The boundary month (containing sinceDate) and all newer months use
+ * the fresh count directly (replace), since we can't distinguish
+ * which events within the boundary month are truly new.
+ * Older months keep their existing counts.
+ *
+ * @param {object} existing - { "YYYY-MM": count }
+ * @param {object} fresh - { "YYYY-MM": count }
+ * @param {string} sinceDate - ISO date string marking the fetch boundary
  */
-function mergeMonths(existing, fresh) {
+function mergeMonths(existing, fresh, sinceDate) {
   const merged = { ...existing };
+  const boundaryMonth = sinceDate ? sinceDate.slice(0, 7) : null;
+
   for (const [month, count] of Object.entries(fresh)) {
-    merged[month] = (merged[month] || 0) + count;
+    if (boundaryMonth && month >= boundaryMonth) {
+      // Boundary month or newer: replace with fresh count
+      merged[month] = count;
+    } else {
+      // Older than boundary: should not happen with correct sinceDate,
+      // but add defensively in case of overlap
+      merged[month] = (merged[month] || 0) + count;
+    }
   }
   return merged;
 }
@@ -174,7 +188,7 @@ async function fetchGitlabData(usernames, options = {}) {
 
         if (sinceDate && existing) {
           // Incremental: merge with existing data
-          const mergedMonths = mergeMonths(existing.months || {}, freshMonths);
+          const mergedMonths = mergeMonths(existing.months || {}, freshMonths, sinceDate);
           const totalContributions = Object.values(mergedMonths).reduce((a, b) => a + b, 0);
           results[username] = { totalContributions, months: mergedMonths, fetchedAt: now };
         } else {
