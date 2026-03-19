@@ -2,8 +2,4 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: team-tracker
-  labels:
-    shard: internal
-    paas.redhat.com/appcode: AMBC-001
-spec:
-  host: team-tracker.apps.int.spoke.preprod.us-west-2.aws.paas.redhat.com
+spec: {}
