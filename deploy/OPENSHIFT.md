@@ -34,6 +34,13 @@ oc patch secret team-tracker-secrets \
   --type merge \
   -p "{\"stringData\":{\"GITHUB_TOKEN\":\"$(tr -d '\n' < ~/.your-github-token)\"}}"
 
+# Optional: GitLab token (for contribution stats)
+# Use a PAT with read_api scope
+oc patch secret team-tracker-secrets \
+  -n team-tracker \
+  --type merge \
+  -p "{\"stringData\":{\"GITLAB_TOKEN\":\"$(tr -d '\n' < ~/.your-gitlab-token)\"}}"
+
 # Required: OAuth proxy cookie secret
 oc create secret generic frontend-proxy-cookie \
   -n team-tracker \

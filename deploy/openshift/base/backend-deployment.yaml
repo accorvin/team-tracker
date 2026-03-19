@@ -45,6 +45,12 @@ spec:
                   name: team-tracker-secrets
                   key: GITHUB_TOKEN
                   optional: true
+            - name: GITLAB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: team-tracker-secrets
+                  key: GITLAB_TOKEN
+                  optional: true
           volumeMounts:
             - name: data
               mountPath: /app/data

@@ -23,6 +23,8 @@ npm run dev:full       # Starts Vite (5173) + Express (3001)
 | Variable | Description |
 |----------|-------------|
 | `GITHUB_TOKEN` | Classic PAT with `read:user` scope (for contribution stats). Fine-grained tokens don't work with GraphQL API. |
+| `GITLAB_TOKEN` | GitLab PAT with `read_api` scope (for contribution stats). Without it, only public project contributions are counted. |
+| `GITLAB_BASE_URL` | GitLab instance URL (default: `https://gitlab.com`) |
 | `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` | Path to Google SA JSON key (default: `/etc/secrets/google-sa-key.json`). For local dev: `./secrets/google-sa-key.json` |
 | `DEMO_MODE` / `VITE_DEMO_MODE` | Set both to `true` to run with fixture data (no credentials needed) |
 
@@ -49,6 +51,7 @@ npm run dev:full       # Starts Vite (5173) + Express (3001)
 - **Roster**: `data/org-roster-full.json` defines all orgs, teams, and members. Built automatically by roster sync (LDAP + Google Sheets). The `deriveRoster()` function transforms this into the API response format.
 - **Person metrics**: Individual Jira stats stored as `data/people/{name}.json`. Fetched via JQL queries against Jira with 365-day lookback.
 - **GitHub contributions**: `data/github-contributions.json` stores contribution counts per user. `data/github-history.json` stores monthly history. Fetched via GitHub GraphQL API with `GITHUB_TOKEN`.
+- **GitLab contributions**: `data/gitlab-contributions.json` and `data/gitlab-history.json`. Fetched via GitLab REST API (`/api/v4/users/:id/events`) with `GITLAB_TOKEN`.
 - **Trends**: Built dynamically from person metric files by bucketing resolved issues by month, with org/team breakdowns.
 - **Composite keys**: Teams are identified by `orgKey::teamName` (e.g., `shgriffi::Model Serving`).
 
@@ -56,10 +59,11 @@ npm run dev:full       # Starts Vite (5173) + Express (3001)
 Automated roster building that replaces manual scripts:
 - **LDAP** (`ldap.js`): Traverses Red Hat corporate directory from configured org root UIDs. Requires VPN.
   - `ldapjs` v3: `createClient()` is synchronous. Search entries use `entry.attributes` array with `.type` and `.values`.
-  - Extracts GitHub usernames from `rhatSocialUrl` LDAP field.
+  - Extracts GitHub and GitLab usernames from `rhatSocialUrl` LDAP field.
 - **Google Sheets** (`sheets.js`): Enriches LDAP data with team assignments, focus areas, etc. Sheet names are auto-discovered from the spreadsheet ID.
   - Auth via `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` env var pointing to a service account JSON key.
-- **Config** (`config.js`): Org roots and Google Sheet ID stored in `data/roster-sync-config.json`, managed via Settings UI.
+- **Username Inference** (`username-inference.js`): Optionally infers missing GitHub/GitLab usernames by fuzzy-matching roster people against GitHub org members or GitLab group members. Configured via Settings UI (`githubOrgs`, `gitlabGroups`).
+- **Config** (`config.js`): Org roots, Google Sheet ID, and username inference settings stored in `data/roster-sync-config.json`, managed via Settings UI.
 - **Scheduler** (`index.js`): Runs sync daily (24h interval). Can be triggered manually via API or Settings UI.
 
 ### Jira Integration (Jira Cloud — redhat.atlassian.net)
@@ -76,6 +80,12 @@ Automated roster building that replaces manual scripts:
 - Auth via `GITHUB_TOKEN` env var (classic PAT with `read:user` scope)
 - Batches users (10 per batch for counts, 5 for history) with 2-second delays between batches to avoid rate limiting
 - Functions are async: `fetchContributions(usernames)` and `fetchContributionHistory(usernames)`
+
+### GitLab Integration (`server/gitlab/contributions.js`)
+- Uses GitLab REST API (`/api/v4/users/:id/events`) via `node-fetch`
+- Auth via `GITLAB_TOKEN` env var (PAT with `read_api` scope). Falls back to unauthenticated (public repos only).
+- `GITLAB_BASE_URL` defaults to `https://gitlab.com`
+- Sequential requests with delays (200ms authenticated, 7s unauthenticated)
 
 ### Caching
 - Frontend uses localStorage stale-while-revalidate pattern (prefix `tt_cache:`)
@@ -95,10 +105,10 @@ Deployed to OpenShift via ArgoCD. Full deployment guide: `deploy/OPENSHIFT.md`.
 | Backend | `quay.io/accorvin/team-tracker-backend` | Express server with PVC-mounted data directory |
 | OAuth Proxy | `quay.io/openshift/origin-oauth-proxy:4.16` | Sidecar on frontend pod |
 
-Overlays: `deploy/openshift/overlays/dev/` (namespace: `team-tracker`) and `deploy/openshift/overlays/prod/` (namespace: `ambient-code--team-tracker`).
+Overlays: `deploy/openshift/overlays/dev/` (namespace: `team-tracker`), `deploy/openshift/overlays/preprod/` (namespace: `ambient-code--team-tracker`), and `deploy/openshift/overlays/prod/`.
 
 Secrets (created manually on cluster, not in git):
-- `team-tracker-secrets`: `JIRA_EMAIL`, `JIRA_TOKEN`, `GITHUB_TOKEN` (optional)
+- `team-tracker-secrets`: `JIRA_EMAIL`, `JIRA_TOKEN`, `GITHUB_TOKEN` (optional), `GITLAB_TOKEN` (optional)
 - `frontend-proxy-cookie`: `session_secret`
 - `google-sa-key`: Google service account JSON key (mounted at `/etc/secrets/`)
 
@@ -117,7 +127,7 @@ OpenShift OAuth proxy (sidecar on frontend pod) authenticates users and sets `X-
 ```
 src/
   components/       # Vue components (App.vue is the root with hash routing)
-  composables/      # Shared state (useRoster, useAuth, useGithubStats, useAllowlist, useRosterSync, useViewPreference)
+  composables/      # Shared state (useRoster, useAuth, useGithubStats, useGitlabStats, useAllowlist, useRosterSync, useViewPreference)
   services/api.js   # API client with caching
   utils/metrics.js  # Metric calculations
   __tests__/        # Frontend tests
@@ -127,7 +137,8 @@ server/
   storage.js        # Local file storage abstraction
   jira/             # Jira API integration (client, sprint-report, person-metrics, orchestration)
   github/           # GitHub GraphQL API (contribution fetching)
-  roster-sync/      # Automated roster sync (LDAP + Google Sheets)
+  gitlab/           # GitLab REST API (contribution fetching)
+  roster-sync/      # Automated roster sync (LDAP + Google Sheets + username inference)
   jira/__tests__/   # Backend tests
 
 deploy/
@@ -137,7 +148,8 @@ deploy/
   openshift/
     base/               # Kustomize base manifests
     overlays/dev/       # Dev cluster overlay (namespace: team-tracker)
-    overlays/prod/      # Prod cluster overlay (namespace: ambient-code--team-tracker)
+    overlays/preprod/   # Preprod cluster overlay (namespace: ambient-code--team-tracker)
+    overlays/prod/      # Prod cluster overlay
 
 data/               # Local dev data (gitignored)
 secrets/            # Service account keys (gitignored)
@@ -170,7 +182,8 @@ In production, all routes are authenticated via OpenShift OAuth proxy. The proxy
 - `/api/person/:name/metrics` — individual person metrics
 - `/api/people/metrics` — bulk all-people metrics
 - `/api/github/contributions` — GitHub contribution data
-- `/api/trends` — monthly Jira + GitHub trend data
+- `/api/gitlab/contributions` — GitLab contribution data
+- `/api/trends` — monthly Jira + GitHub + GitLab trend data
 - `/api/allowlist` — authorized email list
 - `/api/admin/roster-sync/config` — roster sync configuration
 - `/api/admin/roster-sync/status` — sync status (running/last result)
@@ -181,8 +194,11 @@ In production, all routes are authenticated via OpenShift OAuth proxy. The proxy
 - `/api/person/:name/metrics?refresh=true` — refresh single person
 - `/api/github/refresh` — refresh all GitHub contributions
 - `/api/github/contributions/:username/refresh` — refresh single user
+- `/api/gitlab/refresh` — refresh all GitLab contributions
+- `/api/gitlab/contributions/:username/refresh` — refresh single user
 - `/api/trends/jira/refresh` — refresh Jira trends
 - `/api/trends/github/refresh` — refresh GitHub history
+- `/api/trends/gitlab/refresh` — refresh GitLab history
 - `/api/admin/roster-sync/config` — save roster sync configuration
 - `/api/admin/roster-sync/trigger` — trigger manual roster sync
 - `/api/allowlist` — update authorized email list

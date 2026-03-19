@@ -113,6 +113,80 @@
       </div>
     </div>
 
+    <!-- Username Inference -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+      <h3 class="text-lg font-semibold text-gray-900 mb-3">Username Inference</h3>
+      <p class="text-sm text-gray-500 mb-4">
+        Optionally infer missing GitHub/GitLab usernames by matching roster people against org/group member lists.
+      </p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">GitHub Orgs</label>
+          <div class="space-y-2 mb-2">
+            <div v-for="(org, idx) in editGithubOrgs" :key="'gh-' + idx" class="flex items-center gap-2">
+              <input
+                v-model="editGithubOrgs[idx]"
+                placeholder="e.g. opendatahub-io"
+                class="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              />
+              <button
+                @click="editGithubOrgs.splice(idx, 1)"
+                class="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                title="Remove"
+              >
+                <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button
+            @click="editGithubOrgs.push('')"
+            class="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+          >
+            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add GitHub org
+          </button>
+          <p class="text-xs text-gray-500 mt-1">Requires GITHUB_TOKEN env var.</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">GitLab Groups</label>
+          <div class="space-y-2 mb-2">
+            <div v-for="(group, idx) in editGitlabGroups" :key="'gl-' + idx" class="flex items-center gap-2">
+              <input
+                v-model="editGitlabGroups[idx]"
+                placeholder="e.g. redhat/rhoai"
+                class="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              />
+              <button
+                @click="editGitlabGroups.splice(idx, 1)"
+                class="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                title="Remove"
+              >
+                <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button
+            @click="editGitlabGroups.push('')"
+            class="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+          >
+            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add GitLab group
+          </button>
+          <p class="text-xs text-gray-500 mt-1">Requires GITLAB_TOKEN env var.</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Save -->
     <div class="flex items-center gap-3">
       <button
@@ -147,6 +221,8 @@ const {
 
 const editRoots = ref([])
 const editSheetId = ref('')
+const editGithubOrgs = ref([])
+const editGitlabGroups = ref([])
 const saveMessage = ref(null)
 const saveError = ref(false)
 
@@ -158,9 +234,13 @@ function populateForm() {
   if (config.value && config.value.configured) {
     editRoots.value = (config.value.orgRoots || []).map(r => ({ ...r }))
     editSheetId.value = config.value.googleSheetId || ''
+    editGithubOrgs.value = [...(config.value.githubOrgs || [])]
+    editGitlabGroups.value = [...(config.value.gitlabGroups || [])]
   } else {
     editRoots.value = [{ uid: '', displayName: '' }]
     editSheetId.value = ''
+    editGithubOrgs.value = []
+    editGitlabGroups.value = []
   }
 }
 
@@ -200,9 +280,14 @@ async function handleSave() {
   }
 
   try {
+    const githubOrgs = editGithubOrgs.value.map(s => s.trim()).filter(Boolean)
+    const gitlabGroups = editGitlabGroups.value.map(s => s.trim()).filter(Boolean)
+
     await saveConfig({
       orgRoots,
-      googleSheetId: editSheetId.value.trim() || null
+      googleSheetId: editSheetId.value.trim() || null,
+      githubOrgs: githubOrgs.length > 0 ? githubOrgs : undefined,
+      gitlabGroups: gitlabGroups.length > 0 ? gitlabGroups : undefined
     })
     saveMessage.value = 'Configuration saved.'
     emit('toast', { message: 'Roster sync configuration saved', type: 'success' })

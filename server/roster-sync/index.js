@@ -7,6 +7,7 @@ const { loadConfig, updateSyncStatus } = require('./config');
 const ldapModule = require('./ldap');
 const { fetchSheetData } = require('./sheets');
 const { buildRoster } = require('./merge');
+const { inferUsernames } = require('./username-inference');
 
 let syncInProgress = false;
 let dailyTimer = null;
@@ -76,8 +77,20 @@ async function runSync(storage) {
         }
       }
 
-      // Phase 3: Merge and write
+      // Phase 3: Merge
       const roster = buildRoster(config.orgRoots, ldapOrgs, sheetsData, vpInfo);
+
+      // Phase 4: Username inference (optional)
+      let usernamesInferred = { github: 0, gitlab: 0 };
+      if (config.githubOrgs || config.githubOrg || config.gitlabGroups || config.gitlabGroup) {
+        try {
+          usernamesInferred = await inferUsernames(roster, config);
+        } catch (err) {
+          console.warn(`[roster-sync] Username inference failed (continuing without): ${err.message}`);
+        }
+      }
+
+      // Phase 5: Write
       storage.writeToStorage('org-roster-full.json', roster);
 
       const summary = {
@@ -85,6 +98,8 @@ async function runSync(storage) {
         totalPeople: totalPeople,
         orgsProcessed: Object.keys(ldapOrgs).length,
         sheetsEnriched: sheetsData ? sheetsData.size : 0,
+        githubInferred: usernamesInferred.github,
+        gitlabInferred: usernamesInferred.gitlab,
         timestamp: new Date().toISOString()
       };
 
