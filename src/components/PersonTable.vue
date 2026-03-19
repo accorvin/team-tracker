@@ -38,13 +38,16 @@
             {{ member.jiraComponent || '—' }}
           </td>
           <td class="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
-            {{ getMemberMetric(member, 'resolvedCount') ?? '—' }}
+            <span v-if="getMemberMetric(member, 'nameNotFound')" class="text-gray-400 italic">no Jira user</span>
+            <template v-else>{{ getMemberMetric(member, 'resolvedCount') ?? '—' }}</template>
           </td>
           <td class="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
-            {{ getMemberMetric(member, 'resolvedPoints') ?? '—' }}
+            <span v-if="getMemberMetric(member, 'nameNotFound')" class="text-gray-400 italic">no Jira user</span>
+            <template v-else>{{ getMemberMetric(member, 'resolvedPoints') ?? '—' }}</template>
           </td>
           <td class="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
-            {{ getMemberMetric(member, 'avgCycleTimeDays') != null ? getMemberMetric(member, 'avgCycleTimeDays') + 'd' : '—' }}
+            <span v-if="getMemberMetric(member, 'nameNotFound')" class="text-gray-400 italic">no Jira user</span>
+            <template v-else>{{ getMemberMetric(member, 'avgCycleTimeDays') != null ? getMemberMetric(member, 'avgCycleTimeDays') + 'd' : '—' }}</template>
           </td>
           <td class="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
             <template v-if="getGithubContribCount(member) != null">{{ getGithubContribCount(member) }}</template>

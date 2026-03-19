@@ -617,7 +617,8 @@ app.get('/api/people/metrics', function(req, res) {
             resolvedPoints: data.resolved?.storyPoints ?? 0,
             inProgressCount: data.inProgress?.count ?? 0,
             avgCycleTimeDays: data.cycleTime?.avgDays ?? null,
-            fetchedAt: data.fetchedAt
+            fetchedAt: data.fetchedAt,
+            ...(data._nameNotFound ? { nameNotFound: true } : {})
           };
         }
       } catch {
@@ -736,7 +737,8 @@ app.get('/api/team/:teamKey/metrics', function(req, res) {
           resolvedCount: cached.resolved?.count || 0,
           resolvedPoints: cached.resolved?.storyPoints || 0,
           inProgressCount: cached.inProgress?.count || 0,
-          avgCycleTimeDays: cached.cycleTime?.avgDays
+          avgCycleTimeDays: cached.cycleTime?.avgDays,
+          ...(cached._nameNotFound ? { nameNotFound: true } : {})
         };
         resolvedCount += cached.resolved?.count || 0;
         resolvedPoints += cached.resolved?.storyPoints || 0;
@@ -809,6 +811,7 @@ app.post('/api/roster/refresh', function(req, res) {
           if (metrics._resolvedName) {
             delete metrics._resolvedName;
           }
+
           const key = sanitizeFilename(member.jiraDisplayName);
           writeToStorage(`people/${key}.json`, metrics);
         } catch (error) {
@@ -882,6 +885,7 @@ app.post('/api/team/:teamKey/refresh', function(req, res) {
           if (metrics._resolvedName) {
             delete metrics._resolvedName;
           }
+
           const key = sanitizeFilename(member.jiraDisplayName);
           writeToStorage(`people/${key}.json`, metrics);
         } catch (error) {
@@ -1314,6 +1318,7 @@ app.post('/api/trends/jira/refresh', async function(req, res) {
             nameCache: jiraNameCache
           });
           if (metrics._resolvedName) delete metrics._resolvedName;
+
           const key = sanitizeFilename(name);
           writeToStorage(`people/${key}.json`, metrics);
           completed++;

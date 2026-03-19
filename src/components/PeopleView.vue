@@ -129,13 +129,16 @@
               <SpecialtyBadge :specialty="person.specialty" />
             </td>
             <td class="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
-              {{ person.metrics?.resolvedCount ?? '—' }}
+              <span v-if="person.metrics?.nameNotFound" class="text-gray-400 italic">no Jira user</span>
+              <template v-else>{{ person.metrics?.resolvedCount ?? '—' }}</template>
             </td>
             <td class="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
-              {{ person.metrics?.resolvedPoints ?? '—' }}
+              <span v-if="person.metrics?.nameNotFound" class="text-gray-400 italic">no Jira user</span>
+              <template v-else>{{ person.metrics?.resolvedPoints ?? '—' }}</template>
             </td>
             <td class="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
-              {{ person.metrics?.avgCycleTimeDays != null ? person.metrics.avgCycleTimeDays + 'd' : '—' }}
+              <span v-if="person.metrics?.nameNotFound" class="text-gray-400 italic">no Jira user</span>
+              <template v-else>{{ person.metrics?.avgCycleTimeDays != null ? person.metrics.avgCycleTimeDays + 'd' : '—' }}</template>
             </td>
             <td class="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
               <template v-if="person.githubContributions != null">{{ person.githubContributions }}</template>

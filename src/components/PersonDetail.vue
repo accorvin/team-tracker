@@ -87,6 +87,19 @@
       </div>
     </div>
 
+    <!-- Name not found warning -->
+    <div v-if="metrics?._nameNotFound" class="bg-orange-50 border border-orange-300 rounded-lg p-4 mb-6 flex items-start gap-3">
+      <svg class="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <div>
+        <p class="text-orange-800 text-sm font-medium">No matching Jira account found</p>
+        <p class="text-orange-700 text-xs mt-0.5">
+          Could not find a matching Jira account for this person. Metrics shown may be empty or belong to someone else.
+        </p>
+      </div>
+    </div>
+
     <!-- Loading state -->
     <div v-if="isLoading && !metrics" class="flex items-center justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
