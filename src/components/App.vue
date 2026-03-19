@@ -49,7 +49,11 @@
                   : 'text-gray-500 hover:text-gray-700'"
               >{{ tab.label }}</button>
             </nav>
-            <!-- Refresh All -->
+            <!-- Last updated + Refresh All -->
+            <span
+              v-if="lastRefreshedLabel"
+              class="hidden md:inline text-xs text-gray-400"
+            >{{ lastRefreshedLabel }}</span>
             <button
               v-if="authUser && authIsAdmin"
               @click="handleRefreshAll($event)"
@@ -149,10 +153,11 @@ import UserManagement from './UserManagement.vue'
 import SettingsView from './SettingsView.vue'
 import SetupBanner from './SetupBanner.vue'
 import AppSidebar from './AppSidebar.vue'
+import { computed, ref, onUnmounted } from 'vue'
 import { useAuth } from '../composables/useAuth'
 import { useRoster } from '../composables/useRoster'
 import { useGithubStats } from '../composables/useGithubStats'
-import { refreshAllMetrics, refreshTrendsGithub } from '../services/api'
+import { refreshAllMetrics, refreshTrendsGithub, getLastRefreshed } from '../services/api'
 
 export default {
   name: 'App',
@@ -176,9 +181,36 @@ export default {
     const { user: authUser, isAdmin: authIsAdmin } = useAuth()
     const { loadRoster, teams, selectedOrgKey, selectOrg, loading: rosterLoading } = useRoster()
     const { loadGithubStats, refreshStats } = useGithubStats()
+    const lastRefreshedAt = ref(null)
+    const tick = ref(0)
+    const tickTimer = setInterval(() => { tick.value++ }, 30000)
+    onUnmounted(() => clearInterval(tickTimer))
+    const lastRefreshedLabel = computed(() => {
+      tick.value
+      if (!lastRefreshedAt.value) return null
+      const ts = new Date(lastRefreshedAt.value)
+      const now = new Date()
+      const diff = now - ts
+      const mins = Math.floor(diff / 60000)
+      if (mins < 1) return 'Updated just now'
+      if (mins === 1) return 'Updated 1 min ago'
+      if (mins < 60) return `Updated ${mins} mins ago`
+      const hours = Math.floor(mins / 60)
+      if (hours === 1) return 'Updated 1 hr ago'
+      if (hours < 24) return `Updated ${hours} hrs ago`
+      return `Updated ${ts.toLocaleDateString()}`
+    })
+    async function fetchLastRefreshed() {
+      try {
+        const { timestamp } = await getLastRefreshed()
+        lastRefreshedAt.value = timestamp
+      } catch { /* ignore */ }
+    }
     return {
       authUser,
       authIsAdmin,
+      lastRefreshedLabel,
+      fetchLastRefreshed,
       loadRoster,
       loadGithubStats,
       refreshStats,
@@ -260,7 +292,8 @@ export default {
       try {
         await Promise.all([
           this.loadRoster(),
-          this.loadGithubStats()
+          this.loadGithubStats(),
+          this.fetchLastRefreshed()
         ])
         this.restoreFromHash()
       } catch (error) {

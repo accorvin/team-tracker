@@ -534,6 +534,10 @@ function sanitizeFilename(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '_');
 }
 
+function saveLastRefreshed() {
+  writeToStorage('last-refreshed.json', { timestamp: new Date().toISOString() });
+}
+
 function readRosterFull() {
   return readFromStorage('org-roster-full.json');
 }
@@ -612,6 +616,11 @@ function deriveRoster() {
 
   return { vp: full.vp, orgs };
 }
+
+app.get('/api/last-refreshed', function(req, res) {
+  const data = readFromStorage('last-refreshed.json');
+  res.json({ timestamp: data?.timestamp || null });
+});
 
 app.get('/api/roster', function(req, res) {
   try {
@@ -849,6 +858,7 @@ app.post('/api/roster/refresh', requireAdmin, function(req, res) {
       }
       await Promise.all(workers);
       persistNameCache();
+      saveLastRefreshed();
       console.log(`[roster-refresh] All teams refresh complete (${uniqueMembers.length} members)`);
     });
   } catch (error) {
@@ -1016,6 +1026,7 @@ app.post('/api/github/refresh', requireAdmin, function(req, res) {
       cache.fetchedAt = new Date().toISOString();
 
       writeToStorage(GITHUB_CACHE_PATH, cache);
+      saveLastRefreshed();
       console.log(`[github] Refresh complete. ${Object.keys(results).length} users processed.`);
     }).catch(function(err) {
       console.error('[github] Refresh failed:', err.message);
@@ -1114,6 +1125,7 @@ app.post('/api/gitlab/refresh', requireAdmin, function(req, res) {
         cache.fetchedAt = new Date().toISOString();
 
         writeToStorage(GITLAB_CACHE_PATH, cache);
+        saveLastRefreshed();
         console.log(`[gitlab] Refresh complete. ${Object.keys(results).length} users processed.`);
       } catch (err) {
         console.error('[gitlab] Refresh failed:', err.message);

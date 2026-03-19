@@ -117,6 +117,12 @@ async function cachedRequest(cacheKey, path, onData) {
   }
 }
 
+// ─── Last Refreshed ───
+
+export async function getLastRefreshed() {
+  return apiRequest('/last-refreshed')
+}
+
 // ─── Roster & Person Metrics ───
 
 export async function getRoster(onData) {
