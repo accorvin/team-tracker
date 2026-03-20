@@ -13,7 +13,7 @@
         <transition name="fade">
           <div v-if="!collapsed" class="overflow-hidden whitespace-nowrap">
             <h1 class="text-sm font-bold text-gray-900 leading-tight">Team Tracker</h1>
-            <p class="text-xs text-gray-400">AI Platform Team</p>
+            <p class="text-xs text-gray-400">AI Engineering</p>
           </div>
         </transition>
       </div>
