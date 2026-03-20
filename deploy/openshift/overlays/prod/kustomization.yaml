@@ -4,14 +4,14 @@ kind: Kustomization
 namespace: ambient-code--team-tracker
 
 resources:
-  - ../../base
-  - cronjob-sync-refresh.yaml
+- ../../base
+- cronjob-sync-refresh.yaml
 
 patches:
-  - path: route-patch.yaml
+- path: route-patch.yaml
 
 images:
-  - name: quay.io/org-pulse/team-tracker-backend
-    newTag: latest
-  - name: quay.io/org-pulse/team-tracker-frontend
-    newTag: latest
+- name: quay.io/org-pulse/team-tracker-backend
+  newTag: 9f366c52ac6a94a15e3cf9b5cc8e76b99a30bf9d
+- name: quay.io/org-pulse/team-tracker-frontend
+  newTag: latest
