@@ -97,6 +97,26 @@ function onIframeLoad() {
     clearTimeout(loadTimeout)
     loadTimeout = null
   }
+
+  // Inject scroll-friendly styles into iframe content so that
+  // nav bars and tab lists scroll horizontally instead of overlapping
+  // when the viewport is narrow.
+  try {
+    const doc = iframeRef.value?.contentDocument
+    if (doc) {
+      const style = doc.createElement('style')
+      style.textContent = `
+        nav, [role="tablist"] {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          flex-wrap: nowrap !important;
+        }
+      `
+      doc.head.appendChild(style)
+    }
+  } catch (e) {
+    // Cross-origin iframe — skip injection
+  }
 }
 
 onMounted(() => {
