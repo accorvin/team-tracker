@@ -98,7 +98,7 @@
       />
 
       <!-- Page content -->
-      <main class="px-6 lg:px-8 py-6">
+      <main :class="currentView === 'module-iframe' ? 'p-0' : 'px-6 lg:px-8 py-6'">
         <!-- Landing Page -->
         <LandingPage
           v-if="currentView === 'landing'"
