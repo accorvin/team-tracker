@@ -12,13 +12,13 @@
 
     <!-- PMs & Eng Lead -->
     <div class="space-y-1 mb-3 text-sm text-gray-600">
-      <div v-if="team.pms && team.pms.length > 0" class="flex items-start gap-1.5">
+      <div v-if="team.productManagers && team.productManagers.length > 0" class="flex items-start gap-1.5">
         <span class="text-gray-400 shrink-0">PM:</span>
-        <span>{{ team.pms.join(', ') }}</span>
+        <span>{{ team.productManagers.join(', ') }}</span>
       </div>
-      <div v-if="team.staffEngineers && team.staffEngineers.length > 0" class="flex items-start gap-1.5">
+      <div v-if="team.engLeads && team.engLeads.length > 0" class="flex items-start gap-1.5">
         <span class="text-gray-400 shrink-0">Eng Lead:</span>
-        <span>{{ team.staffEngineers.join(', ') }}</span>
+        <span>{{ team.engLeads.join(', ') }}</span>
       </div>
     </div>
 

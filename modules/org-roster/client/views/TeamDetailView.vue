@@ -34,14 +34,14 @@
 
         <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <!-- PMs -->
-          <div v-if="team.pms && team.pms.length > 0">
+          <div v-if="team.productManagers && team.productManagers.length > 0">
             <p class="text-xs text-gray-500 uppercase font-medium mb-1">Product Manager</p>
-            <p class="text-sm text-gray-800">{{ team.pms.join(', ') }}</p>
+            <p class="text-sm text-gray-800">{{ team.productManagers.join(', ') }}</p>
           </div>
           <!-- Eng Leads -->
-          <div v-if="team.staffEngineers && team.staffEngineers.length > 0">
+          <div v-if="team.engLeads && team.engLeads.length > 0">
             <p class="text-xs text-gray-500 uppercase font-medium mb-1">Engineering Lead</p>
-            <p class="text-sm text-gray-800">{{ team.staffEngineers.join(', ') }}</p>
+            <p class="text-sm text-gray-800">{{ team.engLeads.join(', ') }}</p>
           </div>
           <!-- Board Links -->
           <div v-if="boardLinks.length > 0">

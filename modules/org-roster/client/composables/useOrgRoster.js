@@ -173,7 +173,8 @@ export function useOrgRoster() {
       const q = searchQuery.value.toLowerCase()
       result = result.filter(t =>
         t.name.toLowerCase().includes(q) ||
-        (t.pms || []).some(pm => pm.toLowerCase().includes(q)) ||
+        (t.productManagers || []).some(pm => pm.toLowerCase().includes(q)) ||
+        (t.engLeads || []).some(el => el.toLowerCase().includes(q)) ||
         (t.components || []).some(c => c.toLowerCase().includes(q))
       )
     }

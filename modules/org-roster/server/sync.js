@@ -25,7 +25,6 @@ function parseTeamBoardsTab(headers, rows) {
     if (h === 'organization') colIdx.org = i;
     else if (h === 'scrum team name') colIdx.teamName = i;
     else if (h === 'jira board') colIdx.board = i;
-    else if (h === 'pm') colIdx.pm = i;
   }
 
   if (colIdx.org === undefined || colIdx.teamName === undefined) {
@@ -44,14 +43,10 @@ function parseTeamBoardsTab(headers, rows) {
     const boardRaw = row[colIdx.board] || '';
     const boardUrls = String(boardRaw).split(/[\n\r]+/).map(u => u.trim()).filter(Boolean);
 
-    const pmRaw = row[colIdx.pm] || '';
-    const pms = String(pmRaw).split(/[,\n\r]+/).map(p => p.trim()).filter(Boolean);
-
     teams.push({
       org: lastOrg,
       name: String(teamName).trim(),
       boardUrls,
-      pms,
     });
   }
 

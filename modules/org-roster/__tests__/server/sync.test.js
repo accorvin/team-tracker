@@ -18,7 +18,6 @@ describe('parseTeamBoardsTab', () => {
       org: 'AI Platform',
       name: 'Dashboard',
       boardUrls: ['https://jira.example.com/board/1'],
-      pms: ['Alice Smith'],
     })
     expect(teams[1].org).toBe('AAET')
   })
@@ -51,35 +50,25 @@ describe('parseTeamBoardsTab', () => {
     expect(teams[0].boardUrls).toEqual(['https://board1.com', 'https://board2.com'])
   })
 
-  it('handles multiple PMs separated by commas', () => {
-    const headers = ['Organization', 'Scrum Team Name', 'JIRA Board', 'PM']
-    const rows = [
-      ['AI Platform', 'Team', '', 'Alice, Bob'],
-    ]
-    const teams = parseTeamBoardsTab(headers, rows)
-    expect(teams[0].pms).toEqual(['Alice', 'Bob'])
-  })
-
   it('handles headers already trimmed by fetchRawSheet', () => {
     // fetchRawSheet trims headers before passing them in
-    const headers = ['Organization', 'Scrum Team Name', 'JIRA Board', 'PM']
+    const headers = ['Organization', 'Scrum Team Name', 'JIRA Board']
     const rows = [
-      ['AI Platform', 'Team A', '', 'Alice'],
+      ['AI Platform', 'Team A', ''],
     ]
     const teams = parseTeamBoardsTab(headers, rows)
     expect(teams).toHaveLength(1)
     expect(teams[0].name).toBe('Team A')
-    expect(teams[0].pms).toEqual(['Alice'])
   })
 
   it('carries forward org for merged cells (empty org column)', () => {
-    const headers = ['Organization', 'Scrum Team Name', 'JIRA Board', 'PM']
+    const headers = ['Organization', 'Scrum Team Name', 'JIRA Board']
     const rows = [
-      ['AI Platform', 'Team A', '', 'Alice'],
-      ['', 'Team B', '', 'Bob'],
-      ['', 'Team C', '', 'Carol'],
-      ['AAET', 'Team D', '', 'Dave'],
-      ['', 'Team E', '', 'Eve'],
+      ['AI Platform', 'Team A', ''],
+      ['', 'Team B', ''],
+      ['', 'Team C', ''],
+      ['AAET', 'Team D', ''],
+      ['', 'Team E', ''],
     ]
     const teams = parseTeamBoardsTab(headers, rows)
     expect(teams).toHaveLength(5)

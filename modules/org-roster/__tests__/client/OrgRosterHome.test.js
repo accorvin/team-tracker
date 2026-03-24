@@ -20,8 +20,8 @@ vi.mock('../../client/composables/useOrgRoster', () => ({
       {
         org: 'AI Platform',
         name: 'Dashboard',
-        pms: ['Alice'],
-        staffEngineers: ['Bob'],
+        productManagers: ['Alice'],
+        engLeads: ['Bob'],
         memberCount: 5,
         components: ['AI Hub'],
         boardUrls: ['https://example.com'],
@@ -31,8 +31,8 @@ vi.mock('../../client/composables/useOrgRoster', () => ({
       {
         org: 'AAET',
         name: 'Pipelines',
-        pms: ['Eve'],
-        staffEngineers: [],
+        productManagers: ['Eve'],
+        engLeads: [],
         memberCount: 4,
         components: [],
         boardUrls: [],

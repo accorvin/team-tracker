@@ -59,9 +59,31 @@ function getOrgKeys(storage) {
   }));
 }
 
+/**
+ * Collect unique non-empty values of a given field across a list of people.
+ * Useful for rolling up fields like engineeringLead or productManager per team.
+ * @param {object[]} people
+ * @param {string} fieldName
+ * @returns {string[]}
+ */
+function getTeamRollup(people, fieldName) {
+  const values = new Set();
+  for (const person of people) {
+    const val = person[fieldName] || person.customFields?.[fieldName];
+    if (val && typeof val === 'string') {
+      for (const v of val.split(',')) {
+        const trimmed = v.trim();
+        if (trimmed) values.add(trimmed);
+      }
+    }
+  }
+  return [...values].sort();
+}
+
 module.exports = {
   readRosterFull,
   getAllPeople,
   getPeopleByOrg,
-  getOrgKeys
+  getOrgKeys,
+  getTeamRollup
 };

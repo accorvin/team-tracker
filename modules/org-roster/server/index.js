@@ -2,7 +2,7 @@ const { runSync, parseTeamBoardsTab } = require('./sync');
 const { calculateHeadcountByRole } = require('./sync');
 const { fetchAllRfeBacklog } = require('./rfe');
 const { isSyncInProgress, setSyncInProgress, scheduleDaily } = require('./scheduler');
-const { getAllPeople } = require('../../../shared/server/roster');
+const { getAllPeople, getTeamRollup } = require('../../../shared/server/roster');
 const { fetchRawSheet } = require('../../../shared/server/google-sheets');
 const { getOrgDisplayNames } = require('../../team-tracker/server/roster-sync/config');
 
@@ -91,15 +91,9 @@ module.exports = function registerRoutes(router, context) {
         }
       }
 
-      // Named staff engineers from people data
-      const staffEngineers = [...new Set(
-        teamPeople
-          .filter(p => {
-            const spec = (p.engineeringSpeciality || p.specialty || '').toLowerCase();
-            return spec.includes('staff') || spec.includes('architect');
-          })
-          .map(p => p.name)
-      )];
+      // Eng leads and PMs from person-level fields
+      const engLeads = getTeamRollup(teamPeople, 'engineeringLead');
+      const productManagers = getTeamRollup(teamPeople, 'productManager');
 
       // Derive jiraFilter from most common value among team members
       const filterCounts = {};
@@ -118,7 +112,8 @@ module.exports = function registerRoutes(router, context) {
       return {
         ...team,
         boards,
-        staffEngineers,
+        engLeads,
+        productManagers,
         headcount: counts,
         components,
         memberCount: teamPeople.length,

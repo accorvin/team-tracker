@@ -9,8 +9,8 @@ vi.mock('../../client/composables/useOrgRoster', () => ({
     loadTeamDetail: vi.fn().mockResolvedValue({
       org: 'AI Platform',
       name: 'Dashboard',
-      pms: ['Alice Smith'],
-      staffEngineers: ['Bob Jones'],
+      productManagers: ['Alice Smith'],
+      engLeads: ['Bob Jones'],
       boardUrls: ['https://jira.example.com/board/1'],
       components: ['AI Hub', 'AI Core Dashboard'],
       memberCount: 3,
