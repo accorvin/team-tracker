@@ -1,5 +1,11 @@
 <template>
   <div>
+    <!-- Loading state when team not yet resolved from roster -->
+    <div v-if="!team" class="flex items-center justify-center py-12">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    </div>
+
+    <template v-else>
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-3">
@@ -119,6 +125,7 @@
       @confirm="handleRefreshConfirm"
       @cancel="showRefreshModal = false"
     />
+    </template>
   </div>
 </template>
 
@@ -182,6 +189,13 @@ watch(() => nav.params.value?.teamKey, () => {
   fetchTeamMetrics()
 })
 
+// Retry loading metrics once team resolves (roster loads async)
+watch(team, (newVal, oldVal) => {
+  if (newVal && !oldVal && !teamMetrics.value) {
+    fetchTeamMetrics()
+  }
+})
+
 const memberMetricsMap = computed(() => {
   const map = new Map()
   if (teamMetrics.value?.members) {
@@ -195,6 +209,7 @@ const memberMetricsMap = computed(() => {
 })
 
 const uniqueMembers = computed(() => {
+  if (!team.value) return []
   const seen = new Set()
   return team.value.members.filter(m => {
     if (seen.has(m.jiraDisplayName)) return false
