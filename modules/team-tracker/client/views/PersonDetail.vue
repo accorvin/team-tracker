@@ -1,5 +1,11 @@
 <template>
   <div>
+    <!-- Loading state when person not yet resolved from roster -->
+    <div v-if="!person" class="flex items-center justify-center py-12">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    </div>
+
+    <template v-else>
     <!-- Breadcrumb -->
     <nav class="flex items-center gap-2 text-sm text-gray-500 mb-4">
       <button @click="nav.navigateTo('dashboard')" class="hover:text-primary-600 transition-colors">Dashboard</button>
@@ -251,11 +257,12 @@
         </div>
       </div>
     </template>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, watch, inject } from 'vue'
 import DynamicFieldBadge from '../components/DynamicFieldBadge.vue'
 import MetricCard from '../components/MetricCard.vue'
 import RefreshModal from '@shared/client/components/RefreshModal.vue'
@@ -353,5 +360,12 @@ async function loadMetrics({ refresh = false, force, sources } = {}) {
 onMounted(() => {
   loadMetrics()
   loadGitlabStats()
+})
+
+// Retry loading metrics once person resolves (roster loads async)
+watch(person, (newVal, oldVal) => {
+  if (newVal && !oldVal && !metrics.value) {
+    loadMetrics()
+  }
 })
 </script>
