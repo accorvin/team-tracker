@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "validate:modules": "node scripts/validate-modules.js"
   },
   "dependencies": {
     "chart.js": "^4.4.7",

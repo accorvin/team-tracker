@@ -40,6 +40,7 @@ npm run dev:full       # Starts Vite (5173) + Express (3001)
 
 - **Frontend**: Vue 3 SPA with Composition API (`<script setup>`), Vite 6, Tailwind CSS 3
 - **Backend**: Express API server (port 3001), single `server/dev-server.js` for both local dev and production
+- **Modules**: Built-in modules live in `modules/<slug>/` with auto-discovery (see Module System below)
 - **Charts**: Chart.js 4 + vue-chartjs 5
 - **Auth**: OpenShift OAuth proxy in production; no auth in local dev (uses `ADMIN_EMAILS` env var)
 - **Storage**: Local filesystem (`./data/`), mounted as PVC in OpenShift
@@ -55,7 +56,7 @@ npm run dev:full       # Starts Vite (5173) + Express (3001)
 - **Trends**: Built dynamically from person metric files by bucketing resolved issues by month, with org/team breakdowns.
 - **Composite keys**: Teams are identified by `orgKey::teamName` (e.g., `shgriffi::Model Serving`).
 
-### Roster Sync (`server/roster-sync/`)
+### Roster Sync (`modules/team-tracker/server/roster-sync/`)
 Automated roster building that replaces manual scripts:
 - **LDAP** (`ldap.js`): Traverses Red Hat corporate directory from configured org root UIDs. Requires VPN.
   - `ldapjs` v3: `createClient()` is synchronous. Search entries use `entry.attributes` array with `.type` and `.values`.
@@ -75,17 +76,30 @@ Automated roster building that replaces manual scripts:
 - Story points field: `customfield_10028`
 - Searches across all Jira projects (no project filter)
 
-### GitHub Integration (`server/github/contributions.js`)
+### GitHub Integration (`modules/team-tracker/server/github/contributions.js`)
 - Uses GitHub GraphQL API directly via `node-fetch` (no `gh` CLI dependency)
 - Auth via `GITHUB_TOKEN` env var (classic PAT with `read:user` scope)
 - Batches users (10 per batch for counts, 5 for history) with 2-second delays between batches to avoid rate limiting
 - Functions are async: `fetchContributions(usernames)` and `fetchContributionHistory(usernames)`
 
-### GitLab Integration (`server/gitlab/contributions.js`)
+### GitLab Integration (`modules/team-tracker/server/gitlab/contributions.js`)
 - Uses GitLab REST API (`/api/v4/users/:id/events`) via `node-fetch`
 - Auth via `GITLAB_TOKEN` env var (PAT with `read_api` scope). Falls back to unauthenticated (public repos only).
 - `GITLAB_BASE_URL` defaults to `https://gitlab.com`
 - Sequential requests with delays (200ms authenticated, 7s unauthenticated)
+
+### Module System
+- **Built-in modules** live in `modules/<slug>/` with `module.json` manifests, `client/`, `server/`, and `__tests__/` directories
+- **Auto-discovery**: Frontend uses `import.meta.glob('/modules/*/module.json')`, backend scans filesystem via `server/module-loader.js`
+- **Shared code**: `shared/client/` (composables, services, components) and `shared/server/` (storage, auth) — importable via `@shared` alias
+- **Vite aliases**: `@shared` → `shared/`, `@modules` → `modules/`
+- **Navigation**: Modules use `inject('moduleNav')` for `navigateTo(viewId, params)`, `goBack()`, and reactive `params`
+- **Hash routing**: `#/<module-slug>/<view-id>?key=value`
+- **Backend routes**: Module server routes are mounted at `/api/modules/<slug>/`
+- **Legacy forwards**: Team Tracker routes are aliased from `/api/roster` etc. to `/api/modules/team-tracker/...` for backward compatibility
+- **Module guide**: See `docs/MODULES.md` for creating new modules; use `/create-module` command to bootstrap
+- **Validation**: `npm run validate:modules` checks all manifests; runs in CI before tests
+- **Stability contract**: `shared/API.md` documents shared exports; modules cannot import from other modules
 
 ### Caching
 - Frontend uses localStorage stale-while-revalidate pattern (prefix `tt_cache:`)
@@ -116,14 +130,12 @@ Secrets (created manually on cluster, not in git):
 
 **GitHub Actions workflows** (`.github/workflows/`):
 - **`ci.yml`** — Runs on all PRs and pushes to `main`. Lints, tests, builds, and validates kustomize overlays (kustomize validation only runs when `deploy/` files change). The job name "Test & Build" is the single required status check.
-- **`build-backend.yml`** — Triggers on pushes to `main` when `server/`, `deploy/backend.Dockerfile`, or `package*.json` change. Runs tests, builds and smoke-tests the image, pushes to `quay.io/org-pulse/team-tracker-backend` with both `:<sha>` and `:latest` tags.
-- **`build-frontend.yml`** — Same pattern for frontend, triggered by `src/`, `public/`, `deploy/frontend.Dockerfile`, `deploy/nginx.conf`, etc.
+- **`build-images.yml`** — Triggers on pushes to `main` when backend or frontend source files change. Detects which components changed, builds/smoke-tests/pushes only the affected images to Quay.io with `:<sha>` and `:latest` tags, then creates a single PR to update prod overlay image tags.
 
 **Automatic prod deployment flow:**
-1. PR merged to `main` → build workflow runs tests, builds image, pushes `quay.io/org-pulse/team-tracker-*:<sha>` + `:latest`
-2. Build workflow creates a follow-up PR updating the prod overlay's image tag via `kustomize edit set image`, then auto-merges it (`gh pr merge --auto --squash`)
-3. ArgoCD (auto-sync) picks up the manifest change and rolls out the new image
-4. A shared `update-prod-image` concurrency group prevents conflicting simultaneous updates from backend and frontend builds
+1. PR merged to `main` → build workflow detects changed components, runs tests, builds affected images, pushes `quay.io/org-pulse/team-tracker-*:<sha>` + `:latest`
+2. A single `update-prod-image` job creates one follow-up PR updating all affected image tags via `kustomize edit set image`, then auto-merges it (`gh pr merge --auto --squash`)
+3. ArgoCD (auto-sync) picks up the manifest change and rolls out the new image(s)
 
 **Image tagging:**
 - Prod overlay pins images to git SHA tags (e.g., `quay.io/org-pulse/team-tracker-backend:abc1234...`), updated automatically by CI
@@ -156,20 +168,37 @@ OpenShift OAuth proxy (sidecar on frontend pod) authenticates users and sets `X-
 
 ```
 src/
-  components/       # Vue components (App.vue is the root with hash routing)
-  composables/      # Shared state (useRoster, useAuth, useGithubStats, useGitlabStats, useAllowlist, useRosterSync, useViewPreference)
-  services/api.js   # API client with caching
-  utils/metrics.js  # Metric calculations
+  components/       # App shell (App.vue, AppSidebar, LandingPage, SettingsView)
+  composables/      # Shell-only composables (useModules, useModuleAdmin)
+  module-loader.js  # Frontend module auto-discovery via import.meta.glob
   __tests__/        # Frontend tests
+
+shared/
+  client/
+    composables/    # Shared composables (useRoster, useAuth, useGithubStats, etc.)
+    services/       # API client with caching (api.js)
+    components/     # Shared UI (Toast, LoadingOverlay, RefreshModal)
+    index.js        # Barrel export
+  server/
+    storage.js      # Filesystem storage abstraction
+    demo-storage.js # Fixture-backed storage for demo mode
+    auth.js         # Auth middleware (requireAuth, requireAdmin)
+    index.js        # Barrel export
+  API.md            # Stability contract for shared exports
+
+modules/
+  team-tracker/     # Main module: delivery metrics, sprint tracking
+    module.json     # Module manifest
+    client/         # Views, components, composables, utils
+    server/         # Jira, GitHub, GitLab, roster-sync integrations
+    __tests__/      # Module tests (client/ and server/)
 
 server/
   dev-server.js     # Express server (local dev + production)
-  storage.js        # Local file storage abstraction
-  jira/             # Jira API integration (client, sprint-report, person-metrics, orchestration)
-  github/           # GitHub GraphQL API (contribution fetching)
-  gitlab/           # GitLab REST API (contribution fetching)
-  roster-sync/      # Automated roster sync (LDAP + Google Sheets + username inference)
-  jira/__tests__/   # Backend tests
+  module-loader.js  # Backend module auto-discovery
+
+scripts/
+  validate-modules.js  # CI manifest validation
 
 deploy/
   backend.Dockerfile    # Backend container image
@@ -180,6 +209,10 @@ deploy/
     overlays/dev/       # Dev cluster overlay (namespace: team-tracker)
     overlays/preprod/   # Preprod cluster overlay (namespace: ambient-code--team-tracker)
     overlays/prod/      # Prod cluster overlay
+
+docs/
+  MODULES.md            # Module development guide
+  module-template/      # Starter template for new modules
 
 data/               # Local dev data (gitignored)
 secrets/            # Service account keys (gitignored)
@@ -196,8 +229,9 @@ secrets/            # Service account keys (gitignored)
 
 ## Testing
 
-- Vitest + @vue/test-utils for frontend tests in `src/__tests__/`
-- Vitest for backend unit tests in `server/jira/__tests__/`
+- Vitest + @vue/test-utils for frontend tests in `src/__tests__/` and `modules/*/__tests__/client/`
+- Vitest for backend unit tests in `modules/*/__tests__/server/`
+- Module manifest validation: `npm run validate:modules`
 - Run `npm test` before committing
 
 ## API Routes

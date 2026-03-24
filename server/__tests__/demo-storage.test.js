@@ -6,7 +6,7 @@ import path from 'path'
 process.env.DEMO_MODE = 'true'
 
 // Import after setting env var
-const { readFromStorage, writeToStorage, FIXTURES_DIR } = require('../demo-storage')
+const { readFromStorage, writeToStorage, FIXTURES_DIR } = require('../../shared/server/demo-storage')
 
 const testFixturePath = path.join(FIXTURES_DIR, 'test-fixture.json')
 

@@ -29,6 +29,7 @@ org-roster.json
 
 output.txt
 
-# Claude Code (keep .claude/CLAUDE.md tracked for contributors)
+# Claude Code (keep .claude/CLAUDE.md and commands tracked for contributors)
 .claude/*
 !.claude/CLAUDE.md
+!.claude/commands/

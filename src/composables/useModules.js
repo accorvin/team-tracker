@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { getModules } from '../services/api'
+import { getModules } from '@shared/client/services/api'
 
 const modulesData = ref(null)
 const loading = ref(false)

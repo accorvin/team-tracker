@@ -6,3 +6,4 @@ data
 dist
 deploy/openshift
 *.md
+modules/*/__tests__/

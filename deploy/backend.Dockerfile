@@ -8,8 +8,10 @@ RUN apk add --no-cache git
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-# Copy server code and data directory structure
+# Copy server code, shared modules, and built-in modules
 COPY server/ ./server/
+COPY shared/server/ ./shared/server/
+COPY modules/ ./modules/
 
 # Create data directory for PVC mount
 RUN mkdir -p /app/data && chown -R 1001:0 /app/data && chmod -R g+rwX /app/data

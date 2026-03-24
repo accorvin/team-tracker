@@ -9,6 +9,8 @@ RUN npm ci
 COPY index.html vite.config.mjs tailwind.config.mjs postcss.config.mjs ./
 COPY src/ ./src/
 COPY public/ ./public/
+COPY shared/client/ ./shared/client/
+COPY modules/ ./modules/
 
 RUN npm run build
 

@@ -27,24 +27,24 @@
             class="px-3 mb-2 mt-4 first:mt-0 text-[10px] font-semibold uppercase tracking-widest text-gray-400"
           >{{ section.label }}</p>
 
-          <!-- Collapsible section header (Team Tracker) -->
+          <!-- Collapsible section header (built-in modules) -->
           <template v-if="section.collapsible && !collapsed">
             <button
               @click="toggleSection(section.id)"
               class="group relative w-full flex items-center py-2.5 rounded-xl text-sm font-medium transition-all duration-200 gap-3 px-3"
-              :class="isTeamTrackerActive
+              :class="activeModule === section.id
                 ? 'bg-gray-900 text-white shadow-sm'
                 : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
               :aria-expanded="section.expanded"
-              :aria-label="section.items[0]?.label"
+              :aria-label="section.headerLabel"
             >
               <component
-                :is="section.items[0]?.icon"
+                :is="section.headerIcon"
                 :size="20"
-                :stroke-width="isTeamTrackerActive ? 2 : 1.7"
+                :stroke-width="activeModule === section.id ? 2 : 1.7"
                 class="flex-shrink-0"
               />
-              <span class="truncate flex-1 text-left">{{ section.items[0]?.label }}</span>
+              <span class="truncate flex-1 text-left">{{ section.headerLabel }}</span>
               <component
                 :is="section.expanded ? ChevronDown : ChevronRight"
                 :size="16"
@@ -54,13 +54,13 @@
             <!-- Sub-items when expanded -->
             <div v-if="section.expanded" class="ml-4 mt-1 space-y-0.5">
               <button
-                v-for="item in section.items.slice(1)"
+                v-for="item in section.items"
                 :key="item.id"
                 @click="$emit('navigate', item.id)"
-                :aria-current="activeModule === item.id ? 'page' : undefined"
+                :aria-current="isNavItemActive(item, section) ? 'page' : undefined"
                 :aria-label="item.label"
                 class="group relative w-full flex items-center py-2 rounded-lg text-sm font-medium transition-all duration-200 gap-3 px-3"
-                :class="isSubItemActive(item.id)
+                :class="isNavItemActive(item, section)
                   ? 'bg-gray-100 text-gray-900'
                   : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'"
               >
@@ -75,18 +75,17 @@
             </div>
           </template>
 
-          <!-- Regular items (or collapsed mode for collapsible sections) -->
+          <!-- Regular items (or collapsed mode) -->
           <template v-else>
-            <template v-for="item in (section.collapsible ? section.items : section.items)" :key="item.id">
-              <!-- In collapsed mode, show all items including collapsible sub-items -->
+            <template v-for="item in section.items" :key="item.id">
               <button
                 v-if="!section.collapsible || collapsed"
                 @click="$emit('navigate', item.id)"
-                :aria-current="activeModule === item.id || (section.collapsible && isSubItemActive(item.id)) ? 'page' : undefined"
+                :aria-current="isNavItemActive(item, section) ? 'page' : undefined"
                 :aria-label="item.label"
                 class="group relative w-full flex items-center py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
                 :class="[
-                  isItemActive(item, section)
+                  isNavItemActive(item, section)
                     ? 'bg-gray-900 text-white shadow-sm'
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
                   collapsed ? 'justify-center px-0' : 'gap-3 px-3'
@@ -95,7 +94,7 @@
                 <component
                   :is="item.icon"
                   :size="20"
-                  :stroke-width="isItemActive(item, section) ? 2 : 1.7"
+                  :stroke-width="isNavItemActive(item, section) ? 2 : 1.7"
                   class="flex-shrink-0"
                 />
                 <transition name="fade">
@@ -180,34 +179,46 @@ import {
 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 
+const ICON_MAP = {
+  BarChart3,
+  Users,
+  TrendingUp,
+  FileText,
+  Home,
+  Shield,
+  Settings,
+  ExternalLink,
+  'bar-chart': BarChart3
+}
+
 const props = defineProps({
   collapsed: Boolean,
   mobileOpen: Boolean,
   activeModule: String,
-  currentView: String,
+  activeViewId: String,
   user: Object,
   isAdmin: Boolean,
-  modules: { type: Array, default: () => [] }
+  modules: { type: Array, default: () => [] },
+  builtInManifests: { type: Array, default: () => [] }
 })
 
 defineEmits(['navigate', 'toggle-collapse', 'close-mobile'])
 
-// Track which collapsible sections are expanded
-const expandedSections = ref({ 'team-tracker': false })
+const expandedSections = ref({})
 
-const isTeamTrackerActive = computed(() => {
-  return props.activeModule === 'team-tracker'
-})
-
-// Auto-expand Team Tracker section when it's active
+// Auto-expand active module section
 watch(() => props.activeModule, (newVal) => {
-  if (newVal === 'team-tracker') {
-    expandedSections.value['team-tracker'] = true
+  if (newVal && props.builtInManifests.some(m => m.slug === newVal)) {
+    expandedSections.value[newVal] = true
   }
 }, { immediate: true })
 
 function toggleSection(sectionId) {
   expandedSections.value[sectionId] = !expandedSections.value[sectionId]
+}
+
+function resolveIcon(iconName) {
+  return ICON_MAP[iconName] || BarChart3
 }
 
 const externalModules = computed(() => {
@@ -222,23 +233,28 @@ const navSections = computed(() => {
       items: [
         { id: 'home', label: 'Home', icon: Home }
       ]
-    },
-    {
-      id: 'team-tracker',
-      label: '',
-      collapsible: true,
-      expanded: expandedSections.value['team-tracker'],
-      items: [
-        { id: 'team-tracker', label: 'Team Tracker', icon: BarChart3 },
-        { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-        { id: 'people', label: 'People', icon: Users },
-        { id: 'trends', label: 'Trends', icon: TrendingUp },
-        { id: 'reports', label: 'Reports', icon: FileText },
-      ]
     }
   ]
 
-  // Dynamic external modules
+  // Built-in modules from manifests
+  for (const manifest of props.builtInManifests) {
+    const navItems = manifest.client?.navItems || []
+    sections.push({
+      id: manifest.slug,
+      label: '',
+      collapsible: true,
+      expanded: expandedSections.value[manifest.slug] || false,
+      headerLabel: manifest.name,
+      headerIcon: resolveIcon(manifest.icon),
+      items: navItems.map(item => ({
+        id: `${manifest.slug}::${item.id}`,
+        label: item.label,
+        icon: resolveIcon(item.icon)
+      }))
+    })
+  }
+
+  // Git-static external modules
   if (externalModules.value.length > 0) {
     sections.push({
       id: 'modules',
@@ -265,21 +281,27 @@ const navSections = computed(() => {
   return sections
 })
 
-function isItemActive(item, section) {
+function isNavItemActive(item, section) {
   if (item.id === 'home') return props.activeModule === 'home'
-  if (section.collapsible && item.id === 'team-tracker') return isTeamTrackerActive.value
   if (item.id.startsWith('modules/')) {
-    return props.activeModule === `module:${item.id.slice('modules/'.length)}`
+    const slug = item.id.slice('modules/'.length)
+    return props.activeModule === 'module-iframe' && props.activeViewId === null && slug === props.activeModule
+  }
+  if (section.collapsible) {
+    // item.id is "slug::viewId"
+    const [slug, viewId] = item.id.split('::')
+    if (props.activeModule !== slug) return false
+    // Mark dashboard-like views as active for the default nav item
+    const manifest = props.builtInManifests.find(m => m.slug === slug)
+    const defaultItem = manifest?.client?.navItems?.find(n => n.default)
+    if (defaultItem && viewId === defaultItem.id) {
+      // Active for the default view AND any internal-only views
+      const navViewIds = new Set((manifest.client?.navItems || []).map(n => n.id))
+      return props.activeViewId === viewId || !navViewIds.has(props.activeViewId)
+    }
+    return props.activeViewId === viewId
   }
   return props.activeModule === item.id
-}
-
-function isSubItemActive(itemId) {
-  if (props.activeModule !== 'team-tracker') return false
-  if (itemId === 'dashboard') {
-    return ['dashboard', 'team-roster', 'person-detail'].includes(props.currentView)
-  }
-  return props.currentView === itemId
 }
 
 function getUserInitials(user) {

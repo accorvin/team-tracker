@@ -105,8 +105,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useAllowlist } from '../composables/useAllowlist'
-import { useAuth } from '../composables/useAuth'
+import { useAllowlist } from '@shared/client/composables/useAllowlist'
+import { useAuth } from '@shared/client/composables/useAuth'
 
 const emit = defineEmits(['back', 'toast'])
 

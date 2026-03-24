@@ -1,0 +1,60 @@
+/**
+ * Demo mode storage - reads from fixtures/ directory.
+ * Write operations are no-ops (demo data is read-only).
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+const FIXTURES_DIR = path.join(__dirname, '..', '..', 'fixtures');
+
+/**
+ * Read JSON from fixtures directory
+ * @param {string} key - Path relative to fixtures/ (e.g., 'org-roster-full.json' or 'people/name.json')
+ * @returns {object|null} Parsed JSON or null if not found
+ */
+function readFromStorage(key) {
+  const filePath = path.join(FIXTURES_DIR, key);
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return JSON.parse(content);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * No-op write for demo mode (fixtures are read-only)
+ * @param {string} key - Would-be path
+ * @param {object} _data - Data that would be written
+ */
+function writeToStorage(key, _data) {
+  console.log(`[Demo Mode] Write ignored: ${key}`);
+}
+
+/**
+ * List JSON files in a subdirectory of fixtures
+ * @param {string} dir - Subdirectory name (e.g., 'people')
+ * @returns {string[]} Array of filenames (without path)
+ */
+function listStorageFiles(dir) {
+  const dirPath = path.join(FIXTURES_DIR, dir);
+  try {
+    return fs.readdirSync(dirPath).filter(f => f.endsWith('.json'));
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+}
+
+module.exports = {
+  readFromStorage,
+  writeToStorage,
+  listStorageFiles,
+  FIXTURES_DIR
+};

@@ -7,7 +7,7 @@
 
     <!-- Empty state -->
     <div
-      v-if="modules.length === 0"
+      v-if="builtInManifests.length === 0 && modules.length === 0"
       class="flex flex-col items-center justify-center py-16 text-center"
     >
       <Package :size="48" class="text-gray-300 mb-4" />
@@ -17,16 +17,16 @@
       </p>
     </div>
 
-    <!-- Built-in Modules -->
-    <div v-if="builtInModules.length > 0" class="mb-8">
+    <!-- Built-in Modules (from manifests) -->
+    <div v-if="builtInManifests.length > 0" class="mb-8">
       <p class="px-1 mb-3 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
         Built-in Modules
       </p>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <button
-          v-for="mod in builtInModules"
+          v-for="mod in builtInManifests"
           :key="mod.slug"
-          @click="handleClick(mod)"
+          @click="$emit('navigate', mod.slug)"
           class="bg-white rounded-lg border border-gray-200 p-5 cursor-pointer hover:border-primary-300 hover:shadow-md transition-all text-left focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
         >
           <div class="flex items-start gap-3">
@@ -42,7 +42,7 @@
       </div>
     </div>
 
-    <!-- External Modules -->
+    <!-- External Modules (git-static) -->
     <div v-if="externalModules.length > 0">
       <p class="px-1 mb-3 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
         External Modules
@@ -51,7 +51,7 @@
         <button
           v-for="mod in externalModules"
           :key="mod.slug"
-          @click="handleClick(mod)"
+          @click="$emit('navigate', `modules/${mod.slug}`)"
           class="bg-white rounded-lg border border-gray-200 p-5 cursor-pointer hover:border-primary-300 hover:shadow-md transition-all text-left focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
         >
           <div class="flex items-start gap-3">
@@ -88,17 +88,14 @@ import {
 
 const props = defineProps({
   modules: { type: Array, default: () => [] },
+  builtInManifests: { type: Array, default: () => [] },
   isAdmin: Boolean
 })
 
-const emit = defineEmits(['navigate', 'select-module'])
-
-const builtInModules = computed(() =>
-  props.modules.filter(m => m.type === 'built-in').sort((a, b) => (a.order || 0) - (b.order || 0))
-)
+defineEmits(['navigate'])
 
 const externalModules = computed(() =>
-  props.modules.filter(m => m.type !== 'built-in').sort((a, b) => (a.order || 0) - (b.order || 0))
+  props.modules.filter(m => m.type === 'git-static').sort((a, b) => (a.order || 0) - (b.order || 0))
 )
 
 const iconMap = {
@@ -114,13 +111,5 @@ const iconMap = {
 
 function getIcon(iconName) {
   return iconMap[iconName] || Box
-}
-
-function handleClick(mod) {
-  if (mod.type === 'built-in' && mod.slug === 'team-tracker') {
-    emit('navigate', 'team-tracker')
-  } else if (mod.type === 'git-static') {
-    emit('navigate', `modules/${mod.slug}`)
-  }
 }
 </script>

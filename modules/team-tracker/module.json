@@ -1,0 +1,20 @@
+{
+  "name": "Team Tracker",
+  "slug": "team-tracker",
+  "description": "Delivery metrics, sprint tracking, and team insights",
+  "icon": "bar-chart",
+  "order": 0,
+  "client": {
+    "entry": "./client/index.js",
+    "navItems": [
+      { "id": "dashboard", "label": "Dashboard", "icon": "BarChart3", "default": true },
+      { "id": "people", "label": "People", "icon": "Users" },
+      { "id": "trends", "label": "Trends", "icon": "TrendingUp" },
+      { "id": "reports", "label": "Reports", "icon": "FileText" }
+    ],
+    "settingsComponent": "./client/components/TeamTrackerSettings.vue"
+  },
+  "server": {
+    "entry": "./server/index.js"
+  }
+}

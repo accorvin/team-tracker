@@ -1,4 +1,4 @@
-import { apiAdmin } from '../services/api'
+import { apiAdmin } from '@shared/client/services/api'
 
 export function useModuleAdmin() {
   async function getAdminModules() {

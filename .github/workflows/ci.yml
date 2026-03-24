@@ -19,7 +19,7 @@ jobs:
         id: changes
         run: |
           CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} HEAD)
-          if echo "$CHANGED" | grep -qE '^(src/|server/|package|vite\.config|tailwind\.config|postcss\.config|vitest\.config|index\.html|public/)'; then
+          if echo "$CHANGED" | grep -qE '^(src/|server/|modules/|shared/|scripts/validate|package|vite\.config|tailwind\.config|postcss\.config|vitest\.config|index\.html|public/)'; then
             echo "app=true" >> "$GITHUB_OUTPUT"
           fi
           if echo "$CHANGED" | grep -q '^deploy/'; then
@@ -36,6 +36,10 @@ jobs:
       - name: Install dependencies
         if: steps.changes.outputs.app == 'true'
         run: npm ci
+
+      - name: Validate module manifests
+        if: steps.changes.outputs.app == 'true'
+        run: npm run validate:modules
 
       - name: Run linting
         if: steps.changes.outputs.app == 'true'
