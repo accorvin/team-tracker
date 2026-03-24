@@ -77,10 +77,19 @@
       <!-- Open RFEs -->
       <div v-if="rfeIssues.length > 0" class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">
-            Open RFEs
-            <span class="text-sm font-normal text-gray-500 ml-2">{{ sortedRfeIssues.length }} of {{ rfeIssues.length }} issue{{ rfeIssues.length !== 1 ? 's' : '' }}</span>
-          </h3>
+          <button class="flex items-center gap-2 group" @click="sections.rfes = !sections.rfes">
+            <svg
+              class="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-transform"
+              :class="{ '-rotate-90': !sections.rfes }"
+              xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-900">
+              Open RFEs
+              <span class="text-sm font-normal text-gray-500 ml-2">{{ sortedRfeIssues.length }} of {{ rfeIssues.length }} issue{{ rfeIssues.length !== 1 ? 's' : '' }}</span>
+            </h3>
+          </button>
           <a
             v-if="teamRfeUrl !== '#'"
             :href="teamRfeUrl"
@@ -91,95 +100,106 @@
             View in Jira
           </a>
         </div>
-        <div class="relative mb-4">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            v-model="rfeSearch"
-            type="text"
-            placeholder="Search RFEs by key, summary, component, status..."
-            class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          />
-        </div>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" @click="toggleRfeSort('key')">
-                  Key <span v-if="rfeSort === 'key'">{{ rfeSortDir === 'asc' ? '▲' : '▼' }}</span>
-                </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" @click="toggleRfeSort('summary')">
-                  Summary <span v-if="rfeSort === 'summary'">{{ rfeSortDir === 'asc' ? '▲' : '▼' }}</span>
-                </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" @click="toggleRfeSort('components')">
-                  Components <span v-if="rfeSort === 'components'">{{ rfeSortDir === 'asc' ? '▲' : '▼' }}</span>
-                </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" @click="toggleRfeSort('status')">
-                  Status <span v-if="rfeSort === 'status'">{{ rfeSortDir === 'asc' ? '▲' : '▼' }}</span>
-                </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" @click="toggleRfeSort('priority')">
-                  Priority <span v-if="rfeSort === 'priority'">{{ rfeSortDir === 'asc' ? '▲' : '▼' }}</span>
-                </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" @click="toggleRfeSort('created')">
-                  Created <span v-if="rfeSort === 'created'">{{ rfeSortDir === 'asc' ? '▲' : '▼' }}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-              <tr v-for="issue in sortedRfeIssues" :key="issue.key" class="hover:bg-gray-50">
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <a
-                    :href="jiraIssueUrl(issue.key)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-primary-600 hover:text-primary-800 hover:underline font-medium"
-                  >
-                    {{ issue.key }}
-                  </a>
-                </td>
-                <td class="px-4 py-3 text-gray-800">{{ issue.summary }}</td>
-                <td class="px-4 py-3">
-                  <div class="flex flex-wrap gap-1">
-                    <span
-                      v-for="comp in issue.components"
-                      :key="comp"
-                      class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700"
+        <template v-if="sections.rfes">
+          <div class="relative mb-4">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              v-model="rfeSearch"
+              type="text"
+              placeholder="Search RFEs by key, summary, component, status..."
+              class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" @click="toggleRfeSort('key')">
+                    Key <span v-if="rfeSort === 'key'">{{ rfeSortDir === 'asc' ? '▲' : '▼' }}</span>
+                  </th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" @click="toggleRfeSort('summary')">
+                    Summary <span v-if="rfeSort === 'summary'">{{ rfeSortDir === 'asc' ? '▲' : '▼' }}</span>
+                  </th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" @click="toggleRfeSort('components')">
+                    Components <span v-if="rfeSort === 'components'">{{ rfeSortDir === 'asc' ? '▲' : '▼' }}</span>
+                  </th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" @click="toggleRfeSort('status')">
+                    Status <span v-if="rfeSort === 'status'">{{ rfeSortDir === 'asc' ? '▲' : '▼' }}</span>
+                  </th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" @click="toggleRfeSort('priority')">
+                    Priority <span v-if="rfeSort === 'priority'">{{ rfeSortDir === 'asc' ? '▲' : '▼' }}</span>
+                  </th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" @click="toggleRfeSort('created')">
+                    Created <span v-if="rfeSort === 'created'">{{ rfeSortDir === 'asc' ? '▲' : '▼' }}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200">
+                <tr v-for="issue in sortedRfeIssues" :key="issue.key" class="hover:bg-gray-50">
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    <a
+                      :href="jiraIssueUrl(issue.key)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-primary-600 hover:text-primary-800 hover:underline font-medium"
                     >
-                      {{ comp }}
+                      {{ issue.key }}
+                    </a>
+                  </td>
+                  <td class="px-4 py-3 text-gray-800">{{ issue.summary }}</td>
+                  <td class="px-4 py-3">
+                    <div class="flex flex-wrap gap-1">
+                      <span
+                        v-for="comp in issue.components"
+                        :key="comp"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700"
+                      >
+                        {{ comp }}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    <span
+                      class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                      :class="statusClass(issue.statusCategory)"
+                    >
+                      {{ issue.status }}
                     </span>
-                  </div>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <span
-                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                    :class="statusClass(issue.statusCategory)"
-                  >
-                    {{ issue.status }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-gray-600">{{ issue.priority }}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-gray-500">{{ formatDate(issue.created) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap text-gray-600">{{ issue.priority }}</td>
+                  <td class="px-4 py-3 whitespace-nowrap text-gray-500">{{ formatDate(issue.created) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
       </div>
 
       <!-- Team Members -->
       <div class="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-          Team Members
-          <span class="text-sm font-normal text-gray-500 ml-2">{{ members.length }} member{{ members.length !== 1 ? 's' : '' }}</span>
-        </h3>
-        <TeamMembersTable :members="members" />
+        <button class="flex items-center gap-2 group mb-4" @click="sections.members = !sections.members">
+          <svg
+            class="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-transform"
+            :class="{ '-rotate-90': !sections.members }"
+            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+          <h3 class="text-lg font-semibold text-gray-900">
+            Team Members
+            <span class="text-sm font-normal text-gray-500 ml-2">{{ members.length }} member{{ members.length !== 1 ? 's' : '' }}</span>
+          </h3>
+        </button>
+        <TeamMembersTable v-if="sections.members" :members="members" />
       </div>
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, reactive, computed, onMounted, inject } from 'vue'
 import HeadcountChart from '../components/HeadcountChart.vue'
 import TeamMembersTable from '../components/TeamMembersTable.vue'
 import ComponentList from '../components/ComponentList.vue'
@@ -199,6 +219,7 @@ const error = ref(null)
 const rfeSort = ref('created')
 const rfeSortDir = ref('desc')
 const rfeSearch = ref('')
+const sections = reactive({ rfes: true, members: true })
 
 const boardLinks = computed(() => {
   if (!team.value) return []

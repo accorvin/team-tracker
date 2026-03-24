@@ -61,8 +61,17 @@
 
       <!-- Teams -->
       <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Teams</h3>
-        <div class="overflow-x-auto">
+        <button class="flex items-center gap-2 group mb-4" @click="teamsExpanded = !teamsExpanded">
+          <svg
+            class="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-transform"
+            :class="{ '-rotate-90': !teamsExpanded }"
+            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+          <h3 class="text-lg font-semibold text-gray-900">Teams</h3>
+        </button>
+        <div v-if="teamsExpanded" class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50">
               <tr>
@@ -175,6 +184,7 @@ const loading = ref(false)
 const error = ref(null)
 const teamSort = ref('members')
 const teamSortDir = ref('desc')
+const teamsExpanded = ref(true)
 
 const roleHeadcount = computed(() => {
   if (!summary.value) return {}
