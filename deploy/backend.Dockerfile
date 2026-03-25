@@ -2,7 +2,12 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache git
+RUN apk add --no-cache git ca-certificates
+
+# Trust internal CA for git and Node.js HTTPS connections
+COPY deploy/certs/internal-root-ca.pem /usr/local/share/ca-certificates/internal-root-ca.crt
+RUN update-ca-certificates
+ENV NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/internal-root-ca.crt
 
 # Install production dependencies only
 COPY package.json package-lock.json ./
