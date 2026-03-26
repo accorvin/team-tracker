@@ -10,8 +10,7 @@ import {
   snapshotPath,
   formatDate,
   sanitizeTeamKey,
-  SNAPSHOT_EPOCH,
-  PERIOD_DAYS
+  SNAPSHOT_EPOCH
 } from '../snapshots'
 
 function createMockStorage(data = {}) {
@@ -86,6 +85,19 @@ const mockGitlabCache = {
   }
 }
 
+const mockGithubHistory = {
+  users: {
+    asmith: { '2026-01': 72, '2026-02': 65 },
+    bjones: { '2026-01': 38, '2026-02': 42 }
+  }
+}
+
+const mockGitlabHistory = {
+  users: {
+    'asmith-gl': { '2026-01': 18, '2026-02': 22 }
+  }
+}
+
 describe('snapshots', () => {
   describe('formatDate', () => {
     it('formats a date as YYYY-MM-DD', () => {
@@ -105,8 +117,8 @@ describe('snapshots', () => {
 
   describe('snapshotPath', () => {
     it('builds the correct storage path', () => {
-      const end = new Date('2026-01-31T00:00:00Z')
-      expect(snapshotPath('org::team', end)).toBe('snapshots/org--team/2026-01-31.json')
+      const end = new Date('2026-02-01T00:00:00Z')
+      expect(snapshotPath('org::team', end)).toBe('snapshots/org--team/2026-02-01.json')
     })
   })
 
@@ -117,12 +129,24 @@ describe('snapshots', () => {
       expect(periods[0].start.getTime()).toBe(SNAPSHOT_EPOCH.getTime())
     })
 
-    it('each period is 30 days long', () => {
+    it('each period is a calendar month', () => {
       const periods = getSnapshotPeriods()
       for (const period of periods) {
-        const diff = (period.end - period.start) / (1000 * 60 * 60 * 24)
-        expect(diff).toBe(PERIOD_DAYS)
+        expect(period.start.getUTCDate()).toBe(1)
+        expect(period.end.getUTCDate()).toBe(1)
+        // end should be the 1st of the next month
+        const expectedEnd = new Date(Date.UTC(
+          period.start.getUTCFullYear(),
+          period.start.getUTCMonth() + 1,
+          1
+        ))
+        expect(period.end.getTime()).toBe(expectedEnd.getTime())
       }
+    })
+
+    it('each period has a monthKey', () => {
+      const periods = getSnapshotPeriods()
+      expect(periods[0].monthKey).toBe('2026-01')
     })
 
     it('periods are contiguous', () => {
@@ -159,31 +183,51 @@ describe('snapshots', () => {
   })
 
   describe('generateSnapshot', () => {
-    it('generates a snapshot with correct team aggregates', () => {
+    it('generates a snapshot with correct team aggregates using monthly history', () => {
       const storage = createMockStorage(mockPersonData)
-      const period = { start: new Date('2026-01-01'), end: new Date('2026-01-31') }
+      const period = { start: new Date('2026-01-01'), end: new Date('2026-02-01'), monthKey: '2026-01' }
 
       const snapshot = generateSnapshot(storage, 'org::team', mockTeam, period, {
+        githubHistory: mockGithubHistory,
+        gitlabHistory: mockGitlabHistory,
         githubCache: mockGithubCache,
         gitlabCache: mockGitlabCache
       })
 
       expect(snapshot.periodStart).toBe('2026-01-01')
-      expect(snapshot.periodEnd).toBe('2026-01-31')
+      expect(snapshot.periodEnd).toBe('2026-02-01')
       expect(snapshot.generatedAt).toBeTruthy()
-      expect(snapshot.team.resolvedCount).toBe(4) // 2 + 2 (only issues in Jan period)
+      expect(snapshot.team.resolvedCount).toBe(4) // 2 + 2 (only issues in Jan)
       expect(snapshot.team.resolvedPoints).toBe(21) // (5+8) + (3+5)
       expect(snapshot.team.inProgressCount).toBe(3) // 2 + 1
       expect(snapshot.team.avgCycleTimeDays).toBe(4.0) // (3.0 + 5.0) / 2
+      expect(snapshot.team.githubContributions).toBe(110) // 72 + 38 (Jan monthly)
+      expect(snapshot.team.gitlabContributions).toBe(18) // 18 + 0 (Jan monthly)
+    })
+
+    it('falls back to total contributions when no history available', () => {
+      const storage = createMockStorage(mockPersonData)
+      const period = { start: new Date('2026-01-01'), end: new Date('2026-02-01'), monthKey: '2026-01' }
+
+      const snapshot = generateSnapshot(storage, 'org::team', mockTeam, period, {
+        githubHistory: { users: {} },
+        gitlabHistory: { users: {} },
+        githubCache: mockGithubCache,
+        gitlabCache: mockGitlabCache
+      })
+
+      // Falls back to totalContributions from cache
       expect(snapshot.team.githubContributions).toBe(150) // 100 + 50
       expect(snapshot.team.gitlabContributions).toBe(30) // 30 + 0
     })
 
-    it('generates per-member metrics', () => {
+    it('generates per-member metrics with monthly history', () => {
       const storage = createMockStorage(mockPersonData)
-      const period = { start: new Date('2026-01-01'), end: new Date('2026-01-31') }
+      const period = { start: new Date('2026-01-01'), end: new Date('2026-02-01'), monthKey: '2026-01' }
 
       const snapshot = generateSnapshot(storage, 'org::team', mockTeam, period, {
+        githubHistory: mockGithubHistory,
+        gitlabHistory: mockGitlabHistory,
         githubCache: mockGithubCache,
         gitlabCache: mockGitlabCache
       })
@@ -193,8 +237,8 @@ describe('snapshots', () => {
         resolvedPoints: 13,
         inProgressCount: 2,
         avgCycleTimeDays: 3.0,
-        githubContributions: 100,
-        gitlabContributions: 30,
+        githubContributions: 72,
+        gitlabContributions: 18,
         hasGithub: true,
         hasGitlab: true
       })
@@ -204,7 +248,7 @@ describe('snapshots', () => {
         resolvedPoints: 8,
         inProgressCount: 1,
         avgCycleTimeDays: 5.0,
-        githubContributions: 50,
+        githubContributions: 38,
         gitlabContributions: 0,
         hasGithub: true,
         hasGitlab: false
@@ -213,7 +257,7 @@ describe('snapshots', () => {
 
     it('handles missing person data gracefully', () => {
       const storage = createMockStorage({}) // no person files
-      const period = { start: new Date('2026-01-01'), end: new Date('2026-01-31') }
+      const period = { start: new Date('2026-01-01'), end: new Date('2026-02-01'), monthKey: '2026-01' }
 
       const snapshot = generateSnapshot(storage, 'org::team', mockTeam, period, {
         githubCache: { users: {} },
@@ -233,7 +277,7 @@ describe('snapshots', () => {
         ]
       }
       const storage = createMockStorage(mockPersonData)
-      const period = { start: new Date('2026-01-01'), end: new Date('2026-01-31') }
+      const period = { start: new Date('2026-01-01'), end: new Date('2026-02-01'), monthKey: '2026-01' }
 
       const snapshot = generateSnapshot(storage, 'org::team', teamWithDupes, period, {
         githubCache: { users: {} },
@@ -249,23 +293,23 @@ describe('snapshots', () => {
   describe('generateAndStoreSnapshot', () => {
     it('writes snapshot to storage when none exists', () => {
       const storage = createMockStorage(mockPersonData)
-      const period = { start: new Date('2026-01-01'), end: new Date('2026-01-31') }
+      const period = { start: new Date('2026-01-01'), end: new Date('2026-02-01'), monthKey: '2026-01' }
 
       const snapshot = generateAndStoreSnapshot(storage, 'org::team', mockTeam, period)
 
       expect(storage.writeToStorage).toHaveBeenCalledWith(
-        'snapshots/org--team/2026-01-31.json',
+        'snapshots/org--team/2026-02-01.json',
         snapshot
       )
     })
 
     it('returns existing snapshot without regenerating', () => {
-      const existingSnapshot = { periodStart: '2026-01-01', periodEnd: '2026-01-31', team: {}, members: {} }
+      const existingSnapshot = { periodStart: '2026-01-01', periodEnd: '2026-02-01', team: {}, members: {} }
       const storage = createMockStorage({
         ...mockPersonData,
-        'snapshots/org--team/2026-01-31.json': existingSnapshot
+        'snapshots/org--team/2026-02-01.json': existingSnapshot
       })
-      const period = { start: new Date('2026-01-01'), end: new Date('2026-01-31') }
+      const period = { start: new Date('2026-01-01'), end: new Date('2026-02-01'), monthKey: '2026-01' }
 
       const result = generateAndStoreSnapshot(storage, 'org::team', mockTeam, period)
 
@@ -277,15 +321,15 @@ describe('snapshots', () => {
   describe('loadTeamSnapshots', () => {
     it('returns snapshots sorted by periodStart', () => {
       const storage = createMockStorage({
-        'snapshots/org--team/2026-02-28.json': { periodStart: '2026-01-31', periodEnd: '2026-02-28', team: {}, members: {} },
-        'snapshots/org--team/2026-01-31.json': { periodStart: '2026-01-01', periodEnd: '2026-01-31', team: {}, members: {} }
+        'snapshots/org--team/2026-03-01.json': { periodStart: '2026-02-01', periodEnd: '2026-03-01', team: {}, members: {} },
+        'snapshots/org--team/2026-02-01.json': { periodStart: '2026-01-01', periodEnd: '2026-02-01', team: {}, members: {} }
       })
 
       const snapshots = loadTeamSnapshots(storage, 'org::team')
 
       expect(snapshots).toHaveLength(2)
       expect(snapshots[0].periodStart).toBe('2026-01-01')
-      expect(snapshots[1].periodStart).toBe('2026-01-31')
+      expect(snapshots[1].periodStart).toBe('2026-02-01')
     })
 
     it('returns empty array when no snapshots exist', () => {
@@ -298,22 +342,22 @@ describe('snapshots', () => {
   describe('loadPersonSnapshots', () => {
     it('returns only snapshots that include the person', () => {
       const storage = createMockStorage({
-        'snapshots/org--team/2026-01-31.json': {
+        'snapshots/org--team/2026-02-01.json': {
           periodStart: '2026-01-01',
-          periodEnd: '2026-01-31',
-          generatedAt: '2026-01-31T06:00:00Z',
+          periodEnd: '2026-02-01',
+          generatedAt: '2026-02-01T06:00:00Z',
           team: {},
           members: {
-            'Alice Smith': { resolvedCount: 12, resolvedPoints: 25, inProgressCount: 2, avgCycleTimeDays: 3.5, githubContributions: 100, gitlabContributions: 30 }
+            'Alice Smith': { resolvedCount: 12, resolvedPoints: 25, inProgressCount: 2, avgCycleTimeDays: 3.5, githubContributions: 72, gitlabContributions: 18 }
           }
         },
-        'snapshots/org--team/2026-02-28.json': {
-          periodStart: '2026-01-31',
-          periodEnd: '2026-02-28',
-          generatedAt: '2026-02-28T06:00:00Z',
+        'snapshots/org--team/2026-03-01.json': {
+          periodStart: '2026-02-01',
+          periodEnd: '2026-03-01',
+          generatedAt: '2026-03-01T06:00:00Z',
           team: {},
           members: {
-            'Bob Jones': { resolvedCount: 5, resolvedPoints: 10, inProgressCount: 0, avgCycleTimeDays: 4.0, githubContributions: 20, gitlabContributions: 0 }
+            'Bob Jones': { resolvedCount: 5, resolvedPoints: 10, inProgressCount: 0, avgCycleTimeDays: 4.0, githubContributions: 42, gitlabContributions: 0 }
           }
         }
       })
@@ -329,10 +373,10 @@ describe('snapshots', () => {
 
     it('returns empty array for unknown person', () => {
       const storage = createMockStorage({
-        'snapshots/org--team/2026-01-31.json': {
+        'snapshots/org--team/2026-02-01.json': {
           periodStart: '2026-01-01',
-          periodEnd: '2026-01-31',
-          generatedAt: '2026-01-31T06:00:00Z',
+          periodEnd: '2026-02-01',
+          generatedAt: '2026-02-01T06:00:00Z',
           team: {},
           members: {}
         }

@@ -21,7 +21,7 @@
 
       <!-- Empty state -->
       <div v-else-if="snapshots.length === 0" class="text-center py-12 px-6">
-        <p class="text-gray-500 dark:text-gray-400">No snapshot history available yet. Snapshots are generated every 30 days starting Jan 1, 2026.</p>
+        <p class="text-gray-500 dark:text-gray-400">No snapshot history available yet. Snapshots are generated monthly starting Jan 2026.</p>
       </div>
 
       <!-- Table -->
@@ -45,7 +45,7 @@
               class="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"
             >
               <td class="py-2 px-2 text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                {{ formatPeriod(snapshot.periodStart, snapshot.periodEnd) }}
+                {{ formatPeriod(snapshot.periodStart) }}
               </td>
               <td class="py-2 px-2 text-right whitespace-nowrap">
                 <span class="text-gray-700 dark:text-gray-300">{{ metrics(snapshot).resolvedCount }}</span>
@@ -79,7 +79,7 @@
       <!-- Footer -->
       <div v-if="snapshots.length > 0" class="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
         {{ snapshots.length }} snapshot{{ snapshots.length !== 1 ? 's' : '' }}
-        | 30-day periods starting Jan 1, 2026
+        | Monthly snapshots starting Jan 2026
       </div>
     </div>
   </div>
@@ -114,12 +114,8 @@ function prevMetrics(displayIdx) {
   return metrics(prev)
 }
 
-function formatPeriod(start, end) {
+function formatPeriod(start) {
   const s = new Date(start + 'T00:00:00Z')
-  const e = new Date(end + 'T00:00:00Z')
-  const opts = { month: 'short', day: 'numeric' }
-  const startStr = s.toLocaleDateString('en-US', opts)
-  const endStr = e.toLocaleDateString('en-US', { ...opts, year: 'numeric' })
-  return `${startStr} - ${endStr}`
+  return s.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 }
 </script>

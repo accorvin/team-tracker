@@ -1,32 +1,29 @@
 /**
- * 30-day metric snapshots for teams and people.
+ * Monthly metric snapshots for teams and people.
  *
  * Generates point-in-time snapshots of team and person metrics,
- * stored in data/snapshots/<sanitized-teamKey>/<periodEnd>.json.
+ * stored in data/snapshots/<sanitized-teamKey>/<YYYY-MM>.json.
  *
- * Periods are 30-day windows starting from Jan 1, 2026.
+ * Periods are calendar months starting from Jan 2026.
  */
 
 const SNAPSHOT_EPOCH = new Date('2026-01-01T00:00:00Z');
-const PERIOD_DAYS = 30;
 
 /**
- * Generate the list of 30-day periods from the epoch up to today.
- * Each period is { start: Date, end: Date }.
+ * Generate the list of calendar month periods from the epoch up to today.
+ * Each period is { start: Date, end: Date, monthKey: "YYYY-MM" }.
  */
 function getSnapshotPeriods() {
   const periods = [];
   const now = new Date();
-  let start = new Date(SNAPSHOT_EPOCH);
+  let cursor = new Date(SNAPSHOT_EPOCH);
 
-  while (start < now) {
-    const end = new Date(start);
-    end.setUTCDate(end.getUTCDate() + PERIOD_DAYS);
-    periods.push({
-      start: new Date(start),
-      end: new Date(end)
-    });
-    start = end;
+  while (cursor < now) {
+    const start = new Date(cursor);
+    const end = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+    const monthKey = start.toISOString().slice(0, 7); // "YYYY-MM"
+    periods.push({ start, end, monthKey });
+    cursor = end;
   }
 
   return periods;
@@ -78,12 +75,15 @@ function snapshotPath(teamKey, periodEnd) {
  * @param {object} storage - Storage context with readFromStorage, writeToStorage, listStorageFiles
  * @param {string} teamKey - Composite key like "orgKey::teamName"
  * @param {object} team - Team object with members array
- * @param {object} period - { start: Date, end: Date }
- * @param {object} [options] - Optional github/gitlab caches
+ * @param {object} period - { start: Date, end: Date, monthKey: "YYYY-MM" }
+ * @param {object} [options] - Optional github/gitlab caches and history
  * @returns {object} The generated snapshot
  */
 function generateSnapshot(storage, teamKey, team, period, options = {}) {
   const { readFromStorage } = storage;
+  const githubHistory = options.githubHistory || readFromStorage('github-history.json') || { users: {} };
+  const gitlabHistory = options.gitlabHistory || readFromStorage('gitlab-history.json') || { users: {} };
+  // Fallback caches used only when history data is unavailable for a user
   const githubCache = options.githubCache || readFromStorage('github-contributions.json') || { users: {} };
   const gitlabCache = options.gitlabCache || readFromStorage('gitlab-contributions.json') || { users: {} };
 
@@ -104,6 +104,7 @@ function generateSnapshot(storage, teamKey, team, period, options = {}) {
 
   const periodStartStr = formatDate(period.start);
   const periodEndStr = formatDate(period.end);
+  const monthKey = period.monthKey || period.start.toISOString().slice(0, 7);
 
   for (const member of uniqueMembers) {
     const key = member.jiraDisplayName.toLowerCase().replace(/[^a-z0-9]/g, '_');
@@ -126,11 +127,18 @@ function generateSnapshot(storage, teamKey, team, period, options = {}) {
       ? +(issueCycleTimes.reduce((a, b) => a + b, 0) / issueCycleTimes.length).toFixed(1)
       : null;
 
+    // GitHub: use monthly history if available, fall back to total
+    const ghUserHistory = member.githubUsername ? (githubHistory.users?.[member.githubUsername] || null) : null;
     const ghContrib = member.githubUsername
-      ? (githubCache.users?.[member.githubUsername]?.totalContributions ?? 0)
+      ? (ghUserHistory ? (ghUserHistory[monthKey] || 0)
+        : (githubCache.users?.[member.githubUsername]?.totalContributions ?? 0))
       : 0;
+
+    // GitLab: use monthly history if available, fall back to total
+    const glUserHistory = member.gitlabUsername ? (gitlabHistory.users?.[member.gitlabUsername] || null) : null;
     const glContrib = member.gitlabUsername
-      ? (gitlabCache.users?.[member.gitlabUsername]?.totalContributions ?? 0)
+      ? (glUserHistory ? (glUserHistory[monthKey] || 0)
+        : (gitlabCache.users?.[member.gitlabUsername]?.totalContributions ?? 0))
       : 0;
 
     const memberSnapshot = {
@@ -240,6 +248,5 @@ module.exports = {
   snapshotPath,
   formatDate,
   sanitizeTeamKey,
-  SNAPSHOT_EPOCH,
-  PERIOD_DAYS
+  SNAPSHOT_EPOCH
 };
