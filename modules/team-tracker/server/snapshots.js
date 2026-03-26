@@ -62,7 +62,7 @@ function formatDate(d) {
  * Replaces :: with -- and removes other special chars.
  */
 function sanitizeTeamKey(teamKey) {
-  return teamKey.replace(/::/g, '--').replace(/[^a-zA-Z0-9_\-]/g, '_');
+  return teamKey.replace(/::/g, '--').replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
 /**
