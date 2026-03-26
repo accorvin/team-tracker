@@ -41,21 +41,13 @@
     </div>
 
     <!-- Team Metrics -->
-    <div class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
-      <div>
-        <MetricCard
-          label="Issues Resolved"
-          :value="teamMetrics?.aggregate?.resolvedCount"
-          subtitle="Last 90 days"
-          @click="showResolvedIssues = true"
-        />
-        <button
-          @click="openTeamHistory"
-          class="mt-1 text-xs text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
-        >
-          View History
-        </button>
-      </div>
+    <div class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-2">
+      <MetricCard
+        label="Issues Resolved"
+        :value="teamMetrics?.aggregate?.resolvedCount"
+        subtitle="Last 90 days"
+        @click="showResolvedIssues = true"
+      />
       <MetricCard
         label="Story Points"
         :value="teamMetrics?.aggregate?.resolvedPoints"
@@ -82,6 +74,15 @@
         :value="teamGitlabTotal"
         subtitle="Last year"
       />
+    </div>
+
+    <div class="mb-4 pl-1">
+      <button
+        @click="openTeamHistory"
+        class="text-xs text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
+      >
+        View History
+      </button>
     </div>
 
     <!-- Export -->
