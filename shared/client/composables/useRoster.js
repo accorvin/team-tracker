@@ -97,9 +97,6 @@ export function useRoster() {
     try {
       await getRoster((data) => {
         rosterData.value = data
-        if (!selectedOrgKey.value && data.orgs?.length > 0) {
-          selectedOrgKey.value = data.orgs[0].key
-        }
         loading.value = false
       })
     } catch (err) {
