@@ -62,6 +62,9 @@ const { authMiddleware, requireAdmin, isAdmin, seedAdminList } = createAuthMiddl
 app.get('/healthz', function(req, res) {
   res.json({ status: 'ok' });
 });
+app.get('/api/healthz', function(req, res) {
+  res.json({ status: 'ok' });
+});
 
 // Whoami endpoint — returns current user info
 app.get('/api/whoami', function(req, res) {
