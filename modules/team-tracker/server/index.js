@@ -16,6 +16,7 @@ module.exports = function registerRoutes(router, context) {
   const { readRosterFull: sharedReadRosterFull, EXCLUDED_TITLES } = require('../../../shared/server/roster');
   const jiraSyncConfig = require('./jira/config');
   const { RESERVED_KEYS } = require('./roster-sync/constants');
+  const snapshots = require('./snapshots');
 
   // ─── Refresh State Tracker ───
 
@@ -1520,6 +1521,71 @@ module.exports = function registerRoutes(router, context) {
       res.json(config);
     } catch (error) {
       console.error('Save jira-sync config error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ─── Routes: Snapshots ───
+
+  router.get('/snapshots/:teamKey', function(req, res) {
+    try {
+      const teamKey = decodeURIComponent(req.params.teamKey);
+      const data = snapshots.loadTeamSnapshots(storage, teamKey);
+      res.json({ snapshots: data });
+    } catch (error) {
+      console.error('Read team snapshots error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/snapshots/:teamKey/:personName', function(req, res) {
+    try {
+      const teamKey = decodeURIComponent(req.params.teamKey);
+      const personName = decodeURIComponent(req.params.personName);
+      const data = snapshots.loadPersonSnapshots(storage, teamKey, personName);
+      res.json({ snapshots: data });
+    } catch (error) {
+      console.error('Read person snapshots error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/snapshots/generate', requireAdmin, function(req, res) {
+    try {
+      const roster = deriveRoster();
+      const completedPeriods = snapshots.getCompletedPeriods();
+      const currentPeriod = snapshots.getCurrentPeriod();
+
+      // Include completed periods + current period
+      const periodsToSnapshot = [...completedPeriods];
+      if (currentPeriod) periodsToSnapshot.push(currentPeriod);
+
+      if (periodsToSnapshot.length === 0) {
+        return res.json({ status: 'no_periods', message: 'No snapshot periods available yet (starts Jan 1, 2026)' });
+      }
+
+      let generated = 0;
+      let skipped = 0;
+
+      for (const org of roster.orgs) {
+        for (const [teamName, team] of Object.entries(org.teams)) {
+          const teamKey = `${org.key}::${teamName}`;
+          for (const period of periodsToSnapshot) {
+            const path = snapshots.snapshotPath(teamKey, period.end);
+            const existing = readFromStorage(path);
+            if (existing) {
+              skipped++;
+            } else {
+              snapshots.generateAndStoreSnapshot(storage, teamKey, team, period);
+              generated++;
+            }
+          }
+        }
+      }
+
+      res.json({ status: 'complete', generated, skipped });
+    } catch (error) {
+      console.error('Generate snapshots error:', error);
       res.status(500).json({ error: error.message });
     }
   });

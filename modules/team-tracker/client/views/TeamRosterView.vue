@@ -42,12 +42,20 @@
 
     <!-- Team Metrics -->
     <div class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
-      <MetricCard
-        label="Issues Resolved"
-        :value="teamMetrics?.aggregate?.resolvedCount"
-        subtitle="Last 90 days"
-        @click="showResolvedIssues = true"
-      />
+      <div>
+        <MetricCard
+          label="Issues Resolved"
+          :value="teamMetrics?.aggregate?.resolvedCount"
+          subtitle="Last 90 days"
+          @click="showResolvedIssues = true"
+        />
+        <button
+          @click="openTeamHistory"
+          class="mt-1 text-xs text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
+        >
+          View History
+        </button>
+      </div>
       <MetricCard
         label="Story Points"
         :value="teamMetrics?.aggregate?.resolvedPoints"
@@ -109,6 +117,7 @@
       :getTeamsForPerson="getTeamsForPerson"
       :memberMetrics="memberMetricsMap"
       @select="handleSelectPerson"
+      @view-history="openPersonHistory"
     />
 
     <!-- Resolved Issues Modal -->
@@ -125,6 +134,15 @@
       @confirm="handleRefreshConfirm"
       @cancel="showRefreshModal = false"
     />
+
+    <SnapshotHistoryModal
+      v-if="showSnapshotHistory"
+      :title="snapshotHistoryTitle"
+      :snapshots="snapshotHistoryData"
+      :loading="snapshotHistoryLoading"
+      :mode="snapshotHistoryMode"
+      @close="showSnapshotHistory = false"
+    />
     </template>
   </div>
 </template>
@@ -137,12 +155,13 @@ import ViewToggle from '../components/ViewToggle.vue'
 import MetricCard from '../components/MetricCard.vue'
 import ResolvedIssuesModal from '../components/ResolvedIssuesModal.vue'
 import RefreshModal from '@shared/client/components/RefreshModal.vue'
+import SnapshotHistoryModal from '../components/SnapshotHistoryModal.vue'
 import { useViewPreference } from '../composables/useViewPreference'
 import { useRoster } from '@shared/client/composables/useRoster'
 import { useGithubStats } from '@shared/client/composables/useGithubStats'
 import { useGitlabStats } from '@shared/client/composables/useGitlabStats'
 import { useAuth } from '@shared/client/composables/useAuth'
-import { refreshMetrics, getTeamMetrics } from '@shared/client/services/api'
+import { refreshMetrics, getTeamMetrics, getTeamSnapshots, getPersonSnapshots } from '@shared/client/services/api'
 
 const nav = inject('moduleNav')
 const { teams: allTeams, selectOrg } = useRoster()
@@ -164,6 +183,45 @@ const isRefreshing = ref(false)
 const teamMetrics = ref(null)
 const showResolvedIssues = ref(false)
 const showRefreshModal = ref(false)
+const showSnapshotHistory = ref(false)
+const snapshotHistoryData = ref([])
+const snapshotHistoryLoading = ref(false)
+const snapshotHistoryTitle = ref('')
+const snapshotHistoryMode = ref('team')
+
+async function openTeamHistory() {
+  if (!team.value) return
+  showSnapshotHistory.value = true
+  snapshotHistoryLoading.value = true
+  snapshotHistoryTitle.value = `${team.value.displayName} - Metric History`
+  snapshotHistoryMode.value = 'team'
+  snapshotHistoryData.value = []
+  try {
+    const result = await getTeamSnapshots(team.value.key)
+    snapshotHistoryData.value = result.snapshots || []
+  } catch (err) {
+    console.error('Failed to load team snapshots:', err)
+  } finally {
+    snapshotHistoryLoading.value = false
+  }
+}
+
+async function openPersonHistory(member) {
+  if (!team.value) return
+  showSnapshotHistory.value = true
+  snapshotHistoryLoading.value = true
+  snapshotHistoryTitle.value = `${member.jiraDisplayName || member.name} - Metric History`
+  snapshotHistoryMode.value = 'person'
+  snapshotHistoryData.value = []
+  try {
+    const result = await getPersonSnapshots(team.value.key, member.jiraDisplayName || member.name)
+    snapshotHistoryData.value = result.snapshots || []
+  } catch (err) {
+    console.error('Failed to load person snapshots:', err)
+  } finally {
+    snapshotHistoryLoading.value = false
+  }
+}
 
 function handleSelectPerson(member) {
   nav.navigateTo('person-detail', { teamKey: team.value?.key, person: member.jiraDisplayName || member.name })

@@ -240,6 +240,23 @@ export async function saveJiraSyncConfig(data) {
   })
 }
 
+// ─── Snapshots ───
+
+export async function getTeamSnapshots(teamKey) {
+  return apiRequest(`/snapshots/${encodeURIComponent(teamKey)}`)
+}
+
+export async function getPersonSnapshots(teamKey, personName) {
+  return apiRequest(`/snapshots/${encodeURIComponent(teamKey)}/${encodeURIComponent(personName)}`)
+}
+
+export async function generateSnapshots() {
+  return apiRequest('/snapshots/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
+}
+
 // ─── Modules ───
 
 export async function getModules(onData) {

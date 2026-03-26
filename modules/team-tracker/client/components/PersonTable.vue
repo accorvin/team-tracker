@@ -72,6 +72,14 @@
             </span>
             <span v-else class="text-gray-400 dark:text-gray-500">1</span>
           </td>
+          <td class="px-4 py-2 text-sm whitespace-nowrap">
+            <button
+              @click.stop="$emit('view-history', member)"
+              class="text-xs text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
+            >
+              View History
+            </button>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -95,7 +103,7 @@ const props = defineProps({
   getTeamsForPerson: { type: Function, default: () => () => [] },
   memberMetrics: { type: Map, default: () => new Map() }
 })
-defineEmits(['select'])
+defineEmits(['select', 'view-history'])
 
 const nonPrimaryVisibleFields = computed(() => {
   return visibleFields.value.filter(f => f.key !== primaryDisplayField.value)
@@ -117,7 +125,8 @@ const columns = computed(() => {
     { key: 'cycleTime', label: 'Cycle Time' },
     { key: 'github', label: 'GitHub (1yr)' },
     { key: 'gitlab', label: 'GitLab (1yr)' },
-    { key: 'teams', label: 'Teams' }
+    { key: 'teams', label: 'Teams' },
+    { key: 'history', label: 'History' }
   )
   return cols
 })
