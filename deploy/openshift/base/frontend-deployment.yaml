@@ -52,6 +52,13 @@ spec:
               cpu: "50m"
         - name: nginx
           image: quay.io/org-pulse/team-tracker-frontend:latest
+          env:
+            - name: PROXY_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: proxy-auth-secret
+                  key: secret
+                  optional: true
           ports:
             - containerPort: 8080
               protocol: TCP

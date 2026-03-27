@@ -22,7 +22,7 @@ errorBuffer.install();
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
 const storageModule = DEMO_MODE ? require('../shared/server/demo-storage') : require('../shared/server/storage');
 const { readFromStorage, writeToStorage } = storageModule;
-const { createAuthMiddleware } = require('../shared/server/auth');
+const { createAuthMiddleware, proxySecretGuard } = require('../shared/server/auth');
 
 const modulesConfig = require('./modules/config');
 const gitSync = require('./modules/git-sync');
@@ -47,6 +47,9 @@ app.use(function(req, res, next) {
 
 // Request tracker middleware
 app.use(requestTracker.createMiddleware());
+
+// Proxy secret guard — validates X-Proxy-Secret header when PROXY_AUTH_SECRET is set
+app.use(proxySecretGuard);
 
 // Demo mode: block refresh routes that would call external APIs
 if (DEMO_MODE) {

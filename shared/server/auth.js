@@ -63,4 +63,25 @@ function createAuthMiddleware(readFromStorage, writeToStorage) {
   return { authMiddleware, requireAdmin, isAdmin, seedAdminList }
 }
 
-module.exports = { createAuthMiddleware }
+let _emptySecretWarned = false;
+
+function proxySecretGuard(req, res, next) {
+  const expectedSecret = process.env.PROXY_AUTH_SECRET;
+  if (!expectedSecret) {
+    if (process.env.PROXY_AUTH_SECRET === '' && !_emptySecretWarned) {
+      _emptySecretWarned = true;
+      console.warn('[auth] PROXY_AUTH_SECRET is set but empty — proxy secret guard is disabled');
+    }
+    return next();
+  }
+  if (req.method === 'OPTIONS') return next();
+  if (req.path === '/healthz' || req.path === '/api/healthz') return next();
+
+  const providedSecret = req.headers['x-proxy-secret'];
+  if (providedSecret === expectedSecret) return next();
+
+  console.warn(`[auth] Proxy secret mismatch from ${req.ip} on ${req.method} ${req.path}`);
+  return res.status(401).json({ error: 'Unauthorized' });
+}
+
+module.exports = { createAuthMiddleware, proxySecretGuard }

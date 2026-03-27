@@ -21,6 +21,7 @@ on:
       - 'postcss.config.mjs'
       - 'deploy/frontend.Dockerfile'
       - 'deploy/nginx.conf'
+      - 'deploy/nginx-entrypoint.sh'
       # Shared
       - 'modules/*/module.json'
       - 'package*.json'
@@ -61,7 +62,7 @@ jobs:
           fi
 
           # Check frontend paths
-          if echo "$CHANGED" | grep -qE '^(src/|public/|modules/[^/]+/client/|modules/[^/]+/module\.json|shared/client/|index\.html|vite\.config|tailwind\.config|postcss\.config|deploy/frontend\.Dockerfile|deploy/nginx\.conf|package)'; then
+          if echo "$CHANGED" | grep -qE '^(src/|public/|modules/[^/]+/client/|modules/[^/]+/module\.json|shared/client/|index\.html|vite\.config|tailwind\.config|postcss\.config|deploy/frontend\.Dockerfile|deploy/nginx\.conf|deploy/nginx-entrypoint\.sh|package)'; then
             FRONTEND=true
           fi
 
