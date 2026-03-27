@@ -64,3 +64,5 @@ jobs:
         env:
           ANTHROPIC_VERTEX_PROJECT_ID: "itpc-gcp-ai-eng-claude"
           CLOUD_ML_REGION: "us-east5"
+          CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS: "1"
+          DISABLE_PROMPT_CACHING: "1"
