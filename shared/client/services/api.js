@@ -257,6 +257,10 @@ export async function generateSnapshots() {
   })
 }
 
+export async function deleteAllSnapshots() {
+  return apiRequest('/modules/team-tracker/snapshots', { method: 'DELETE' })
+}
+
 // ─── Modules ───
 
 export async function getModules(onData) {

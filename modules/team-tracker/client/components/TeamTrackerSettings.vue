@@ -18,6 +18,7 @@
     <RosterSyncSettings v-if="activeTab === 'roster-sync'" />
     <TeamStructureSettings v-if="activeTab === 'team-structure'" />
     <JiraSyncSettings v-if="activeTab === 'jira-sync'" />
+    <SnapshotSettings v-if="activeTab === 'snapshots'" />
   </div>
 </template>
 
@@ -26,11 +27,13 @@ import { ref } from 'vue'
 import RosterSyncSettings from './RosterSyncSettings.vue'
 import TeamStructureSettings from './TeamStructureSettings.vue'
 import JiraSyncSettings from './JiraSyncSettings.vue'
+import SnapshotSettings from './SnapshotSettings.vue'
 
 const tabs = [
   { id: 'roster-sync', label: 'Roster Sync' },
   { id: 'team-structure', label: 'Team Structure' },
-  { id: 'jira-sync', label: 'Jira Sync' }
+  { id: 'jira-sync', label: 'Jira Sync' },
+  { id: 'snapshots', label: 'Snapshots' }
 ]
 
 const activeTab = ref('roster-sync')

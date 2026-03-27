@@ -45,8 +45,8 @@ Core team owns `shared/` via CODEOWNERS. Changes require core team review.
 
 | Export | Description |
 |--------|-------------|
-| `storage` | `{ readFromStorage, writeToStorage }` — filesystem-backed JSON storage |
-| `demoStorage` | `{ readFromStorage, writeToStorage }` — fixture-backed read-only storage for demo mode |
+| `storage` | `{ readFromStorage, writeToStorage, listStorageFiles, deleteStorageDirectory }` — filesystem-backed JSON storage |
+| `demoStorage` | `{ readFromStorage, writeToStorage, listStorageFiles, deleteStorageDirectory }` — fixture-backed read-only storage for demo mode |
 | `createAuthMiddleware(readFromStorage, writeToStorage)` | Factory returning `{ authMiddleware, requireAdmin, isAdmin, seedAdminList }` |
 | `googleSheets` | `{ getAuth, discoverSheetNames, fetchRawSheet }` — Google Sheets auth and raw data fetching |
 | `roster` | `{ EXCLUDED_TITLES, readRosterFull, getAllPeople, getPeopleByOrg, getOrgKeys, getTeamRollup }` — shared roster data access (getAllPeople and getPeopleByOrg filter out EXCLUDED_TITLES) |

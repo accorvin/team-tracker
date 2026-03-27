@@ -70,6 +70,25 @@ function snapshotPath(teamKey, periodEnd) {
 }
 
 /**
+ * Get a user's monthly contribution count, handling both nested and flat formats.
+ * Production format: { months: { "2026-01": 72 }, fetchedAt: "..." }
+ * Legacy flat format: { "2026-01": 72 }
+ * Returns null if no history data is available (triggers fallback to cache).
+ */
+function getMonthlyContribution(userHistory, monthKey) {
+  if (!userHistory) return null;
+  // Production format: monthly data nested under "months" key
+  if (userHistory.months && typeof userHistory.months === 'object') {
+    return userHistory.months[monthKey] || 0;
+  }
+  // Legacy flat format: monthly data directly on the user object
+  if (monthKey in userHistory) {
+    return userHistory[monthKey] || 0;
+  }
+  return null;
+}
+
+/**
  * Generate a snapshot for a team for a given period.
  *
  * @param {object} storage - Storage context with readFromStorage, writeToStorage, listStorageFiles
@@ -129,15 +148,17 @@ function generateSnapshot(storage, teamKey, team, period, options = {}) {
 
     // GitHub: use monthly history if available, fall back to total
     const ghUserHistory = member.githubUsername ? (githubHistory.users?.[member.githubUsername] || null) : null;
+    const ghMonthly = getMonthlyContribution(ghUserHistory, monthKey);
     const ghContrib = member.githubUsername
-      ? (ghUserHistory ? (ghUserHistory[monthKey] || 0)
+      ? (ghMonthly !== null ? ghMonthly
         : (githubCache.users?.[member.githubUsername]?.totalContributions ?? 0))
       : 0;
 
     // GitLab: use monthly history if available, fall back to total
     const glUserHistory = member.gitlabUsername ? (gitlabHistory.users?.[member.gitlabUsername] || null) : null;
+    const glMonthly = getMonthlyContribution(glUserHistory, monthKey);
     const glContrib = member.gitlabUsername
-      ? (glUserHistory ? (glUserHistory[monthKey] || 0)
+      ? (glMonthly !== null ? glMonthly
         : (gitlabCache.users?.[member.gitlabUsername]?.totalContributions ?? 0))
       : 0;
 

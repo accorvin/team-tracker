@@ -65,9 +65,39 @@ function listStorageFiles(dir) {
   }
 }
 
+/**
+ * Recursively delete a subdirectory of storage
+ * @param {string} dir - Subdirectory name (e.g., 'snapshots')
+ * @returns {{ deleted: number }} Count of JSON files that were in the directory
+ */
+function deleteStorageDirectory(dir) {
+  const dirPath = path.join(DATA_DIR, dir);
+  let deleted = 0;
+  try {
+    // Count files before deletion
+    const countFiles = (p) => {
+      const entries = fs.readdirSync(p, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) countFiles(path.join(p, entry.name));
+        else if (entry.name.endsWith('.json')) deleted++;
+      }
+    };
+    countFiles(dirPath);
+    fs.rmSync(dirPath, { recursive: true, force: true });
+    console.log(`Deleted storage directory ${dir} (${deleted} files)`);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return { deleted: 0 };
+    }
+    throw error;
+  }
+  return { deleted };
+}
+
 module.exports = {
   readFromStorage,
   writeToStorage,
   listStorageFiles,
+  deleteStorageDirectory,
   DATA_DIR
 };

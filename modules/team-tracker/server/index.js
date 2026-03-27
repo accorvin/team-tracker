@@ -2,7 +2,7 @@ const fetch = require('node-fetch');
 
 module.exports = function registerRoutes(router, context) {
   const { storage, requireAdmin } = context;
-  const { readFromStorage, writeToStorage, listStorageFiles } = storage;
+  const { readFromStorage, writeToStorage, listStorageFiles, deleteStorageDirectory } = storage;
 
   const DEMO_MODE = process.env.DEMO_MODE === 'true';
   const JIRA_HOST = process.env.JIRA_HOST || 'https://redhat.atlassian.net';
@@ -1628,6 +1628,16 @@ module.exports = function registerRoutes(router, context) {
       res.json({ status: 'complete', generated, skipped });
     } catch (error) {
       console.error('Generate snapshots error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.delete('/snapshots', requireAdmin, function(req, res) {
+    try {
+      const result = deleteStorageDirectory('snapshots');
+      res.json({ success: true, deleted: result.deleted });
+    } catch (error) {
+      console.error('Delete all snapshots error:', error);
       res.status(500).json({ error: error.message });
     }
   });

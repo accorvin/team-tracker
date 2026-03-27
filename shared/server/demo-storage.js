@@ -52,9 +52,20 @@ function listStorageFiles(dir) {
   }
 }
 
+/**
+ * No-op delete for demo mode (fixtures are read-only)
+ * @param {string} dir - Would-be directory to delete
+ * @returns {{ deleted: number }}
+ */
+function deleteStorageDirectory(dir) {
+  console.log(`[Demo Mode] Delete ignored: ${dir}`);
+  return { deleted: 0 };
+}
+
 module.exports = {
   readFromStorage,
   writeToStorage,
   listStorageFiles,
+  deleteStorageDirectory,
   FIXTURES_DIR
 };

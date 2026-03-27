@@ -87,12 +87,25 @@ const mockGitlabCache = {
 
 const mockGithubHistory = {
   users: {
+    asmith: { months: { '2026-01': 72, '2026-02': 65 }, fetchedAt: '2026-03-01T00:00:00Z' },
+    bjones: { months: { '2026-01': 38, '2026-02': 42 }, fetchedAt: '2026-03-01T00:00:00Z' }
+  }
+}
+
+const mockGitlabHistory = {
+  users: {
+    'asmith-gl': { months: { '2026-01': 18, '2026-02': 22 }, fetchedAt: '2026-03-01T00:00:00Z' }
+  }
+}
+
+const mockGithubHistoryFlat = {
+  users: {
     asmith: { '2026-01': 72, '2026-02': 65 },
     bjones: { '2026-01': 38, '2026-02': 42 }
   }
 }
 
-const mockGitlabHistory = {
+const mockGitlabHistoryFlat = {
   users: {
     'asmith-gl': { '2026-01': 18, '2026-02': 22 }
   }
@@ -287,6 +300,24 @@ describe('snapshots', () => {
       // Should count Alice only once (2 issues in Jan period)
       expect(snapshot.team.resolvedCount).toBe(2)
       expect(Object.keys(snapshot.members)).toHaveLength(1)
+    })
+
+    it('handles flat format history (backward compatibility)', () => {
+      const storage = createMockStorage(mockPersonData)
+      const period = { start: new Date('2026-01-01'), end: new Date('2026-02-01'), monthKey: '2026-01' }
+
+      const snapshot = generateSnapshot(storage, 'org::team', mockTeam, period, {
+        githubHistory: mockGithubHistoryFlat,
+        gitlabHistory: mockGitlabHistoryFlat,
+        githubCache: mockGithubCache,
+        gitlabCache: mockGitlabCache
+      })
+
+      // Same results as nested format
+      expect(snapshot.team.githubContributions).toBe(110) // 72 + 38
+      expect(snapshot.team.gitlabContributions).toBe(18) // 18 + 0
+      expect(snapshot.members['Alice Smith'].githubContributions).toBe(72)
+      expect(snapshot.members['Alice Smith'].gitlabContributions).toBe(18)
     })
   })
 

@@ -53,8 +53,10 @@ npm run dev:full       # Starts Vite (5173) + Express (3001)
 - **Person metrics**: Individual Jira stats stored as `data/people/{name}.json`. Fetched via JQL queries against Jira with 365-day lookback.
 - **GitHub contributions**: `data/github-contributions.json` stores contribution counts per user. `data/github-history.json` stores monthly history. Fetched via GitHub GraphQL API with `GITHUB_TOKEN`.
 - **GitLab contributions**: `data/gitlab-contributions.json` and `data/gitlab-history.json`. Fetched via GitLab REST API (`/api/v4/users/:id/events`) with `GITLAB_TOKEN`.
+- **Snapshots**: Monthly metric snapshots stored in `data/snapshots/{teamKey}/{YYYY-MM-DD}.json`. Generated from person metrics + GitHub/GitLab history. Admin can delete all via Settings > Snapshots.
 - **Trends**: Built dynamically from person metric files by bucketing resolved issues by month, with org/team breakdowns.
 - **Composite keys**: Teams are identified by `orgKey::teamName` (e.g., `shgriffi::Model Serving`).
+- **Data file formats**: See `docs/DATA-FORMATS.md` for the JSON schema of every data file. Demo fixtures in `fixtures/` must always match production format.
 
 ### Roster Sync (`modules/team-tracker/server/roster-sync/`)
 Automated roster building that replaces manual scripts:
@@ -234,6 +236,16 @@ secrets/            # Service account keys (gitignored)
 - Module manifest validation: `npm run validate:modules`
 - Run `npm test` before committing
 
+## Documentation Maintenance
+
+Keep docs in sync with code changes. When making changes, update the relevant docs in the same PR:
+
+- **Data format changes** (how JSON is read/written in `data/`): Update `docs/DATA-FORMATS.md` AND the corresponding `fixtures/` files to match
+- **New or changed API routes**: Update the API Routes section in this file
+- **New data files or storage paths**: Update the Data Flow section in this file and add schema to `docs/DATA-FORMATS.md`
+- **New shared exports**: Update `shared/API.md`
+- **Module system changes**: Update `docs/MODULES.md`
+
 ## API Routes
 
 In production, all routes are authenticated via OpenShift OAuth proxy. The proxy sets `X-Forwarded-Email` and `X-Forwarded-User` headers. All routes are prefixed with `/api`.
@@ -266,3 +278,11 @@ In production, all routes are authenticated via OpenShift OAuth proxy. The proxy
 - `/api/admin/roster-sync/config` — save roster sync configuration
 - `/api/admin/roster-sync/trigger` — trigger manual roster sync
 - `/api/allowlist` — update authorized email list
+- `/api/modules/team-tracker/snapshots/generate` — generate snapshots for all teams (admin)
+
+**DELETE:**
+- `/api/modules/team-tracker/snapshots` — delete all stored snapshots (admin)
+
+**GET (snapshots):**
+- `/api/modules/team-tracker/snapshots/:teamKey` — all snapshots for a team
+- `/api/modules/team-tracker/snapshots/:teamKey/:personName` — person snapshots within a team
