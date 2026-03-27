@@ -138,7 +138,6 @@ Team key is sanitized: `::` becomes `--`, special chars become `_`. The filename
   "team": {
     "resolvedCount": 42,
     "resolvedPoints": 85,
-    "inProgressCount": 5,
     "avgCycleTimeDays": 4.2,
     "githubContributions": 350,
     "gitlabContributions": 120
@@ -147,7 +146,6 @@ Team key is sanitized: `::` becomes `--`, special chars become `_`. The filename
     "Alice Smith": {
       "resolvedCount": 10,
       "resolvedPoints": 25,
-      "inProgressCount": 2,
       "avgCycleTimeDays": 3.5,
       "githubContributions": 72,
       "gitlabContributions": 18,

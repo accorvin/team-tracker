@@ -111,11 +111,6 @@ const METRIC_DEFS = {
     unit: 'days',
     extract: (d) => d.aggregate?.avgCycleTimeDays ?? 0
   },
-  inProgressCount: {
-    label: 'In Progress',
-    unit: '',
-    extract: (d) => d.aggregate?.inProgressCount ?? 0
-  },
   resolvedPerMember: {
     label: 'Issues Resolved per Member (90d)',
     unit: '',

@@ -32,7 +32,6 @@
               <th class="text-left py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Period</th>
               <th class="text-right py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Issues Resolved</th>
               <th class="text-right py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Story Points</th>
-              <th class="text-right py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">In Progress</th>
               <th class="text-right py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Avg Cycle Time</th>
               <th class="text-right py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">GitHub</th>
               <th class="text-right py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">GitLab</th>
@@ -55,7 +54,6 @@
                 <span class="text-gray-700 dark:text-gray-300">{{ metrics(snapshot).resolvedPoints }}</span>
                 <TrendArrow :current="metrics(snapshot).resolvedPoints" :previous="prevMetrics(idx)?.resolvedPoints" />
               </td>
-              <td class="py-2 px-2 text-right text-gray-700 dark:text-gray-300">{{ metrics(snapshot).inProgressCount }}</td>
               <td class="py-2 px-2 text-right text-gray-700 dark:text-gray-300">
                 {{ metrics(snapshot).avgCycleTimeDays != null ? metrics(snapshot).avgCycleTimeDays + 'd' : '--' }}
               </td>

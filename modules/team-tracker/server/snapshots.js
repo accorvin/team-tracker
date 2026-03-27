@@ -115,7 +115,6 @@ function generateSnapshot(storage, teamKey, team, period, options = {}) {
 
   let totalResolved = 0;
   let totalPoints = 0;
-  let totalInProgress = 0;
   let cycleTimes = [];
   let totalGithub = 0;
   let totalGitlab = 0;
@@ -165,7 +164,6 @@ function generateSnapshot(storage, teamKey, team, period, options = {}) {
     const memberSnapshot = {
       resolvedCount,
       resolvedPoints,
-      inProgressCount: cached?.inProgress?.count || 0,
       avgCycleTimeDays,
       githubContributions: ghContrib,
       gitlabContributions: glContrib,
@@ -177,7 +175,6 @@ function generateSnapshot(storage, teamKey, team, period, options = {}) {
 
     totalResolved += resolvedCount;
     totalPoints += resolvedPoints;
-    totalInProgress += memberSnapshot.inProgressCount;
     totalGithub += ghContrib;
     totalGitlab += glContrib;
     if (avgCycleTimeDays != null) {
@@ -196,7 +193,6 @@ function generateSnapshot(storage, teamKey, team, period, options = {}) {
     team: {
       resolvedCount: totalResolved,
       resolvedPoints: totalPoints,
-      inProgressCount: totalInProgress,
       avgCycleTimeDays,
       githubContributions: totalGithub,
       gitlabContributions: totalGitlab

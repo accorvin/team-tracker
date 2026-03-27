@@ -25,7 +25,6 @@ const metrics = [
   { key: 'teamSize', label: 'Team Size' },
   { key: 'resolvedCount', label: 'Issues Resolved (90d)' },
   { key: 'avgCycleTime', label: 'Avg Cycle Time' },
-  { key: 'inProgressCount', label: 'In Progress' },
   { key: 'resolvedPerMember', label: 'Issues Resolved per Member (90d)' },
   { key: 'githubContributions', label: 'GitHub Contributions (1yr)' },
   { key: 'githubPerMember', label: 'Avg GitHub Contributions per Member (1yr)' }

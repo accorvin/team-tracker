@@ -212,7 +212,6 @@ describe('snapshots', () => {
       expect(snapshot.generatedAt).toBeTruthy()
       expect(snapshot.team.resolvedCount).toBe(4) // 2 + 2 (only issues in Jan)
       expect(snapshot.team.resolvedPoints).toBe(21) // (5+8) + (3+5)
-      expect(snapshot.team.inProgressCount).toBe(3) // 2 + 1
       expect(snapshot.team.avgCycleTimeDays).toBe(4.0) // (3.0 + 5.0) / 2
       expect(snapshot.team.githubContributions).toBe(110) // 72 + 38 (Jan monthly)
       expect(snapshot.team.gitlabContributions).toBe(18) // 18 + 0 (Jan monthly)
@@ -248,7 +247,6 @@ describe('snapshots', () => {
       expect(snapshot.members['Alice Smith']).toEqual({
         resolvedCount: 2,
         resolvedPoints: 13,
-        inProgressCount: 2,
         avgCycleTimeDays: 3.0,
         githubContributions: 72,
         gitlabContributions: 18,
@@ -259,7 +257,6 @@ describe('snapshots', () => {
       expect(snapshot.members['Bob Jones']).toEqual({
         resolvedCount: 2,
         resolvedPoints: 8,
-        inProgressCount: 1,
         avgCycleTimeDays: 5.0,
         githubContributions: 38,
         gitlabContributions: 0,
@@ -379,7 +376,7 @@ describe('snapshots', () => {
           generatedAt: '2026-02-01T06:00:00Z',
           team: {},
           members: {
-            'Alice Smith': { resolvedCount: 12, resolvedPoints: 25, inProgressCount: 2, avgCycleTimeDays: 3.5, githubContributions: 72, gitlabContributions: 18 }
+            'Alice Smith': { resolvedCount: 12, resolvedPoints: 25, avgCycleTimeDays: 3.5, githubContributions: 72, gitlabContributions: 18 }
           }
         },
         'snapshots/org--team/2026-03-01.json': {
@@ -388,7 +385,7 @@ describe('snapshots', () => {
           generatedAt: '2026-03-01T06:00:00Z',
           team: {},
           members: {
-            'Bob Jones': { resolvedCount: 5, resolvedPoints: 10, inProgressCount: 0, avgCycleTimeDays: 4.0, githubContributions: 42, gitlabContributions: 0 }
+            'Bob Jones': { resolvedCount: 5, resolvedPoints: 10, avgCycleTimeDays: 4.0, githubContributions: 42, gitlabContributions: 0 }
           }
         }
       })
