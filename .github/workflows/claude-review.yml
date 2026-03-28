@@ -52,6 +52,7 @@ jobs:
         with:
           use_vertex: "true"
           claude_args: "--model claude-sonnet-4@20250514"
+          display_report: "true"
           prompt: |
             Review this PR for:
             - Code quality and maintainability
@@ -61,8 +62,6 @@ jobs:
             - Performance concerns
 
             Be concise. Focus on actionable feedback. Don't nitpick style unless it impacts readability.
-
-            IMPORTANT: Always post a summary comment on the PR, even if you find no issues. If the code looks good, post a brief comment confirming the review passed with no concerns.
         env:
           ANTHROPIC_VERTEX_PROJECT_ID: "itpc-gcp-ai-eng-claude"
           CLOUD_ML_REGION: "us-east5"
