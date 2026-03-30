@@ -107,6 +107,31 @@ spec:
                     exit 1
                   fi
 
+                  # Step 3: Trigger AI Impact refresh
+                  echo "=== Triggering AI Impact refresh ==="
+                  curl -sf -X POST "$BACKEND/api/modules/ai-impact/refresh" \
+                    -H "$AUTH_HEADER" -H "$PROXY_SECRET_HEADER" || echo "AI Impact refresh skipped"
+
+                  # Poll until complete
+                  ATTEMPTS=0
+                  MAX_ATTEMPTS=20
+                  while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+                    sleep 10
+                    ATTEMPTS=$((ATTEMPTS + 1))
+                    STATUS=$(curl -sf "$BACKEND/api/modules/ai-impact/refresh/status" \
+                      -H "$AUTH_HEADER" -H "$PROXY_SECRET_HEADER")
+                    RUNNING=$(echo "$STATUS" | grep -oE '"running"\s*:\s*true' || true)
+                    if [ -z "$RUNNING" ]; then
+                      echo "AI Impact refresh complete after $ATTEMPTS checks"
+                      break
+                    fi
+                    echo "Still refreshing... (attempt $ATTEMPTS/$MAX_ATTEMPTS)"
+                  done
+
+                  if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
+                    echo "WARNING: AI Impact refresh timed out (non-fatal, continuing)"
+                  fi
+
                   echo "=== Sync and refresh completed successfully ==="
               resources:
                 requests:

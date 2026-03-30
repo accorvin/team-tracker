@@ -10,6 +10,8 @@
  * Compatible with Jira Cloud (v3 search/jql API with cursor pagination).
  */
 
+const { fetchAllJqlResults } = require('../../../../shared/server/jira');
+
 const STORY_POINTS_FIELD = process.env.JIRA_STORY_POINTS_FIELD || 'customfield_10028';
 
 const FIELDS = `summary,issuetype,status,assignee,resolutiondate,created,components,${STORY_POINTS_FIELD}`;
@@ -19,40 +21,6 @@ const FIELDS_VERSION = 'v1';
 
 // Force a full refresh if the last full refresh was more than 7 days ago
 const FULL_REFRESH_INTERVAL_DAYS = 7;
-
-/**
- * Fetch paginated JQL results using the v3 search/jql GET API (all pages).
- * Uses nextPageToken cursor-based pagination.
- */
-async function fetchAllJqlResults(jiraRequest, jql, fields, { maxResults = 100, expand } = {}) {
-  const issues = [];
-  let nextPageToken = null;
-
-  while (true) {
-    const params = new URLSearchParams({
-      jql,
-      fields,
-      maxResults: String(maxResults)
-    });
-    if (expand) {
-      params.set('expand', expand);
-    }
-    if (nextPageToken) {
-      params.set('nextPageToken', nextPageToken);
-    }
-
-    const data = await jiraRequest(`/rest/api/3/search/jql?${params}`);
-    if (!data.issues || data.issues.length === 0) break;
-
-    issues.push(...data.issues);
-
-    if (data.isLast !== false) break;
-    nextPageToken = data.nextPageToken;
-    if (!nextPageToken) break;
-  }
-
-  return issues;
-}
 
 /**
  * Extract story points from an issue.
