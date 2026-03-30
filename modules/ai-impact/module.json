@@ -1,0 +1,19 @@
+{
+  "name": "AI Impact",
+  "slug": "ai-impact",
+  "description": "Track AI adoption across the RHAI delivery pipeline",
+  "icon": "sparkles",
+  "order": 5,
+  "client": {
+    "entry": "./client/index.js",
+    "navItems": [
+      { "id": "main", "label": "AI Impact", "icon": "Sparkles", "default": true }
+    ],
+    "settingsComponent": "./client/components/AIImpactSettings.vue"
+  },
+  "server": {
+    "entry": "./server/index.js"
+  },
+  "defaultEnabled": true,
+  "requires": []
+}

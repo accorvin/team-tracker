@@ -4,6 +4,7 @@ const { createAuthMiddleware, proxySecretGuard } = require('./auth')
 const googleSheets = require('./google-sheets')
 const roster = require('./roster')
 const rosterSync = require('./roster-sync')
+const jira = require('./jira')
 
 module.exports = {
   storage,
@@ -12,5 +13,6 @@ module.exports = {
   proxySecretGuard,
   googleSheets,
   roster,
-  rosterSync
+  rosterSync,
+  jira
 }

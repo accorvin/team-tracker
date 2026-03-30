@@ -237,6 +237,66 @@ Large file containing the full org/team hierarchy with members. See `shared/serv
 
 ---
 
+## AI Impact — RFE Data (`data/ai-impact/rfe-data.json`)
+
+Cached RFE issues fetched from Jira. The module's primary data file.
+
+```json
+{
+  "fetchedAt": "2026-03-30T12:00:00Z",
+  "issues": [
+    {
+      "key": "RHAIRFE-1234",
+      "summary": "Implement real-time collaboration features",
+      "status": "In Progress",
+      "priority": "High",
+      "created": "2026-03-25T10:00:00Z",
+      "creator": "schen",
+      "creatorDisplayName": "Sarah Chen",
+      "labels": ["rfe-creator-v2", "rfe-assess-v1", "customer-request"],
+      "aiInvolvement": "both",
+      "linkedFeature": {
+        "key": "RHAISTRAT-567",
+        "summary": "Strat: Real-time collaboration",
+        "status": "In Progress",
+        "fixVersions": ["RHOAI 2.16"]
+      }
+    }
+  ]
+}
+```
+
+**Notes:**
+- `aiInvolvement` is one of: `"both"`, `"created"`, `"assessed"`, `"none"` — derived from label prefixes at fetch time
+- `linkedFeature` is resolved from Jira issue links (type = "Cloners", outward to RHAISTRAT project). Can be `null` if no link exists.
+- `labels` is the raw Jira label array, preserved for reference
+
+## AI Impact — Config (`data/ai-impact/config.json`)
+
+Admin-configurable settings for the AI Impact module.
+
+```json
+{
+  "jiraProject": "RHAIRFE",
+  "linkedProject": "RHAISTRAT",
+  "createdLabelPrefix": "rfe-creator-",
+  "assessedLabelPrefix": "rfe-assess-",
+  "testExclusionLabel": "rfe-creator-skill-testing",
+  "linkTypeName": "Cloners",
+  "excludedStatuses": ["Closed"],
+  "lookbackMonths": 12,
+  "trendThresholdPp": 2
+}
+```
+
+**Notes:**
+- All string fields are validated against JQL injection (no quotes, parens, semicolons, backslashes)
+- `lookbackMonths` must be an integer between 1 and 120
+- `trendThresholdPp` is the percentage-point threshold for classifying trends as "growing" or "declining" (0-50)
+- Defaults are used when no config file exists
+
+---
+
 ## Fixture Rules
 
 The `fixtures/` directory provides read-only demo data used when `DEMO_MODE=true`. These rules prevent data format drift:

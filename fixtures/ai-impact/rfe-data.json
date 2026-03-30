@@ -1,0 +1,140 @@
+{
+  "fetchedAt": "2026-03-28T12:00:00Z",
+  "issues": [
+    {
+      "key": "RHAIRFE-1001",
+      "summary": "Implement model serving autoscaling for high-throughput inference",
+      "status": "In Progress",
+      "priority": "High",
+      "created": "2026-03-15T10:00:00Z",
+      "creator": "schen",
+      "creatorDisplayName": "Sarah Chen",
+      "labels": ["rfe-creator-v2", "rfe-assess-v1", "customer-request"],
+      "aiInvolvement": "both",
+      "linkedFeature": {
+        "key": "RHAISTRAT-501",
+        "summary": "Strat: Model serving autoscaling",
+        "status": "In Progress",
+        "fixVersions": ["RHOAI 2.16"]
+      }
+    },
+    {
+      "key": "RHAIRFE-1002",
+      "summary": "Add GPU memory monitoring dashboard for notebook users",
+      "status": "New",
+      "priority": "Medium",
+      "created": "2026-03-12T14:30:00Z",
+      "creator": "jpark",
+      "creatorDisplayName": "James Park",
+      "labels": ["rfe-creator-v2"],
+      "aiInvolvement": "created",
+      "linkedFeature": null
+    },
+    {
+      "key": "RHAIRFE-1003",
+      "summary": "Support for fine-tuning LLMs with custom datasets",
+      "status": "In Review",
+      "priority": "Critical",
+      "created": "2026-03-10T09:15:00Z",
+      "creator": "mgarcia",
+      "creatorDisplayName": "Maria Garcia",
+      "labels": ["rfe-assess-v1", "strategic"],
+      "aiInvolvement": "assessed",
+      "linkedFeature": {
+        "key": "RHAISTRAT-502",
+        "summary": "Strat: LLM fine-tuning capability",
+        "status": "Planning",
+        "fixVersions": ["RHOAI 2.17"]
+      }
+    },
+    {
+      "key": "RHAIRFE-1004",
+      "summary": "Integrate OpenTelemetry tracing for pipeline debugging",
+      "status": "New",
+      "priority": "Low",
+      "created": "2026-03-08T11:00:00Z",
+      "creator": "akim",
+      "creatorDisplayName": "Alex Kim",
+      "labels": [],
+      "aiInvolvement": "none",
+      "linkedFeature": null
+    },
+    {
+      "key": "RHAIRFE-1005",
+      "summary": "Multi-model A/B testing framework for inference endpoints",
+      "status": "In Progress",
+      "priority": "High",
+      "created": "2026-02-28T16:45:00Z",
+      "creator": "lwong",
+      "creatorDisplayName": "Lisa Wong",
+      "labels": ["rfe-creator-v2", "rfe-assess-v2"],
+      "aiInvolvement": "both",
+      "linkedFeature": {
+        "key": "RHAISTRAT-503",
+        "summary": "Strat: A/B testing for model endpoints",
+        "status": "In Progress",
+        "fixVersions": ["RHOAI 2.16"]
+      }
+    },
+    {
+      "key": "RHAIRFE-1006",
+      "summary": "Automated data quality validation for training pipelines",
+      "status": "New",
+      "priority": "Medium",
+      "created": "2026-02-20T08:30:00Z",
+      "creator": "rpatel",
+      "creatorDisplayName": "Raj Patel",
+      "labels": ["rfe-creator-v1"],
+      "aiInvolvement": "created",
+      "linkedFeature": null
+    },
+    {
+      "key": "RHAIRFE-1007",
+      "summary": "Role-based access control for shared model registry",
+      "status": "In Review",
+      "priority": "High",
+      "created": "2026-02-15T13:20:00Z",
+      "creator": "emiller",
+      "creatorDisplayName": "Emily Miller",
+      "labels": ["rfe-assess-v1"],
+      "aiInvolvement": "assessed",
+      "linkedFeature": null
+    },
+    {
+      "key": "RHAIRFE-1008",
+      "summary": "Support custom runtime images for Jupyter notebooks",
+      "status": "New",
+      "priority": "Medium",
+      "created": "2026-02-10T10:00:00Z",
+      "creator": "dlee",
+      "creatorDisplayName": "David Lee",
+      "labels": [],
+      "aiInvolvement": "none",
+      "linkedFeature": null
+    },
+    {
+      "key": "RHAIRFE-1009",
+      "summary": "Federated learning support for distributed model training",
+      "status": "In Progress",
+      "priority": "Critical",
+      "created": "2026-01-25T15:00:00Z",
+      "creator": "schen",
+      "creatorDisplayName": "Sarah Chen",
+      "labels": ["rfe-creator-v2", "rfe-assess-v1", "innovation"],
+      "aiInvolvement": "both",
+      "linkedFeature": null
+    },
+    {
+      "key": "RHAIRFE-1010",
+      "summary": "Improve model deployment latency for real-time applications",
+      "status": "New",
+      "priority": "High",
+      "created": "2026-01-15T09:45:00Z",
+      "creator": "jpark",
+      "creatorDisplayName": "James Park",
+      "labels": [],
+      "aiInvolvement": "none",
+      "linkedFeature": null
+    }
+  ]
+}

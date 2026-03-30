@@ -1,11 +1,9 @@
-const fetch = require('node-fetch');
-
 module.exports = function registerRoutes(router, context) {
   const { storage, requireAdmin } = context;
   const { readFromStorage, writeToStorage, listStorageFiles, deleteStorageDirectory } = storage;
 
   const DEMO_MODE = process.env.DEMO_MODE === 'true';
-  const JIRA_HOST = process.env.JIRA_HOST || 'https://redhat.atlassian.net';
+  const { JIRA_HOST, jiraRequest } = require('../../../shared/server/jira');
 
   // Module-specific server imports
   const { fetchPersonMetrics } = require('./jira/person-metrics');
@@ -29,54 +27,6 @@ module.exports = function registerRoutes(router, context) {
   };
 
   // ─── Jira API helpers ───
-
-  function getJiraAuth() {
-    const token = process.env.JIRA_TOKEN;
-    const email = process.env.JIRA_EMAIL;
-    if (!token || !email) {
-      throw new Error(
-        'JIRA_TOKEN and JIRA_EMAIL environment variables must be set.\n' +
-        'Set them in a .env file or pass them directly:\n' +
-        '  JIRA_EMAIL=you@redhat.com JIRA_TOKEN=your-api-token node server/dev-server.js'
-      );
-    }
-    return Buffer.from(`${email}:${token}`).toString('base64');
-  }
-
-  async function jiraRequest(path, { method = 'GET', body } = {}) {
-    const auth = getJiraAuth();
-    const MAX_RETRIES = 3;
-
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      const options = {
-        method,
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Accept': 'application/json'
-        }
-      };
-      if (body) {
-        options.headers['Content-Type'] = 'application/json';
-        options.body = JSON.stringify(body);
-      }
-      const response = await fetch(`${JIRA_HOST}${path}`, options);
-
-      if (response.status === 429 && attempt < MAX_RETRIES) {
-        const retryAfter = parseInt(response.headers.get('retry-after'), 10);
-        const delay = (!isNaN(retryAfter) && retryAfter > 0) ? retryAfter * 1000 : Math.pow(2, attempt + 1) * 1000;
-        console.warn(`[Jira API] Rate limited (429), retrying in ${delay / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Jira API error (${response.status}): ${text}`);
-      }
-
-      return response.json();
-    }
-  }
 
   // ─── Cache paths & helpers ───
 
