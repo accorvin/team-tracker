@@ -12,7 +12,7 @@ describe('upstream-pulse server module', () => {
   it('registers expected GET routes', () => {
     const registered = []
     const router = {
-      get: vi.fn((path, handler) => registered.push({ method: 'get', path })),
+      get: vi.fn((path, _handler) => registered.push({ method: 'get', path })),
       post: vi.fn(),
     }
     const context = { registerDiagnostics: vi.fn() }
