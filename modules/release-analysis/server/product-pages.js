@@ -179,7 +179,7 @@ async function fetchProductsByShortname(shortnames, config) {
 
         releases.push({
           productName: r.product_name || r.product_shortname || shortname,
-          releaseNumber: r.name || r.shortname || '',
+          releaseNumber: r.shortname || r.name || '',
           dueDate: gaDate
         })
       }
