@@ -222,11 +222,13 @@ import {
   Settings,
   ExternalLink,
   Network,
+  Layers,
   ChevronDown,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   HelpCircle,
+  ChartCandlestick,
   Sparkles,
   Activity
 } from 'lucide-vue-next'
@@ -242,8 +244,12 @@ const ICON_MAP = {
   Settings,
   ExternalLink,
   Network,
+  Layers,
+  Sparkles,
+  Activity,
   Building2,
   'bar-chart': BarChart3,
+  'chart-candlestick': ChartCandlestick,
   'sparkles': Sparkles,
   'activity': Activity,
   'network': Network

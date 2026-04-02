@@ -7,8 +7,40 @@
  * no client-side token management needed.
  */
 
-const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '/api'
 const CACHE_PREFIX = 'tt_cache:'
+/** Prefix for sessionStorage-only caches (same family as tt_cache: localStorage keys). */
+export const SESSION_CACHE_PREFIX = 'tt_cache:session:'
+
+/**
+ * Base URL for REST calls. Relative paths default to `/api` (Vite proxy in dev).
+ * Absolute URLs must point at the API root: if you set only the host (e.g.
+ * `http://localhost:3001`), `/api` is appended so paths like `/modules/...`
+ * resolve to `/api/modules/...` on the backend.
+ */
+let _cachedApiBase = null
+export function getApiBase() {
+  if (_cachedApiBase !== null) return _cachedApiBase
+  const raw = import.meta.env.VITE_API_ENDPOINT
+  if (raw === undefined || raw === '') { _cachedApiBase = '/api'; return _cachedApiBase }
+  const s = String(raw).trim()
+  if (!s) { _cachedApiBase = '/api'; return _cachedApiBase }
+  if (!/^https?:\/\//i.test(s)) {
+    _cachedApiBase = s.replace(/\/$/, '') || '/api'
+    return _cachedApiBase
+  }
+  try {
+    const u = new URL(s)
+    const p = u.pathname.replace(/\/$/, '') || '/'
+    if (p === '/') {
+      _cachedApiBase = `${u.origin}/api`
+    } else {
+      _cachedApiBase = s.replace(/\/$/, '')
+    }
+  } catch {
+    _cachedApiBase = '/api'
+  }
+  return _cachedApiBase
+}
 
 // ─── LocalStorage Cache ───
 
@@ -64,7 +96,7 @@ export function clearApiCache() {
 }
 
 export async function apiRequest(path, options = {}) {
-  const response = await fetch(`${API_ENDPOINT}${path}`, options)
+  const response = await fetch(`${getApiBase()}${path}`, options)
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))

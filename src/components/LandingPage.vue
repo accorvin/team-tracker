@@ -111,6 +111,7 @@ import {
   Zap,
   Layout,
   Network,
+  ChartCandlestick,
   Sparkles
 } from 'lucide-vue-next'
 
@@ -136,6 +137,7 @@ const iconMap = {
   'layout': Layout,
   'box': Box,
   'network': Network,
+  'chart-candlestick': ChartCandlestick,
   'sparkles': Sparkles
 }
 

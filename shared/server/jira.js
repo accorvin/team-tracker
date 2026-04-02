@@ -43,7 +43,12 @@ async function jiraRequest(path, { method = 'GET', body } = {}) {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Jira API error (${response.status}): ${text}`);
+      let msg = `Jira API error (${response.status}): ${text}`;
+      if (response.status === 401) {
+        msg +=
+          ' Auth: use a Jira Cloud API token + JIRA_EMAIL in .env (see https://id.atlassian.com/manage-profile/security/api-tokens), then restart the API.';
+      }
+      throw new Error(msg);
     }
 
     return response.json();

@@ -30,6 +30,20 @@ function discoverModules(modulesDir = MODULES_DIR) {
   return modules
 }
 
+/** Cached module list from disk — avoids readdir/parse on every hot-path request. Invalidate after adding a module folder (or restart). */
+let _discoveredModulesCache = null
+
+function getDiscoveredModules(modulesDir = MODULES_DIR) {
+  if (_discoveredModulesCache === null) {
+    _discoveredModulesCache = discoverModules(modulesDir)
+  }
+  return _discoveredModulesCache
+}
+
+function invalidateDiscoveredModulesCache() {
+  _discoveredModulesCache = null
+}
+
 // ─── State Persistence ───
 
 function loadModuleState(storage) {
@@ -177,7 +191,6 @@ function createModuleRouters(modules, context, enabledSlugs, diagnosticsRegistry
   const routers = {}
   for (const mod of modules) {
     if (!mod.server?.entry) continue
-    // Skip disabled modules if enabledSlugs is provided
     if (enabledSlugs && !enabledSlugs.has(mod.slug)) continue
     // Validate entry path does not escape module directory
     const entryPath = path.join(mod._dir, mod.server.entry)
@@ -253,6 +266,8 @@ function mountModuleRouters(app, modules, routers) {
 
 module.exports = {
   discoverModules,
+  getDiscoveredModules,
+  invalidateDiscoveredModulesCache,
   createModuleRouters,
   mountModuleRouters,
   collectModuleDiagnostics,

@@ -1,0 +1,17 @@
+{
+  "name": "Release Analysis",
+  "slug": "release-analysis",
+  "defaultEnabled": true,
+  "description": "Release Analysis for RHAI Releases",
+  "icon": "chart-candlestick",
+  "order": 10,
+  "client": {
+    "entry": "./client/index.js",
+    "navItems": [
+      { "id": "main", "label": "Release Analysis", "icon": "BarChart3", "default": true }
+    ]
+  },
+  "server": {
+    "entry": "./server/index.js"
+  }
+}

@@ -1,6 +1,5 @@
 import { ref, computed } from 'vue'
-
-const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '/api'
+import { getApiBase } from '@shared/client/services/api'
 
 const user = ref(null)
 const loading = ref(true)
@@ -15,7 +14,7 @@ export function useAuth() {
 
   async function fetchCurrentUser() {
     try {
-      const res = await fetch(`${API_ENDPOINT}/whoami`)
+      const res = await fetch(`${getApiBase()}/whoami`)
       if (res.ok) {
         user.value = await res.json()
       }

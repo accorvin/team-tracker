@@ -76,6 +76,8 @@ function proxySecretGuard(req, res, next) {
   }
   if (req.method === 'OPTIONS') return next();
   if (req.path === '/healthz' || req.path === '/api/healthz') return next();
+  // Shell module list: public metadata only (same payload as unauthenticated dev)
+  if (req.method === 'GET' && req.path === '/api/built-in-modules/manifests') return next();
 
   const providedSecret = req.headers['x-proxy-secret'];
   if (providedSecret === expectedSecret) return next();
