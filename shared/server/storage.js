@@ -9,6 +9,16 @@ const path = require('path');
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 
 /**
+ * Verify that a resolved path stays within DATA_DIR to prevent path traversal.
+ * @param {string} resolvedPath - The fully resolved path to check
+ * @returns {boolean} true if safe, false if path escapes DATA_DIR
+ */
+function isPathSafe(resolvedPath) {
+  const resolvedDataDir = path.resolve(DATA_DIR);
+  return resolvedPath === resolvedDataDir || resolvedPath.startsWith(resolvedDataDir + path.sep);
+}
+
+/**
  * Ensure the data directory and any subdirectories exist
  */
 function ensureDir(filePath) {
@@ -24,7 +34,11 @@ function ensureDir(filePath) {
  * @returns {object|null} Parsed JSON or null if not found
  */
 function readFromStorage(key) {
-  const filePath = path.join(DATA_DIR, key);
+  const filePath = path.resolve(DATA_DIR, key);
+  if (!isPathSafe(filePath)) {
+    console.error(`[storage] Blocked path traversal attempt: ${key}`);
+    return null;
+  }
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     return JSON.parse(content);
@@ -42,7 +56,11 @@ function readFromStorage(key) {
  * @param {object} data - Data to write
  */
 function writeToStorage(key, data) {
-  const filePath = path.join(DATA_DIR, key);
+  const filePath = path.resolve(DATA_DIR, key);
+  if (!isPathSafe(filePath)) {
+    console.error(`[storage] Blocked path traversal attempt: ${key}`);
+    return;
+  }
   ensureDir(filePath);
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
   console.log(`Wrote ${key} to local storage`);
@@ -54,7 +72,11 @@ function writeToStorage(key, data) {
  * @returns {string[]} Array of filenames (without path)
  */
 function listStorageFiles(dir) {
-  const dirPath = path.join(DATA_DIR, dir);
+  const dirPath = path.resolve(DATA_DIR, dir);
+  if (!isPathSafe(dirPath)) {
+    console.error(`[storage] Blocked path traversal attempt: ${dir}`);
+    return [];
+  }
   try {
     return fs.readdirSync(dirPath).filter(f => f.endsWith('.json'));
   } catch (error) {
@@ -71,7 +93,11 @@ function listStorageFiles(dir) {
  * @returns {{ deleted: number }} Count of JSON files that were in the directory
  */
 function deleteStorageDirectory(dir) {
-  const dirPath = path.join(DATA_DIR, dir);
+  const dirPath = path.resolve(DATA_DIR, dir);
+  if (!isPathSafe(dirPath)) {
+    console.error(`[storage] Blocked path traversal attempt: ${dir}`);
+    return { deleted: 0 };
+  }
   let deleted = 0;
   try {
     // Count files before deletion

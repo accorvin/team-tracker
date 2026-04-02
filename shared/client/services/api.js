@@ -121,7 +121,7 @@ export async function apiRequest(path, options = {}) {
  * then fetch fresh data and call onData again if it changed.
  * If no cache exists, fetches and returns normally.
  */
-async function cachedRequest(cacheKey, path, onData) {
+export async function cachedRequest(cacheKey, path, onData) {
   const cached = cacheGet(cacheKey)
 
   if (cached && onData) {
