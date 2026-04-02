@@ -103,6 +103,10 @@ function extractGaDate(release) {
   }
   if (lastGaTask?.date_finish) return lastGaTask.date_finish
 
+  // Priority 3: last task's date_finish (covers releases that label GA as "Release")
+  const lastTask = tasks[tasks.length - 1]
+  if (lastTask?.date_finish) return lastTask.date_finish
+
   return null
 }
 
@@ -119,7 +123,8 @@ function getAuthStatus() {
   return 'none'
 }
 
-const RELEVANT_PHASES = new Set([200, 350, 400])
+// Exclude phases where the release is already shipped or end-of-life
+const EXCLUDED_PHASES = new Set([600, 1000]) // Maintenance, Unsupported
 
 /**
  * Fetches releases for given product shortnames from Product Pages API.
@@ -172,7 +177,7 @@ async function fetchProductsByShortname(shortnames, config) {
 
       for (const r of rows) {
         if (r.canceled) continue
-        if (!RELEVANT_PHASES.has(r.phase)) continue
+        if (EXCLUDED_PHASES.has(r.phase)) continue
 
         const gaDate = extractGaDate(r)
         if (!gaDate) continue
