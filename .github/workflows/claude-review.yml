@@ -19,7 +19,6 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
-  id-token: write  # Required for GCP credential exchange
 
 jobs:
   claude-review:
@@ -44,6 +43,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure git identity
+        run: |
+          git config user.name "claude-code-review[bot]"
+          git config user.email "claude-code-review[bot]@users.noreply.github.com"
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -56,21 +69,66 @@ jobs:
           use_vertex: "true"
           track_progress: true
           display_report: "true"
-          claude_args: '--model claude-opus-4-6 --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"'
+          claude_args: '--model claude-opus-4-6 --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checkout:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin:*),Bash(git diff:*),Bash(git status:*),Bash(npm test:*),Bash(npm run lint:*),Read,Glob,Grep,Edit,Write"'
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
 
-            Review this PR for:
-            - Code quality and maintainability
-            - Security vulnerabilities (OWASP top 10, injection, XSS, etc.)
-            - Potential bugs and edge cases
-            - Adherence to project conventions (see CLAUDE.md)
-            - Performance concerns
+            You are reviewing a pull request. Your job is to:
 
-            Provide inline comments for specific issues found in the diff.
-            Post a top-level PR comment summarizing your review findings.
-            Be concise. Focus on actionable feedback. Don't nitpick style unless it impacts readability.
+            1. **Determine PR context**:
+               - If no PR number is available (e.g., workflow_dispatch without context),
+                 post a comment explaining that no PR was found and exit.
+               - Run `gh pr view <PR_NUMBER> --json isCrossRepository` to check if
+                 this is a fork PR. If `isCrossRepository` is true, do a **read-only
+                 review only** — post comments but do NOT edit files, commit, or push.
+               - Run `gh pr checkout <PR_NUMBER>` to switch to the PR branch.
+
+            2. **Review** the PR diff for:
+               - Code quality and maintainability
+               - Security vulnerabilities (OWASP top 10, injection, XSS, etc.)
+               - Potential bugs and edge cases
+               - Adherence to project conventions (see CLAUDE.md)
+               - Performance concerns
+
+            3. **Fix** any issues you find by editing the files directly:
+               - Use Edit/Write tools to modify the source files
+               - Fix all issues you're confident about: bugs, style, security, performance
+               - After making all fixes, validate them:
+                 ```
+                 npm test
+                 npm run lint
+                 ```
+               - If tests or lint fail due to your changes, fix the issues or revert
+                 your changes to that file
+               - Only commit and push if you actually made changes and tests pass:
+                 ```
+                 git add -u
+                 git diff --cached --quiet || git commit -m "fix: Claude code review autofix
+
+                 <concise summary of changes>"
+                 git push origin HEAD
+                 ```
+
+            4. **Report** your findings:
+               - Use inline comments for issues you found (whether or not you fixed them)
+               - Post a top-level PR comment summarizing:
+                 - Issues found and fixed (with brief descriptions)
+                 - Issues found but NOT fixed (with explanations of why)
+                 - If no issues were found, say so briefly
+               - NOTE: CI (the "Test & Build" check) will NOT automatically run on
+                 your autofix commit. Mention this in your summary so the PR author
+                 knows to re-run CI if needed.
+
+            **Important rules:**
+            - Never force push. Only push to the current PR branch via `git push origin HEAD`.
+            - Use `git add -u` (not `git add -A`) to avoid staging untracked files.
+            - Be concise. Focus on actionable feedback. Don't nitpick style unless
+              it impacts readability.
+            - Only fix things you're confident about. If a fix is ambiguous or
+              subjective, comment instead of changing code.
+            - Do not modify files outside the scope of the PR unless necessary to
+              fix an issue (e.g., a missing import in another file).
         env:
           ANTHROPIC_VERTEX_PROJECT_ID: "itpc-gcp-ai-eng-claude"
           CLOUD_ML_REGION: "us-east5"
