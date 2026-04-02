@@ -63,6 +63,10 @@ function removeProduct(shortname) {
   config.value.productPagesProductShortnames = config.value.productPagesProductShortnames.filter(s => s !== shortname)
 }
 
+function onProductInputBlur() {
+  setTimeout(() => { showProductDropdown.value = false }, 150)
+}
+
 async function loadProducts() {
   loadingProducts.value = true
   try {
@@ -366,7 +370,8 @@ onMounted(() => {
               v-model="productSearchQuery"
               @input="updateFilteredProducts"
               @focus="showProductDropdown = true; updateFilteredProducts()"
-              @blur="setTimeout(() => { showProductDropdown = false }, 150)"
+              @click="showProductDropdown = true; updateFilteredProducts()"
+              @blur="onProductInputBlur"
               @keydown.enter.prevent="addManualShortname"
               type="text"
               placeholder="Search or type a product shortname..."

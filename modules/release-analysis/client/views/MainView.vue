@@ -46,10 +46,23 @@
           <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mt-2 max-w-3xl">
             {{ riskLegendText }}
           </p>
+          <div class="flex gap-1 mt-4 border-b border-gray-200 dark:border-gray-700">
+            <button
+              v-for="tab in tabs"
+              :key="tab.key"
+              class="px-4 py-2 text-sm font-medium transition-colors -mb-px"
+              :class="activeTab === tab.key
+                ? 'border-b-2 border-gray-900 dark:border-gray-100 text-gray-900 dark:text-gray-100'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-b-2 hover:border-gray-300 dark:hover:border-gray-600'"
+              @click="activeTab = tab.key"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
         </div>
 
         <article
-          v-for="release in analysis.releases"
+          v-for="release in filteredReleases"
           :key="release.releaseNumber"
           class="rounded-xl border border-gray-200/80 dark:border-gray-700/80 bg-white dark:bg-gray-900/40 p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_12px_rgba(0,0,0,0.04)] flex flex-col gap-4"
         >
@@ -274,6 +287,29 @@ const ANALYSIS_CACHE_KEY = `${SESSION_CACHE_PREFIX}release-analysis:analysis-v4`
 const loading = ref(false)
 const error = ref('')
 const analysis = ref(null)
+const activeTab = ref('all')
+
+const tabs = computed(() => {
+  const releases = analysis.value?.releases || []
+  const products = [...new Set(releases.map(r => {
+    const num = (r.releaseNumber || '').toLowerCase()
+    const dash = num.indexOf('-')
+    return dash > 0 ? num.slice(0, dash) : num
+  }).filter(Boolean))]
+  products.sort()
+  return [
+    { key: 'all', label: 'All' },
+    ...products.map(p => ({ key: p, label: p }))
+  ]
+})
+
+const filteredReleases = computed(() => {
+  if (!analysis.value?.releases) return []
+  if (activeTab.value === 'all') return analysis.value.releases
+  return analysis.value.releases.filter(r =>
+    (r.releaseNumber || '').toLowerCase().startsWith(activeTab.value)
+  )
+})
 
 const riskLegendText = computed(() => {
   const a = analysis.value

@@ -81,27 +81,61 @@ async function getProductPagesToken(config) {
 
 /**
  * Extracts the GA date from a Product Pages release object.
- * Priority: ga_date field > all_ga_tasks with main:true > all_ga_tasks matching /\bGA\b/ > null
+ *
+ * The `ga_date` top-level field is often unreliable — it can point to the EA1
+ * date instead of the actual GA. `major_milestones` has the correct GA date
+ * when present.
+ *
+ * Priority:
+ * 1. major_milestones entry matching /\bGA\b/ but NOT /\bEA\b/
+ * 2. all_ga_tasks entry matching /\bGA\b/ but NOT /\bEA\b/
+ * 3. all_ga_tasks with main:true
+ * 4. ga_date field (fallback — may be EA1 date)
+ * 5. all_ga_tasks last entry
+ * 6. null
  */
 function extractGaDate(release) {
-  if (release.ga_date) return release.ga_date
+  const gaNotEa = /\bGA\b/i
+  const eaPattern = /\bEA\d?\b/i
+
+  // Priority 1: major_milestones with GA (not EA) in name
+  const milestones = release.major_milestones
+  if (Array.isArray(milestones) && milestones.length > 0) {
+    let lastGaMilestone = null
+    for (const m of milestones) {
+      const name = m.name || ''
+      if (gaNotEa.test(name) && !eaPattern.test(name)) {
+        lastGaMilestone = m
+      }
+    }
+    if (lastGaMilestone?.date_finish) return lastGaMilestone.date_finish
+  }
 
   const tasks = release.all_ga_tasks
-  if (!Array.isArray(tasks) || tasks.length === 0) return null
-
-  // Priority 1: entry with main: true
-  const mainTask = tasks.find(t => t.main === true)
-  if (mainTask?.date_finish) return mainTask.date_finish
-
-  // Priority 2: entry whose name matches /\bGA\b/
-  const gaPattern = /\bGA\b/
-  let lastGaTask = null
-  for (const t of tasks) {
-    if (gaPattern.test(t.name || '')) {
-      lastGaTask = t
+  if (Array.isArray(tasks) && tasks.length > 0) {
+    // Priority 2: all_ga_tasks with GA (not EA) in name
+    let lastGaTask = null
+    for (const t of tasks) {
+      const name = t.name || ''
+      if (gaNotEa.test(name) && !eaPattern.test(name)) {
+        lastGaTask = t
+      }
     }
+    if (lastGaTask?.date_finish) return lastGaTask.date_finish
+
+    // Priority 3: entry with main: true
+    const mainTask = tasks.find(t => t.main === true)
+    if (mainTask?.date_finish) return mainTask.date_finish
   }
-  if (lastGaTask?.date_finish) return lastGaTask.date_finish
+
+  // Priority 4: ga_date field (may be EA1 date — last resort from top-level fields)
+  if (release.ga_date) return release.ga_date
+
+  // Priority 5: last task's date_finish
+  if (Array.isArray(tasks) && tasks.length > 0) {
+    const lastTask = tasks[tasks.length - 1]
+    if (lastTask?.date_finish) return lastTask.date_finish
+  }
 
   return null
 }
@@ -119,7 +153,74 @@ function getAuthStatus() {
   return 'none'
 }
 
-const RELEVANT_PHASES = new Set([200, 350, 400])
+// Exclude phases where the release is already shipped or end-of-life.
+// Known phases: 100=Planning, 200=Development, 230=Early Access, 350=Testing,
+// 400=Launch, 500=Update, 600=Maintenance, 1000=Unsupported/EOL
+const EXCLUDED_PHASES = new Set([600, 1000]) // Maintenance, Unsupported
+
+const RELEASE_MILESTONE_PATTERN = /\b(EA\d?|GA)\b/i
+
+/**
+ * Expands a single Product Pages release into discrete EA/GA entries when
+ * the release's major_milestones contain EA1, EA2, GA sub-releases.
+ *
+ * Products like rhoai already have separate releases per EA (rhoai-3.4.EA1,
+ * rhoai-3.4.EA2, rhoai-3.4), so those pass through as a single entry.
+ * Products like rhelai and RHAIIS bundle EA/GA as milestones within one
+ * release — those get expanded here.
+ */
+function expandReleaseMilestones(r, productName) {
+  const milestones = r.major_milestones
+  if (!Array.isArray(milestones) || milestones.length === 0) return null
+
+  // Only consider non-draft milestones that are EA/GA release events
+  // Exclude noise like "rpms release 1 month before the 3.4 GA"
+  const releaseMilestones = milestones.filter(m => {
+    if (m.draft) return false
+    const name = m.name || ''
+    if (!RELEASE_MILESTONE_PATTERN.test(name)) return false
+    // Must be an EA release or a standalone GA milestone
+    const isEaRelease = /\bEA\d?\b/i.test(name) && /release|GA\b/i.test(name)
+    // GA milestone: short name ending in "GA" (e.g. "rhelai-3.4 GA", "rhaiis-3.4 GA")
+    // Exclude long descriptive milestones that just happen to mention GA
+    const isGa = /\bGA\s*$/i.test(name) && !/\bEA\d?\b/i.test(name) && name.split(/\s+/).length <= 4
+    return isEaRelease || isGa
+  })
+
+  // If there's only one milestone (just GA), don't expand — the main entry is fine
+  if (releaseMilestones.length <= 1) return null
+
+  // Deduplicate by release number (RHAIIS has both "EA1 release" and "EA1 GA" milestones)
+  const byNumber = new Map()
+  for (const m of releaseMilestones) {
+    const num = milestoneToReleaseNumber(r.shortname, m.name)
+    // Keep the latest date for each release number
+    if (!byNumber.has(num) || m.date_finish > byNumber.get(num).date_finish) {
+      byNumber.set(num, m)
+    }
+  }
+
+  return [...byNumber.entries()].map(([releaseNumber, m]) => ({
+    productName,
+    releaseNumber,
+    dueDate: m.date_finish
+  }))
+}
+
+/**
+ * Derives a release number from the parent shortname and milestone name.
+ * e.g. (rhelai-3.4, "rhelai-3.4 EA1 release") → "rhelai-3.4.EA1"
+ *      (rhelai-3.4, "rhelai-3.4 GA") → "rhelai-3.4"
+ *      (RHAIIS-3.4, "rhaiis-3.4 EA2 GA") → "RHAIIS-3.4.EA2"
+ */
+function milestoneToReleaseNumber(shortname, milestoneName) {
+  const eaMatch = milestoneName.match(/\b(EA\d?)\b/i)
+  if (eaMatch) {
+    return `${shortname}.${eaMatch[1].toUpperCase()}`
+  }
+  // GA milestone → use the parent shortname as-is
+  return shortname
+}
 
 /**
  * Fetches releases for given product shortnames from Product Pages API.
@@ -172,14 +273,26 @@ async function fetchProductsByShortname(shortnames, config) {
 
       for (const r of rows) {
         if (r.canceled) continue
-        if (!RELEVANT_PHASES.has(r.phase)) continue
+        if (EXCLUDED_PHASES.has(r.phase)) continue
 
+        const productName = r.product_name || r.product_shortname || shortname
+
+        // Try to expand into discrete EA/GA entries from milestones
+        const expanded = expandReleaseMilestones(r, productName)
+        if (expanded) {
+          for (const entry of expanded) {
+            if (entry.dueDate) releases.push(entry)
+          }
+          continue
+        }
+
+        // Single-milestone or no-milestone release — use extractGaDate
         const gaDate = extractGaDate(r)
         if (!gaDate) continue
 
         releases.push({
-          productName: r.product_name || r.product_shortname || shortname,
-          releaseNumber: r.name || r.shortname || '',
+          productName,
+          releaseNumber: r.shortname || r.name || '',
           dueDate: gaDate
         })
       }

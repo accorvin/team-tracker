@@ -713,9 +713,17 @@ async function runFullAnalysis(storage, config) {
     jiraWarning = `Jira data unavailable: ${err.message}`
   }
 
-  const analysisReleases = jiraReleases.length
-    ? enrichJiraReleasesWithProductPages(jiraReleases, openReleases)
-    : openReleases
+  // When Product Pages product shortnames are configured, use Product Pages as
+  // the primary release source. Otherwise fall back to the legacy behavior where
+  // Jira Fix Versions are primary and Product Pages only enriches metadata.
+  let analysisReleases
+  if (config.productPagesProductShortnames?.length) {
+    analysisReleases = openReleases
+  } else if (jiraReleases.length) {
+    analysisReleases = enrichJiraReleasesWithProductPages(jiraReleases, openReleases)
+  } else {
+    analysisReleases = openReleases
+  }
   const analysisOpenReleases = filterUnreleased(analysisReleases)
 
   const result = buildAnalysis(analysisOpenReleases, issues, fieldMeta, config)
