@@ -10,7 +10,7 @@
       <button
         class="px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
         :disabled="loading"
-        @click="loadAnalysis"
+        @click="refreshAnalysis"
       >
         {{ loading ? 'Refreshing...' : 'Refresh' }}
       </button>
@@ -321,7 +321,7 @@
 import { computed, ref } from 'vue'
 import { useReleaseAnalysis } from '../composables/useReleaseAnalysis'
 
-const { loading, error, analysis, loadAnalysis } = useReleaseAnalysis()
+const { loading, error, analysis, loadAnalysis, refreshAnalysis } = useReleaseAnalysis()
 
 const activeTab = ref('all')
 

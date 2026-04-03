@@ -329,8 +329,6 @@
 import { computed, ref, reactive } from 'vue'
 import { useReleaseAnalysis } from '../composables/useReleaseAnalysis'
 
-const FALLBACK_WINDOW_DAYS = 14
-
 const STRATEGIC_TYPES = new Set(['feature', 'initiative', 'spike'])
 
 const activeRelease = ref('')
