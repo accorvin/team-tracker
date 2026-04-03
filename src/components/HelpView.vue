@@ -16,7 +16,7 @@
         </dl>
         <div class="flex items-center justify-center">
           <a
-            href="https://github.com/accorvin/team-tracker"
+            href="https://github.com/red-hat-data-services/rhai-org-pulse"
             target="_blank"
             rel="noopener noreferrer"
             class="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"

@@ -12,7 +12,7 @@
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/accorvin/team-tracker.git
+git clone https://github.com/red-hat-data-services/rhai-org-pulse.git
 cd team-tracker
 npm install
 ```

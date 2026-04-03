@@ -1,5 +1,8 @@
 name: Build & Push Images
 
+permissions:
+  pull-requests: write
+
 on:
   workflow_dispatch:
   push:
@@ -208,10 +211,17 @@ jobs:
       needs.build-frontend.result != 'failure'
     runs-on: ubuntu-latest
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v4
         with:
           ref: main
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Install kustomize
         uses: imranismail/setup-kustomize@v2
@@ -233,7 +243,7 @@ jobs:
 
       - name: Create PR
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           # Build commit message and PR title based on what changed
           PARTS=""
@@ -256,4 +266,5 @@ jobs:
             --title "deploy: update ${PARTS} image to ${GITHUB_SHA::7}" \
             --body "Automated image tag update for ${PARTS} to \`${{ github.sha }}\`." \
             --label automated
+          GH_TOKEN=${{ secrets.GITHUB_TOKEN }} gh pr review "$BRANCH" --approve
           gh pr merge "$BRANCH" --auto --squash
