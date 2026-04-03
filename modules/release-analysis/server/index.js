@@ -374,45 +374,49 @@ async function fetchUnreleasedJiraFixVersions(config) {
   const releaseMap = new Map()
   const warnings = []
 
-  for (const projectKey of config.projectKeys) {
-    try {
-      let startAt = 0
-      const maxResults = 50
-      let isLast = false
+  async function fetchVersionsForProject(projectKey) {
+    let startAt = 0
+    const maxResults = 50
+    let isLast = false
 
-      while (!isLast) {
-        const data = await jiraRequest(`/rest/api/3/project/${encodeURIComponent(projectKey)}/version?startAt=${startAt}&maxResults=${maxResults}`)
-        const values = data.values || []
+    while (!isLast) {
+      const data = await jiraRequest(`/rest/api/3/project/${encodeURIComponent(projectKey)}/version?startAt=${startAt}&maxResults=${maxResults}`)
+      const values = data.values || []
 
-        for (const version of values) {
-          const name = String(version.name || '').trim()
-          if (!name) continue
-          if (version.archived) continue
-          if (version.released === true) continue
+      for (const version of values) {
+        const name = String(version.name || '').trim()
+        if (!name) continue
+        if (version.archived) continue
+        if (version.released === true) continue
 
-          if (!releaseMap.has(name)) {
-            releaseMap.set(name, {
-              productName: 'Jira version catalog',
-              releaseNumber: name,
-              dueDate: toIsoDate(version.releaseDate),
-              _projects: new Set()
-            })
-          }
-          const row = releaseMap.get(name)
-          row._projects.add(projectKey)
-          if (!row.dueDate && version.releaseDate) {
-            row.dueDate = toIsoDate(version.releaseDate)
-          }
+        if (!releaseMap.has(name)) {
+          releaseMap.set(name, {
+            productName: 'Jira version catalog',
+            releaseNumber: name,
+            dueDate: toIsoDate(version.releaseDate),
+            _projects: new Set()
+          })
         }
-
-        isLast = data.isLast === true || values.length < maxResults
-        startAt += maxResults
+        const row = releaseMap.get(name)
+        row._projects.add(projectKey)
+        if (!row.dueDate && version.releaseDate) {
+          row.dueDate = toIsoDate(version.releaseDate)
+        }
       }
+
+      isLast = data.isLast === true || values.length < maxResults
+      startAt += maxResults
+    }
+  }
+
+  await Promise.all(config.projectKeys.map(async (projectKey) => {
+    try {
+      await fetchVersionsForProject(projectKey)
     } catch (err) {
       const hint = jiraConnectivityHint(err)
       warnings.push(`Could not load Jira versions for ${projectKey}: ${err.message}.${hint}`)
     }
-  }
+  }))
 
   const releases = [...releaseMap.values()].map(r => ({
     productName: `${r.productName} (${[...r._projects].sort().join(', ')})`,
@@ -713,39 +717,38 @@ async function detectSprintWindow(config) {
   }
 
   try {
-    const boardIds = []
-    for (const projectKey of config.projectKeys) {
-      const data = await jiraRequest(
-        `/rest/agile/1.0/board?projectKeyOrId=${encodeURIComponent(projectKey)}&type=scrum&maxResults=10`
-      )
-      if (data?.values) {
-        for (const b of data.values) boardIds.push(b.id)
+    const boardResults = await Promise.all(config.projectKeys.map(async (projectKey) => {
+      try {
+        const data = await jiraRequest(
+          `/rest/agile/1.0/board?projectKeyOrId=${encodeURIComponent(projectKey)}&type=scrum&maxResults=10`
+        )
+        return (data?.values || []).map(b => b.id)
+      } catch {
+        return []
       }
-    }
+    }))
+    const boardIds = [...new Set(boardResults.flat())]
 
     if (!boardIds.length) return fallback
 
-    let latestSprint = null
-    for (const boardId of [...new Set(boardIds)].slice(0, 5)) {
+    const sprintResults = await Promise.all(boardIds.slice(0, 5).map(async (boardId) => {
       try {
-        // Jira returns sprints oldest-first. Probe total count, then
-        // jump to the last page to efficiently get the most recent closed sprints.
         const pageSize = 50
         const probe = await jiraRequest(
           `/rest/agile/1.0/board/${boardId}/sprint?state=closed&startAt=0&maxResults=1`
         )
-        if (!probe?.values?.length) continue
+        if (!probe?.values?.length) return null
         const total = probe.total ?? 0
         const lastPageStart = Math.max(0, total - pageSize)
         const lastPage = await jiraRequest(
           `/rest/agile/1.0/board/${boardId}/sprint?state=closed&startAt=${lastPageStart}&maxResults=${pageSize}`
         )
-        const candidates = lastPage?.values || []
-        for (const s of candidates) {
+        let best = null
+        for (const s of (lastPage?.values || [])) {
           if (!s.startDate || !s.endDate) continue
           const endIso = (s.completeDate || s.endDate).slice(0, 10)
-          if (!latestSprint || endIso > latestSprint.endDate) {
-            latestSprint = {
+          if (!best || endIso > best.endDate) {
+            best = {
               startDate: s.startDate.slice(0, 10),
               endDate: endIso,
               sprintName: s.name,
@@ -755,8 +758,17 @@ async function detectSprintWindow(config) {
             }
           }
         }
+        return best
       } catch (err) {
         console.warn(`[release-analysis] Could not fetch sprints for board ${boardId}: ${err.message}`)
+        return null
+      }
+    }))
+
+    let latestSprint = null
+    for (const candidate of sprintResults) {
+      if (candidate && (!latestSprint || candidate.endDate > latestSprint.endDate)) {
+        latestSprint = candidate
       }
     }
 
@@ -901,8 +913,12 @@ async function fetchDeliverableChildrenCounts(deliverableKeys) {
   if (!deliverableKeys.length) return counts
 
   const batchSize = 40
+  const batches = []
   for (let i = 0; i < deliverableKeys.length; i += batchSize) {
-    const batch = deliverableKeys.slice(i, i + batchSize)
+    batches.push(deliverableKeys.slice(i, i + batchSize))
+  }
+
+  await Promise.all(batches.map(async (batch, idx) => {
     const keysStr = batch.join(', ')
     const jql = `"Epic Link" in (${keysStr}) ORDER BY key ASC`
     try {
@@ -923,9 +939,9 @@ async function fetchDeliverableChildrenCounts(deliverableKeys) {
         else counts[parentKey].remaining++
       }
     } catch (err) {
-      console.warn(`[release-analysis] Could not fetch children for deliverables batch ${i}: ${err.message}`)
+      console.warn(`[release-analysis] Could not fetch children for deliverables batch ${idx}: ${err.message}`)
     }
-  }
+  }))
   return counts
 }
 
