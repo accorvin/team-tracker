@@ -44,6 +44,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Checkout PR branch
+        run: |
+          PR_NUM=${{ github.event.pull_request.number || github.event.issue.number }}
+          if [ -n "$PR_NUM" ]; then
+            gh pr checkout "$PR_NUM"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
