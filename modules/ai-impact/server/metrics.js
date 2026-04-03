@@ -6,9 +6,18 @@
  * @param {object} config - Module config (for trendThresholdPp)
  * @returns {{ metrics, trendData, breakdown }}
  */
+function getRelevantDate(issue) {
+  const dates = [issue.created];
+  if (issue.createdLabelDate) dates.push(issue.createdLabelDate);
+  if (issue.revisedLabelDate) dates.push(issue.revisedLabelDate);
+  return dates.reduce((latest, d) =>
+    new Date(d) > new Date(latest) ? d : latest
+  );
+}
+
 function computeAllMetrics(issues, timeWindow, config) {
   const { cutoff } = getTimeWindowDates(new Date(), timeWindow);
-  const windowIssues = issues.filter(i => new Date(i.created) >= cutoff);
+  const windowIssues = issues.filter(i => new Date(getRelevantDate(i)) >= cutoff);
   return {
     metrics: computeMetrics(issues, timeWindow, config),
     trendData: buildTrendData(issues, timeWindow),
@@ -28,9 +37,9 @@ function computeMetrics(issues, timeWindow, config) {
   const now = new Date();
   const { cutoff, priorCutoff } = getTimeWindowDates(now, timeWindow);
 
-  const currentIssues = issues.filter(i => new Date(i.created) >= cutoff);
+  const currentIssues = issues.filter(i => new Date(getRelevantDate(i)) >= cutoff);
   const priorIssues = issues.filter(i => {
-    const d = new Date(i.created);
+    const d = new Date(getRelevantDate(i));
     return d >= priorCutoff && d < cutoff;
   });
 
@@ -73,7 +82,7 @@ function buildTrendData(issues, timeWindow) {
     const weekStart = new Date(weekEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const weekIssues = issues.filter(i => {
-      const d = new Date(i.created);
+      const d = new Date(getRelevantDate(i));
       return d >= weekStart && d < weekEnd;
     });
     const total = weekIssues.length;
@@ -102,4 +111,4 @@ function buildBreakdownData(issues) {
   ];
 }
 
-module.exports = { computeAllMetrics, computeMetrics, buildTrendData, buildBreakdownData, getTimeWindowDates };
+module.exports = { computeAllMetrics, computeMetrics, buildTrendData, buildBreakdownData, getTimeWindowDates, getRelevantDate };

@@ -33,16 +33,16 @@ const adoptionChartData = computed(() => ({
     {
       label: 'Created with AI (%)',
       data: props.trendData.map(p => p.createdPct),
-      borderColor: '#3b82f6',
-      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      borderColor: '#10b981',
+      backgroundColor: 'rgba(16, 185, 129, 0.1)',
       fill: true,
       tension: 0.3
     },
     {
       label: 'Revised with AI (%)',
       data: props.trendData.map(p => p.revisedPct),
-      borderColor: '#10b981',
-      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+      borderColor: '#f59e0b',
+      backgroundColor: 'rgba(245, 158, 11, 0.1)',
       fill: true,
       tension: 0.3
     }

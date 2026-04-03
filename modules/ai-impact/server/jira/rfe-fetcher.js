@@ -1,6 +1,25 @@
 const { fetchAllJqlResults } = require('../../../../shared/server/jira');
 const { classifyAIInvolvement } = require('./label-parser');
 
+function extractLabelDate(changelog, targetLabel) {
+  if (!changelog?.histories) return null;
+  let latestDate = null;
+  for (const history of changelog.histories) {
+    for (const item of history.items) {
+      if (item.field !== 'labels') continue;
+      const before = (item.fromString || '').split(/\s+/).filter(Boolean);
+      const after = (item.toString || '').split(/\s+/).filter(Boolean);
+      if (after.includes(targetLabel) && !before.includes(targetLabel)) {
+        const historyDate = new Date(history.created);
+        if (!latestDate || historyDate > new Date(latestDate)) {
+          latestDate = history.created;
+        }
+      }
+    }
+  }
+  return latestDate;
+}
+
 function processIssue(issue, config) {
   const {
     createdLabel,
@@ -13,6 +32,19 @@ function processIssue(issue, config) {
     labels, createdLabel, revisedLabel, testExclusionLabel
   );
 
+  // Only extract label dates when the label is currently on the issue.
+  let createdLabelDate = null;
+  let revisedLabelDate = null;
+
+  if (aiInvolvement === 'created' || aiInvolvement === 'both') {
+    createdLabelDate = extractLabelDate(issue.changelog, createdLabel)
+      || issue.fields.created;
+  }
+  if (aiInvolvement === 'revised' || aiInvolvement === 'both') {
+    revisedLabelDate = extractLabelDate(issue.changelog, revisedLabel)
+      || issue.fields.created;
+  }
+
   return {
     key: issue.key,
     summary: issue.fields.summary,
@@ -23,6 +55,8 @@ function processIssue(issue, config) {
     creatorDisplayName: issue.fields.creator?.displayName || 'Unknown',
     labels,
     aiInvolvement,
+    createdLabelDate,
+    revisedLabelDate,
     linkedFeature: null,
     _rawIssueLinks: issue.fields.issuelinks || []
   };
@@ -66,10 +100,10 @@ async function fetchRFEData(jiraRequest, config) {
   const fields = 'summary,status,priority,created,creator,labels,issuelinks';
 
   // Use cursor-based pagination (same as person-metrics.js)
-  const issues = await fetchAllJqlResults(jiraRequest, jql, fields);
+  const issues = await fetchAllJqlResults(jiraRequest, jql, fields, { expand: 'changelog' });
 
   // Process each issue
   return issues.map(issue => processIssue(issue, config));
 }
 
-module.exports = { fetchRFEData, processIssue };
+module.exports = { fetchRFEData, processIssue, extractLabelDate };

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { processIssue } from '../../server/jira/rfe-fetcher.js';
+import { processIssue, extractLabelDate } from '../../server/jira/rfe-fetcher.js';
 
 const DEFAULT_CONFIG = {
   jiraProject: 'RHAIRFE',
@@ -28,6 +28,89 @@ function makeIssue(overrides = {}) {
     }
   };
 }
+
+describe('extractLabelDate', () => {
+  it('returns null when changelog is missing', () => {
+    expect(extractLabelDate(null, 'some-label')).toBeNull();
+    expect(extractLabelDate(undefined, 'some-label')).toBeNull();
+    expect(extractLabelDate({}, 'some-label')).toBeNull();
+  });
+
+  it('returns the date when label was added once', () => {
+    const changelog = {
+      histories: [{
+        created: '2026-03-20T14:30:00.000+0000',
+        items: [{
+          field: 'labels',
+          fromString: '',
+          toString: 'rfe-creator-auto-created'
+        }]
+      }]
+    };
+    expect(extractLabelDate(changelog, 'rfe-creator-auto-created')).toBe('2026-03-20T14:30:00.000+0000');
+  });
+
+  it('returns the latest addition date when label was removed and re-added', () => {
+    const changelog = {
+      histories: [
+        {
+          created: '2026-03-10T10:00:00.000+0000',
+          items: [{ field: 'labels', fromString: '', toString: 'rfe-creator-auto-created' }]
+        },
+        {
+          created: '2026-03-15T10:00:00.000+0000',
+          items: [{ field: 'labels', fromString: 'rfe-creator-auto-created', toString: '' }]
+        },
+        {
+          created: '2026-03-25T10:00:00.000+0000',
+          items: [{ field: 'labels', fromString: '', toString: 'rfe-creator-auto-created' }]
+        }
+      ]
+    };
+    expect(extractLabelDate(changelog, 'rfe-creator-auto-created')).toBe('2026-03-25T10:00:00.000+0000');
+  });
+
+  it('returns null when label was never added via changelog (present since creation)', () => {
+    const changelog = {
+      histories: [{
+        created: '2026-03-20T14:30:00.000+0000',
+        items: [{ field: 'status', fromString: 'New', toString: 'In Progress' }]
+      }]
+    };
+    expect(extractLabelDate(changelog, 'rfe-creator-auto-created')).toBeNull();
+  });
+
+  it('correctly identifies the target label among multiple labels in one history entry', () => {
+    const changelog = {
+      histories: [{
+        created: '2026-03-20T14:30:00.000+0000',
+        items: [{
+          field: 'labels',
+          fromString: 'other-label',
+          toString: 'other-label rfe-creator-auto-created'
+        }]
+      }]
+    };
+    expect(extractLabelDate(changelog, 'rfe-creator-auto-created')).toBe('2026-03-20T14:30:00.000+0000');
+    expect(extractLabelDate(changelog, 'other-label')).toBeNull();
+  });
+
+  it('returns latest date even when histories are in reverse-chronological order', () => {
+    const changelog = {
+      histories: [
+        {
+          created: '2026-03-25T10:00:00.000+0000',
+          items: [{ field: 'labels', fromString: '', toString: 'rfe-creator-auto-created' }]
+        },
+        {
+          created: '2026-03-10T10:00:00.000+0000',
+          items: [{ field: 'labels', fromString: '', toString: 'rfe-creator-auto-created' }]
+        }
+      ]
+    };
+    expect(extractLabelDate(changelog, 'rfe-creator-auto-created')).toBe('2026-03-25T10:00:00.000+0000');
+  });
+});
 
 describe('processIssue', () => {
   it('processes an issue correctly', () => {
@@ -92,11 +175,62 @@ describe('processIssue', () => {
     const result = processIssue(issue, DEFAULT_CONFIG);
     expect(result.labels).toEqual(['rfe-creator-auto-created', 'customer-request']);
   });
+
+  it('populates createdLabelDate from changelog when label is present', () => {
+    const issue = makeIssue({ labels: ['rfe-creator-auto-created'] });
+    issue.changelog = {
+      histories: [{
+        created: '2026-03-20T14:30:00.000+0000',
+        items: [{ field: 'labels', fromString: '', toString: 'rfe-creator-auto-created' }]
+      }]
+    };
+    const result = processIssue(issue, DEFAULT_CONFIG);
+    expect(result.createdLabelDate).toBe('2026-03-20T14:30:00.000+0000');
+    expect(result.revisedLabelDate).toBeNull();
+  });
+
+  it('populates revisedLabelDate from changelog when label is present', () => {
+    const issue = makeIssue({ labels: ['rfe-creator-auto-revised'] });
+    issue.changelog = {
+      histories: [{
+        created: '2026-03-22T09:00:00.000+0000',
+        items: [{ field: 'labels', fromString: '', toString: 'rfe-creator-auto-revised' }]
+      }]
+    };
+    const result = processIssue(issue, DEFAULT_CONFIG);
+    expect(result.revisedLabelDate).toBe('2026-03-22T09:00:00.000+0000');
+    expect(result.createdLabelDate).toBeNull();
+  });
+
+  it('falls back to created date when label is present but no changelog entry', () => {
+    const issue = makeIssue({ labels: ['rfe-creator-auto-created'] });
+    // No changelog
+    const result = processIssue(issue, DEFAULT_CONFIG);
+    expect(result.createdLabelDate).toBe('2026-03-15T10:00:00Z');
+  });
+
+  it('sets label dates to null when label was removed (not currently present)', () => {
+    const issue = makeIssue({ labels: [] });
+    issue.changelog = {
+      histories: [{
+        created: '2026-03-20T14:30:00.000+0000',
+        items: [{ field: 'labels', fromString: '', toString: 'rfe-creator-auto-created' }]
+      }]
+    };
+    const result = processIssue(issue, DEFAULT_CONFIG);
+    expect(result.createdLabelDate).toBeNull();
+    expect(result.revisedLabelDate).toBeNull();
+  });
+
+  it('sets both label dates to null when no AI labels', () => {
+    const issue = makeIssue({ labels: ['unrelated'] });
+    const result = processIssue(issue, DEFAULT_CONFIG);
+    expect(result.createdLabelDate).toBeNull();
+    expect(result.revisedLabelDate).toBeNull();
+  });
 });
 
 describe('fetchRFEData JQL validation', () => {
-  // Test that unsafe config values are rejected at JQL construction time
-  // by importing fetchRFEData and passing a mock jiraRequest
   it('rejects unsafe config values', async () => {
     const { fetchRFEData } = await import('../../server/jira/rfe-fetcher.js');
     const mockJiraRequest = vi.fn();

@@ -251,6 +251,8 @@ Cached RFE issues fetched from Jira. The module's primary data file.
       "status": "In Progress",
       "priority": "High",
       "created": "2026-03-25T10:00:00Z",
+      "createdLabelDate": "2026-03-26T14:30:00.000+0000",
+      "revisedLabelDate": "2026-03-27T09:15:00.000+0000",
       "creator": "schen",
       "creatorDisplayName": "Sarah Chen",
       "labels": ["rfe-creator-auto-created", "rfe-creator-auto-revised", "customer-request"],
@@ -268,6 +270,8 @@ Cached RFE issues fetched from Jira. The module's primary data file.
 
 **Notes:**
 - `aiInvolvement` is one of: `"both"`, `"created"`, `"revised"`, `"none"` — derived from exact label matching at fetch time
+- `createdLabelDate`: ISO timestamp of the most recent changelog addition of the created label. Set only when `aiInvolvement` is `"created"` or `"both"`. Falls back to `created` if the label was present since issue creation (no changelog entry). `null` when the created label is not present.
+- `revisedLabelDate`: ISO timestamp of the most recent changelog addition of the revised label. Same logic as `createdLabelDate`. `null` when the revised label is not present.
 - `linkedFeature` is resolved from Jira issue links (type = "Cloners", outward to RHAISTRAT project). Can be `null` if no link exists.
 - `labels` is the raw Jira label array, preserved for reference
 
