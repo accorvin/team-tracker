@@ -32,6 +32,7 @@
         <a
           :href="issue.url"
           target="_blank"
+          rel="noopener noreferrer"
           class="text-primary-600 hover:text-primary-800 font-mono text-xs flex-shrink-0"
         >{{ issue.key }}</a>
 

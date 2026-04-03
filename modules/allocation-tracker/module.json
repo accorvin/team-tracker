@@ -16,6 +16,6 @@
   "server": {
     "entry": "./server/index.js"
   },
-  "defaultEnabled": true,
+  "defaultEnabled": false,
   "requires": []
 }

@@ -257,11 +257,16 @@ function buildOrgSummary(projectSummaries) {
     'uncategorized': 0
   };
 
-  const totalWeight = totalPoints + totalCount;
-  if (totalWeight > 0) {
+  // Use points for percentages when available; fall back to counts.
+  // Avoids mixing units (points vs issue counts) across projects
+  // with different calculationModes.
+  if (totalPoints > 0) {
     for (const bucketKey of Object.keys(percentages)) {
-      const bucketTotal = buckets[bucketKey].points + buckets[bucketKey].count;
-      percentages[bucketKey] = (bucketTotal / totalWeight) * 100;
+      percentages[bucketKey] = (buckets[bucketKey].points / totalPoints) * 100;
+    }
+  } else if (totalCount > 0) {
+    for (const bucketKey of Object.keys(percentages)) {
+      percentages[bucketKey] = (buckets[bucketKey].count / totalCount) * 100;
     }
   }
 
