@@ -661,7 +661,7 @@ async function loadData() {
     const [dashData, contribData, leaderData, orgsData, projectsData] = await Promise.all([
       apiRequest(`${MODULE_API}/dashboard?days=${selectedDays.value}&githubOrg=${encodeURIComponent(org)}`),
       apiRequest(`${MODULE_API}/contributors?days=${selectedDays.value}&limit=10&githubOrg=${encodeURIComponent(org)}`),
-      apiRequest(`${MODULE_API}/leadership`).catch(() => null),
+      apiRequest(`${MODULE_API}/leadership?githubOrg=${encodeURIComponent(org)}`).catch(() => null),
       apiRequest(`${MODULE_API}/orgs?days=${selectedDays.value}`),
       apiRequest(`${MODULE_API}/projects?githubOrg=${encodeURIComponent(org)}`),
     ])

@@ -179,7 +179,10 @@ module.exports = function registerRoutes(router, context) {
 
   router.get('/leadership', async function(req, res) {
     try {
-      const data = await proxyRequest('/api/metrics/leadership');
+      const data = await proxyRequest('/api/metrics/leadership', {
+        githubOrg: req.query.githubOrg,
+        projectId: req.query.projectId,
+      });
       res.json(data);
     } catch (err) {
       handleProxyError(res, err);

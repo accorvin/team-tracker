@@ -602,7 +602,7 @@ async function loadData() {
     const [dashData, contribData, leaderData, projectsData] = await Promise.all([
       apiRequest(`${MODULE_API}/dashboard?days=${selectedDays.value}&projectId=${encodeURIComponent(pid)}`),
       apiRequest(`${MODULE_API}/contributors?days=${selectedDays.value}&limit=10&projectId=${encodeURIComponent(pid)}`),
-      apiRequest(`${MODULE_API}/leadership`).catch(() => null),
+      apiRequest(`${MODULE_API}/leadership?projectId=${encodeURIComponent(pid)}`).catch(() => null),
       apiRequest(`${MODULE_API}/projects`),
     ])
 
