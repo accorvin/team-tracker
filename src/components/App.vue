@@ -129,6 +129,11 @@
           @toast="({ message, type }) => showToast(message, type)"
         />
 
+        <!-- Docs View -->
+        <DocsView
+          v-else-if="activeModule === 'docs'"
+        />
+
         <!-- Help & Debug View -->
         <HelpView
           v-else-if="activeModule === 'help'"
@@ -166,6 +171,7 @@ import Toast from '@shared/client/components/Toast.vue'
 import RefreshModal from '@shared/client/components/RefreshModal.vue'
 import SettingsView from './SettingsView.vue'
 import HelpView from './HelpView.vue'
+import DocsView from './DocsView.vue'
 import ApiTokensView from './ApiTokensView.vue'
 import AppSidebar from './AppSidebar.vue'
 import LandingPage from './LandingPage.vue'
@@ -195,6 +201,7 @@ export default {
     Toast,
     SettingsView,
     HelpView,
+    DocsView,
     ApiTokensView,
     AppSidebar,
     RefreshModal,
@@ -375,6 +382,7 @@ export default {
       }
       if (this.activeModule === 'api-tokens') return 'API Tokens'
       if (this.activeModule === 'settings') return 'Settings'
+      if (this.activeModule === 'docs') return 'Docs'
       if (this.activeModule === 'help') return 'Help & Debug'
       // Built-in module: find manifest name
       const manifest = this.builtInManifests.find(m => m.slug === this.activeModule)
@@ -475,6 +483,10 @@ export default {
       }
       if (parts[0] === 'help') {
         this.setShellView('help')
+        return
+      }
+      if (parts[0] === 'docs') {
+        this.setShellView('docs')
         return
       }
 
@@ -598,6 +610,11 @@ export default {
       if (target === 'help') {
         this.setShellView('help')
         window.location.hash = '#/help'
+        return
+      }
+      if (target === 'docs') {
+        this.setShellView('docs')
+        window.location.hash = '#/docs'
         return
       }
 
