@@ -122,6 +122,32 @@
         </div>
       </nav>
 
+      <!-- Docs (bottom-justified, above user) -->
+      <div class="px-3 pt-3 pb-1 border-t border-gray-100 dark:border-gray-700">
+        <button
+          @click="$emit('navigate', 'docs')"
+          :aria-current="activeModule === 'docs' ? 'page' : undefined"
+          class="group relative w-full flex items-center py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
+          :class="[
+            activeModule === 'docs'
+              ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 shadow-sm'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100',
+            collapsed ? 'justify-center px-0' : 'gap-3 px-3'
+          ]"
+        >
+          <BookOpen :size="20" :stroke-width="activeModule === 'docs' ? 2 : 1.7" class="flex-shrink-0" />
+          <transition name="fade">
+            <span v-if="!collapsed" class="truncate">Docs</span>
+          </transition>
+          <span
+            v-if="collapsed"
+            class="absolute left-full ml-3 px-2.5 py-1.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs font-medium rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 shadow-lg"
+          >
+            Docs
+          </span>
+        </button>
+      </div>
+
       <!-- Footer -->
       <div class="px-3 py-3 border-t border-gray-100 dark:border-gray-700 space-y-1">
         <!-- User (clickable with popover) -->
@@ -223,7 +249,8 @@ import {
   Sparkles,
   Activity,
   Wrench,
-  KeyRound
+  KeyRound,
+  BookOpen
 } from 'lucide-vue-next'
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 
