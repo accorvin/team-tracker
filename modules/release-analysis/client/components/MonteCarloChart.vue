@@ -80,7 +80,7 @@ function gammaSample(shape, scale) {
   }
   const d = shape - 1 / 3
   const c = 1 / Math.sqrt(9 * d)
-  while (true) {
+  for (let iter = 0; iter < 1000; iter++) {
     let x, v
     do {
       x = boxMullerNormal()
@@ -91,6 +91,7 @@ function gammaSample(shape, scale) {
     if (u < 1 - 0.0331 * x * x * x * x) return d * v * scale
     if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v * scale
   }
+  return shape * scale
 }
 
 // ── Date helpers ──
