@@ -4,6 +4,7 @@
  */
 
 const nodeFetch = require('node-fetch');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const AdmZip = require('adm-zip');
 const path = require('path');
 
@@ -38,10 +39,18 @@ async function fetchArtifacts(storage, config, token) {
   console.log(`[feature-traffic] Fetching artifacts from ${projectPath} (branch: ${branch}, job: ${jobName})`);
   const startTime = Date.now();
 
-  const response = await _fetch(url, {
+  const fetchOptions = {
     headers: { 'Authorization': `Bearer ${token}` },
     timeout: 30000
-  });
+  };
+
+  // Use HTTPS proxy if configured (required in OpenShift environments)
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+  if (proxyUrl) {
+    fetchOptions.agent = new HttpsProxyAgent(proxyUrl);
+  }
+
+  const response = await _fetch(url, fetchOptions);
 
   if (!response.ok) {
     const status = response.status;
