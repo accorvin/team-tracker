@@ -2307,7 +2307,8 @@ module.exports = function registerRoutes(router, context) {
             label: i.label,
             baseUrl: i.baseUrl,
             tokenEnvVar: i.tokenEnvVar,
-            groupCount: (i.groups || []).length
+            groupCount: (i.groups || []).length,
+            excludeGroupCount: (i.excludeGroups || []).length
           }))
         },
         lastSyncAt: syncConfig.lastSyncAt || null,
