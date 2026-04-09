@@ -36,7 +36,7 @@
           <button
             v-if="selectedProducts.size"
             class="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
-            @click="selectedProducts.clear()"
+            @click="clearProducts"
           >Clear All</button>
         </div>
         <div class="max-h-52 overflow-y-auto py-1">
@@ -88,7 +88,7 @@
           <button
             v-if="selectedVersions.size"
             class="text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300"
-            @click="selectedVersions.clear()"
+            @click="clearVersions"
           >Clear All</button>
         </div>
         <div class="max-h-52 overflow-y-auto py-1">
@@ -133,6 +133,8 @@ defineProps({
   totalCount: { type: Number, required: true },
   toggleProduct: { type: Function, required: true },
   toggleVersion: { type: Function, required: true },
+  clearProducts: { type: Function, required: true },
+  clearVersions: { type: Function, required: true },
   resetFilters: { type: Function, required: true }
 })
 

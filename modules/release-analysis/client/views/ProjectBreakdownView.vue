@@ -47,6 +47,8 @@
         :total-count="allReleases.length"
         :toggle-product="toggleProduct"
         :toggle-version="toggleVersion"
+        :clear-products="clearProducts"
+        :clear-versions="clearVersions"
         :reset-filters="resetFilters"
       />
 
@@ -380,6 +382,8 @@ const {
   filteredReleases,
   toggleProduct,
   toggleVersion,
+  clearProducts,
+  clearVersions,
   resetFilters
 } = useReleaseFilter(allReleases)
 

@@ -1,4 +1,4 @@
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 
 function extractProduct(releaseNumber) {
   const s = (releaseNumber || '').toLowerCase()
@@ -19,8 +19,6 @@ function extractVersion(releaseNumber) {
 export function useReleaseFilter(allReleases) {
   const selectedProducts = reactive(new Set())
   const selectedVersions = reactive(new Set())
-  const productDropdownOpen = ref(false)
-  const versionDropdownOpen = ref(false)
 
   const allProducts = computed(() =>
     [...new Set(allReleases.value.map(r => extractProduct(r.releaseNumber)).filter(Boolean))].sort()
@@ -81,6 +79,14 @@ export function useReleaseFilter(allReleases) {
     })
   })
 
+  function clearProducts() {
+    selectedProducts.clear()
+  }
+
+  function clearVersions() {
+    selectedVersions.clear()
+  }
+
   function resetFilters() {
     selectedProducts.clear()
     selectedVersions.clear()
@@ -89,8 +95,6 @@ export function useReleaseFilter(allReleases) {
   return {
     selectedProducts,
     selectedVersions,
-    productDropdownOpen,
-    versionDropdownOpen,
     allProducts,
     allVersions,
     visibleProducts,
@@ -98,6 +102,8 @@ export function useReleaseFilter(allReleases) {
     filteredReleases,
     toggleProduct,
     toggleVersion,
+    clearProducts,
+    clearVersions,
     resetFilters
   }
 }
