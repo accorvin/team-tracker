@@ -145,6 +145,20 @@ export async function cachedRequest(cacheKey, path, onData) {
   }
 }
 
+// ─── Site Config ───
+
+export async function getSiteConfig() {
+  return apiRequest('/site-config')
+}
+
+export async function saveSiteConfig(config) {
+  return apiRequest('/site-config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config)
+  })
+}
+
 // ─── Last Refreshed ───
 
 export async function getLastRefreshed() {

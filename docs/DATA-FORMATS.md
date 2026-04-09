@@ -134,6 +134,20 @@ Filename is the person's display name lowercased with non-alphanumeric chars rep
 
 **Note on `instances` field:** When multi-instance GitLab is configured, each user's entry includes an `instances` array showing per-instance contribution breakdowns. Users with no contributions on a given instance will not have that instance listed. Legacy data without `instances` is treated as a single default gitlab.com instance by the frontend.
 
+## Site Config — `data/site-config.json`
+
+Platform-level configuration for the site. Created when an admin saves settings in Settings > General.
+
+```json
+{
+  "titlePrefix": "AI Engineering"
+}
+```
+
+**Notes:**
+- `titlePrefix` is a string (max 100 characters). When non-empty, it's shown as a subtitle in the sidebar and prepended to the page title.
+- If this file doesn't exist, `titlePrefix` defaults to `""` (empty string).
+
 ## Roster Sync Config — `data/roster-sync-config.json`
 
 Stores the configuration for automated roster building. Managed via the Settings UI and the `POST /api/admin/roster-sync/config` endpoint.

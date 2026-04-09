@@ -10,6 +10,7 @@
       :is-admin="authIsAdmin"
       :modules="gitStaticModules"
       :built-in-manifests="builtInManifests"
+      :title-prefix="titlePrefix"
       @navigate="handleSidebarNavigate"
       @toggle-collapse="sidebarCollapsed = !sidebarCollapsed"
       @close-mobile="mobileMenuOpen = false"
@@ -127,6 +128,7 @@
           :built-in-manifests="builtInManifests"
           :initial-tab="settingsInitialTab"
           @toast="({ message, type }) => showToast(message, type)"
+          @config-updated="(c) => { if (c.titlePrefix != null) titlePrefix = c.titlePrefix }"
         />
 
         <!-- Docs View -->
@@ -177,14 +179,14 @@ import AppSidebar from './AppSidebar.vue'
 import LandingPage from './LandingPage.vue'
 import ModuleIframeView from './ModuleIframeView.vue'
 import BackendConnectivityModal from './BackendConnectivityModal.vue'
-import { computed, ref, readonly, provide, onUnmounted } from 'vue'
+import { computed, ref, readonly, provide, onUnmounted, watch } from 'vue'
 import { useAuth } from '@shared/client/composables/useAuth'
 import { useRoster } from '@shared/client/composables/useRoster'
 import { useGithubStats } from '@shared/client/composables/useGithubStats'
 import { useGitlabStats } from '@shared/client/composables/useGitlabStats'
 import { useModules } from '../composables/useModules'
 import { useTheme } from '../composables/useTheme'
-import { refreshMetrics, getLastRefreshed, apiRequest } from '@shared/client/services/api'
+import { refreshMetrics, getLastRefreshed, apiRequest, getSiteConfig } from '@shared/client/services/api'
 import { loadModuleManifests, loadModuleClient } from '../module-loader'
 
 export default {
@@ -216,6 +218,12 @@ export default {
     const { loadGitlabStats } = useGitlabStats()
     const { modulesData, loadModules, enabledBuiltInSlugs, loadEnabledBuiltInSlugs } = useModules()
     const { mode: themeMode, cycle: cycleTheme } = useTheme()
+    const titlePrefix = ref('')
+
+    watch(titlePrefix, (prefix) => {
+      document.title = prefix ? `${prefix} Org Pulse` : 'Org Pulse'
+    })
+
     const lastRefreshedAt = ref(null)
     const tick = ref(0)
     const tickTimer = setInterval(() => { tick.value++ }, 30000)
@@ -236,6 +244,13 @@ export default {
       return `Updated ${ts.toLocaleDateString()}`
     })
     const jiraConfigChangedAt = ref(null)
+    async function fetchSiteConfig() {
+      try {
+        const data = await getSiteConfig()
+        titlePrefix.value = data.titlePrefix || ''
+      } catch { /* ignore */ }
+    }
+
     async function fetchLastRefreshed() {
       try {
         const data = await getLastRefreshed()
@@ -325,6 +340,8 @@ export default {
     return {
       authUser,
       authIsAdmin,
+      titlePrefix,
+      fetchSiteConfig,
       lastRefreshedLabel,
       lastRefreshedAt,
       jiraConfigChangedAt,
@@ -427,7 +444,8 @@ export default {
           this.loadGitlabStats(),
           this.loadModules(),
           this.fetchLastRefreshed(),
-          this.loadEnabledBuiltInSlugs(allSlugs)
+          this.loadEnabledBuiltInSlugs(allSlugs),
+          this.fetchSiteConfig()
         ])
         this.restoreFromHash()
       } catch (error) {

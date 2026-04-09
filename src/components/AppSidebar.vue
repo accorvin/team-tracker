@@ -22,7 +22,7 @@
         <transition name="fade">
           <div v-if="!collapsed" class="overflow-hidden whitespace-nowrap flex-1">
             <h1 class="text-sm font-bold text-gray-900 dark:text-gray-100 leading-tight">Org Pulse</h1>
-            <p class="text-xs text-gray-400 dark:text-gray-500">AI Engineering</p>
+            <p v-if="titlePrefix" class="text-xs text-gray-400 dark:text-gray-500">{{ titlePrefix }}</p>
           </div>
         </transition>
       </div>
@@ -283,7 +283,8 @@ const props = defineProps({
   user: Object,
   isAdmin: Boolean,
   modules: { type: Array, default: () => [] },
-  builtInManifests: { type: Array, default: () => [] }
+  builtInManifests: { type: Array, default: () => [] },
+  titlePrefix: { type: String, default: '' }
 })
 
 defineEmits(['navigate', 'toggle-collapse', 'close-mobile'])

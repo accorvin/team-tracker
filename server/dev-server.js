@@ -216,6 +216,73 @@ app.get('/api/whoami', function(req, res) {
   });
 });
 
+// ─── Routes: Site Config ───
+
+/**
+ * @openapi
+ * /api/site-config:
+ *   get:
+ *     tags: [Config]
+ *     summary: Get site configuration
+ *     responses:
+ *       200:
+ *         description: Site configuration
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 titlePrefix:
+ *                   type: string
+ */
+app.get('/api/site-config', function(req, res) {
+  try {
+    const config = readFromStorage('site-config.json') || { titlePrefix: '' };
+    res.json({ titlePrefix: config.titlePrefix || '' });
+  } catch (error) {
+    console.error('Get site-config error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/site-config:
+ *   post:
+ *     tags: [Config]
+ *     summary: Update site configuration (admin only)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               titlePrefix:
+ *                 type: string
+ *                 maxLength: 100
+ *     responses:
+ *       200:
+ *         description: Updated site configuration
+ */
+app.post('/api/site-config', requireAdmin, function(req, res) {
+  try {
+    if (DEMO_MODE) {
+      return res.json({ status: 'skipped', message: 'Configuration changes disabled in demo mode' });
+    }
+    const { titlePrefix } = req.body;
+    if (typeof titlePrefix !== 'string' || titlePrefix.length > 100) {
+      return res.status(400).json({ error: 'titlePrefix must be a string of 100 characters or fewer' });
+    }
+    const config = { titlePrefix };
+    writeToStorage('site-config.json', config);
+    res.json(config);
+  } catch (error) {
+    console.error('Save site-config error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ─── Routes: API Tokens ───
 
 /**

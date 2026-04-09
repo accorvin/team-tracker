@@ -59,6 +59,7 @@ npm run dev:full       # Starts Vite (5173) + Express (3001)
 - **GitLab contributions**: `data/gitlab-contributions.json` and `data/gitlab-history.json`. Fetched via GitLab GraphQL API across one or more configured instances (see `gitlabInstances` in roster-sync-config). Each user entry may include an `instances` array for per-instance contribution breakdowns.
 - **Snapshots**: Monthly metric snapshots stored in `data/snapshots/{sanitized-teamKey}/{YYYY-MM-DD}.json` (teamKey sanitized: `::` → `--`, special chars → `_`). Generated from person metrics + GitHub/GitLab history. Admin can delete all via Settings > Snapshots.
 - **Trends**: Built dynamically from person metric files by bucketing resolved issues by month, with org/team breakdowns.
+- **Site config**: `data/site-config.json` stores platform-level settings (title prefix). Editable by admins via Settings > General.
 - **Composite keys**: Teams are identified by `orgKey::teamName` (e.g., `shgriffi::Model Serving`).
 - **Data file formats**: See `docs/DATA-FORMATS.md` for the JSON schema of every data file. Demo fixtures in `fixtures/` must always match production format.
 
@@ -262,6 +263,7 @@ In production, all routes are authenticated via OpenShift OAuth proxy. The proxy
 **GET:**
 - `/api/healthz` — health check (no auth)
 - `/api/whoami` — current user info (supports both proxy and token auth)
+- `/api/site-config` — site configuration (titlePrefix)
 - `/api/tokens` — list current user's API tokens
 - `/api/admin/tokens` — list all API tokens (admin)
 - `/api/roster` — org/team structure with members
@@ -283,6 +285,7 @@ In production, all routes are authenticated via OpenShift OAuth proxy. The proxy
 
 **POST:**
 - `/api/tokens` — create a new API token (returns raw token once)
+- `/api/site-config` — update site configuration (admin)
 
 - `/api/roster/refresh` — refresh all person metrics from Jira
 - `/api/team/:teamKey/refresh` — refresh metrics for one team

@@ -32,6 +32,8 @@ Core team owns `shared/` via CODEOWNERS. Changes require core team review.
 | `apiRequest(url, options)` | Fetch wrapper with error handling |
 | `cachedRequest(key, fetcher, onData)` | Stale-while-revalidate caching via localStorage |
 | `clearApiCache()` | Clear all cached API data |
+| `getSiteConfig()` | Fetch site configuration (`{ titlePrefix }`) — no cache |
+| `saveSiteConfig(config)` | Save site configuration (admin only) |
 
 ### Components
 
