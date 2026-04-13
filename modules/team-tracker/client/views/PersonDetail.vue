@@ -191,10 +191,23 @@
         />
         <MetricCard
           label="GitLab Contributions"
-          :value="gitlabContributions?.totalContributions ?? '—'"
-          :subtitle="person.gitlabUsername ? 'Last year' : 'No GitLab username'"
-          tooltip="Public contributions via GitLab calendar API."
-        />
+          :value="person.gitlabUsername ? (gitlabContributions?.totalContributions ?? '—') : 'N/A'"
+          :subtitle="person.gitlabUsername ? 'Last year' : 'Username not configured'"
+          tooltip="Contributions via GitLab GraphQL API, summed across all configured instances."
+        >
+          <template v-if="gitlabInstanceBreakdown.length > 1" #footer>
+            <div class="mt-1 space-y-0.5">
+              <div
+                v-for="inst in gitlabInstanceBreakdown"
+                :key="inst.baseUrl"
+                class="flex justify-between text-xs text-gray-400 dark:text-gray-500"
+              >
+                <span class="truncate mr-2">{{ inst.label }}</span>
+                <span class="font-medium tabular-nums">{{ inst.count }}</span>
+              </div>
+            </div>
+          </template>
+        </MetricCard>
       </div>
 
       <div class="mb-4 pl-1">
@@ -373,6 +386,15 @@ const gitlabContributions = computed(() => person.value ? getGitlabContributions
 const gitlabProfileUrls = computed(() => person.value?.gitlabUsername
   ? getGitlabProfileUrls(person.value.gitlabUsername)
   : [])
+
+const gitlabInstanceBreakdown = computed(() => {
+  if (!gitlabContributions.value?.instances) return []
+  return Object.entries(gitlabContributions.value.instances).map(([baseUrl, data]) => ({
+    label: baseUrl.replace(/^https?:\/\//, ''),
+    baseUrl,
+    count: data.totalContributions
+  }))
+})
 
 const jiraProfileUrl = computed(() => {
   if (metrics.value?.jiraAccountId) {

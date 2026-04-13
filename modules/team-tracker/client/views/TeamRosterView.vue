@@ -72,8 +72,21 @@
       <MetricCard
         label="GitLab Contributions"
         :value="teamGitlabTotal"
-        subtitle="Last year"
-      />
+        :subtitle="gitlabConfiguredCount < uniqueCount ? `${gitlabConfiguredCount}/${uniqueCount} members configured` : 'Last year'"
+      >
+        <template v-if="Object.keys(teamGitlabByInstance).length > 1" #footer>
+          <div class="mt-1 space-y-0.5">
+            <div
+              v-for="(count, baseUrl) in teamGitlabByInstance"
+              :key="baseUrl"
+              class="flex justify-between text-xs text-gray-400 dark:text-gray-500"
+            >
+              <span class="truncate mr-2">{{ baseUrl.replace(/^https?:\/\//, '') }}</span>
+              <span class="font-medium tabular-nums">{{ count }}</span>
+            </div>
+          </div>
+        </template>
+      </MetricCard>
     </div>
 
     <div class="mb-4 pl-1">
@@ -289,6 +302,20 @@ const teamGitlabTotal = computed(() => {
     const c = m.gitlabUsername ? getGitlabContributions(m.gitlabUsername) : null
     return sum + (c?.totalContributions ?? 0)
   }, 0)
+})
+
+const gitlabConfiguredCount = computed(() => uniqueMembers.value.filter(m => m.gitlabUsername).length)
+
+const teamGitlabByInstance = computed(() => {
+  const totals = {}
+  for (const m of uniqueMembers.value) {
+    if (!m.gitlabUsername) continue
+    const instances = getGitlabContributions(m.gitlabUsername)?.instances || {}
+    for (const [baseUrl, data] of Object.entries(instances)) {
+      totals[baseUrl] = (totals[baseUrl] || 0) + (data.totalContributions || 0)
+    }
+  }
+  return totals
 })
 
 function exportCsv() {
