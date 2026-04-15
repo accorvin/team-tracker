@@ -41,6 +41,13 @@
         <span class="text-xs text-gray-500 dark:text-gray-400">
           Due {{ formatDate(release.dueDate) }} · {{ release.daysRemaining }}d left
         </span>
+        <span
+          v-if="predictedDate"
+          class="inline-flex items-center gap-1 text-xs text-teal-600 dark:text-teal-400"
+          title="95% confidence predicted completion date (Monte Carlo)"
+        >
+          Predicted {{ predictedDate }}
+        </span>
       </div>
       <div class="flex items-center gap-4 shrink-0">
         <!-- Compact progress bar -->
@@ -337,6 +344,53 @@ const issueSum = computed(() => {
 })
 
 const releaseHasNoIssues = computed(() => issueSum.value === 0)
+
+// ── Lightweight Monte Carlo for header predicted date ──
+
+const MC_ITERATIONS = 1000
+const MC_MAX_DAYS = 730
+
+function boxMullerNormal() {
+  const u1 = Math.random()
+  const u2 = Math.random()
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
+}
+
+function gammaSample(shape, scale) {
+  if (shape < 1) return gammaSample(shape + 1, scale) * Math.pow(Math.random(), 1 / shape)
+  const d = shape - 1 / 3
+  const c = 1 / Math.sqrt(9 * d)
+  for (let iter = 0; iter < 1000; iter++) {
+    let x, v
+    do { x = boxMullerNormal(); v = 1 + c * x } while (v <= 0)
+    v = v * v * v
+    const u = Math.random()
+    if (u < 1 - 0.0331 * x * x * x * x) return d * v * scale
+    if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v * scale
+  }
+  return shape * scale
+}
+
+const predictedDate = computed(() => {
+  const mc = props.mcInputs
+  if (!mc || mc.notDoneCount <= 0 || mc.totalVelocity <= 0) return null
+
+  const scale = 14 / mc.totalVelocity
+  const n = mc.notDoneCount
+  const completionDays = new Array(MC_ITERATIONS)
+  for (let i = 0; i < MC_ITERATIONS; i++) {
+    completionDays[i] = Math.min(Math.ceil(gammaSample(n, scale)), MC_MAX_DAYS)
+  }
+  completionDays.sort((a, b) => a - b)
+
+  const p95Days = completionDays[Math.ceil(MC_ITERATIONS * 0.95) - 1]
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const p95Date = new Date(today)
+  p95Date.setDate(p95Date.getDate() + p95Days)
+
+  return p95Date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
+})
 
 const releaseRiskTitle = computed(() => {
   return props.release?.riskSummary || 'Schedule risk from open issue count vs days to due date.'
