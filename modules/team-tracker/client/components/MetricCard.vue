@@ -13,6 +13,7 @@
       <span v-if="unit" class="text-sm text-gray-500 dark:text-gray-400">{{ unit }}</span>
     </div>
     <p v-if="subtitle" class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ subtitle }}</p>
+    <slot name="footer" />
   </div>
 </template>
 

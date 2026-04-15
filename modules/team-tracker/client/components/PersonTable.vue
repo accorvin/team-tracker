@@ -59,7 +59,9 @@
             <span v-else class="text-gray-300 dark:text-gray-600 italic text-xs" title="GitHub username not configured">no GitHub</span>
           </td>
           <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-            <template v-if="getGitlabContribCount(member) != null">{{ getGitlabContribCount(member) }}</template>
+            <template v-if="getGitlabContribCount(member) != null">
+              <span :title="getGitlabInstanceTooltip(member) || undefined">{{ getGitlabContribCount(member) }}</span>
+            </template>
             <span v-else-if="member.gitlabUsername" class="text-gray-300 dark:text-gray-600">—</span>
             <span v-else class="text-gray-300 dark:text-gray-600 italic text-xs" title="GitLab username not configured">no GitLab</span>
           </td>
@@ -160,6 +162,15 @@ function getGithubContribCount(member) {
 function getGitlabContribCount(member) {
   if (!member.gitlabUsername) return null
   return getGitlabContributions(member.gitlabUsername)?.totalContributions ?? null
+}
+
+function getGitlabInstanceTooltip(member) {
+  if (!member.gitlabUsername) return ''
+  const instances = getGitlabContributions(member.gitlabUsername)?.instances
+  if (!instances || Object.keys(instances).length <= 1) return ''
+  return Object.entries(instances)
+    .map(([url, data]) => `${url.replace(/^https?:\/\//, '')}: ${data.totalContributions}`)
+    .join('\n')
 }
 
 const sortedMembers = computed(() => {
