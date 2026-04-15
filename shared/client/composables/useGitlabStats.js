@@ -64,13 +64,13 @@ export function useGitlabStats() {
   function getProfileUrls(gitlabUsername) {
     const contrib = getContributions(gitlabUsername)
     if (!contrib) return []
-    if (!contrib.instances || contrib.instances.length === 0) {
-      return [{ baseUrl: 'https://gitlab.com', label: 'GitLab', url: `https://gitlab.com/${gitlabUsername}` }]
+    if (!contrib.instances || Object.keys(contrib.instances).length === 0) {
+      return [{ baseUrl: 'https://gitlab.com', label: 'gitlab.com', url: `https://gitlab.com/${gitlabUsername}` }]
     }
-    return contrib.instances.map(i => ({
-      baseUrl: i.baseUrl,
-      label: i.label,
-      url: `${i.baseUrl}/${gitlabUsername}`
+    return Object.entries(contrib.instances).map(([baseUrl]) => ({
+      baseUrl,
+      label: baseUrl.replace(/^https?:\/\//, ''),
+      url: `${baseUrl}/${gitlabUsername}`
     }))
   }
 
