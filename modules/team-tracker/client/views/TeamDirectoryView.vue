@@ -1,11 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { onMounted, inject } from 'vue'
 import { useOrgRoster } from '../composables/useOrgRoster'
 import OrgSelector from '../components/OrgSelector.vue'
 import TeamCard from '../components/TeamCard.vue'
 
 const nav = inject('moduleNav')
-const { teams, orgs, selectedOrg, loading, error, searchQuery, sortBy, filteredTeams, loadTeams, loadOrgs } = useOrgRoster()
+const { orgs, selectedOrg, loading, searchQuery, sortBy, filteredTeams, loadTeams, loadOrgs } = useOrgRoster()
 
 function openTeam(team) {
   nav.navigateTo('team-detail', { teamKey: `${team.org}::${team.name}` })

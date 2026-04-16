@@ -32,7 +32,7 @@ function escapeLdapFilter(value) {
     .replace(/\*/g, '\\2a')
     .replace(/\(/g, '\\28')
     .replace(/\)/g, '\\29')
-    .replace(/\x00/g, '\\00');
+    .replace(/\x00/g, '\\00'); // eslint-disable-line no-control-regex
 }
 
 const DEFAULT_HOST = 'ldaps://ipa.corp.redhat.com';

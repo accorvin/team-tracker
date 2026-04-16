@@ -261,7 +261,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
   router.get('/components', function(req, res) {
     try {
       res.json(readFromStorage('org-roster/components.json') || { components: {} });
-    } catch (error) {
+    } catch {
       res.status(500).json({ error: 'Failed to load component data' });
     }
   });
@@ -283,7 +283,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
         }
       }
       res.json(data);
-    } catch (error) {
+    } catch {
       res.status(500).json({ error: 'Failed to load RFE backlog data' });
     }
   });
@@ -297,7 +297,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
         rfeIssueType: config.rfeIssueType || 'Feature Request',
         componentMapping: config.componentMapping || {}
       });
-    } catch (error) {
+    } catch {
       res.status(500).json({ error: 'Failed to load RFE config' });
     }
   });
@@ -306,7 +306,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
 
   router.get('/org-config', requireAdmin, function(req, res) {
     try { res.json(getOrgConfig()); }
-    catch (error) { res.status(500).json({ error: 'Failed to load configuration' }); }
+    catch { res.status(500).json({ error: 'Failed to load configuration' }); }
   });
 
   router.post('/org-config', requireAdmin, function(req, res) {
@@ -316,7 +316,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
         return res.status(400).json({ error: 'Request body must be a JSON object' });
       }
 
-      const allowedKeys = ['teamBoardsTab', 'componentsTab', 'jiraProject', 'rfeIssueType', 'orgNameMapping', 'componentMapping'];
+      const _allowedKeys = ['teamBoardsTab', 'componentsTab', 'jiraProject', 'rfeIssueType', 'orgNameMapping', 'componentMapping'];
       const config = getOrgConfig();
 
       if (body.teamBoardsTab !== undefined && typeof body.teamBoardsTab === 'string') config.teamBoardsTab = body.teamBoardsTab;
@@ -328,7 +328,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
 
       writeToStorage('org-roster/config.json', config);
       res.json({ status: 'saved', config });
-    } catch (error) {
+    } catch {
       res.status(500).json({ error: 'Failed to save configuration' });
     }
   });
@@ -339,7 +339,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
     try {
       const data = readFromStorage('org-roster/sync-status.json');
       res.json(data || { lastSyncAt: null, status: 'never', syncing: orgSyncInProgress });
-    } catch (error) {
+    } catch {
       res.status(500).json({ error: 'Failed to load sync status' });
     }
   });
