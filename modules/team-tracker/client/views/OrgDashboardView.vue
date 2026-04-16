@@ -172,10 +172,8 @@ import { ref, computed, onMounted, inject } from 'vue'
 import HeadcountChart from '../components/HeadcountChart.vue'
 import OrgSelector from '../components/OrgSelector.vue'
 import { useOrgRoster } from '../composables/useOrgRoster'
-import { useModuleLink } from '@shared/client/composables/useModuleLink'
 
 const nav = inject('moduleNav')
-const { navigateTo: crossNav } = useModuleLink()
 const { loadOrgSummary, loadOrgs, orgs } = useOrgRoster()
 
 const summary = ref(null)
@@ -239,7 +237,7 @@ function goToTeamDirectory() {
 }
 
 function goToPeople() {
-  crossNav('team-tracker', 'people', selectedOrg.value ? { org: selectedOrg.value } : {})
+  nav.navigateTo('people', selectedOrg.value ? { org: selectedOrg.value } : {})
 }
 
 function goToTeam(team) {

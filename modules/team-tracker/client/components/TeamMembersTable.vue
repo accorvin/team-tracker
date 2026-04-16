@@ -60,7 +60,7 @@
         >
           <td class="px-4 py-3 text-sm whitespace-nowrap">
             <a
-              :href="personLink(member.name)"
+              :href="personLink(member)"
               class="text-primary-600 hover:underline"
               @click.stop
             >
@@ -105,8 +105,11 @@ const columns = [
   { key: 'geo', label: 'Location' },
 ]
 
-function personLink(name) {
-  return linkTo('team-tracker', 'person-detail', { person: name })
+function personLink(member) {
+  if (member.uid) {
+    return linkTo('team-tracker', 'person-detail', { uid: member.uid })
+  }
+  return linkTo('team-tracker', 'person-detail', { person: member.name })
 }
 
 function getSpecialty(member) {

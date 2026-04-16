@@ -1,0 +1,289 @@
+<script setup>
+import { ref, computed, onMounted, watch, inject } from 'vue'
+import { apiRequest } from '@shared/client/services/api.js'
+import { useAuth } from '@shared/client/composables/useAuth.js'
+
+const nav = inject('moduleNav')
+const { isAdmin } = useAuth()
+
+const person = ref(null)
+const managerChain = ref([])
+const directReports = ref([])
+const jiraMetrics = ref(null)
+const loading = ref(true)
+const error = ref(null)
+
+const editField = ref(null)
+const editValue = ref('')
+const editSaving = ref(false)
+
+const uid = computed(() => nav.params.value?.uid)
+const personName = computed(() => nav.params.value?.person)
+
+async function loadPerson() {
+  const lookupId = uid.value || personName.value
+  if (!lookupId) return
+  loading.value = true
+  error.value = null
+  try {
+    const data = await apiRequest('/modules/team-tracker/registry/people/' + encodeURIComponent(lookupId))
+    person.value = data.person
+    managerChain.value = data.managerChain || []
+    directReports.value = data.directReports || []
+
+    if (person.value?.name) {
+      try {
+        jiraMetrics.value = await apiRequest(
+          '/modules/team-tracker/person/' + encodeURIComponent(person.value.name) + '/metrics'
+        )
+      } catch {
+        jiraMetrics.value = null
+      }
+    }
+  } catch (e) {
+    error.value = e.message || 'Person not found'
+    person.value = null
+  } finally {
+    loading.value = false
+  }
+}
+
+function goBack() {
+  nav.navigateTo('people')
+}
+
+function openPerson(personUid) {
+  nav.navigateTo('person-detail', { uid: personUid })
+}
+
+function startEdit(field) {
+  editField.value = field
+  if (field === 'github') {
+    editValue.value = person.value.github ? person.value.github.username : ''
+  } else {
+    editValue.value = person.value.gitlab ? person.value.gitlab.username : ''
+  }
+}
+
+async function saveEdit() {
+  if (!editValue.value.trim() || !editField.value) return
+  editSaving.value = true
+  try {
+    await apiRequest('/modules/team-tracker/registry/people/' + uid.value + '/' + editField.value, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: editValue.value.trim() })
+    })
+    person.value[editField.value] = { username: editValue.value.trim(), source: 'manual' }
+  } catch {
+    // silently fail
+  } finally {
+    editSaving.value = false
+    editField.value = null
+    editValue.value = ''
+  }
+}
+
+async function removeId(field) {
+  try {
+    await apiRequest('/modules/team-tracker/registry/people/' + uid.value + '/' + field, { method: 'DELETE' })
+    person.value[field] = null
+  } catch { /* silently fail */ }
+}
+
+async function reactivate() {
+  try {
+    await apiRequest('/modules/team-tracker/registry/people/' + uid.value + '/reactivate', { method: 'POST' })
+    person.value.status = 'active'
+    person.value.inactiveSince = null
+  } catch { /* silently fail */ }
+}
+
+async function purge() {
+  if (!confirm('Remove ' + person.value.name + ' from the registry? This cannot be undone.')) return
+  try {
+    await apiRequest('/modules/team-tracker/registry/people/' + uid.value, { method: 'DELETE' })
+    goBack()
+  } catch { /* silently fail */ }
+}
+
+function cancelEdit() {
+  editField.value = null
+  editValue.value = ''
+}
+
+function sourceLabel(source) {
+  if (source === 'ldap') return 'from LDAP'
+  if (source === 'manual') return 'set by admin'
+  return source
+}
+
+watch([uid, personName], loadPerson)
+onMounted(loadPerson)
+</script>
+
+<template>
+  <div>
+    <nav class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
+      <button @click="goBack" class="hover:text-primary-600 dark:hover:text-primary-400 transition-colors">People</button>
+      <span class="text-gray-300 dark:text-gray-600">›</span>
+      <span class="text-gray-900 dark:text-gray-100 font-medium">{{ person ? person.name : 'Loading...' }}</span>
+    </nav>
+
+    <div v-if="loading" class="flex items-center justify-center py-12">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    </div>
+
+    <div v-else-if="error" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center">
+      <p class="text-red-600 dark:text-red-400">{{ error }}</p>
+      <button @click="goBack" class="mt-3 text-sm text-primary-600 dark:text-primary-400 hover:underline">Back to People</button>
+    </div>
+
+    <template v-else-if="person">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-6">
+          <!-- Profile Card -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                  {{ person.name }}
+                  <span v-if="person.status === 'inactive'" class="text-xs font-normal px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400">Inactive</span>
+                </h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ person.title }}</p>
+              </div>
+              <div v-if="isAdmin && person.status === 'inactive'" class="flex gap-2">
+                <button @click="reactivate" class="px-3 py-1.5 text-xs bg-green-600 text-white rounded-md hover:bg-green-700">Reactivate</button>
+                <button @click="purge" class="px-3 py-1.5 text-xs border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20">Purge</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span class="text-gray-500 dark:text-gray-400">Email</span>
+                <div><a :href="'mailto:' + person.email" class="text-primary-600 dark:text-primary-400 hover:underline">{{ person.email }}</a></div>
+              </div>
+              <div>
+                <span class="text-gray-500 dark:text-gray-400">UID</span>
+                <div class="text-gray-900 dark:text-gray-100 font-mono text-xs">{{ person.uid }}</div>
+              </div>
+              <div>
+                <span class="text-gray-500 dark:text-gray-400">Location</span>
+                <div class="text-gray-900 dark:text-gray-100">{{ person.city }}{{ person.country ? ', ' + person.country : '' }}</div>
+              </div>
+              <div>
+                <span class="text-gray-500 dark:text-gray-400">Geo</span>
+                <div class="text-gray-900 dark:text-gray-100">{{ person.geo || '—' }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Identities -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4 uppercase tracking-wider">Identities</h3>
+            <div class="space-y-4">
+              <div v-for="platform in ['github', 'gitlab']" :key="platform" class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" :class="platform === 'github' ? 'bg-gray-900 dark:bg-gray-100' : 'bg-orange-600'">
+                    <span class="text-xs font-bold" :class="platform === 'github' ? 'text-white dark:text-gray-900' : 'text-white'">{{ platform === 'github' ? 'GH' : 'GL' }}</span>
+                  </div>
+                  <div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100 capitalize">{{ platform }}</div>
+                    <template v-if="editField === platform">
+                      <div class="flex items-center gap-2 mt-1">
+                        <input v-model="editValue" @keyup.enter="saveEdit" @keyup.escape="cancelEdit" class="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 dark:text-gray-100 w-40" placeholder="username" autofocus />
+                        <button @click="saveEdit" :disabled="editSaving" class="text-green-600 text-xs font-medium">Save</button>
+                        <button @click="cancelEdit" class="text-gray-400 text-xs">Cancel</button>
+                      </div>
+                    </template>
+                    <template v-else-if="person[platform] && person[platform].username">
+                      <a :href="(platform === 'github' ? 'https://github.com/' : 'https://gitlab.com/') + person[platform].username" target="_blank" rel="noopener" class="text-sm text-primary-600 dark:text-primary-400 hover:underline">{{ person[platform].username }}</a>
+                      <span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">{{ sourceLabel(person[platform].source) }}</span>
+                    </template>
+                    <template v-else>
+                      <span class="text-sm text-gray-400 dark:text-gray-500">Not set</span>
+                    </template>
+                  </div>
+                </div>
+                <div v-if="isAdmin && editField !== platform" class="flex gap-2">
+                  <button @click="startEdit(platform)" class="text-xs text-primary-600 dark:text-primary-400 hover:underline">{{ person[platform] && person[platform].username ? 'Edit' : 'Set' }}</button>
+                  <button v-if="person[platform] && person[platform].source === 'manual'" @click="removeId(platform)" class="text-xs text-red-500 hover:underline">Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Jira Metrics (cross-module from team-tracker) -->
+          <div v-if="jiraMetrics && !jiraMetrics.nameNotFound" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4 uppercase tracking-wider">Jira Metrics (90 days)</h3>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ jiraMetrics.resolved?.issues?.length || 0 }}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Resolved Issues</div>
+              </div>
+              <div>
+                <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ jiraMetrics.resolved?.totalPoints || 0 }}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Story Points</div>
+              </div>
+              <div>
+                <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ jiraMetrics.cycleTime?.averageDays != null ? jiraMetrics.cycleTime.averageDays + 'd' : '—' }}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Avg Cycle Time</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Metadata -->
+          <div class="text-xs text-gray-400 dark:text-gray-500 flex flex-wrap gap-4">
+            <span>First seen: {{ person.firstSeenAt ? new Date(person.firstSeenAt).toLocaleDateString() : '—' }}</span>
+            <span>Last seen: {{ person.lastSeenAt ? new Date(person.lastSeenAt).toLocaleDateString() : '—' }}</span>
+            <span v-if="person.inactiveSince">Inactive since: {{ new Date(person.inactiveSince).toLocaleDateString() }}</span>
+          </div>
+        </div>
+
+        <!-- Sidebar: Manager Chain + Direct Reports -->
+        <div class="space-y-6">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4 uppercase tracking-wider">Manager Chain</h3>
+            <div v-if="managerChain.length === 0" class="text-sm text-gray-400 dark:text-gray-500">No managers found</div>
+            <div v-else class="space-y-1">
+              <div v-for="(mgr, i) in [...managerChain].reverse()" :key="mgr.uid" class="flex items-center gap-2">
+                <div class="flex flex-col items-center" style="width: 16px">
+                  <div v-if="i > 0" class="w-px h-3 bg-gray-300 dark:bg-gray-600"></div>
+                  <div class="w-2 h-2 rounded-full" :class="i === managerChain.length - 1 ? 'bg-primary-500' : 'bg-gray-300 dark:bg-gray-600'"></div>
+                </div>
+                <button @click="openPerson(mgr.uid)" class="text-sm text-primary-600 dark:text-primary-400 hover:underline truncate">{{ mgr.name }}</button>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="flex flex-col items-center" style="width: 16px">
+                  <div class="w-px h-3 bg-gray-300 dark:bg-gray-600"></div>
+                  <div class="w-2.5 h-2.5 rounded-full bg-gray-900 dark:bg-gray-100 ring-2 ring-primary-500"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ person.name }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4 uppercase tracking-wider">
+              Direct Reports <span v-if="directReports.length > 0" class="font-normal text-gray-400">({{ directReports.length }})</span>
+            </h3>
+            <div v-if="directReports.length === 0" class="text-sm text-gray-400 dark:text-gray-500">No direct reports</div>
+            <div v-else class="space-y-2">
+              <button
+                v-for="dr in directReports"
+                :key="dr.uid"
+                @click="openPerson(dr.uid)"
+                class="w-full text-left flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+              >
+                <div class="min-w-0">
+                  <div class="text-sm text-primary-600 dark:text-primary-400 truncate">{{ dr.name }}</div>
+                  <div class="text-[10px] text-gray-400 dark:text-gray-500 truncate">{{ dr.title }}</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</template>

@@ -2483,6 +2483,14 @@ module.exports = function registerRoutes(router, context) {
     });
   }
 
+  // ─── Absorbed routes from org-roster and team-data ───
+
+  const registerIpaRegistryRoutes = require('./routes/ipa-registry');
+  const registerOrgTeamsRoutes = require('./routes/org-teams');
+
+  registerIpaRegistryRoutes(router, context);
+  registerOrgTeamsRoutes(router, context);
+
   // ─── Startup: schedule roster sync ───
 
   if (!DEMO_MODE && rosterSyncConfig.isConfigured(storage)) {

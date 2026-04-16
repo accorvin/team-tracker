@@ -26,13 +26,13 @@ async function cachedRequest(cacheKey, path, onData) {
   if (cached && onData) onData(cached)
 
   try {
-    const fresh = await apiRequest(`/modules/org-roster${path}`)
+    const fresh = await apiRequest(`/modules/team-tracker${path}`)
     cacheSet(cacheKey, fresh)
     if (onData) onData(fresh)
     return fresh
   } catch (err) {
     if (cached) {
-      console.warn(`Using cached org-roster data for ${path}:`, err.message)
+      console.warn(`Using cached data for ${path}:`, err.message)
       return cached
     }
     throw err
@@ -48,14 +48,14 @@ const loading = ref(false)
 const error = ref(null)
 const fetchedAt = ref(null)
 const searchQuery = ref('')
-const sortBy = ref('name') // 'name', 'headcount', 'rfe'
+const sortBy = ref('name')
 
 export function useOrgRoster() {
   async function loadTeams(orgFilter) {
     loading.value = true
     error.value = null
     try {
-      const path = orgFilter ? `/teams?org=${encodeURIComponent(orgFilter)}` : '/teams'
+      const path = orgFilter ? `/org-teams?org=${encodeURIComponent(orgFilter)}` : '/org-teams'
       const cacheKey = orgFilter ? `teams:${orgFilter}` : 'teams:all'
       await cachedRequest(cacheKey, path, (data) => {
         teams.value = data.teams || []
@@ -70,7 +70,7 @@ export function useOrgRoster() {
 
   async function loadOrgs() {
     try {
-      await cachedRequest('orgs', '/orgs', (data) => {
+      await cachedRequest('orgs', '/org-list', (data) => {
         orgs.value = data.orgs || []
       })
     } catch (err) {
@@ -80,7 +80,7 @@ export function useOrgRoster() {
 
   async function loadPeople(filters = {}) {
     try {
-      let path = '/people'
+      let path = '/registry/people'
       const params = []
       if (filters.org) params.push(`org=${encodeURIComponent(filters.org)}`)
       if (filters.team) params.push(`team=${encodeURIComponent(filters.team)}`)
@@ -96,70 +96,57 @@ export function useOrgRoster() {
   }
 
   async function loadTeamDetail(teamKey) {
-    const data = await cachedRequest(`team:${teamKey}`, `/teams/${encodeURIComponent(teamKey)}`)
-    return data
+    return cachedRequest(`team:${teamKey}`, `/org-teams/${encodeURIComponent(teamKey)}`)
   }
 
   async function loadTeamMembers(teamKey) {
-    const data = await cachedRequest(`members:${teamKey}`, `/teams/${encodeURIComponent(teamKey)}/members`)
-    return data
+    return cachedRequest(`members:${teamKey}`, `/org-teams/${encodeURIComponent(teamKey)}/members`)
   }
 
   async function loadOrgSummary(orgName) {
-    const data = await cachedRequest(`org-summary:${orgName}`, `/orgs/${encodeURIComponent(orgName)}/summary`)
-    return data
+    return cachedRequest(`org-summary:${orgName}`, `/org-summary/${encodeURIComponent(orgName)}`)
   }
 
   async function loadComponents() {
-    const data = await cachedRequest('components', '/components')
-    return data
+    return cachedRequest('components', '/components')
   }
 
   async function loadRfeBacklog(orgFilter) {
     const path = orgFilter ? `/rfe-backlog?org=${encodeURIComponent(orgFilter)}` : '/rfe-backlog'
     const cacheKey = orgFilter ? `rfe:${orgFilter}` : 'rfe:all'
-    const data = await cachedRequest(cacheKey, path)
-    return data
+    return cachedRequest(cacheKey, path)
   }
 
   async function loadRfeConfig() {
-    return apiRequest('/modules/org-roster/rfe-config')
+    return apiRequest('/modules/team-tracker/rfe-config')
   }
 
   async function loadSyncStatus() {
-    return apiRequest('/modules/org-roster/sync/status')
+    return apiRequest('/modules/team-tracker/org-sync/status')
   }
 
   async function triggerSync() {
-    return apiRequest('/modules/org-roster/sync/trigger', { method: 'POST' })
-  }
-
-  async function triggerSheetsSync() {
-    return apiRequest('/modules/org-roster/sync/sheets/trigger', { method: 'POST' })
-  }
-
-  async function triggerRfeSync() {
-    return apiRequest('/modules/org-roster/sync/rfe/trigger', { method: 'POST' })
+    return apiRequest('/modules/team-tracker/org-sync/trigger', { method: 'POST' })
   }
 
   async function loadSheetOrgs() {
-    return apiRequest('/modules/org-roster/sheet-orgs')
+    return apiRequest('/modules/team-tracker/sheet-orgs')
   }
 
   async function loadConfiguredOrgs() {
-    return apiRequest('/modules/org-roster/configured-orgs')
+    return apiRequest('/modules/team-tracker/configured-orgs')
   }
 
   async function loadJiraComponents() {
-    return apiRequest('/modules/org-roster/jira-components')
+    return apiRequest('/modules/team-tracker/jira-components')
   }
 
   async function loadConfig() {
-    return apiRequest('/modules/org-roster/config')
+    return apiRequest('/modules/team-tracker/org-config')
   }
 
   async function saveConfig(configData) {
-    return apiRequest('/modules/org-roster/config', {
+    return apiRequest('/modules/team-tracker/org-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(configData)
@@ -212,8 +199,6 @@ export function useOrgRoster() {
     loadRfeConfig,
     loadSyncStatus,
     triggerSync,
-    triggerSheetsSync,
-    triggerRfeSync,
     loadSheetOrgs,
     loadConfiguredOrgs,
     loadJiraComponents,

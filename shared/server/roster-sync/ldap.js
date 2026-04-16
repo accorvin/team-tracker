@@ -97,17 +97,30 @@ function entryToPerson(entry) {
  * Recursively traverse an org tree starting from a root UID.
  * Returns { leader, members } where members is a flat array.
  */
+function escapeLdapFilter(value) {
+  if (!value) return '';
+  return String(value)
+    .replace(/\\/g, '\\5c')
+    .replace(/\*/g, '\\2a')
+    .replace(/\(/g, '\\28')
+    .replace(/\)/g, '\\29')
+    .replace(/\x00/g, '\\00');
+}
+
 async function traverseOrg(client, rootUid) {
-  const rootEntries = await searchEntries(client, `(uid=${rootUid})`);
+  const rootEntries = await searchEntries(client, `(uid=${escapeLdapFilter(rootUid)})`);
   if (rootEntries.length === 0) {
     throw new Error(`Could not find ${rootUid} in LDAP`);
   }
 
   const leader = entryToPerson(rootEntries[0]);
   const members = [];
+  const visited = new Set();
 
   async function recurse(managerUid, depth) {
-    const filter = `(manager=uid=${managerUid},${LDAP_USER_BASE})`;
+    if (visited.has(managerUid)) return;
+    visited.add(managerUid);
+    const filter = `(manager=uid=${escapeLdapFilter(managerUid)},${LDAP_USER_BASE})`;
     const reports = await searchEntries(client, filter);
 
     for (const entry of reports) {
@@ -130,7 +143,7 @@ async function traverseOrg(client, rootUid) {
  * Look up a single person by UID.
  */
 async function lookupPerson(client, uid) {
-  const entries = await searchEntries(client, `(uid=${uid})`);
+  const entries = await searchEntries(client, `(uid=${escapeLdapFilter(uid)})`);
   if (entries.length === 0) return null;
   return entryToPerson(entries[0]);
 }
