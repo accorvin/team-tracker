@@ -209,12 +209,12 @@ onMounted(loadData)
         <div class="text-xs text-gray-500 dark:text-gray-400">Total</div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <div class="text-2xl font-bold text-green-600">{{ stats.coverage?.github?.hasId || 0 }}</div>
-        <div class="text-xs text-gray-500 dark:text-gray-400">GitHub IDs</div>
+        <div class="text-2xl font-bold text-green-600">{{ stats.coverage?.github?.hasId || 0 }} <span class="text-sm font-normal text-gray-400">/ {{ stats.active }}</span></div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">GitHub IDs <span class="text-green-600 font-medium">{{ stats.active ? Math.round((stats.coverage?.github?.hasId || 0) / stats.active * 100) : 0 }}%</span></div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <div class="text-2xl font-bold text-orange-600">{{ stats.coverage?.gitlab?.hasId || 0 }}</div>
-        <div class="text-xs text-gray-500 dark:text-gray-400">GitLab IDs</div>
+        <div class="text-2xl font-bold text-orange-600">{{ stats.coverage?.gitlab?.hasId || 0 }} <span class="text-sm font-normal text-gray-400">/ {{ stats.active }}</span></div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">GitLab IDs <span class="text-orange-600 font-medium">{{ stats.active ? Math.round((stats.coverage?.gitlab?.hasId || 0) / stats.active * 100) : 0 }}%</span></div>
       </div>
     </div>
 
