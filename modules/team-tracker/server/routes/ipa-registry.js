@@ -249,7 +249,10 @@ module.exports = function registerIpaRegistryRoutes(router, context) {
 
     var managerChain = [];
     var current = person;
+    var visitedManagers = new Set();
     while (current && current.managerUid && managerChain.length < 20) {
+      if (visitedManagers.has(current.managerUid)) break;
+      visitedManagers.add(current.managerUid);
       var manager = people[current.managerUid];
       if (!manager) break;
       managerChain.push({ uid: manager.uid, name: manager.name, title: manager.title });
@@ -269,9 +272,12 @@ module.exports = function registerIpaRegistryRoutes(router, context) {
 
   // ─── Identity Overrides ───
 
+  var VALID_USERNAME = /^[a-zA-Z0-9_.-]{1,39}$/;
+
   router.put('/registry/people/:uid/github', requireAdmin, function(req, res) {
     var username = req.body.username;
     if (!username || typeof username !== 'string' || !username.trim()) return res.status(400).json({ error: 'Username is required' });
+    if (!VALID_USERNAME.test(username.trim())) return res.status(400).json({ error: 'Invalid username format (1-39 chars, alphanumeric/dash/underscore/dot)' });
     var updated = writePeopleUpdate(req.params.uid, function(p) { p.github = { username: username.trim(), source: 'manual' }; });
     if (!updated) return res.status(404).json({ error: 'Person not found' });
     res.json({ status: 'updated', github: updated.github });
@@ -280,6 +286,7 @@ module.exports = function registerIpaRegistryRoutes(router, context) {
   router.put('/registry/people/:uid/gitlab', requireAdmin, function(req, res) {
     var username = req.body.username;
     if (!username || typeof username !== 'string' || !username.trim()) return res.status(400).json({ error: 'Username is required' });
+    if (!VALID_USERNAME.test(username.trim())) return res.status(400).json({ error: 'Invalid username format (1-39 chars, alphanumeric/dash/underscore/dot)' });
     var updated = writePeopleUpdate(req.params.uid, function(p) { p.gitlab = { username: username.trim(), source: 'manual' }; });
     if (!updated) return res.status(404).json({ error: 'Person not found' });
     res.json({ status: 'updated', gitlab: updated.gitlab });

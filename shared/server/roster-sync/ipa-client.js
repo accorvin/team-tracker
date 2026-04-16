@@ -21,6 +21,20 @@ const fs = require('fs');
 const path = require('path');
 const tls = require('tls');
 
+/**
+ * Escape a value for safe use in an LDAP filter.
+ * Per RFC 4515, these characters must be hex-escaped: *, (, ), \, NUL.
+ */
+function escapeLdapFilter(value) {
+  if (!value) return '';
+  return String(value)
+    .replace(/\\/g, '\\5c')
+    .replace(/\*/g, '\\2a')
+    .replace(/\(/g, '\\28')
+    .replace(/\)/g, '\\29')
+    .replace(/\x00/g, '\\00');
+}
+
 const DEFAULT_HOST = 'ldaps://ipa.corp.redhat.com';
 const DEFAULT_BASE_DN = 'cn=users,cn=accounts,dc=ipa,dc=redhat,dc=com';
 
@@ -192,16 +206,19 @@ function entryToPerson(entry) {
  * Returns { leader, people } where people is a flat array including the leader.
  */
 async function traverseOrg(client, baseDn, rootUid, excludedTitles) {
-  var rootEntries = await searchEntries(client, baseDn, '(uid=' + rootUid + ')');
+  var rootEntries = await searchEntries(client, baseDn, '(uid=' + escapeLdapFilter(rootUid) + ')');
   if (rootEntries.length === 0) {
     throw new Error('Could not find ' + rootUid + ' in IPA');
   }
 
   var leader = entryToPerson(rootEntries[0]);
   var people = [leader];
+  var visited = new Set();
 
   async function recurse(managerUid) {
-    var filter = '(manager=uid=' + managerUid + ',' + baseDn + ')';
+    if (visited.has(managerUid)) return;
+    visited.add(managerUid);
+    var filter = '(manager=uid=' + escapeLdapFilter(managerUid) + ',' + baseDn + ')';
     var reports = await searchEntries(client, baseDn, filter);
 
     for (var i = 0; i < reports.length; i++) {
@@ -231,7 +248,7 @@ async function traverseOrg(client, baseDn, rootUid, excludedTitles) {
  * Look up a single person by UID.
  */
 async function lookupPerson(client, baseDn, uid) {
-  var entries = await searchEntries(client, baseDn, '(uid=' + uid + ')');
+  var entries = await searchEntries(client, baseDn, '(uid=' + escapeLdapFilter(uid) + ')');
   if (entries.length === 0) return null;
   return entryToPerson(entries[0]);
 }
@@ -262,6 +279,7 @@ module.exports = {
   testConnection,
   getIpaStatus,
   entryToPerson,
+  escapeLdapFilter,
   extractGithubUsername,
   extractGitlabUsername
 };

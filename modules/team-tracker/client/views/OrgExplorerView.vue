@@ -185,11 +185,11 @@ onMounted(loadOrgs)
                 <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">{{ p.title }}</td>
                 <td class="px-4 py-3 text-right"><span v-if="p.hasReports" class="text-sm tabular-nums text-gray-900 dark:text-gray-100">{{ p.teamSize }}</span></td>
                 <td class="px-4 py-3 text-sm" @click.stop>
-                  <a v-if="p.github && p.github.username" :href="'https://github.com/' + p.github.username" target="_blank" class="text-primary-600 dark:text-primary-400 hover:underline">{{ p.github.username }}</a>
+                  <a v-if="p.github && p.github.username" :href="'https://github.com/' + p.github.username" target="_blank" rel="noopener noreferrer" class="text-primary-600 dark:text-primary-400 hover:underline">{{ p.github.username }}</a>
                   <span v-else class="text-gray-300 dark:text-gray-600">&mdash;</span>
                 </td>
                 <td class="px-4 py-3 text-sm hidden md:table-cell" @click.stop>
-                  <a v-if="p.gitlab && p.gitlab.username" :href="'https://gitlab.com/' + p.gitlab.username" target="_blank" class="text-primary-600 dark:text-primary-400 hover:underline">{{ p.gitlab.username }}</a>
+                  <a v-if="p.gitlab && p.gitlab.username" :href="'https://gitlab.com/' + p.gitlab.username" target="_blank" rel="noopener noreferrer" class="text-primary-600 dark:text-primary-400 hover:underline">{{ p.gitlab.username }}</a>
                   <span v-else class="text-gray-300 dark:text-gray-600">&mdash;</span>
                 </td>
               </tr>

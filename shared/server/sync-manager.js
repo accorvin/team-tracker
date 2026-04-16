@@ -18,12 +18,14 @@ const jobs = {};
  * @param {number} [options.intervalMs] - Repeat interval in ms (default: 24 hours)
  * @param {number} [options.delayMs] - Initial delay before first run (default: 0)
  * @param {boolean} [options.autoStart] - Whether to start scheduling immediately (default: false)
+ * @param {Object} [options.storage] - Storage object passed to fn on scheduled runs
  */
 function registerJob(name, fn, options) {
   var opts = options || {};
   jobs[name] = {
     name: name,
     fn: fn,
+    storage: opts.storage || null,
     intervalMs: opts.intervalMs || 24 * 60 * 60 * 1000,
     delayMs: opts.delayMs || 0,
     running: false,
@@ -64,7 +66,7 @@ function scheduleJob(name) {
 
 function startRecurring(job) {
   job.timer = setInterval(function() {
-    runJobInternal(job).catch(function(err) {
+    runJobInternal(job, job.storage).catch(function(err) {
       console.error('[sync-manager] Scheduled run of "' + job.name + '" failed:', err.message);
     });
   }, job.intervalMs);

@@ -311,14 +311,21 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
 
   router.post('/org-config', requireAdmin, function(req, res) {
     try {
-      const { teamBoardsTab, componentsTab, jiraProject, rfeIssueType, orgNameMapping, componentMapping } = req.body;
+      const body = req.body;
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return res.status(400).json({ error: 'Request body must be a JSON object' });
+      }
+
+      const allowedKeys = ['teamBoardsTab', 'componentsTab', 'jiraProject', 'rfeIssueType', 'orgNameMapping', 'componentMapping'];
       const config = getOrgConfig();
-      if (teamBoardsTab) config.teamBoardsTab = teamBoardsTab;
-      if (componentsTab) config.componentsTab = componentsTab;
-      if (jiraProject) config.jiraProject = jiraProject;
-      if (rfeIssueType) config.rfeIssueType = rfeIssueType;
-      if (orgNameMapping !== undefined) config.orgNameMapping = orgNameMapping;
-      if (componentMapping !== undefined) config.componentMapping = componentMapping;
+
+      if (body.teamBoardsTab !== undefined && typeof body.teamBoardsTab === 'string') config.teamBoardsTab = body.teamBoardsTab;
+      if (body.componentsTab !== undefined && typeof body.componentsTab === 'string') config.componentsTab = body.componentsTab;
+      if (body.jiraProject !== undefined && typeof body.jiraProject === 'string') config.jiraProject = body.jiraProject;
+      if (body.rfeIssueType !== undefined && typeof body.rfeIssueType === 'string') config.rfeIssueType = body.rfeIssueType;
+      if (body.orgNameMapping !== undefined && typeof body.orgNameMapping === 'object' && !Array.isArray(body.orgNameMapping)) config.orgNameMapping = body.orgNameMapping;
+      if (body.componentMapping !== undefined && typeof body.componentMapping === 'object' && !Array.isArray(body.componentMapping)) config.componentMapping = body.componentMapping;
+
       writeToStorage('org-roster/config.json', config);
       res.json({ status: 'saved', config });
     } catch (error) {
@@ -339,11 +346,15 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
 
   router.post('/org-sync/trigger', requireAdmin, async function(req, res) {
     if (orgSyncInProgress) return res.status(409).json({ error: 'Sync already in progress' });
+    orgSyncInProgress = true;
+
     const sheetId = getSheetId();
-    if (!sheetId) return res.status(400).json({ error: 'No Google Sheet ID configured.' });
+    if (!sheetId) {
+      orgSyncInProgress = false;
+      return res.status(400).json({ error: 'No Google Sheet ID configured.' });
+    }
 
     const config = getOrgConfig();
-    orgSyncInProgress = true;
     res.json({ status: 'started' });
 
     try {
