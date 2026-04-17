@@ -12,10 +12,8 @@ const syncStatus = ref(null)
 const orgDisplayNames = ref({})
 const loading = ref(true)
 const search = ref('')
-const filterOrg = ref('')
-const filterGeo = ref('')
-const filterStatus = ref('active')
-const filterMissing = ref('')
+const selectedOrgs = ref([])
+const selectedGeos = ref([])
 const sortField = ref('name')
 const sortAsc = ref(true)
 
@@ -65,24 +63,28 @@ const geos = computed(() => {
   return Array.from(set).sort()
 })
 
+const filteredStats = computed(() => {
+  const list = filtered.value
+  const ghCount = list.filter(p => p.github && p.github.username).length
+  const glCount = list.filter(p => p.gitlab && p.gitlab.username).length
+  return {
+    total: list.length,
+    github: ghCount,
+    gitlab: glCount
+  }
+})
+
 const filtered = computed(() => {
-  let list = people.value
+  let list = people.value.filter(p => p.status === 'active')
 
-  if (filterStatus.value) {
-    list = list.filter(p => p.status === filterStatus.value)
+  if (selectedOrgs.value.length > 0) {
+    const orgSet = new Set(selectedOrgs.value)
+    list = list.filter(p => orgSet.has(p.orgRoot))
   }
-  if (filterOrg.value) {
-    list = list.filter(p => p.orgRoot === filterOrg.value)
+  if (selectedGeos.value.length > 0) {
+    const geoSet = new Set(selectedGeos.value)
+    list = list.filter(p => geoSet.has(p.geo))
   }
-  if (filterGeo.value) {
-    list = list.filter(p => p.geo === filterGeo.value)
-  }
-  if (filterMissing.value === 'github') {
-    list = list.filter(p => !p.github || !p.github.username)
-  } else if (filterMissing.value === 'gitlab') {
-    list = list.filter(p => !p.gitlab || !p.gitlab.username)
-  }
-
   if (search.value) {
     const term = search.value.toLowerCase()
     list = list.filter(p => {
@@ -199,22 +201,18 @@ onMounted(loadData)
 <template>
   <div>
     <!-- Stats header -->
-    <div v-if="stats" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div v-if="!loading && people.length > 0" class="grid grid-cols-3 gap-4 mb-6">
       <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ stats.active }}</div>
-        <div class="text-xs text-gray-500 dark:text-gray-400">Active People</div>
+        <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ filteredStats.total }}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">People</div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ stats.total }}</div>
-        <div class="text-xs text-gray-500 dark:text-gray-400">Total</div>
+        <div class="text-2xl font-bold text-green-600">{{ filteredStats.github }} <span class="text-sm font-normal text-gray-400">/ {{ filteredStats.total }}</span></div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">GitHub IDs <span class="text-green-600 font-medium">{{ filteredStats.total ? Math.round(filteredStats.github / filteredStats.total * 100) : 0 }}%</span></div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <div class="text-2xl font-bold text-green-600">{{ stats.coverage?.github?.hasId || 0 }} <span class="text-sm font-normal text-gray-400">/ {{ stats.active }}</span></div>
-        <div class="text-xs text-gray-500 dark:text-gray-400">GitHub IDs <span class="text-green-600 font-medium">{{ stats.active ? Math.round((stats.coverage?.github?.hasId || 0) / stats.active * 100) : 0 }}%</span></div>
-      </div>
-      <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <div class="text-2xl font-bold text-orange-600">{{ stats.coverage?.gitlab?.hasId || 0 }} <span class="text-sm font-normal text-gray-400">/ {{ stats.active }}</span></div>
-        <div class="text-xs text-gray-500 dark:text-gray-400">GitLab IDs <span class="text-orange-600 font-medium">{{ stats.active ? Math.round((stats.coverage?.gitlab?.hasId || 0) / stats.active * 100) : 0 }}%</span></div>
+        <div class="text-2xl font-bold text-orange-600">{{ filteredStats.gitlab }} <span class="text-sm font-normal text-gray-400">/ {{ filteredStats.total }}</span></div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">GitLab IDs <span class="text-orange-600 font-medium">{{ filteredStats.total ? Math.round(filteredStats.gitlab / filteredStats.total * 100) : 0 }}%</span></div>
       </div>
     </div>
 
@@ -238,25 +236,47 @@ onMounted(loadData)
         <button @click="exportCsv" class="px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex-shrink-0">Export CSV</button>
       </div>
 
-      <div class="flex flex-wrap gap-2">
-        <select v-model="filterOrg" class="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-          <option value="">All Orgs</option>
-          <option v-for="org in orgs" :key="org.uid" :value="org.uid">{{ org.name }}</option>
-        </select>
-        <select v-model="filterGeo" class="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-          <option value="">All Geos</option>
-          <option v-for="geo in geos" :key="geo" :value="geo">{{ geo }}</option>
-        </select>
-        <select v-model="filterStatus" class="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-        <select v-model="filterMissing" class="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-          <option value="">All IDs</option>
-          <option value="github">Missing GitHub</option>
-          <option value="gitlab">Missing GitLab</option>
-        </select>
+      <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 flex flex-wrap items-start gap-6">
+        <!-- Orgs -->
+        <div v-if="orgs.length > 0">
+          <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Orgs</label>
+          <div class="space-y-1 max-h-48 overflow-y-auto">
+            <label
+              v-for="org in orgs"
+              :key="org.uid"
+              class="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                :value="org.uid"
+                v-model="selectedOrgs"
+                class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+              />
+              <span class="text-sm text-gray-700 dark:text-gray-300">{{ org.name }}</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Geos -->
+        <div v-if="geos.length > 0">
+          <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Geo</label>
+          <div class="space-y-1 max-h-48 overflow-y-auto">
+            <label
+              v-for="geo in geos"
+              :key="geo"
+              class="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                :value="geo"
+                v-model="selectedGeos"
+                class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+              />
+              <span class="text-sm text-gray-700 dark:text-gray-300">{{ geo }}</span>
+            </label>
+          </div>
+        </div>
+
         <span class="text-sm text-gray-500 dark:text-gray-400 self-center ml-auto">{{ filtered.length }} results</span>
       </div>
 
@@ -280,12 +300,9 @@ onMounted(loadData)
                 @click="openPerson(p.uid)"
               >
                 <td class="px-4 py-3">
-                  <div class="flex items-center gap-2">
-                    <span v-if="p.status === 'inactive'" class="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 flex-shrink-0" title="Inactive"></span>
-                    <div>
-                      <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ p.name }}</div>
-                      <div class="text-xs text-gray-500 dark:text-gray-400 md:hidden">{{ p.title }}</div>
-                    </div>
+                  <div>
+                    <div class="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline">{{ p.name }}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 md:hidden">{{ p.title }}</div>
                   </div>
                 </td>
                 <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden md:table-cell">{{ p.title }}</td>

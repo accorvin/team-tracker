@@ -2609,15 +2609,21 @@ module.exports = function registerRoutes(router, context) {
         if (isIpaSyncInProgress()) {
           console.warn('[unified-sync] IPA sync became active between phases, skipping Phase 3');
         } else {
-          // Seed IPA config org roots from roster sync config if not configured
-          const ipaConfig = storage.readFromStorage('team-data/config.json');
-          if (!ipaConfig || !ipaConfig.orgRoots || ipaConfig.orgRoots.length === 0) {
-            const rosterConfig = rosterSyncConfig.loadConfig(storage);
-            if (rosterConfig && rosterConfig.orgRoots && rosterConfig.orgRoots.length > 0) {
-              const seeded = Object.assign({}, ipaConfig || {}, { orgRoots: rosterConfig.orgRoots });
-              storage.writeToStorage('team-data/config.json', seeded);
-              console.log('[unified-sync] Seeded IPA registry config with roster sync org roots');
-            }
+          // Sync IPA config from roster sync config (org roots + excluded titles)
+          const ipaConfig = storage.readFromStorage('team-data/config.json') || {};
+          const rosterConfig = rosterSyncConfig.loadConfig(storage);
+          let ipaConfigChanged = false;
+
+          if ((!ipaConfig.orgRoots || ipaConfig.orgRoots.length === 0) && rosterConfig?.orgRoots?.length > 0) {
+            ipaConfig.orgRoots = rosterConfig.orgRoots;
+            ipaConfigChanged = true;
+          }
+          const excludedTitles = rosterConfig?.excludedTitles?.length ? rosterConfig.excludedTitles : DEFAULT_EXCLUDED_TITLES;
+          ipaConfig.excludedTitles = excludedTitles;
+          ipaConfigChanged = true;
+          if (ipaConfigChanged) {
+            storage.writeToStorage('team-data/config.json', ipaConfig);
+            console.log('[unified-sync] Synced IPA registry config from roster sync config');
           }
           await runIpaSync(storage);
         }

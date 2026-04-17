@@ -1,13 +1,25 @@
 <template>
   <div>
-    <!-- Org selector (shown when accessed directly or to switch orgs) -->
-    <div v-if="orgs.length > 0" class="mb-6">
-      <OrgSelector :orgs="orgs" :modelValue="selectedOrg" @select="handleOrgSelect" />
-    </div>
+    <template v-if="summary">
+      <!-- Header -->
+      <div class="mb-6">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ summary.org }} Dashboard</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Org-level summary</p>
+      </div>
+    </template>
+
+    <!-- Org selector -->
+    <OrgSelector
+      v-if="orgs.length > 0"
+      :orgs="orgs"
+      :modelValue="selectedOrg"
+      @select="handleOrgSelect"
+      class="mb-6"
+    />
 
     <!-- No org selected prompt (shouldn't normally show since we auto-load All) -->
     <div v-if="!selectedOrg && !summary && !loading" class="text-center py-12">
-      <p class="text-gray-500 dark:text-gray-400">Select an organization above to view its dashboard.</p>
+      <p class="text-gray-500 dark:text-gray-400">Select an organization to view its dashboard.</p>
     </div>
 
     <!-- Loading -->
@@ -20,12 +32,8 @@
       <p class="text-red-700 dark:text-red-400 text-sm">{{ error }}</p>
     </div>
 
-    <template v-else-if="summary">
-      <!-- Header -->
-      <div class="mb-8">
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ summary.org }} Dashboard</h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Org-level summary</p>
-      </div>
+    <template v-if="summary && !loading && !error">
+      <!-- Stats cards -->
 
       <!-- Stats cards -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
