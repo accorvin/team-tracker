@@ -196,8 +196,8 @@ function entryToPerson(entry) {
     officeLocation: entry.rhatOfficeLocation || '',
     costCenter: entry.rhatCostCenter || '',
     managerUid: extractManagerUid(entry),
-    _githubFromLdap: extractGithubUsername(entry),
-    _gitlabFromLdap: extractGitlabUsername(entry)
+    githubUsername: extractGithubUsername(entry),
+    gitlabUsername: extractGitlabUsername(entry)
   };
 }
 

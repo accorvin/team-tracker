@@ -18,7 +18,7 @@ const sampleModules = {
   modules: [
     {
       slug: 'team-tracker',
-      name: 'Team Tracker',
+      name: 'People & Teams',
       description: 'Delivery metrics',
       icon: 'bar-chart',
       requires: [],
@@ -48,7 +48,7 @@ describe('BuiltInModuleSettings', () => {
   it('renders module list after loading', async () => {
     const wrapper = mount(BuiltInModuleSettings)
     await flushPromises()
-    expect(wrapper.text()).toContain('Team Tracker')
+    expect(wrapper.text()).toContain('People & Teams')
     expect(wrapper.text()).toContain('Release Analysis')
   })
 
@@ -114,7 +114,7 @@ describe('BuiltInModuleSettings', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Requires: Release Analysis')
-    expect(wrapper.text()).toContain('Required by: Team Tracker')
+    expect(wrapper.text()).toContain('Required by: People & Teams')
   })
 
   it('shows confirmation dialog when enabling with unmet deps', async () => {

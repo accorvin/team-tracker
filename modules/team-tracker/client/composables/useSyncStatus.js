@@ -44,7 +44,11 @@ async function fetchStatus() {
     syncing.value = status.value.syncing
     currentPhase.value = status.value.phase || null
     phaseLabel.value = status.value.phaseLabel || null
-    error.value = null
+    if (status.value?.lastSyncStatus === 'error' && status.value?.lastSyncError) {
+      error.value = status.value.lastSyncError
+    } else {
+      error.value = null
+    }
   } catch (err) {
     error.value = err.message
   }
@@ -56,9 +60,13 @@ function startPolling() {
     await fetchStatus()
     if (!syncing.value) {
       stopPolling()
-      // Sync completed — clear configDirty, refresh caches
-      configDirty.value = false
-      try { sessionStorage.removeItem(SESSION_KEY) } catch { /* ignore */ }
+      // Sync completed — check for errors, clear configDirty, refresh caches
+      if (status.value?.lastSyncStatus === 'error' && status.value?.lastSyncError) {
+        error.value = status.value.lastSyncError
+      } else {
+        configDirty.value = false
+        try { sessionStorage.removeItem(SESSION_KEY) } catch { /* ignore */ }
+      }
       clearApiCache()
       const { reloadRoster } = useRoster()
       reloadRoster()

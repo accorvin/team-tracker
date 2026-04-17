@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 // Mock module-loader functions
 const mockModuleState = {}
 const mockModules = [
-  { slug: 'team-tracker', name: 'Team Tracker', requires: [], defaultEnabled: true },
+  { slug: 'team-tracker', name: 'People & Teams', requires: [], defaultEnabled: true },
   { slug: 'release-analysis', name: 'Release Analysis', requires: [], defaultEnabled: true }
 ]
 

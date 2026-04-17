@@ -54,6 +54,52 @@
       </button>
     </div>
 
+    <!-- Excluded Titles -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Excluded Titles</h3>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+        People with these job titles are excluded during roster sync. Changes take effect on the next sync.
+      </p>
+
+      <div class="flex flex-wrap gap-2 mb-3">
+        <span
+          v-for="(title, idx) in editExcludedTitles"
+          :key="idx"
+          class="inline-flex items-center gap-1 px-2.5 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full"
+        >
+          {{ title }}
+          <button
+            @click="removeExcludedTitle(idx)"
+            class="ml-0.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+            title="Remove"
+          >
+            <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </span>
+        <span v-if="editExcludedTitles.length === 0" class="text-sm text-gray-400 dark:text-gray-500 italic">
+          No excluded titles — all job titles will be included in roster sync.
+        </span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <input
+          v-model="newExcludedTitle"
+          @keydown.enter.prevent="addExcludedTitle"
+          placeholder="e.g. Intern"
+          class="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+        />
+        <button
+          @click="addExcludedTitle"
+          :disabled="!newExcludedTitle.trim()"
+          class="px-3 py-1.5 text-sm font-medium text-primary-600 dark:text-primary-400 border border-primary-300 dark:border-primary-600 rounded-md hover:bg-primary-50 dark:hover:bg-primary-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Add
+        </button>
+      </div>
+    </div>
+
     <!-- Google Sheets Integration -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
       <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Google Sheets Integration</h3>
@@ -548,6 +594,8 @@ const editNameColumn = ref('')
 const editTeamGroupingColumn = ref('')
 const editCustomFields = ref([])
 const primaryDisplayIdx = ref(null)
+const editExcludedTitles = ref([])
+const newExcludedTitle = ref('')
 const editSelectedSheets = ref([])
 const discoveredSheets = ref(null)
 const discoveringSheets = ref(false)
@@ -569,6 +617,7 @@ let savedSheetId = ''
 let savedNameColumn = ''
 let savedTeamGroupingColumn = ''
 let savedOrgNameMapping = {}
+let savedExcludedTitles = ''
 
 const autoMatchedOrgs = computed(() => orgMappingRows.value.filter(r => r.isExactMatch))
 const unmatchedOrgs = computed(() => orgMappingRows.value.filter(r => !r.isExactMatch))
@@ -596,6 +645,8 @@ function populateForm() {
     populatingForm = true
 
     // Roster sync fields
+    editExcludedTitles.value = [...(config.value.excludedTitles || [])]
+
     if (config.value.configured) {
       editRoots.value = (config.value.orgRoots || []).map(r => ({ ...r }))
       editGithubOrgs.value = [...(config.value.githubOrgs || [])]
@@ -635,6 +686,7 @@ function populateForm() {
     savedNameColumn = editNameColumn.value
     savedTeamGroupingColumn = editTeamGroupingColumn.value
     savedOrgNameMapping = JSON.stringify(orgConfig.value.orgNameMapping || {})
+    savedExcludedTitles = JSON.stringify(editExcludedTitles.value)
 
     populatingForm = false
   }
@@ -672,6 +724,18 @@ function addRoot() {
 
 function removeRoot(idx) {
   editRoots.value.splice(idx, 1)
+}
+
+function addExcludedTitle() {
+  const trimmed = newExcludedTitle.value.trim().slice(0, 100)
+  if (trimmed && !editExcludedTitles.value.includes(trimmed)) {
+    editExcludedTitles.value.push(trimmed)
+  }
+  newExcludedTitle.value = ''
+}
+
+function removeExcludedTitle(idx) {
+  editExcludedTitles.value.splice(idx, 1)
 }
 
 function addField() {
@@ -888,7 +952,8 @@ async function handleSave() {
         gitlabInstances,
         googleSheetId: editSheetId.value.trim() || null,
         sheetNames: editSelectedSheets.value,
-        teamStructure
+        teamStructure,
+        excludedTitles: editExcludedTitles.value
       })
     } catch (err) {
       if (orgConfigSaveError) {
@@ -919,12 +984,14 @@ async function handleSave() {
     // Detect if structure-affecting fields changed
     const currentOrgRoots = JSON.stringify(orgRoots)
     const currentOrgMapping = JSON.stringify(orgConfig.value.orgNameMapping || {})
+    const currentExcludedTitles = JSON.stringify(editExcludedTitles.value)
     const structureAffecting =
       currentOrgRoots !== savedOrgRoots ||
       editSheetId.value !== savedSheetId ||
       editNameColumn.value !== savedNameColumn ||
       editTeamGroupingColumn.value !== savedTeamGroupingColumn ||
-      currentOrgMapping !== savedOrgNameMapping
+      currentOrgMapping !== savedOrgNameMapping ||
+      currentExcludedTitles !== savedExcludedTitles
 
     // Update snapshots
     savedOrgRoots = currentOrgRoots
@@ -932,6 +999,7 @@ async function handleSave() {
     savedNameColumn = editNameColumn.value
     savedTeamGroupingColumn = editTeamGroupingColumn.value
     savedOrgNameMapping = currentOrgMapping
+    savedExcludedTitles = currentExcludedTitles
 
     saveMessage.value = 'Configuration saved.'
     emit('toast', { message: 'Configuration saved', type: 'success' })

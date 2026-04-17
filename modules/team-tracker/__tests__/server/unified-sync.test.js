@@ -47,8 +47,7 @@ vi.mock('../../../../shared/server/roster-sync/sheets', () => ({
 vi.mock('../../../../shared/server/roster', () => ({
   readRosterFull: vi.fn(() => null),
   getAllPeople: vi.fn(() => []),
-  getTeamRollup: vi.fn(() => []),
-  EXCLUDED_TITLES: []
+  getTeamRollup: vi.fn(() => [])
 }))
 
 vi.mock('../../../../shared/server/auth', () => ({

@@ -32,11 +32,11 @@ function mergePerson(existing, fresh, orgRootUid, now) {
         costCenter: fresh.costCenter,
         managerUid: fresh.managerUid,
         orgRoot: orgRootUid,
-        github: fresh._githubFromLdap
-          ? { username: fresh._githubFromLdap, source: 'ldap' }
+        github: fresh.githubUsername
+          ? { username: fresh.githubUsername, source: 'ldap' }
           : null,
-        gitlab: fresh._gitlabFromLdap
-          ? { username: fresh._gitlabFromLdap, source: 'ldap' }
+        gitlab: fresh.gitlabUsername
+          ? { username: fresh.gitlabUsername, source: 'ldap' }
           : null,
         status: 'active',
         firstSeenAt: now,
@@ -71,12 +71,12 @@ function mergePerson(existing, fresh, orgRootUid, now) {
   }
 
   if (!existing.github || existing.github.source !== 'manual') {
-    if (fresh._githubFromLdap) {
+    if (fresh.githubUsername) {
       var oldGh = existing.github ? existing.github.username : null;
-      if (oldGh !== fresh._githubFromLdap) {
-        changes.push({ uid: fresh.uid, field: 'github', from: oldGh || '', to: fresh._githubFromLdap });
+      if (oldGh !== fresh.githubUsername) {
+        changes.push({ uid: fresh.uid, field: 'github', from: oldGh || '', to: fresh.githubUsername });
       }
-      merged.github = { username: fresh._githubFromLdap, source: 'ldap' };
+      merged.github = { username: fresh.githubUsername, source: 'ldap' };
     } else if (existing.github && existing.github.source === 'ldap') {
       changes.push({ uid: fresh.uid, field: 'github', from: existing.github.username, to: '' });
       merged.github = null;
@@ -84,12 +84,12 @@ function mergePerson(existing, fresh, orgRootUid, now) {
   }
 
   if (!existing.gitlab || existing.gitlab.source !== 'manual') {
-    if (fresh._gitlabFromLdap) {
+    if (fresh.gitlabUsername) {
       var oldGl = existing.gitlab ? existing.gitlab.username : null;
-      if (oldGl !== fresh._gitlabFromLdap) {
-        changes.push({ uid: fresh.uid, field: 'gitlab', from: oldGl || '', to: fresh._gitlabFromLdap });
+      if (oldGl !== fresh.gitlabUsername) {
+        changes.push({ uid: fresh.uid, field: 'gitlab', from: oldGl || '', to: fresh.gitlabUsername });
       }
-      merged.gitlab = { username: fresh._gitlabFromLdap, source: 'ldap' };
+      merged.gitlab = { username: fresh.gitlabUsername, source: 'ldap' };
     } else if (existing.gitlab && existing.gitlab.source === 'ldap') {
       changes.push({ uid: fresh.uid, field: 'gitlab', from: existing.gitlab.username, to: '' });
       merged.gitlab = null;
