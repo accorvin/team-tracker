@@ -6,9 +6,12 @@
     <!-- Header -->
     <div class="flex items-start justify-between mb-2">
       <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">{{ team.name }}</h3>
-      <span class="text-lg font-bold text-primary-600">{{ team.memberCount || 0 }}</span>
+      <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ team.memberCount || 0 }} members</span>
     </div>
-    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ team.org }}</p>
+    <div class="flex items-start gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-3">
+      <span class="text-gray-400 dark:text-gray-500 shrink-0">Org:</span>
+      <span>{{ team.org }}</span>
+    </div>
 
     <!-- PMs & Eng Lead -->
     <div class="space-y-1 mb-3 text-sm text-gray-600 dark:text-gray-400">
@@ -23,7 +26,9 @@
     </div>
 
     <!-- Components -->
-    <div v-if="team.components && team.components.length > 0" class="flex flex-wrap gap-1 mb-3">
+    <div v-if="team.components && team.components.length > 0" class="mb-3">
+      <span class="text-xs text-gray-400 dark:text-gray-500 mb-1 block">Components:</span>
+      <div class="flex flex-wrap gap-1">
       <span
         v-for="comp in team.components.slice(0, 3)"
         :key="comp"
@@ -37,6 +42,7 @@
       >
         +{{ team.components.length - 3 }} more
       </span>
+      </div>
     </div>
 
     <!-- Footer: Board link + RFE count -->
