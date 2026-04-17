@@ -448,6 +448,10 @@ onMounted(async () => {
   ])
   if (orgCfg) {
     orgConfig.value = orgCfg
+    // Auto-run detect if mappings exist so all orgs (auto-matched + saved) are shown
+    if (Object.keys(orgCfg.orgNameMapping || {}).length > 0) {
+      handleDetectOrgs()
+    }
   }
   populateForm()
 })
