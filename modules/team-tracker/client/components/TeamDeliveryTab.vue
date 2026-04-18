@@ -6,6 +6,7 @@
         label="Issues Resolved"
         :value="teamMetrics?.aggregate?.resolvedCount"
         subtitle="Last year"
+        clickable
         @click="showResolvedIssues = true"
       />
       <MetricCard

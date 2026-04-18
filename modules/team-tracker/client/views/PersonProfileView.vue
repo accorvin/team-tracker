@@ -49,6 +49,8 @@ const jiraMetrics = ref(null)
 const loading = ref(true)
 const error = ref(null)
 
+const showResolvedIssues = ref(true)
+const showInProgressIssues = ref(true)
 const editField = ref(null)
 const editValue = ref('')
 const editSaving = ref(false)
@@ -277,12 +279,12 @@ onMounted(() => {
                   <div class="text-[10px] text-gray-400 dark:text-gray-500">90 days</div>
                 </div>
                 <div>
-                  <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ jiraMetrics.resolved?.totalPoints || 0 }}</div>
+                  <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ jiraMetrics.resolved?.storyPoints || 0 }}</div>
                   <div class="text-xs text-gray-500 dark:text-gray-400">Story Points</div>
                   <div class="text-[10px] text-gray-400 dark:text-gray-500">90 days</div>
                 </div>
                 <div>
-                  <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ jiraMetrics.cycleTime?.averageDays != null ? jiraMetrics.cycleTime.averageDays + 'd' : '—' }}</div>
+                  <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ jiraMetrics.cycleTime?.avgDays != null ? jiraMetrics.cycleTime.avgDays + 'd' : '—' }}</div>
                   <div class="text-xs text-gray-500 dark:text-gray-400">Avg Cycle Time</div>
                 </div>
               </template>
@@ -296,6 +298,94 @@ onMounted(() => {
                 <div class="text-xs text-gray-500 dark:text-gray-400">GitLab Contributions</div>
                 <div class="text-[10px] text-gray-400 dark:text-gray-500">Last year</div>
               </div>
+            </div>
+          </div>
+
+          <!-- In-Progress Issues (collapsible) -->
+          <div v-if="jiraMetrics?.inProgress?.issues?.length" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <button
+              @click="showInProgressIssues = !showInProgressIssues"
+              class="w-full px-6 py-4 flex items-center justify-between text-left"
+            >
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
+                In Progress <span class="font-normal text-gray-400 normal-case tracking-normal">({{ jiraMetrics.inProgress.issues.length }})</span>
+              </h3>
+              <svg
+                class="h-4 w-4 text-gray-400 dark:text-gray-500 transition-transform"
+                :class="{ 'rotate-180': showInProgressIssues }"
+                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+            <div v-if="showInProgressIssues" class="border-t border-gray-200 dark:border-gray-700 overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-800">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Key</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Summary</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Points</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                  <tr v-for="issue in jiraMetrics.inProgress.issues" :key="issue.key" class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td class="px-4 py-2 text-sm">
+                      <a :href="`https://redhat.atlassian.net/browse/${issue.key}`" target="_blank" class="text-primary-600 hover:underline">{{ issue.key }}</a>
+                    </td>
+                    <td class="px-4 py-2 text-sm text-gray-900 dark:text-gray-100 max-w-md truncate">{{ issue.summary }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">{{ issue.issueType }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">{{ issue.status }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">{{ issue.storyPoints || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Resolved Issues (collapsible) -->
+          <div v-if="jiraMetrics?.resolved?.issues?.length" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <button
+              @click="showResolvedIssues = !showResolvedIssues"
+              class="w-full px-6 py-4 flex items-center justify-between text-left"
+            >
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
+                Resolved Issues <span class="font-normal text-gray-400 normal-case tracking-normal">({{ jiraMetrics.resolved.issues.length }})</span>
+              </h3>
+              <svg
+                class="h-4 w-4 text-gray-400 dark:text-gray-500 transition-transform"
+                :class="{ 'rotate-180': showResolvedIssues }"
+                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+            <div v-if="showResolvedIssues" class="border-t border-gray-200 dark:border-gray-700 overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-800">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Key</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Summary</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Points</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cycle Time</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Resolved</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                  <tr v-for="issue in jiraMetrics.resolved.issues" :key="issue.key" class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td class="px-4 py-2 text-sm">
+                      <a :href="`https://redhat.atlassian.net/browse/${issue.key}`" target="_blank" class="text-primary-600 hover:underline">{{ issue.key }}</a>
+                    </td>
+                    <td class="px-4 py-2 text-sm text-gray-900 dark:text-gray-100 max-w-md truncate">{{ issue.summary }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">{{ issue.issueType }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">{{ issue.storyPoints || '—' }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ issue.cycleTimeDays != null ? `${Math.round(issue.cycleTimeDays)}d` : '—' }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ issue.resolutionDate ? new Date(issue.resolutionDate).toLocaleDateString() : '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
