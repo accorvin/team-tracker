@@ -2,9 +2,16 @@
 import { ref, computed, onMounted, watch, inject } from 'vue'
 import { apiRequest } from '@shared/client/services/api.js'
 import { useAuth } from '@shared/client/composables/useAuth.js'
+import { useRoster } from '@shared/client/composables/useRoster.js'
 
 const nav = inject('moduleNav')
 const { isAdmin } = useAuth()
+const { getTeamsForPerson } = useRoster()
+
+const personTeams = computed(() => {
+  if (!person.value) return []
+  return getTeamsForPerson(person.value.name)
+})
 
 const person = ref(null)
 const managerChain = ref([])
@@ -240,8 +247,27 @@ onMounted(loadPerson)
           </div>
         </div>
 
-        <!-- Sidebar: Manager Chain + Direct Reports -->
+        <!-- Sidebar: Teams + Manager Chain + Direct Reports -->
         <div class="space-y-6">
+          <div v-if="personTeams.length > 0" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4 uppercase tracking-wider">
+              Teams <span class="font-normal text-gray-400">({{ personTeams.length }})</span>
+            </h3>
+            <div class="space-y-2">
+              <button
+                v-for="t in personTeams"
+                :key="t.key"
+                @click="nav.navigateTo('team-detail', { teamKey: t.key })"
+                class="w-full text-left flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+              >
+                <svg class="h-4 w-4 text-gray-400 dark:text-gray-500 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span class="text-sm text-primary-600 dark:text-primary-400 truncate">{{ t.displayName }}</span>
+              </button>
+            </div>
+          </div>
+
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4 uppercase tracking-wider">Manager Chain</h3>
             <div v-if="managerChain.length === 0" class="text-sm text-gray-400 dark:text-gray-500">No managers found</div>
@@ -263,12 +289,11 @@ onMounted(loadPerson)
             </div>
           </div>
 
-          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div v-if="directReports.length > 0" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4 uppercase tracking-wider">
-              Direct Reports <span v-if="directReports.length > 0" class="font-normal text-gray-400">({{ directReports.length }})</span>
+              Direct Reports <span class="font-normal text-gray-400">({{ directReports.length }})</span>
             </h3>
-            <div v-if="directReports.length === 0" class="text-sm text-gray-400 dark:text-gray-500">No direct reports</div>
-            <div v-else class="space-y-2">
+            <div class="space-y-2">
               <button
                 v-for="dr in directReports"
                 :key="dr.uid"

@@ -57,7 +57,17 @@
           </div>
           <div v-if="teamDetail.engLeads?.length > 0" class="flex items-start gap-1.5">
             <span class="text-gray-400 dark:text-gray-500 shrink-0">Eng Lead:</span>
-            <span>{{ teamDetail.engLeads.join(', ') }}</span>
+            <span>
+              <template v-for="(lead, i) in teamDetail.engLeads" :key="i">
+                <template v-if="i > 0">, </template>
+                <button
+                  v-if="memberUidByName.get(lead)"
+                  @click="navigateToPerson(lead)"
+                  class="text-primary-600 dark:text-primary-400 hover:underline"
+                >{{ lead }}</button>
+                <span v-else>{{ lead }}</span>
+              </template>
+            </span>
           </div>
           <div v-if="boardLinks.length > 0" class="flex items-center gap-1.5">
             <span class="text-gray-400 dark:text-gray-500 shrink-0">Board{{ boardLinks.length > 1 ? 's' : '' }}:</span>
@@ -223,6 +233,24 @@ async function fetchTeamMetrics() {
     })
   } catch (error) {
     console.error('Failed to fetch team metrics:', error)
+  }
+}
+
+// --- People lookup (name -> uid) for linking ---
+const memberUidByName = computed(() => {
+  const map = new Map()
+  for (const t of allTeams.value) {
+    for (const m of t.members) {
+      if (m.name && m.uid) map.set(m.name, m.uid)
+    }
+  }
+  return map
+})
+
+function navigateToPerson(name) {
+  const uid = memberUidByName.value.get(name)
+  if (uid) {
+    nav.navigateTo('person-detail', { uid })
   }
 }
 
