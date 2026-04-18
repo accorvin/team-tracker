@@ -18,6 +18,7 @@ vi.mock('@shared/client/composables/useRoster', () => ({
         ]
       }
     ]),
+    loading: ref(false),
     multiTeamMembers: ref(new Set()),
     getTeamsForPerson: () => ['Model Serving'],
     visibleFields: ref([]),

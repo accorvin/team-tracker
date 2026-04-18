@@ -41,6 +41,7 @@ async function cachedRequest(cacheKey, path, onData) {
 
 // Shared reactive state
 const teams = ref([])
+const unassigned = ref([])
 const people = ref([])
 const orgs = ref([])
 const selectedOrg = ref(null)
@@ -59,6 +60,7 @@ export function useOrgRoster() {
       const cacheKey = orgFilter ? `teams:${orgFilter}` : 'teams:all'
       await cachedRequest(cacheKey, path, (data) => {
         teams.value = data.teams || []
+        unassigned.value = data.unassigned || []
         fetchedAt.value = data.fetchedAt || null
       })
     } catch (err) {
@@ -179,6 +181,7 @@ export function useOrgRoster() {
 
   return {
     teams,
+    unassigned,
     people,
     orgs,
     selectedOrg,

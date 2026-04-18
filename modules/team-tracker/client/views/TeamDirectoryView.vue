@@ -1,11 +1,12 @@
 <script setup>
-import { onMounted, inject } from 'vue'
+import { ref, onMounted, inject } from 'vue'
 import { useOrgRoster } from '../composables/useOrgRoster'
 import OrgSelector from '../components/OrgSelector.vue'
 import TeamCard from '../components/TeamCard.vue'
 
 const nav = inject('moduleNav')
-const { orgs, selectedOrg, loading, searchQuery, sortBy, filteredTeams, loadTeams, loadOrgs } = useOrgRoster()
+const { orgs, selectedOrg, loading, searchQuery, sortBy, filteredTeams, unassigned, loadTeams, loadOrgs } = useOrgRoster()
+const unassignedExpanded = ref(false)
 
 function openTeam(team) {
   nav.navigateTo('team-detail', { teamKey: `${team.org}::${team.name}` })
@@ -57,6 +58,42 @@ onMounted(async () => {
       @select="selectOrg"
       class="mb-6"
     />
+
+    <!-- Unassigned people banner -->
+    <div v-if="unassigned.length > 0 && !loading" class="mb-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-lg">
+      <button
+        @click="unassignedExpanded = !unassignedExpanded"
+        class="w-full flex items-center justify-between px-4 py-3 text-left"
+      >
+        <div class="flex items-center gap-2">
+          <svg class="h-4 w-4 text-amber-500 dark:text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="text-sm font-medium text-amber-800 dark:text-amber-300">
+            {{ unassigned.length }} {{ unassigned.length === 1 ? 'person' : 'people' }} not assigned to any team
+          </span>
+        </div>
+        <svg
+          class="h-4 w-4 text-amber-500 dark:text-amber-400 transition-transform"
+          :class="{ 'rotate-180': unassignedExpanded }"
+          xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <div v-if="unassignedExpanded" class="px-4 pb-3">
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="person in unassigned"
+            :key="person.name"
+            class="inline-flex items-center px-2.5 py-1 rounded-md text-xs bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-800/30 text-gray-700 dark:text-gray-300"
+            :title="[person.title, person.org].filter(Boolean).join(' · ')"
+          >
+            {{ person.name }}
+          </span>
+        </div>
+      </div>
+    </div>
 
     <div v-if="loading" class="flex items-center justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>

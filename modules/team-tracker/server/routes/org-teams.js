@@ -99,23 +99,34 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
       const boards = (team.boardUrls || []).map(url => ({ url, name: boardNames[url] || null }));
 
       return { ...team, boards, engLeads, productManagers, headcount: counts, components, memberCount: teamPeople.length, jiraFilter };
-    });
+    }).filter(t => t.memberCount > 0);
 
-    return { teams, fetchedAt: metaData.fetchedAt };
+    // Find people with no team assignment
+    const relevantPeople = orgFilter
+      ? allPeople.filter(p => (orgKeyToDisplay[p.orgKey] || '') === orgFilter)
+      : allPeople;
+    const unassigned = relevantPeople
+      .filter(p => {
+        const grouping = p._teamGrouping || p.miroTeam || '';
+        return !grouping.trim();
+      })
+      .map(p => ({ name: p.name, orgKey: p.orgKey, org: orgKeyToDisplay[p.orgKey] || p.orgKey, title: p.title || '' }));
+
+    return { teams, unassigned, fetchedAt: metaData.fetchedAt };
   }
 
   // ─── GET /org-teams ───
 
   router.get('/org-teams', function(req, res) {
     try {
-      const { teams, fetchedAt } = buildEnrichedTeams(req.query.org);
+      const { teams, unassigned, fetchedAt } = buildEnrichedTeams(req.query.org);
       const rfeData = readFromStorage('org-roster/rfe-backlog.json');
       const enriched = rfeData ? teams.map(function(t) {
         const teamKey = `${t.org}::${t.name}`;
         const rfe = rfeData.byTeam?.[teamKey];
         return { ...t, rfeCount: rfe?.count || 0 };
       }) : teams;
-      res.json({ teams: enriched, fetchedAt });
+      res.json({ teams: enriched, unassigned, fetchedAt });
     } catch (error) {
       console.error('[team-tracker] GET /org-teams error:', error);
       res.status(500).json({ error: 'Failed to load team data' });

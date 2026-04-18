@@ -1,8 +1,22 @@
 <template>
   <div>
     <!-- Loading state when team not yet resolved from roster -->
-    <div v-if="!team" class="flex items-center justify-center py-12">
+    <div v-if="!team && rosterLoading" class="flex items-center justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    </div>
+
+    <!-- Team not found after roster loaded -->
+    <div v-else-if="!team" class="flex flex-col items-center justify-center py-12 text-center">
+      <svg class="h-12 w-12 text-gray-300 dark:text-gray-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+      <p class="text-gray-500 dark:text-gray-400 text-sm">This team has no members or could not be found.</p>
+      <button
+        @click="nav.goBack()"
+        class="mt-4 px-4 py-2 text-sm text-primary-600 dark:text-primary-400 hover:underline"
+      >
+        Back to directory
+      </button>
     </div>
 
     <template v-else>
@@ -166,7 +180,7 @@ import { useOrgRoster } from '../composables/useOrgRoster'
 import { refreshMetrics, getTeamMetrics } from '@shared/client/services/api'
 
 const nav = inject('moduleNav')
-const { teams: allTeams } = useRoster()
+const { teams: allTeams, loading: rosterLoading } = useRoster()
 const { loadTeamDetail, loadRfeConfig } = useOrgRoster()
 const { loadGitlabStats } = useGitlabStats()
 const { isAdmin } = useAuth()
