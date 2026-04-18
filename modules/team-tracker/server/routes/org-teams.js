@@ -50,6 +50,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
     const map = {};
     for (const person of allPeople) {
       const orgDisplay = orgKeyToDisplay[person.orgKey] || '';
+      if (!orgDisplay) continue;
       const groupingValue = person._teamGrouping || person.miroTeam || '';
       const teamNames = groupingValue ? groupingValue.split(',').map(t => t.trim()).filter(Boolean) : [];
       for (const teamName of teamNames) {
@@ -110,7 +111,6 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
 
       teams.push({ org, name, boardUrls: teamBoardUrls, boards, engLeads, productManagers, headcount: counts, components, memberCount: teamPeople.length, jiraFilter });
     }
-
 
     // Find people with no team assignment
     const relevantPeople = orgFilter
