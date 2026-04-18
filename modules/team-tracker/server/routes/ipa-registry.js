@@ -6,6 +6,8 @@
 
 const ipaClient = require('../../../../shared/server/roster-sync/ipa-client');
 const { mergePerson, computeCoverage, processLifecycle } = require('../../../../shared/server/roster-sync/lifecycle');
+const { getAllPeople } = require('../../../../shared/server/roster');
+const { getOrgDisplayNames } = require('../../../../shared/server/roster-sync/config');
 
 const REGISTRY_KEY = 'team-data/registry.json';
 const SYNC_LOG_KEY = 'team-data/sync-log.json';
@@ -226,6 +228,18 @@ function registerIpaRegistryRoutes(router, context) {
     var result = [];
     var uids = Object.keys(people);
 
+    // Build team lookup from roster data
+    var orgDisplayNames = getOrgDisplayNames(storage);
+    var rosterPeople = getAllPeople(storage);
+    var teamsByUid = {};
+    for (var r = 0; r < rosterPeople.length; r++) {
+      var rp = rosterPeople[r];
+      if (!rp.uid) continue;
+      var grouping = rp._teamGrouping || rp.miroTeam || '';
+      var teams = grouping.split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+      teamsByUid[rp.uid] = teams;
+    }
+
     for (var i = 0; i < uids.length; i++) {
       var p = people[uids[i]];
       if (req.query.status && p.status !== req.query.status) continue;
@@ -237,7 +251,10 @@ function registerIpaRegistryRoutes(router, context) {
         var searchable = [p.name, p.email, p.uid, p.github ? p.github.username : '', p.gitlab ? p.gitlab.username : ''].join(' ').toLowerCase();
         if (searchable.indexOf(term) === -1) continue;
       }
-      result.push(p);
+      result.push(Object.assign({}, p, {
+        orgDisplayName: orgDisplayNames[p.orgRoot] || p.orgRoot || '',
+        teams: teamsByUid[p.uid] || []
+      }));
     }
     res.json({ people: result, total: result.length });
   });

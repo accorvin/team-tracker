@@ -33,8 +33,8 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
 
   function getOrgConfig() {
     return readFromStorage('org-roster/config.json') || {
-      teamBoardsTab: 'Scrum Team Boards',
-      componentsTab: 'Summary: components per team',
+      teamBoardsTab: '',
+      componentsTab: '',
       jiraProject: 'RHAIRFE',
       rfeIssueType: 'Feature Request',
       orgNameMapping: {},
@@ -50,6 +50,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
     const map = {};
     for (const person of allPeople) {
       const orgDisplay = orgKeyToDisplay[person.orgKey] || '';
+      if (!orgDisplay) continue;
       const groupingValue = person._teamGrouping || person.miroTeam || '';
       const teamNames = groupingValue ? groupingValue.split(',').map(t => t.trim()).filter(Boolean) : [];
       for (const teamName of teamNames) {
@@ -65,27 +66,29 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
     const metaData = readFromStorage('org-roster/teams-metadata.json');
     const compData = readFromStorage('org-roster/components.json');
     const componentMap = compData?.components || {};
+    const boardNames = metaData?.boardNames || {};
 
-    if (!metaData || !metaData.teams) return { teams: [], fetchedAt: null };
+    // Build a lookup of metadata by composite key for enrichment
+    const metaByKey = {};
+    if (metaData?.teams) {
+      for (const mt of metaData.teams) {
+        metaByKey[`${mt.org}::${mt.name}`] = mt;
+      }
+    }
 
-    const boardNames = metaData.boardNames || {};
-    let rawTeams = metaData.teams;
-    if (orgFilter) rawTeams = rawTeams.filter(t => t.org === orgFilter);
-
+    // Teams are derived from people's _teamGrouping values (the source of truth)
     const allPeople = getAllPeople(storage);
     const orgKeyToDisplay = buildOrgKeyToDisplayName();
     const orgTeamPeopleMap = groupPeopleByOrgTeam(allPeople, orgKeyToDisplay);
 
-    const teams = rawTeams.map(function(team) {
-      const compositeKey = `${team.org}::${team.name}`;
-      const teamPeople = orgTeamPeopleMap[compositeKey] || [];
+    const teams = [];
+    for (const [compositeKey, teamPeople] of Object.entries(orgTeamPeopleMap)) {
+      const sepIdx = compositeKey.indexOf('::');
+      const org = compositeKey.substring(0, sepIdx);
+      const name = compositeKey.substring(sepIdx + 2);
+      if (orgFilter && org !== orgFilter) continue;
+
       const counts = calculateHeadcountByRole(teamPeople);
-
-      const components = [];
-      for (const [comp, teamNames] of Object.entries(componentMap)) {
-        if (teamNames.includes(team.name)) components.push(comp);
-      }
-
       const engLeads = getTeamRollup(teamPeople, 'engineeringLead');
       const productManagers = getTeamRollup(teamPeople, 'productManager');
 
@@ -96,10 +99,18 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
       }
       const jiraFilter = Object.entries(filterCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
-      const boards = (team.boardUrls || []).map(url => ({ url, name: boardNames[url] || null }));
+      // Enrich with metadata (board URLs, etc.) if available
+      const meta = metaByKey[compositeKey];
+      const teamBoardUrls = meta?.boardUrls || [];
+      const boards = teamBoardUrls.map(url => ({ url, name: boardNames[url] || null }));
 
-      return { ...team, boards, engLeads, productManagers, headcount: counts, components, memberCount: teamPeople.length, jiraFilter };
-    }).filter(t => t.memberCount > 0);
+      const components = [];
+      for (const [comp, teamNames] of Object.entries(componentMap)) {
+        if (teamNames.includes(name)) components.push(comp);
+      }
+
+      teams.push({ org, name, boardUrls: teamBoardUrls, boards, engLeads, productManagers, headcount: counts, components, memberCount: teamPeople.length, jiraFilter });
+    }
 
     // Find people with no team assignment
     const relevantPeople = orgFilter
@@ -113,7 +124,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
       .map(p => ({ name: p.name, orgKey: p.orgKey, org: orgKeyToDisplay[p.orgKey] || p.orgKey, title: p.title || '' }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    return { teams, unassigned, fetchedAt: metaData.fetchedAt };
+    return { teams, unassigned, fetchedAt: metaData?.fetchedAt || null };
   }
 
   // ─── GET /org-teams ───
@@ -186,18 +197,20 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
 
   router.get('/org-list', function(req, res) {
     try {
-      const metaData = readFromStorage('org-roster/teams-metadata.json');
-      if (!metaData) return res.json({ orgs: [] });
-
-      const orgMap = {};
-      for (const team of metaData.teams) {
-        if (!orgMap[team.org]) orgMap[team.org] = { name: team.org, teamCount: 0 };
-        orgMap[team.org].teamCount++;
-      }
-
+      // Derive orgs and team counts from people data (source of truth)
       const allPeople = getAllPeople(storage);
       const orgKeyToDisplay = buildOrgKeyToDisplayName();
+      const orgTeamPeopleMap = groupPeopleByOrgTeam(allPeople, orgKeyToDisplay);
+
+      const orgMap = {};
       const orgPeople = {};
+      for (const [compositeKey] of Object.entries(orgTeamPeopleMap)) {
+        const sepIdx = compositeKey.indexOf('::');
+        const org = compositeKey.substring(0, sepIdx);
+        if (!orgMap[org]) orgMap[org] = { name: org, teamCount: 0 };
+        orgMap[org].teamCount++;
+      }
+
       for (const person of allPeople) {
         const personOrg = orgKeyToDisplay[person.orgKey] || '';
         if (!personOrg || !orgMap[personOrg]) continue;
@@ -406,12 +419,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
     if (orgSyncInProgress) return { status: 'already_running' };
     orgSyncInProgress = true;
 
-    const sheetId = getSheetId();
-    if (!sheetId) {
-      orgSyncInProgress = false;
-      return { status: 'skipped', reason: 'No Google Sheet ID configured.' };
-    }
-
+    const sheetId = getSheetId();  // may be null — runSync handles it
     const config = getOrgConfig();
 
     try {
@@ -444,11 +452,6 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
   router.post('/org-sync/trigger', requireAdmin, async function(req, res) {
     if (orgSyncInProgress) return res.status(409).json({ error: 'Sync already in progress' });
 
-    const sheetId = getSheetId();
-    if (!sheetId) {
-      return res.status(400).json({ error: 'No Google Sheet ID configured.' });
-    }
-
     res.json({ status: 'started' });
     triggerOrgSync();
   });
@@ -457,23 +460,20 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
 
   if (!DEMO_MODE) {
     setTimeout(function() {
-      const sheetId = getSheetId();
-      if (sheetId) {
-        const rosterData = readFromStorage('org-roster-full.json');
-        if (rosterData) {
-          triggerOrgSync().catch(function(err) {
-            console.error('[team-tracker] Initial org sync error:', err.message);
-          });
-        }
-
-        if (orgDailyTimer) clearInterval(orgDailyTimer);
-        orgDailyTimer = setInterval(function() {
-          triggerOrgSync().catch(function(err) {
-            console.error('[team-tracker] Scheduled org sync error:', err.message);
-          });
-        }, TWENTY_FOUR_HOURS);
-        if (orgDailyTimer.unref) orgDailyTimer.unref();
+      const rosterData = readFromStorage('org-roster-full.json');
+      if (rosterData) {
+        triggerOrgSync().catch(function(err) {
+          console.error('[team-tracker] Initial org sync error:', err.message);
+        });
       }
+
+      if (orgDailyTimer) clearInterval(orgDailyTimer);
+      orgDailyTimer = setInterval(function() {
+        triggerOrgSync().catch(function(err) {
+          console.error('[team-tracker] Scheduled org sync error:', err.message);
+        });
+      }, TWENTY_FOUR_HOURS);
+      if (orgDailyTimer.unref) orgDailyTimer.unref();
     }, 5 * 60 * 1000);
   }
 };

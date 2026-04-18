@@ -2407,7 +2407,7 @@ module.exports = function registerRoutes(router, context) {
           orgRootUids: (syncConfig.orgRoots || []).map(function(r) { return r.uid }),
           googleSheetId: syncConfig.googleSheetId || null,
           hasTeamStructure: !!(syncConfig.teamStructure),
-          teamGroupingColumn: syncConfig.teamStructure?.groupingColumn || null,
+          teamGroupingColumn: syncConfig.teamStructure?.teamGroupingColumn || null,
           customFieldCount: syncConfig.teamStructure?.customFields?.length || 0,
           githubOrgs: syncConfig.githubOrgs || [],
           gitlabGroups: syncConfig.gitlabGroups || [],

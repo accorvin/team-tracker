@@ -1,7 +1,8 @@
 /**
- * Google Sheets sync for org roster metadata.
- * Fetches team-level data from "Scrum Team Boards" tab and
- * component mapping from "Summary components per team" tab.
+ * Org roster metadata sync and team derivation.
+ * Optionally fetches team-level data from a configurable spreadsheet tab
+ * and component mapping. When no sheet is configured or the fetch fails,
+ * teams are derived from people's _teamGrouping values in the roster.
  *
  * People data comes from shared/server/roster.js (reads org-roster-full.json
  * populated by team-tracker's roster-sync).
@@ -9,6 +10,7 @@
 
 const { fetchRawSheet } = require('../../../shared/server/google-sheets');
 const { getOrgDisplayNames } = require('../../../shared/server/roster-sync/config');
+const { getAllPeople } = require('../../../shared/server/roster');
 
 /**
  * Parse the "Scrum Team Boards" tab into team metadata objects.
@@ -175,7 +177,7 @@ function calculateHeadcountByRole(people) {
     totalHeadcount++;
 
     // FTE: if a person is on multiple teams, they're split
-    const miroTeam = person.miroTeam || person._teamGrouping || '';
+    const miroTeam = person._teamGrouping || person.miroTeam || '';
     const teamCount = miroTeam ? miroTeam.split(',').filter(t => t.trim()).length : 1;
     const personFte = 1 / Math.max(teamCount, 1);
     fte[role] = (fte[role] || 0) + personFte;
@@ -270,12 +272,38 @@ async function resolveBoardNames(teams) {
 }
 
 /**
+ * Derive teams from people's _teamGrouping (or miroTeam) values.
+ * Used as a fallback when no team-boards spreadsheet tab is configured or available.
+ */
+function deriveTeamsFromPeople(storage) {
+  const allPeople = getAllPeople(storage);
+  const orgDisplayNames = getOrgDisplayNames(storage);
+  const teamSet = new Map();
+
+  for (const person of allPeople) {
+    const org = orgDisplayNames[person.orgKey] || '';
+    if (!org) continue;
+    const grouping = person._teamGrouping || person.miroTeam || '';
+    const teamNames = grouping.split(',').map(t => t.trim()).filter(Boolean);
+    for (const teamName of teamNames) {
+      const key = `${org}::${teamName}`;
+      if (!teamSet.has(key)) {
+        teamSet.set(key, { org, name: teamName, boardUrls: [] });
+      }
+    }
+  }
+
+  return [...teamSet.values()];
+}
+
+/**
  * Run a sync of metadata tabs from Google Sheets.
  * Does NOT sync people (those come from team-tracker's roster-sync via shared/server/roster.js).
+ * sheetId may be null — in that case, teams are derived from people data.
  */
 async function runSync(storage, sheetId, config) {
-  const teamBoardsTab = config?.teamBoardsTab || 'Scrum Team Boards';
-  const componentsTab = config?.componentsTab || 'Summary: components per team';
+  const teamBoardsTab = config?.teamBoardsTab || null;
+  const componentsTab = config?.componentsTab || null;
   const orgNameMapping = config?.orgNameMapping || {};
 
   console.log('[org-roster sync] Starting metadata sync...');
@@ -287,60 +315,75 @@ async function runSync(storage, sheetId, config) {
     console.warn('[org-roster sync] No org roots configured — sync will include all orgs from sheet');
   }
 
-  // 1. Fetch and parse Scrum Team Boards
-  console.log(`[org-roster sync] Fetching "${teamBoardsTab}"...`);
-  const boardData = await fetchRawSheet(sheetId, teamBoardsTab);
-  const allTeams = parseTeamBoardsTab(boardData.headers, boardData.rows);
-  console.log(`[org-roster sync] Found ${allTeams.length} teams in sheet`);
+  // 1. Fetch and parse Scrum Team Boards (conditional + try/catch)
+  let rawTeams = [];
+  if (teamBoardsTab && sheetId) {
+    try {
+      console.log(`[org-roster sync] Fetching "${teamBoardsTab}"...`);
+      const boardData = await fetchRawSheet(sheetId, teamBoardsTab);
+      const allTeams = parseTeamBoardsTab(boardData.headers, boardData.rows);
+      console.log(`[org-roster sync] Found ${allTeams.length} teams in sheet`);
 
-  // 2. Map sheet org names and filter to configured orgs
-  let rawTeams;
-  if (configuredOrgNames.size > 0) {
-    rawTeams = [];
-    const skippedOrgs = new Set();
-    for (const team of allTeams) {
-      const mappedOrg = orgNameMapping[team.org] || team.org;
-      if (configuredOrgNames.has(mappedOrg)) {
-        rawTeams.push({ ...team, org: mappedOrg });
+      // 2. Map sheet org names and filter to configured orgs
+      if (configuredOrgNames.size > 0) {
+        const skippedOrgs = new Set();
+        for (const team of allTeams) {
+          const mappedOrg = orgNameMapping[team.org] || team.org;
+          if (configuredOrgNames.has(mappedOrg)) {
+            rawTeams.push({ ...team, org: mappedOrg });
+          } else {
+            skippedOrgs.add(team.org);
+          }
+        }
+        if (skippedOrgs.size > 0) {
+          console.log(`[org-roster sync] Skipped unconfigured orgs: ${[...skippedOrgs].join(', ')}`);
+        }
+        console.log(`[org-roster sync] Kept ${rawTeams.length} teams in ${configuredOrgNames.size} configured orgs`);
       } else {
-        skippedOrgs.add(team.org);
+        rawTeams = allTeams;
       }
+    } catch (err) {
+      console.warn(`[org-roster sync] Failed to fetch team boards tab: ${err.message}`);
     }
-    if (skippedOrgs.size > 0) {
-      console.log(`[org-roster sync] Skipped unconfigured orgs: ${[...skippedOrgs].join(', ')}`);
-    }
-    console.log(`[org-roster sync] Kept ${rawTeams.length} teams in ${configuredOrgNames.size} configured orgs`);
-  } else {
-    rawTeams = allTeams;
+  }
+
+  // Fallback: derive teams from people data
+  if (rawTeams.length === 0) {
+    rawTeams = deriveTeamsFromPeople(storage);
+    console.log(`[org-roster sync] Derived ${rawTeams.length} teams from people data`);
   }
 
   // 3. Fetch and parse component mapping, filtered to kept teams
   const keptTeamNames = new Set(rawTeams.map(t => t.name));
   let componentMap = {};
-  try {
-    console.log(`[org-roster sync] Fetching "${componentsTab}"...`);
-    const compData = await fetchRawSheet(sheetId, componentsTab);
-    const allComponents = parseComponentsTab(compData.headers, compData.rows);
-    // Filter to only components associated with kept teams
-    for (const [comp, teamNames] of Object.entries(allComponents)) {
-      const filtered = teamNames.filter(t => keptTeamNames.has(t));
-      if (filtered.length > 0) {
-        componentMap[comp] = filtered;
+  if (componentsTab && sheetId) {
+    try {
+      console.log(`[org-roster sync] Fetching "${componentsTab}"...`);
+      const compData = await fetchRawSheet(sheetId, componentsTab);
+      const allComponents = parseComponentsTab(compData.headers, compData.rows);
+      // Filter to only components associated with kept teams
+      for (const [comp, teamNames] of Object.entries(allComponents)) {
+        const filtered = teamNames.filter(t => keptTeamNames.has(t));
+        if (filtered.length > 0) {
+          componentMap[comp] = filtered;
+        }
       }
+      console.log(`[org-roster sync] Found ${Object.keys(componentMap).length} components (filtered from ${Object.keys(allComponents).length})`);
+    } catch (err) {
+      console.warn(`[org-roster sync] Failed to fetch components tab: ${err.message}`);
     }
-    console.log(`[org-roster sync] Found ${Object.keys(componentMap).length} components (filtered from ${Object.keys(allComponents).length})`);
-  } catch (err) {
-    console.warn(`[org-roster sync] Failed to fetch components tab: ${err.message}`);
   }
 
-  // 4. Resolve Jira board names (only for kept teams)
+  // 4. Resolve Jira board names (only if any team has URLs)
   let boardNames = {};
-  try {
-    console.log('[org-roster sync] Resolving Jira board names...');
-    boardNames = await resolveBoardNames(rawTeams);
-    console.log(`[org-roster sync] Resolved ${Object.keys(boardNames).length} board names`);
-  } catch (err) {
-    console.warn(`[org-roster sync] Failed to resolve board names: ${err.message}`);
+  if (rawTeams.some(t => t.boardUrls.length > 0)) {
+    try {
+      console.log('[org-roster sync] Resolving Jira board names...');
+      boardNames = await resolveBoardNames(rawTeams);
+      console.log(`[org-roster sync] Resolved ${Object.keys(boardNames).length} board names`);
+    } catch (err) {
+      console.warn(`[org-roster sync] Failed to resolve board names: ${err.message}`);
+    }
   }
 
   // 5. Write metadata files
@@ -377,4 +420,5 @@ module.exports = {
   parseTeamBoardsTab,
   parseComponentsTab,
   calculateHeadcountByRole,
+  deriveTeamsFromPeople,
 };
