@@ -176,7 +176,7 @@ async function handleSelectSprint(sprintId) {
 async function handleRefreshData(hardRefresh) {
   isRefreshing.value = true
   try {
-    const projectKey = selectedProject.value?.key || projects.value[0]?.key
+    const projectKey = selectedProject.value?.key
     await apiRefreshData(projectKey, { hardRefresh })
   } catch (error) {
     console.error('Refresh error:', error)
