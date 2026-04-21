@@ -18,7 +18,13 @@ const props = defineProps({
   filter: { type: String, default: 'all' },
   searchQuery: { type: String, default: '' },
   chartExpanded: { type: Boolean, default: true },
-  isAdmin: { type: Boolean, default: false }
+  isAdmin: { type: Boolean, default: false },
+  assessments: { type: Object, default: () => ({}) },
+  filteredAssessments: { type: Object, default: () => ({}) },
+  sortBy: { type: String, default: 'default' },
+  passFailFilter: { type: String, default: 'all' },
+  priorityFilter: { type: String, default: 'all' },
+  statusFilter: { type: String, default: 'all' }
 })
 
 const emit = defineEmits([
@@ -26,6 +32,10 @@ const emit = defineEmits([
   'update:filter',
   'update:searchQuery',
   'update:chartExpanded',
+  'update:sortBy',
+  'update:passFailFilter',
+  'update:priorityFilter',
+  'update:statusFilter',
   'selectRFE',
   'retry'
 ])
@@ -95,6 +105,7 @@ const isEmpty = computed(() => !props.rfeData?.fetchedAt)
           :trendData="trendData"
           :breakdown="breakdown"
           :expanded="chartExpanded"
+          :filteredAssessments="filteredAssessments"
           @toggle="emit('update:chartExpanded', !chartExpanded)"
         />
 
@@ -103,8 +114,17 @@ const isEmpty = computed(() => !props.rfeData?.fetchedAt)
           :filter="filter"
           :searchQuery="searchQuery"
           :jiraHost="rfeData?.jiraHost"
+          :assessments="assessments"
+          :sortBy="sortBy"
+          :passFailFilter="passFailFilter"
+          :priorityFilter="priorityFilter"
+          :statusFilter="statusFilter"
           @update:filter="emit('update:filter', $event)"
           @update:searchQuery="emit('update:searchQuery', $event)"
+          @update:sortBy="emit('update:sortBy', $event)"
+          @update:passFailFilter="emit('update:passFailFilter', $event)"
+          @update:priorityFilter="emit('update:priorityFilter', $event)"
+          @update:statusFilter="emit('update:statusFilter', $event)"
           @selectRFE="emit('selectRFE', $event)"
         />
       </template>
