@@ -99,20 +99,76 @@ function getOrgKeys(storage) {
 }
 
 /**
- * Collect unique non-empty values of a given field across a list of people.
- * Useful for rolling up fields like engineeringLead or productManager per team.
- * @param {object[]} people
- * @param {string} fieldName
+ * Split a string that may contain multiple concatenated names (from Google Sheets
+ * smart chips entered without commas) into individual names by matching against
+ * a set of known roster names.
+ *
+ * Uses greedy longest-first matching from left to right. Falls back to returning
+ * the original string if no roster names match.
+ *
+ * @param {string} text - The possibly-concatenated name string
+ * @param {Set<string>} knownNames - Set of all known roster names
  * @returns {string[]}
  */
-function getTeamRollup(people, fieldName) {
+function splitByKnownNames(text, knownNames) {
+  if (knownNames.has(text)) return [text];
+
+  const candidates = [...knownNames]
+    .filter(name => text.includes(name))
+    .sort((a, b) => b.length - a.length);
+
+  if (candidates.length === 0) return [text];
+
+  const result = [];
+  let remaining = text.trim();
+
+  while (remaining.length > 0) {
+    let found = false;
+    for (const name of candidates) {
+      if (remaining.startsWith(name)) {
+        result.push(name);
+        remaining = remaining.substring(name.length).trim();
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      return [text];
+    }
+  }
+
+  return result.length > 0 ? result : [text];
+}
+
+/**
+ * Collect unique non-empty values of a given field across a list of people.
+ * Useful for rolling up fields like engineeringLead or productManager per team.
+ *
+ * When knownNames is provided, comma-separated tokens that don't match a known
+ * name are further split by matching against roster names (handles Google Sheets
+ * smart chip concatenation without commas).
+ *
+ * @param {object[]} people
+ * @param {string} fieldName
+ * @param {Set<string>} [knownNames] - Optional set of all roster names for smart-chip splitting
+ * @returns {string[]}
+ */
+function getTeamRollup(people, fieldName, knownNames) {
   const values = new Set();
   for (const person of people) {
     const val = person[fieldName] || person.customFields?.[fieldName];
     if (val && typeof val === 'string') {
       for (const v of val.split(',')) {
         const trimmed = v.trim();
-        if (trimmed) values.add(trimmed);
+        if (trimmed) {
+          if (knownNames && knownNames.size > 0) {
+            for (const name of splitByKnownNames(trimmed, knownNames)) {
+              values.add(name);
+            }
+          } else {
+            values.add(trimmed);
+          }
+        }
       }
     }
   }
@@ -125,5 +181,6 @@ module.exports = {
   getPeopleByOrg,
   getOrgKeys,
   getTeamRollup,
+  splitByKnownNames,
   getOrgDisplayNames
 };

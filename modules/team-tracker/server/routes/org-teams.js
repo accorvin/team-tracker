@@ -82,6 +82,8 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
     const orgKeyToDisplay = buildOrgKeyToDisplayName();
     const orgTeamPeopleMap = groupPeopleByOrgTeam(allPeople, orgKeyToDisplay);
 
+    const allNames = new Set(allPeople.map(p => p.name).filter(Boolean));
+
     const teams = [];
     for (const [compositeKey, teamPeople] of Object.entries(orgTeamPeopleMap)) {
       const sepIdx = compositeKey.indexOf('::');
@@ -90,8 +92,8 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
       if (orgFilter && org !== orgFilter) continue;
 
       const counts = calculateHeadcountByRole(teamPeople);
-      const engLeads = getTeamRollup(teamPeople, 'engineeringLead');
-      const productManagers = getTeamRollup(teamPeople, 'productManager');
+      const engLeads = getTeamRollup(teamPeople, 'engineeringLead', allNames);
+      const productManagers = getTeamRollup(teamPeople, 'productManager', allNames);
 
       const filterCounts = {};
       for (const p of teamPeople) {
