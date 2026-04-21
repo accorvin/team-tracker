@@ -7,7 +7,9 @@ const DEFAULT_CONFIG = {
   linkTypeName: 'Cloners',
   excludedStatuses: ['Closed'],
   lookbackMonths: 12,
-  trendThresholdPp: 2
+  trendThresholdPp: 2,
+  autofixProjects: ['AIPCC', 'RHOAIENG'],
+  autofixCreatedAfter: '2026-04-15'
 };
 
 // Characters that could enable JQL injection when interpolated into queries
@@ -45,7 +47,7 @@ function saveConfig(writeToStorage, config) {
 
   // String fields — validate type and JQL safety
   const stringFields = ['jiraProject', 'linkedProject', 'createdLabel',
-    'revisedLabel', 'testExclusionLabel', 'linkTypeName'];
+    'revisedLabel', 'testExclusionLabel', 'linkTypeName', 'autofixCreatedAfter'];
   for (const key of stringFields) {
     if (config[key] !== undefined) {
       validateJqlSafeString(config[key], key);
@@ -80,6 +82,17 @@ function saveConfig(writeToStorage, config) {
       throw new Error('trendThresholdPp must be a number between 0 and 50');
     }
     merged.trendThresholdPp = val;
+  }
+
+  // autofixProjects — must be array of JQL-safe strings
+  if (config.autofixProjects !== undefined) {
+    if (!Array.isArray(config.autofixProjects)) {
+      throw new Error('autofixProjects must be an array');
+    }
+    for (const p of config.autofixProjects) {
+      validateJqlSafeString(p, 'autofixProjects entry');
+    }
+    merged.autofixProjects = config.autofixProjects;
   }
 
   writeToStorage('ai-impact/config.json', merged);
