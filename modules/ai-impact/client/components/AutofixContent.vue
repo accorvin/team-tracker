@@ -317,31 +317,31 @@ function buildJiraLabelUrl(jiraLabels) {
     <!-- Top Bar -->
     <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-6 py-3 flex items-center justify-between">
       <div>
-        <h2 class="text-lg font-semibold dark:text-gray-100 flex items-center gap-2">
+        <h2 class="text-lg font-semibold dark:text-gray-100">
           Jira AutoFix
-          <div class="relative group">
+          <span class="relative group inline-flex align-middle ml-1">
             <svg class="h-4 w-4 text-gray-400 dark:text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <div class="absolute left-0 top-7 z-20 hidden group-hover:block w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg dark:shadow-gray-900/50 p-4 text-xs text-gray-700 dark:text-gray-300">
-              <p class="font-semibold text-gray-900 dark:text-gray-100 mb-2">Pipeline Label Legend</p>
-              <p class="font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide text-[10px]">Triage</p>
-              <div class="space-y-1 mb-3">
-                <div class="flex justify-between"><span>AI Assessing</span><span class="text-gray-400">Bot is evaluating the ticket</span></div>
-                <div class="flex justify-between"><span>Needs Info</span><span class="text-gray-400">Ticket incomplete, waiting on reporter</span></div>
-                <div class="flex justify-between"><span>Not AI-Fixable</span><span class="text-gray-400">Not suitable for automated fixing</span></div>
-                <div class="flex justify-between"><span>Stale</span><span class="text-gray-400">No response for 14+ days</span></div>
-              </div>
-              <p class="font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide text-[10px]">Autofix</p>
-              <div class="space-y-1">
-                <div class="flex justify-between"><span>Queued for AI</span><span class="text-gray-400">Waiting for bot pickup</span></div>
-                <div class="flex justify-between"><span>AI Working</span><span class="text-gray-400">Bot is generating a fix</span></div>
-                <div class="flex justify-between"><span>AI Fix Under Review</span><span class="text-gray-400">MR/PR created, iterating on feedback</span></div>
-                <div class="flex justify-between"><span>AI Completed</span><span class="text-gray-400">Bot finished (merged, rejected, or max retries)</span></div>
-                <div class="flex justify-between"><span>AI Blocked</span><span class="text-gray-400">Bot stuck, needs human intervention</span></div>
-              </div>
+            <div class="absolute left-0 top-6 z-20 hidden group-hover:block w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg dark:shadow-gray-900/50 p-4 text-xs text-gray-700 dark:text-gray-300">
+              <p class="font-semibold text-gray-900 dark:text-gray-100 mb-3">Pipeline Label Legend</p>
+              <table class="w-full">
+                <tbody>
+                  <tr><td colspan="2" class="font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide text-[10px] pb-1 pt-0">Triage</td></tr>
+                  <tr><td class="font-medium pr-4 py-0.5 whitespace-nowrap">AI Assessing</td><td class="text-gray-400 py-0.5">Bot is evaluating the ticket</td></tr>
+                  <tr><td class="font-medium pr-4 py-0.5 whitespace-nowrap">Needs Info</td><td class="text-gray-400 py-0.5">Ticket incomplete, waiting on reporter</td></tr>
+                  <tr><td class="font-medium pr-4 py-0.5 whitespace-nowrap">Not AI-Fixable</td><td class="text-gray-400 py-0.5">Not suitable for automated fixing</td></tr>
+                  <tr><td class="font-medium pr-4 py-0.5 whitespace-nowrap">Stale</td><td class="text-gray-400 py-0.5">No response for 14+ days</td></tr>
+                  <tr><td colspan="2" class="font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide text-[10px] pb-1 pt-3">Autofix</td></tr>
+                  <tr><td class="font-medium pr-4 py-0.5 whitespace-nowrap">Queued for AI</td><td class="text-gray-400 py-0.5">Waiting for bot pickup</td></tr>
+                  <tr><td class="font-medium pr-4 py-0.5 whitespace-nowrap">AI Working</td><td class="text-gray-400 py-0.5">Bot is generating a fix</td></tr>
+                  <tr><td class="font-medium pr-4 py-0.5 whitespace-nowrap">AI Fix Under Review</td><td class="text-gray-400 py-0.5">MR/PR created, iterating on feedback</td></tr>
+                  <tr><td class="font-medium pr-4 py-0.5 whitespace-nowrap">AI Completed</td><td class="text-gray-400 py-0.5">Bot finished (merged, rejected, or max retries)</td></tr>
+                  <tr><td class="font-medium pr-4 py-0.5 whitespace-nowrap">AI Blocked</td><td class="text-gray-400 py-0.5">Bot stuck, needs human intervention</td></tr>
+                </tbody>
+              </table>
             </div>
-          </div>
+          </span>
         </h2>
         <p class="text-sm text-gray-500 dark:text-gray-400">
           AI-driven issue triage and automated code fixes
@@ -479,7 +479,23 @@ function buildJiraLabelUrl(jiraLabels) {
           <!-- Triage Outcomes -->
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
             <div class="flex items-center justify-between mb-4">
-              <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Triage Outcomes</h3>
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                Triage Outcomes
+                <div class="relative group">
+                  <svg class="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div class="absolute left-0 top-6 z-20 hidden group-hover:block w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg dark:shadow-gray-900/50 p-3 text-xs text-gray-700 dark:text-gray-300">
+                    <div class="space-y-1">
+                      <div class="flex justify-between"><span class="font-medium">Ready for AI</span><span class="text-gray-400">Qualified for autofix</span></div>
+                      <div class="flex justify-between"><span class="font-medium">Needs Info</span><span class="text-gray-400">Waiting on reporter</span></div>
+                      <div class="flex justify-between"><span class="font-medium">Not AI-Fixable</span><span class="text-gray-400">Not suitable for AI</span></div>
+                      <div class="flex justify-between"><span class="font-medium">Stale</span><span class="text-gray-400">No response 14+ days</span></div>
+                      <div class="flex justify-between"><span class="font-medium">AI Assessing</span><span class="text-gray-400">Bot is evaluating</span></div>
+                    </div>
+                  </div>
+                </div>
+              </h3>
               <span class="text-xs text-gray-400 dark:text-gray-500">{{ triageSegmentTotal }} issues</span>
             </div>
 
@@ -518,7 +534,23 @@ function buildJiraLabelUrl(jiraLabels) {
           <!-- Autofix Progress -->
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
             <div class="flex items-center justify-between mb-4">
-              <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Autofix Progress</h3>
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                Autofix Progress
+                <div class="relative group">
+                  <svg class="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div class="absolute left-0 top-6 z-20 hidden group-hover:block w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg dark:shadow-gray-900/50 p-3 text-xs text-gray-700 dark:text-gray-300">
+                    <div class="space-y-1">
+                      <div class="flex justify-between"><span class="font-medium">AI Completed</span><span class="text-gray-400">Bot finished</span></div>
+                      <div class="flex justify-between"><span class="font-medium">AI Fix Under Review</span><span class="text-gray-400">MR/PR iterating</span></div>
+                      <div class="flex justify-between"><span class="font-medium">AI Working</span><span class="text-gray-400">Generating fix</span></div>
+                      <div class="flex justify-between"><span class="font-medium">Queued for AI</span><span class="text-gray-400">Waiting for bot</span></div>
+                      <div class="flex justify-between"><span class="font-medium">AI Blocked</span><span class="text-gray-400">Needs human help</span></div>
+                    </div>
+                  </div>
+                </div>
+              </h3>
               <span class="text-xs text-gray-400 dark:text-gray-500">{{ autofixSegmentTotal }} issues</span>
             </div>
 
@@ -586,7 +618,32 @@ function buildJiraLabelUrl(jiraLabels) {
         <div class="px-6 pb-6">
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div class="px-5 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
-              <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Issues</h3>
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                Issues
+                <div class="relative group">
+                  <svg class="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div class="absolute left-0 top-6 z-20 hidden group-hover:block w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg dark:shadow-gray-900/50 p-4 text-xs text-gray-700 dark:text-gray-300">
+                    <p class="font-semibold text-gray-900 dark:text-gray-100 mb-2">State Labels</p>
+                    <p class="font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide text-[10px]">Triage</p>
+                    <div class="space-y-1 mb-3">
+                      <div class="flex justify-between"><span>AI Assessing</span><span class="text-gray-400">Bot is evaluating</span></div>
+                      <div class="flex justify-between"><span>Needs Info</span><span class="text-gray-400">Waiting on reporter</span></div>
+                      <div class="flex justify-between"><span>Not AI-Fixable</span><span class="text-gray-400">Not suitable for AI</span></div>
+                      <div class="flex justify-between"><span>Stale</span><span class="text-gray-400">No response 14+ days</span></div>
+                    </div>
+                    <p class="font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide text-[10px]">Autofix</p>
+                    <div class="space-y-1">
+                      <div class="flex justify-between"><span>Queued for AI</span><span class="text-gray-400">Waiting for bot</span></div>
+                      <div class="flex justify-between"><span>AI Working</span><span class="text-gray-400">Generating fix</span></div>
+                      <div class="flex justify-between"><span>AI Fix Under Review</span><span class="text-gray-400">MR/PR iterating</span></div>
+                      <div class="flex justify-between"><span>AI Completed</span><span class="text-gray-400">Bot finished</span></div>
+                      <div class="flex justify-between"><span>AI Blocked</span><span class="text-gray-400">Needs human help</span></div>
+                    </div>
+                  </div>
+                </div>
+              </h3>
               <div class="flex items-center gap-2">
                 <input
                   v-model="searchQuery"

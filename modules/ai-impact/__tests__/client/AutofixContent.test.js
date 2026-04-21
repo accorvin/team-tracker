@@ -104,13 +104,22 @@ describe('AutofixContent', () => {
     expect(wrapper.text()).toContain('Connection failed')
   })
 
+  function findIssueTableRows(wrapper) {
+    const tables = wrapper.findAll('table')
+    const issueTable = tables.find(t => {
+      const th = t.findAll('th')
+      return th.length > 0 && th[0].text() === 'Key'
+    })
+    return issueTable ? issueTable.findAll('tbody tr') : []
+  }
+
   it('filters issues by search query', async () => {
     const wrapper = mount(AutofixContent, {
       props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'month' }
     })
     const input = wrapper.find('input[placeholder="Search issues..."]')
     await input.setValue('null pointer')
-    const rows = wrapper.findAll('tbody tr')
+    const rows = findIssueTableRows(wrapper)
     expect(rows).toHaveLength(1)
     expect(rows[0].text()).toContain('AIPCC-100')
   })
@@ -123,7 +132,7 @@ describe('AutofixContent', () => {
       return s.findAll('option').some(o => o.attributes('value') === 'all' && o.text() === 'All')
     })
     await select.setValue('triage-not-fixable')
-    const rows = wrapper.findAll('tbody tr')
+    const rows = findIssueTableRows(wrapper)
     expect(rows).toHaveLength(1)
     expect(rows[0].text()).toContain('RHOAIENG-200')
   })
