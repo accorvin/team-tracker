@@ -1,4 +1,5 @@
 const { fetchAllJqlResults } = require('../../../../shared/server/jira');
+const { validateJqlSafeString } = require('../config');
 
 // All labels from the jira-autofix triage + autofix pipelines
 const TRIAGE_LABELS = [
@@ -102,6 +103,10 @@ function computeAutofixMetrics(issues, timeWindow) {
   };
 }
 
+// Buckets issues by created date but uses current pipelineState. An issue
+// created 3 weeks ago that later moved to autofix-done appears as "done"
+// in the week it was created, not when it completed. This is a known
+// limitation — Jira labels don't carry timestamps for state transitions.
 function buildTrendData(issues, timeWindow) {
   const weekCounts = timeWindow === 'week' ? 4 : timeWindow === 'month' ? 8 : 13;
   const now = new Date();
@@ -138,32 +143,8 @@ function buildTrendData(issues, timeWindow) {
   return points;
 }
 
-function buildComponentBreakdown(issues) {
-  const map = {};
-
-  for (const issue of issues) {
-    for (const comp of issue.components) {
-      if (!map[comp]) {
-        map[comp] = { component: comp, triaged: 0, autofixed: 0, done: 0 };
-      }
-      if (issue.pipelineState.startsWith('triage-') || issue.pipelineState.startsWith('autofix-')) {
-        map[comp].triaged++;
-      }
-      if (issue.pipelineState.startsWith('autofix-')) {
-        map[comp].autofixed++;
-      }
-      if (issue.pipelineState === 'autofix-done') {
-        map[comp].done++;
-      }
-    }
-  }
-
-  return Object.values(map).sort((a, b) => b.triaged - a.triaged);
-}
-
 async function fetchAutofixData(jiraRequest, config) {
   const { autofixProjects, autofixCreatedAfter } = config;
-  const { validateJqlSafeString } = require('../config');
 
   for (const p of autofixProjects) {
     validateJqlSafeString(p, 'autofixProjects entry');
@@ -193,7 +174,6 @@ module.exports = {
   classifyIssue,
   computeAutofixMetrics,
   buildTrendData,
-  buildComponentBreakdown,
   ALL_PIPELINE_LABELS,
   TRIAGE_LABELS,
   AUTOFIX_LABELS

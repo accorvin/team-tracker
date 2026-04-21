@@ -9,7 +9,7 @@ const DEFAULT_CONFIG = {
   lookbackMonths: 12,
   trendThresholdPp: 2,
   autofixProjects: ['AIPCC', 'RHOAIENG'],
-  autofixCreatedAfter: '2026-04-15'
+  autofixCreatedAfter: null
 };
 
 // Characters that could enable JQL injection when interpolated into queries
@@ -47,11 +47,21 @@ function saveConfig(writeToStorage, config) {
 
   // String fields — validate type and JQL safety
   const stringFields = ['jiraProject', 'linkedProject', 'createdLabel',
-    'revisedLabel', 'testExclusionLabel', 'linkTypeName', 'autofixCreatedAfter'];
+    'revisedLabel', 'testExclusionLabel', 'linkTypeName'];
   for (const key of stringFields) {
     if (config[key] !== undefined) {
       validateJqlSafeString(config[key], key);
       merged[key] = config[key];
+    }
+  }
+
+  // autofixCreatedAfter — nullable string, validated only when non-empty
+  if (config.autofixCreatedAfter !== undefined) {
+    if (config.autofixCreatedAfter === null || config.autofixCreatedAfter === '') {
+      merged.autofixCreatedAfter = null;
+    } else {
+      validateJqlSafeString(config.autofixCreatedAfter, 'autofixCreatedAfter');
+      merged.autofixCreatedAfter = config.autofixCreatedAfter;
     }
   }
 

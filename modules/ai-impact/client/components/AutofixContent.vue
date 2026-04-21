@@ -84,6 +84,11 @@ const hasActiveFilter = computed(() =>
   selectedProject.value !== 'all' || selectedIssueType.value !== 'all' || selectedComponent.value !== 'all'
 )
 
+// Client-side metrics recomputation when filters are active.
+// Mirrors computeAutofixMetrics() in autofix-fetcher.js (server).
+// Uses startsWith('autofix-') for triageVerdicts.ready which includes
+// autofix-needs-info — matches the server's enumerated list in practice
+// since both count all autofix-* states as "passed triage."
 const metrics = computed(() => {
   if (!props.autofixData?.metrics) return null
   if (!hasActiveFilter.value) return props.autofixData.metrics

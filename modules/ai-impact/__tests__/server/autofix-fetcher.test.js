@@ -4,8 +4,7 @@ const {
   classifyIssue,
   processIssue,
   computeAutofixMetrics,
-  buildTrendData,
-  buildComponentBreakdown
+  buildTrendData
 } = require('../../server/jira/autofix-fetcher')
 
 describe('classifyIssue', () => {
@@ -160,40 +159,3 @@ describe('buildTrendData', () => {
   })
 })
 
-describe('buildComponentBreakdown', () => {
-  it('aggregates counts by component', () => {
-    const issues = [
-      { components: ['A', 'B'], pipelineState: 'autofix-done' },
-      { components: ['A'], pipelineState: 'autofix-review' },
-      { components: ['B'], pipelineState: 'triage-not-fixable' }
-    ]
-
-    const result = buildComponentBreakdown(issues)
-    expect(result).toHaveLength(2)
-
-    const compA = result.find(c => c.component === 'A')
-    expect(compA.triaged).toBe(2)
-    expect(compA.autofixed).toBe(2)
-    expect(compA.done).toBe(1)
-
-    const compB = result.find(c => c.component === 'B')
-    expect(compB.triaged).toBe(2)
-    expect(compB.autofixed).toBe(1)
-    expect(compB.done).toBe(1)
-  })
-
-  it('sorts by triaged count descending', () => {
-    const issues = [
-      { components: ['Rare'], pipelineState: 'autofix-done' },
-      { components: ['Common'], pipelineState: 'autofix-review' },
-      { components: ['Common'], pipelineState: 'triage-needs-info' }
-    ]
-
-    const result = buildComponentBreakdown(issues)
-    expect(result[0].component).toBe('Common')
-  })
-
-  it('returns empty array for no issues', () => {
-    expect(buildComponentBreakdown([])).toEqual([])
-  })
-})
