@@ -175,6 +175,49 @@ function getTeamRollup(people, fieldName, knownNames) {
   return [...values].sort();
 }
 
+/**
+ * Discover real names from role field values (e.g. engineeringLead, productManager)
+ * by iteratively building a known-names set. Handles the case where role holders
+ * (like PMs) aren't in the LDAP roster but their names appear in field values.
+ *
+ * Sorts comma-separated tokens by length (shortest first) so atomic names are
+ * discovered before concatenations. A token that can be decomposed into already-known
+ * names is a concatenation; one that can't is a new name.
+ *
+ * @param {object[]} allPeople
+ * @param {string[]} fieldNames - Fields to scan (e.g. ['engineeringLead', 'productManager'])
+ * @param {Set<string>} existingNames - Seed names (e.g. roster names)
+ * @returns {Set<string>} Union of existing + discovered names
+ */
+function collectRoleNames(allPeople, fieldNames, existingNames) {
+  const allTokens = new Set();
+
+  for (const p of allPeople) {
+    for (const field of fieldNames) {
+      const val = p[field] || p.customFields?.[field];
+      if (val && typeof val === 'string') {
+        for (const v of val.split(',')) {
+          const trimmed = v.trim();
+          if (trimmed) allTokens.add(trimmed);
+        }
+      }
+    }
+  }
+
+  const sorted = [...allTokens].sort((a, b) => a.length - b.length);
+  const discovered = new Set(existingNames);
+
+  for (const token of sorted) {
+    if (discovered.has(token)) continue;
+    const result = splitByKnownNames(token, discovered);
+    if (result.length <= 1) {
+      discovered.add(token);
+    }
+  }
+
+  return discovered;
+}
+
 module.exports = {
   readRosterFull,
   getAllPeople,
@@ -182,5 +225,6 @@ module.exports = {
   getOrgKeys,
   getTeamRollup,
   splitByKnownNames,
+  collectRoleNames,
   getOrgDisplayNames
 };
