@@ -142,45 +142,49 @@ function getFeaturePhaseSignal(phaseId) {
             <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               <!-- Source RFE link (feature context) -->
               <template v-if="getPhaseSignal(phase.id).isSourceRfe && getPhaseSignal(phase.id).linkedKey">
+                <button
+                  class="text-blue-600 dark:text-blue-400 hover:underline"
+                  @click="emit('navigateToRFE', getPhaseSignal(phase.id).linkedKey)"
+                >
+                  {{ getPhaseSignal(phase.id).linkedKey }}
+                </button>
                 <a
                   v-if="jiraHost"
                   :href="`${jiraHost}/browse/${getPhaseSignal(phase.id).linkedKey}`"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="text-blue-600 dark:text-blue-400 hover:underline"
+                  class="ml-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                  title="View in Jira"
                 >
-                  {{ getPhaseSignal(phase.id).linkedKey }}
+                  <svg class="inline h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
                 </a>
-                <span v-else>{{ getPhaseSignal(phase.id).linkedKey }}</span>
-                <button
-                  class="ml-1 text-primary-600 dark:text-primary-400 hover:underline"
-                  @click="emit('navigateToRFE', getPhaseSignal(phase.id).linkedKey)"
-                >
-                  View in RFE Review
-                </button>
               </template>
               <!-- Linked feature link (RFE context) -->
               <template v-else-if="phase.id === 'feature-review' && getPhaseSignal(phase.id).linkedKey">
+                <button
+                  class="text-blue-600 dark:text-blue-400 hover:underline"
+                  @click="emit('navigateToFeature', getPhaseSignal(phase.id).linkedKey)"
+                >
+                  {{ getPhaseSignal(phase.id).linkedKey }}
+                </button>
                 <a
                   v-if="jiraHost"
                   :href="`${jiraHost}/browse/${getPhaseSignal(phase.id).linkedKey}`"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="text-blue-600 dark:text-blue-400 hover:underline"
+                  class="ml-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                  title="View in Jira"
                 >
-                  {{ getPhaseSignal(phase.id).linkedKey }}
+                  <svg class="inline h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
                 </a>
-                <span v-else>{{ getPhaseSignal(phase.id).linkedKey }}</span>
                 - {{ getPhaseSignal(phase.id).detail.split(' - ')[1] }}
                 <span v-if="getPhaseSignal(phase.id).fixVersions?.length > 0" class="ml-1">
                   ({{ getPhaseSignal(phase.id).fixVersions.join(', ') }})
                 </span>
-                <button
-                  class="ml-1 text-primary-600 dark:text-primary-400 hover:underline"
-                  @click="emit('navigateToFeature', getPhaseSignal(phase.id).linkedKey)"
-                >
-                  View in Feature Review
-                </button>
               </template>
               <template v-else-if="phase.status === 'coming-soon' && phase.id !== 'feature-review' && phase.id !== 'build-release'">
                 <span class="text-gray-300 dark:text-gray-600">No signals yet</span>
