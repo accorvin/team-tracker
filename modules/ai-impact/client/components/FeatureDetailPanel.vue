@@ -50,8 +50,8 @@ function getScoreClass(score) {
 
 function getHumanReviewLabel(status) {
   switch (status) {
-    case 'reviewed': return 'Reviewed'
-    case 'pending': return 'Pending'
+    case 'reviewed': return 'Human Reviewed'
+    case 'pending': return 'Awaiting Review'
     default: return 'Not Required'
   }
 }
@@ -96,10 +96,10 @@ function getHistory() {
           </a>
           <span v-else class="font-mono text-xs text-gray-500 dark:text-gray-400">{{ feature.key }}</span>
           <span
-            class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize"
+            class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
             :class="getRecommendationClass(feature.recommendation)"
           >
-            {{ feature.recommendation }}
+            AI Recommendation: {{ feature.recommendation === 'approve' ? 'Approve' : feature.recommendation === 'revise' ? 'Needs Revision' : 'Reject' }}
           </span>
         </div>
         <h4 class="text-lg font-semibold mt-1 dark:text-gray-100">{{ feature.title }}</h4>
@@ -185,10 +185,10 @@ function getHistory() {
                 {{ feature.scores?.[dim] ?? 0 }}/2
               </span>
               <span
-                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize"
+                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
                 :class="getRecommendationClass(feature.reviewers?.[dim])"
               >
-                {{ feature.reviewers?.[dim] || 'N/A' }}
+                {{ feature.reviewers?.[dim] === 'approve' ? 'Pass' : feature.reviewers?.[dim] === 'revise' ? 'Revise' : feature.reviewers?.[dim] === 'reject' ? 'Fail' : 'N/A' }}
               </span>
             </div>
           </div>
@@ -212,10 +212,10 @@ function getHistory() {
                 {{ entry.scores?.total || 0 }}/8
               </span>
               <span
-                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize"
+                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
                 :class="getRecommendationClass(entry.recommendation)"
               >
-                {{ entry.recommendation }}
+                {{ entry.recommendation === 'approve' ? 'Approve' : entry.recommendation === 'revise' ? 'Needs Revision' : 'Reject' }}
               </span>
             </div>
           </div>

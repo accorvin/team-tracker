@@ -96,10 +96,10 @@ const sortedAndFilteredFeatures = computed(() => {
         @change="emit('update:recommendationFilter', $event.target.value)"
         class="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-300"
       >
-        <option value="all">All Recommendations</option>
-        <option value="approve">Approve</option>
-        <option value="revise">Revise</option>
-        <option value="reject">Reject</option>
+        <option value="all">All AI Recommendations</option>
+        <option value="approve">AI Recommendation: Approve</option>
+        <option value="revise">AI Recommendation: Needs Revision</option>
+        <option value="reject">AI Recommendation: Reject</option>
       </select>
 
       <select
@@ -117,9 +117,9 @@ const sortedAndFilteredFeatures = computed(() => {
         class="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-300"
       >
         <option value="all">All Review Status</option>
-        <option value="pending">Pending</option>
-        <option value="reviewed">Reviewed</option>
-        <option value="not-required">Not Required</option>
+        <option value="pending">Awaiting Human Review</option>
+        <option value="reviewed">Human Reviewed</option>
+        <option value="not-required">No Review Needed</option>
       </select>
 
       <select
