@@ -426,6 +426,60 @@ Quality assessment data pushed from the rfe-quality-dashboard CI pipeline. Store
 - The file is written atomically (write-to-temp-then-rename) to prevent corruption from mid-write crashes.
 - On DELETE, the file is written as `{ "lastSyncedAt": null, "totalAssessed": 0, "assessments": {} }` (never `null`).
 
+## AI Impact — Features (`data/ai-impact/features.json`)
+
+Feature review data pushed from the strat creator pipeline. Stores the latest review and score history for each RHAISTRAT feature.
+
+```json
+{
+  "lastSyncedAt": "2026-04-20T06:00:00Z",
+  "totalFeatures": 75,
+  "features": {
+    "RHAISTRAT-1168": {
+      "latest": {
+        "key": "RHAISTRAT-1168",
+        "title": "GPU-as-a-Service Observability",
+        "sourceRfe": "RHAIRFE-262",
+        "priority": "Major",
+        "status": "Refined",
+        "size": "L",
+        "recommendation": "approve",
+        "needsAttention": false,
+        "humanReviewStatus": "reviewed",
+        "scores": { "feasibility": 2, "testability": 1, "scope": 2, "architecture": 2, "total": 7 },
+        "reviewers": { "feasibility": "approve", "testability": "revise", "scope": "approve", "architecture": "approve" },
+        "labels": ["strat-creator-auto-created", "tech-reviewed"],
+        "runId": "20260419-013035",
+        "runTimestamp": "2026-04-19T01:30:35Z",
+        "reviewedAt": "2026-04-19T01:30:35Z"
+      },
+      "history": [
+        {
+          "scores": { "feasibility": 1, "testability": 1, "scope": 2, "architecture": 1, "total": 5 },
+          "recommendation": "revise",
+          "needsAttention": true,
+          "humanReviewStatus": "pending",
+          "reviewedAt": "2026-04-12T01:30:00Z"
+        }
+      ]
+    }
+  }
+}
+```
+
+**Notes:**
+- `latest` contains the full feature review (scores, reviewers, labels, etc.). Used by list, detail, and chart views.
+- `history` contains prior reviews with a trimmed payload (only `scores`, `recommendation`, `needsAttention`, `humanReviewStatus`, `reviewedAt`). Full labels and reviewers are only kept in `latest` to control file size.
+- History is sorted newest-first, capped at 20 entries per feature (`MAX_HISTORY`).
+- `lastSyncedAt` and `totalFeatures` are updated on every write (PUT single or POST bulk).
+- `scores`: each dimension (`feasibility`, `testability`, `scope`, `architecture`) is an integer 0-2. `total` is the sum (0-8).
+- `recommendation` is one of `"approve"`, `"revise"`, `"reject"`.
+- `humanReviewStatus` is derived from `labels`: `"reviewed"` if labels contain `tech-reviewed`, `"pending"` if `needs-tech-review`, otherwise `"not-required"`.
+- The API accepts both camelCase and snake_case field names (from `summary.json` pipeline output). Normalization happens in validation.
+- Upsert is idempotent: if `latest.reviewedAt` matches the incoming `reviewedAt`, the write is skipped and returns `"unchanged"`.
+- The file is written atomically (write-to-temp-then-rename) to prevent corruption.
+- On DELETE, the file is written as `{ "lastSyncedAt": null, "totalFeatures": 0, "features": {} }`.
+
 ## AI Impact — Config (`data/ai-impact/config.json`)
 
 Admin-configurable settings for the AI Impact module.

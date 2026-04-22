@@ -6,7 +6,7 @@
 
 const { runSync, calculateHeadcountByRole, parseTeamBoardsTab } = require('../org-sync');
 const { fetchAllRfeBacklog } = require('../rfe');
-const { getAllPeople, getTeamRollup } = require('../../../../shared/server/roster');
+const { getAllPeople, getTeamRollup, collectRoleNames } = require('../../../../shared/server/roster');
 const { getOrgDisplayNames } = require('../../../../shared/server/roster-sync/config');
 const { fetchRawSheet } = require('../../../../shared/server/google-sheets');
 
@@ -82,7 +82,8 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
     const orgKeyToDisplay = buildOrgKeyToDisplayName();
     const orgTeamPeopleMap = groupPeopleByOrgTeam(allPeople, orgKeyToDisplay);
 
-    const allNames = new Set(allPeople.map(p => p.name).filter(Boolean));
+    const rosterNames = new Set(allPeople.map(p => p.name).filter(Boolean));
+    const allNames = collectRoleNames(allPeople, ['engineeringLead', 'productManager'], rosterNames);
 
     const teams = [];
     for (const [compositeKey, teamPeople] of Object.entries(orgTeamPeopleMap)) {
