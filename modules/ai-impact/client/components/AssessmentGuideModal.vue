@@ -49,15 +49,6 @@ function handleClose() {
               Quality Scoring
             </button>
             <button
-              @click="activeTab = 'features'"
-              class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
-              :class="activeTab === 'features'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
-            >
-              Feature Review
-            </button>
-            <button
               @click="activeTab = 'creator'"
               class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
               :class="activeTab === 'creator'
@@ -65,6 +56,15 @@ function handleClose() {
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
             >
               RFE Creator
+            </button>
+            <button
+              @click="activeTab = 'features'"
+              class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
+              :class="activeTab === 'features'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+            >
+              Feature Review
             </button>
           </div>
 
