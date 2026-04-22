@@ -14,6 +14,10 @@ const DATA_PREFIX = 'release-planning'
 const VERSION_RE = /^[a-zA-Z0-9._-]{1,50}$/
 const RESERVED_VERSIONS = ['__proto__', 'constructor', 'prototype']
 
+function isValidVersion(version) {
+  return VERSION_RE.test(version) && !RESERVED_VERSIONS.includes(version)
+}
+
 module.exports = function registerRoutes(router, context) {
   const { storage, requireAuth, requireAdmin } = context
   const { readFromStorage, writeToStorage } = storage
@@ -119,7 +123,7 @@ module.exports = function registerRoutes(router, context) {
   // GET /releases/:version/candidates
   router.get('/releases/:version/candidates', requireAuth, function(req, res) {
     const version = req.params.version
-    if (!VERSION_RE.test(version)) {
+    if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
     const rockFilter = req.query.rockFilter || null
@@ -192,7 +196,7 @@ module.exports = function registerRoutes(router, context) {
   // POST /releases/:version/refresh
   router.post('/releases/:version/refresh', requireAdmin, function(req, res) {
     const version = req.params.version
-    if (!VERSION_RE.test(version)) {
+    if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
     if (DEMO_MODE) {
@@ -242,7 +246,7 @@ module.exports = function registerRoutes(router, context) {
 
   router.put('/releases/:version/big-rocks/reorder', requirePM, async function(req, res) {
     var version = req.params.version
-    if (!VERSION_RE.test(version)) {
+    if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
     var order = req.body && req.body.order
@@ -265,7 +269,7 @@ module.exports = function registerRoutes(router, context) {
 
   router.put('/releases/:version/big-rocks/:name', requirePM, async function(req, res) {
     const version = req.params.version
-    if (!VERSION_RE.test(version)) {
+    if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
     const name = decodeURIComponent(req.params.name)
@@ -306,7 +310,7 @@ module.exports = function registerRoutes(router, context) {
 
   router.post('/releases/:version/big-rocks', requirePM, async function(req, res) {
     const version = req.params.version
-    if (!VERSION_RE.test(version)) {
+    if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
 
@@ -345,7 +349,7 @@ module.exports = function registerRoutes(router, context) {
 
   router.delete('/releases/:version/big-rocks/:name', requirePM, async function(req, res) {
     const version = req.params.version
-    if (!VERSION_RE.test(version)) {
+    if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
     const name = decodeURIComponent(req.params.name)
@@ -387,10 +391,10 @@ module.exports = function registerRoutes(router, context) {
     if (!version || typeof version !== 'string') {
       return res.status(400).json({ error: 'version is required' })
     }
-    if (!VERSION_RE.test(version) || RESERVED_VERSIONS.includes(version)) {
+    if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
-    if (cloneFrom && !VERSION_RE.test(cloneFrom)) {
+    if (cloneFrom && !isValidVersion(cloneFrom)) {
       return res.status(400).json({ error: 'Invalid cloneFrom version format' })
     }
 
@@ -413,7 +417,7 @@ module.exports = function registerRoutes(router, context) {
 
   router.delete('/releases/:version', requireAdmin, async function(req, res) {
     var version = req.params.version
-    if (!VERSION_RE.test(version)) {
+    if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
 
@@ -516,7 +520,7 @@ module.exports = function registerRoutes(router, context) {
 
   router.post('/releases/:version/import/doc/preview', requirePM, async function(req, res) {
     var version = req.params.version
-    if (!VERSION_RE.test(version)) {
+    if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
     var docId = req.body && req.body.docId
@@ -554,7 +558,7 @@ module.exports = function registerRoutes(router, context) {
 
   router.post('/releases/:version/import/doc', requirePM, async function(req, res) {
     var version = req.params.version
-    if (!VERSION_RE.test(version)) {
+    if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
     var docId = req.body && req.body.docId

@@ -35,8 +35,9 @@ function addPMUser(readFromStorage, writeToStorage, email) {
 }
 
 function removePMUser(readFromStorage, writeToStorage, email) {
+  var normalized = email.toLowerCase()
   var data = readFromStorage('release-planning/pm-users.json') || { emails: [] }
-  data.emails = data.emails.filter(function(e) { return e !== email })
+  data.emails = data.emails.filter(function(e) { return e !== normalized })
   writeToStorage('release-planning/pm-users.json', data)
   return data.emails
 }
