@@ -1,27 +1,12 @@
 <script setup>
+import { getRecommendationClass, getRecommendationLabel, getHumanReviewClass, getHumanReviewLabel } from '../utils/feature-helpers.js'
+
 defineProps({
   feature: { type: Object, required: true },
   selected: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['select'])
-
-function getRecommendationClass(rec) {
-  switch (rec) {
-    case 'approve': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
-    case 'revise': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
-    case 'reject': return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
-    default: return 'bg-gray-100 text-gray-600'
-  }
-}
-
-function getHumanReviewClass(status) {
-  switch (status) {
-    case 'reviewed': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200'
-    case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200'
-    default: return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-  }
-}
 </script>
 
 <template>
@@ -41,7 +26,7 @@ function getHumanReviewClass(status) {
             class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
             :class="getRecommendationClass(feature.recommendation)"
           >
-            AI Recommendation: {{ feature.recommendation === 'approve' ? 'Approve' : feature.recommendation === 'revise' ? 'Needs Revision' : 'Reject' }}
+            AI Recommendation: {{ getRecommendationLabel(feature.recommendation) }}
           </span>
           <span
             v-if="feature.needsAttention"
@@ -69,7 +54,7 @@ function getHumanReviewClass(status) {
             class="inline-flex items-center px-2 py-0.5 rounded-full text-xs"
             :class="getHumanReviewClass(feature.humanReviewStatus)"
           >
-            {{ feature.humanReviewStatus === 'reviewed' ? 'Human Reviewed' : feature.humanReviewStatus === 'pending' ? 'Awaiting Human Review' : 'Human Review: Not Required' }}
+            {{ getHumanReviewLabel(feature.humanReviewStatus) }}
           </span>
         </div>
       </div>

@@ -22,6 +22,7 @@ export function useFeatures() {
     try {
       const data = await apiRequest('/modules/ai-impact/features')
       features.value = data.features || {}
+      detailCache.value = {}
       featureMeta.value = {
         lastSyncedAt: data.lastSyncedAt,
         totalFeatures: data.totalFeatures

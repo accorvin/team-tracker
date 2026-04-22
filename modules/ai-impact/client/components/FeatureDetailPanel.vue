@@ -1,6 +1,7 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import PipelineTimeline from './PipelineTimeline.vue'
+import { getRecommendationClass, getRecommendationLabel, getScoreClass, getHumanReviewClass, getHumanReviewLabel } from '../utils/feature-helpers.js'
 
 const props = defineProps({
   feature: { type: Object, required: true },
@@ -33,41 +34,7 @@ watch(
 
 const DIMENSIONS = ['feasibility', 'testability', 'scope', 'architecture']
 
-function getRecommendationClass(rec) {
-  switch (rec) {
-    case 'approve': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
-    case 'revise': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
-    case 'reject': return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
-    default: return 'bg-gray-100 text-gray-600'
-  }
-}
-
-function getScoreClass(score) {
-  if (score === 2) return 'text-green-600 dark:text-green-400'
-  if (score === 1) return 'text-amber-600 dark:text-amber-400'
-  return 'text-red-600 dark:text-red-400'
-}
-
-function getHumanReviewLabel(status) {
-  switch (status) {
-    case 'reviewed': return 'Human Reviewed'
-    case 'pending': return 'Awaiting Human Review'
-    default: return 'Human Review: Not Required'
-  }
-}
-
-function getHumanReviewClass(status) {
-  switch (status) {
-    case 'reviewed': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200'
-    case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200'
-    default: return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-  }
-}
-
-// Get history from detail fetch, or empty array
-function getHistory() {
-  return featureDetail.value?.history || []
-}
+const history = computed(() => featureDetail.value?.history || [])
 </script>
 
 <template>
@@ -99,7 +66,7 @@ function getHistory() {
             class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
             :class="getRecommendationClass(feature.recommendation)"
           >
-            AI Recommendation: {{ feature.recommendation === 'approve' ? 'Approve' : feature.recommendation === 'revise' ? 'Needs Revision' : 'Reject' }}
+            AI Recommendation: {{ getRecommendationLabel(feature.recommendation) }}
           </span>
         </div>
         <h4 class="text-lg font-semibold mt-1 dark:text-gray-100">{{ feature.title }}</h4>
@@ -188,7 +155,7 @@ function getHistory() {
                 class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
                 :class="getRecommendationClass(feature.reviewers?.[dim])"
               >
-                {{ feature.reviewers?.[dim] === 'approve' ? 'Pass' : feature.reviewers?.[dim] === 'revise' ? 'Revise' : feature.reviewers?.[dim] === 'reject' ? 'Fail' : 'N/A' }}
+                {{ feature.reviewers?.[dim] === 'approve' ? 'Pass' : feature.reviewers?.[dim] === 'revise' ? 'Revise' : feature.reviewers?.[dim] === 'reject' ? 'Fail' : getRecommendationLabel(feature.reviewers?.[dim]) }}
               </span>
             </div>
           </div>
@@ -196,11 +163,11 @@ function getHistory() {
       </div>
 
       <!-- History -->
-      <div v-if="getHistory().length > 0" class="mb-6">
+      <div v-if="history.length > 0" class="mb-6">
         <h5 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Score History</h5>
         <div class="space-y-2">
           <div
-            v-for="(entry, idx) in getHistory()"
+            v-for="(entry, idx) in history"
             :key="idx"
             class="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0"
           >
@@ -215,7 +182,7 @@ function getHistory() {
                 class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
                 :class="getRecommendationClass(entry.recommendation)"
               >
-                {{ entry.recommendation === 'approve' ? 'Approve' : entry.recommendation === 'revise' ? 'Needs Revision' : 'Reject' }}
+                {{ getRecommendationLabel(entry.recommendation) }}
               </span>
             </div>
           </div>
