@@ -44,10 +44,12 @@ async function previewDocImport(docIdOrUrl) {
     // Google API errors
     if (err.code === 403 || err.code === 404) {
       var email = googleDocs.getServiceAccountEmail()
-      var shareMsg = email ? ' Share it with: ' + email : ''
+      if (email) {
+        console.error('[release-planning] Document access denied. Share with:', email)
+      }
       throw Object.assign(
-        new Error('Cannot access this document.' + shareMsg),
-        { statusCode: 403 }
+        new Error('Cannot access this document. Ensure the document is shared with the service account.'),
+        { statusCode: 403, shareWith: email || undefined }
       )
     }
     throw Object.assign(

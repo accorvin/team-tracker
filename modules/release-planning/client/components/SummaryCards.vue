@@ -9,7 +9,7 @@ defineProps({
     <!-- Tier 1 -->
     <div class="p-4 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30">
       <div class="text-sm font-semibold text-blue-700 dark:text-blue-400">Tier 1: Milestone Essentials</div>
-      <div class="text-xs text-blue-600/70 dark:text-blue-400/70 mt-0.5 leading-snug">Must-have for rhoai-3.5 release</div>
+      <div class="text-xs text-blue-600/70 dark:text-blue-400/70 mt-0.5 leading-snug">Must-have for release milestones</div>
       <div class="flex items-baseline gap-4 mt-3">
         <div>
           <span class="text-2xl font-bold text-blue-700 dark:text-blue-400">{{ summary.tier1 ? summary.tier1.features : 0 }}</span>

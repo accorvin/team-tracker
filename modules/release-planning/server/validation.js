@@ -3,7 +3,7 @@
  * priority constraints, and outcomeKeys format validation.
  */
 
-const RESERVED_NAMES = ['reorder']
+const RESERVED_NAMES = ['reorder', '__proto__', 'constructor', 'prototype']
 
 const FIELD_LIMITS = {
   name: 100,

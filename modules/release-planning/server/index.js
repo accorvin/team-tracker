@@ -29,7 +29,7 @@ module.exports = function registerRoutes(router, context) {
   if (DEMO_MODE) {
     router.use(function(req, res, next) {
       if (req.method !== 'GET') {
-        return res.json({
+        return res.status(403).json({
           status: 'skipped',
           message: req.method + ' operations disabled in demo mode'
         })
@@ -39,9 +39,10 @@ module.exports = function registerRoutes(router, context) {
   }
 
   function loadFixture(name) {
+    const fs = require('fs')
     const fixturePath = require('path').join(__dirname, '..', '..', '..', 'fixtures', DATA_PREFIX, name)
     try {
-      return require(fixturePath)
+      return JSON.parse(fs.readFileSync(fixturePath, 'utf-8'))
     } catch {
       return null
     }
@@ -477,10 +478,10 @@ module.exports = function registerRoutes(router, context) {
           }
         }
       } catch (err) {
-        // If Jira is unreachable, mark all as unknown
+        console.error('[release-planning] Jira key validation failed:', err.message)
         for (var m = 0; m < keysToFetch.length; m++) {
           if (!results[keysToFetch[m]]) {
-            results[keysToFetch[m]] = { valid: false, error: 'Jira unavailable: ' + err.message }
+            results[keysToFetch[m]] = { valid: false, error: 'Jira unavailable' }
           }
         }
       }

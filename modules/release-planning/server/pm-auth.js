@@ -25,9 +25,10 @@ function getPMUsers(readFromStorage) {
 }
 
 function addPMUser(readFromStorage, writeToStorage, email) {
+  var normalized = email.toLowerCase()
   var data = readFromStorage('release-planning/pm-users.json') || { emails: [] }
-  if (!data.emails.includes(email)) {
-    data.emails.push(email)
+  if (!data.emails.includes(normalized)) {
+    data.emails.push(normalized)
     writeToStorage('release-planning/pm-users.json', data)
   }
   return data.emails

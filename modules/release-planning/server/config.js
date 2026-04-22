@@ -184,11 +184,11 @@ function reorderBigRocks(readFromStorage, writeToStorage, version, orderedNames)
   }
 
   // Validate: same set of names (no duplicates, no extras, no missing)
-  var currentSet = {}
+  var currentSet = Object.create(null)
   for (var i = 0; i < currentNames.length; i++) {
     currentSet[currentNames[i]] = true
   }
-  var submittedSet = {}
+  var submittedSet = Object.create(null)
   for (var j = 0; j < orderedNames.length; j++) {
     if (submittedSet[orderedNames[j]]) {
       throw Object.assign(
@@ -206,7 +206,7 @@ function reorderBigRocks(readFromStorage, writeToStorage, version, orderedNames)
   }
 
   // Build a lookup map for fast access
-  var rockByName = {}
+  var rockByName = Object.create(null)
   for (var k = 0; k < bigRocks.length; k++) {
     rockByName[bigRocks[k].name] = bigRocks[k]
   }
