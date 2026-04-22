@@ -17,7 +17,7 @@ const {
   candidates, loading, error, refreshing, cacheStale, permissions,
   loadCandidates, triggerRefresh, loadPermissions,
   saveBigRock, deleteBigRock: deleteBigRockApi, updateBigRocksInPlace,
-  reorderBigRocks
+  reorderBigRocks, seedFromFixture
 } = useReleasePlanning()
 
 const { releases, loadReleases } = useReleases()
@@ -38,6 +38,9 @@ const deleting = ref(false)
 
 // New release dialog state
 const newReleaseDialogOpen = ref(false)
+
+// Seed state
+const seeding = ref(false)
 
 const features = computed(() => candidates.value ? candidates.value.features || [] : [])
 const rfes = computed(() => candidates.value ? candidates.value.rfes || [] : [])
@@ -198,6 +201,24 @@ async function handleReleaseCreated(result) {
   }
 }
 
+// ─── Seed handler ───
+
+async function handleSeedFixture() {
+  seeding.value = true
+  error.value = null
+  try {
+    var result = await seedFromFixture()
+    await loadReleases()
+    if (result.seeded && result.seeded.length > 0) {
+      selectedVersion.value = result.seeded[0].version
+    }
+  } catch (err) {
+    error.value = err.message || 'Failed to load fixture data'
+  } finally {
+    seeding.value = false
+  }
+}
+
 watch(selectedVersion, function(newVersion) {
   if (newVersion) {
     loadCandidates(newVersion)
@@ -336,6 +357,23 @@ onMounted(async function() {
     <div v-else-if="!loading && releases.length === 0" class="text-center py-12">
       <p class="text-gray-500 dark:text-gray-400">No releases configured.</p>
       <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">Add Big Rocks configuration to get started.</p>
+      <div class="flex items-center justify-center gap-3 mt-4">
+        <button
+          v-if="canEdit"
+          @click="handleNewRelease"
+          class="px-4 py-2 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700"
+        >
+          New Release
+        </button>
+        <button
+          v-if="canEdit"
+          @click="handleSeedFixture"
+          :disabled="seeding"
+          class="px-4 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {{ seeding ? 'Loading...' : 'Load Fixture Data' }}
+        </button>
+      </div>
     </div>
 
     <!-- Edit panel -->

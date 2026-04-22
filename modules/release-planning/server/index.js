@@ -629,6 +629,58 @@ module.exports = function registerRoutes(router, context) {
     }
   })
 
+  // ─── Admin Seed / Bootstrap ───
+
+  router.post('/admin/seed', requireAdmin, async function(req, res) {
+    var config = req.body
+    if (!config || typeof config !== 'object' || !config.releases) {
+      return res.status(400).json({ error: 'Request body must include a "releases" object' })
+    }
+
+    var versions = Object.keys(config.releases)
+    for (var i = 0; i < versions.length; i++) {
+      if (!VERSION_RE.test(versions[i]) || RESERVED_VERSIONS.includes(versions[i])) {
+        return res.status(400).json({ error: 'Invalid version: ' + versions[i] })
+      }
+    }
+
+    try {
+      var result = await withConfigLock(function() {
+        backupConfig(readFromStorage, writeToStorage, listStorageFiles, deleteFromStorage)
+
+        var existing = getConfig(readFromStorage)
+        var merged = {
+          ...existing,
+          ...config,
+          releases: { ...existing.releases, ...config.releases },
+          fieldMapping: { ...existing.fieldMapping, ...(config.fieldMapping || {}) },
+          customFieldIds: { ...existing.customFieldIds, ...(config.customFieldIds || {}) }
+        }
+
+        writeToStorage('release-planning/config.json', merged)
+
+        var seededVersions = versions.map(function(v) {
+          return { version: v, bigRockCount: (merged.releases[v].bigRocks || []).length }
+        })
+
+        return { seeded: seededVersions, totalReleases: Object.keys(merged.releases).length }
+      })
+
+      res.json(result)
+    } catch (err) {
+      var status = err.statusCode || 500
+      res.status(status).json({ error: err.message })
+    }
+  })
+
+  router.get('/admin/seed/fixture', requireAdmin, function(req, res) {
+    var fixture = loadFixture('config.json')
+    if (!fixture) {
+      return res.status(404).json({ error: 'No fixture data found' })
+    }
+    res.json(fixture)
+  })
+
   // Diagnostics
   if (context.registerDiagnostics) {
     context.registerDiagnostics(async function() {

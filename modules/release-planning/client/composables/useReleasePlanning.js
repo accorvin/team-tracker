@@ -169,6 +169,15 @@ export function useReleasePlanning() {
     )
   }
 
+  async function seedFromFixture() {
+    var fixture = await apiRequest(`${API_BASE}/admin/seed/fixture`)
+    return apiRequest(`${API_BASE}/admin/seed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fixture)
+    })
+  }
+
   async function fetchSmartSheetReleases() {
     try {
       var data = await apiRequest(`${API_BASE}/smartsheet/releases`)
@@ -198,6 +207,7 @@ export function useReleasePlanning() {
     reorderBigRocks,
     createRelease,
     deleteRelease,
+    seedFromFixture,
     fetchSmartSheetReleases
   }
 }
