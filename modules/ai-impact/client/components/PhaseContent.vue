@@ -6,7 +6,7 @@ import TrendCharts from './TrendCharts.vue'
 import RFEList from './RFEList.vue'
 import AssessmentGuideModal from './AssessmentGuideModal.vue'
 
-const GUIDE_DISMISSED_KEY = 'tt_cache:ai-impact-guide-dismissed'
+const GUIDE_DISMISSED_KEY = 'ai-impact-guide-dismissed'
 const showGuideModal = ref(false)
 
 onMounted(() => {
