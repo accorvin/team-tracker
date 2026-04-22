@@ -15,6 +15,10 @@ const assessmentStatus = ref(null)
 const assessmentStatusLoading = ref(false)
 const clearingAssessments = ref(false)
 const clearAssessmentsResult = ref(null)
+const featureStatus = ref(null)
+const featureStatusLoading = ref(false)
+const clearingFeatures = ref(false)
+const clearFeaturesResult = ref(null)
 
 async function loadConfig() {
   loading.value = true
@@ -133,10 +137,37 @@ async function clearAssessments() {
   }
 }
 
+async function loadFeatureStatus() {
+  featureStatusLoading.value = true
+  try {
+    featureStatus.value = await apiRequest('/modules/ai-impact/features/status')
+  } catch {
+    featureStatus.value = null
+  } finally {
+    featureStatusLoading.value = false
+  }
+}
+
+async function clearFeatures() {
+  clearingFeatures.value = true
+  clearFeaturesResult.value = null
+  try {
+    await apiRequest('/modules/ai-impact/features', { method: 'DELETE' })
+    clearFeaturesResult.value = { status: 'success', message: 'Feature data cleared' }
+    loadFeatureStatus()
+    setTimeout(() => { clearFeaturesResult.value = null }, 3000)
+  } catch (e) {
+    clearFeaturesResult.value = { status: 'error', message: e.message }
+  } finally {
+    clearingFeatures.value = false
+  }
+}
+
 onMounted(() => {
   loadConfig()
   checkRefreshStatus()
   loadAssessmentStatus()
+  loadFeatureStatus()
 })
 
 // Format excludedStatuses for display
@@ -363,6 +394,42 @@ function getAutofixProjectsDisplay() {
         </div>
       </template>
       <div v-else class="text-sm text-gray-500 dark:text-gray-400">No assessment data available</div>
+    </div>
+    <!-- Feature Review Data -->
+    <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+      <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Feature Reviews</h4>
+      <div v-if="featureStatusLoading" class="text-sm text-gray-500 dark:text-gray-400">Loading feature status...</div>
+      <template v-else-if="featureStatus">
+        <div class="grid grid-cols-3 gap-4 mb-3">
+          <div class="bg-gray-50 dark:bg-gray-700 rounded-md p-3">
+            <p class="text-xs text-gray-500 dark:text-gray-400">Total Features</p>
+            <p class="text-lg font-semibold dark:text-gray-200">{{ featureStatus.totalFeatures }}</p>
+          </div>
+          <div class="bg-gray-50 dark:bg-gray-700 rounded-md p-3">
+            <p class="text-xs text-gray-500 dark:text-gray-400">History Entries</p>
+            <p class="text-lg font-semibold dark:text-gray-200">{{ featureStatus.totalHistoryEntries }}</p>
+          </div>
+          <div class="bg-gray-50 dark:bg-gray-700 rounded-md p-3">
+            <p class="text-xs text-gray-500 dark:text-gray-400">Last Synced</p>
+            <p class="text-sm font-medium dark:text-gray-200">
+              {{ featureStatus.lastSyncedAt ? new Date(featureStatus.lastSyncedAt).toLocaleString() : 'Never' }}
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <button
+            @click="clearFeatures"
+            :disabled="clearingFeatures || featureStatus.totalFeatures === 0"
+            class="px-4 py-2 border border-red-300 dark:border-red-600 text-red-700 dark:text-red-300 rounded-md text-sm hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+          >
+            {{ clearingFeatures ? 'Clearing...' : 'Clear Feature Data' }}
+          </button>
+          <span v-if="clearFeaturesResult" class="text-sm" :class="clearFeaturesResult.status === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+            {{ clearFeaturesResult.message }}
+          </span>
+        </div>
+      </template>
+      <div v-else class="text-sm text-gray-500 dark:text-gray-400">No feature data available</div>
     </div>
   </div>
 </template>
