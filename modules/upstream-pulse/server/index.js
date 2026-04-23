@@ -132,6 +132,7 @@ const ROSTER_PUSH_SOURCE = 'org_pulse_roster';
 const ROSTER_PUSH_REPLACES = ['github_org_sync'];
 const ROSTER_PUSH_INTERVAL = 2 * 60 * 60 * 1000; // 2 hours
 const ROSTER_PUSH_STARTUP_DELAY = 2 * 60 * 1000; // 2 minutes
+const ROSTER_PUSH_TIMEOUT = 5 * 60 * 1000; // 5 minutes (bulk sync processes hundreds of members)
 
 let _lastPushGeneratedAt = null;
 
@@ -177,7 +178,7 @@ async function pushRosterToUpstream(storage) {
   console.log('[upstream-pulse] Pushing ' + people.length + ' roster members to ' + url);
   const response = await fetch(url, {
     method: 'POST',
-    timeout: PROXY_TIMEOUT,
+    timeout: ROSTER_PUSH_TIMEOUT,
     headers: getServiceIdentityHeaders(),
     body: JSON.stringify(body)
   });
