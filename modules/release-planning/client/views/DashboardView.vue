@@ -82,6 +82,10 @@ function tabCount(tabId) {
   return 0
 }
 
+function escapeCell(val) {
+  return String(val).replace(/\|/g, '\\|').replace(/\n/g, ' ')
+}
+
 function exportMarkdown() {
   var lines = []
   var filename
@@ -94,13 +98,13 @@ function exportMarkdown() {
     for (var rock of bigRocks.value) {
       lines.push('| ' + [
         rock.priority,
-        rock.pillar || '-',
-        rock.name,
-        rock.owner || '-',
-        rock.architect || '-',
+        escapeCell(rock.pillar || '-'),
+        escapeCell(rock.name),
+        escapeCell(rock.owner || '-'),
+        escapeCell(rock.architect || '-'),
         rock.featureCount,
         rock.rfeCount,
-        rock.notes || '-'
+        escapeCell(rock.notes || '-')
       ].join(' | ') + ' |')
     }
     filename = 'big-rocks-' + selectedVersion.value + '.md'
@@ -111,18 +115,18 @@ function exportMarkdown() {
     lines.push('|----------|---------|--------|----------|-------|-------|------------|----------------|-----|----------------|-----|-------------|')
     for (var f of filteredFeatures.value) {
       lines.push('| ' + [
-        f.bigRock || '-',
+        escapeCell(f.bigRock || '-'),
         f.issueKey,
-        f.status || '-',
-        f.priority || '-',
-        f.phase || '-',
-        f.summary || '-',
-        f.components || '-',
-        f.targetRelease || '-',
-        f.pm || '-',
-        f.deliveryOwner || '-',
+        escapeCell(f.status || '-'),
+        escapeCell(f.priority || '-'),
+        escapeCell(f.phase || '-'),
+        escapeCell(f.summary || '-'),
+        escapeCell(f.components || '-'),
+        escapeCell(f.targetRelease || '-'),
+        escapeCell(f.pm || '-'),
+        escapeCell(f.deliveryOwner || '-'),
         f.rfe || '-',
-        f.fixVersion || '-'
+        escapeCell(f.fixVersion || '-')
       ].join(' | ') + ' |')
     }
     filename = 'features-' + selectedVersion.value + '.md'
@@ -133,14 +137,14 @@ function exportMarkdown() {
     lines.push('|----------|-----|--------|----------|-------|------------|-----|--------|')
     for (var r of filteredRfes.value) {
       lines.push('| ' + [
-        r.bigRock || '-',
+        escapeCell(r.bigRock || '-'),
         r.issueKey,
-        r.status || '-',
-        r.priority || '-',
-        r.summary || '-',
-        r.components || '-',
-        r.pm || '-',
-        (r.labels || []).join(', ') || '-'
+        escapeCell(r.status || '-'),
+        escapeCell(r.priority || '-'),
+        escapeCell(r.summary || '-'),
+        escapeCell(r.components || '-'),
+        escapeCell(r.pm || '-'),
+        escapeCell((r.labels || []).join(', ') || '-')
       ].join(' | ') + ' |')
     }
     filename = 'rfes-' + selectedVersion.value + '.md'
