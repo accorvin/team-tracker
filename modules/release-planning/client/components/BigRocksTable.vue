@@ -1,7 +1,6 @@
 <script setup>
-import { ref, toRef, watch } from 'vue'
+import { ref, watch } from 'vue'
 import draggable from 'vuedraggable'
-import { useRockColors } from '../composables/useRockColors'
 
 const props = defineProps({
   bigRocks: { type: Array, default: () => [] },
@@ -10,8 +9,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['editRock', 'addRock', 'deleteRock', 'reorder'])
-
-const { rockRowClass } = useRockColors(toRef(props, 'bigRocks'))
 
 // Local copy for draggable to mutate
 const localRocks = ref([...props.bigRocks])
@@ -79,7 +76,7 @@ function onDragEnd() {
         >
           <template #item="{ element: rock }">
             <tr
-              :class="[rockRowClass(rock.name).bg, 'cursor-pointer hover:ring-2 hover:ring-primary-400 hover:ring-inset']"
+              class="cursor-pointer hover:ring-2 hover:ring-primary-400 hover:ring-inset"
               @click="handleRowClick(rock)"
             >
               <td class="px-2 py-2 text-center border border-gray-300 dark:border-gray-600">
@@ -139,7 +136,6 @@ function onDragEnd() {
           <tr
             v-for="rock in bigRocks"
             :key="rock.name"
-            :class="[rockRowClass(rock.name).bg]"
           >
             <td class="px-3 py-2 text-gray-400 dark:text-gray-500 font-mono text-xs border border-gray-300 dark:border-gray-600">{{ rock.priority }}</td>
             <td class="px-3 py-2 border border-gray-300 dark:border-gray-600">
