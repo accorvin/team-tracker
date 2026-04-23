@@ -66,6 +66,15 @@ function handleClose() {
             >
               Feature Review
             </button>
+            <button
+              @click="activeTab = 'autofix'"
+              class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
+              :class="activeTab === 'autofix'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+            >
+              Jira Autofix
+            </button>
           </div>
 
           <!-- Content (scrollable) -->
@@ -329,6 +338,101 @@ function handleClose() {
                 </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
                   Source: <a href="https://github.com/n1hility/assess-rfe" target="_blank" rel="noopener noreferrer" class="font-mono text-blue-600 dark:text-blue-400 hover:underline">n1hility/assess-rfe</a> and <a href="https://github.com/jwforres/rfe-creator" target="_blank" rel="noopener noreferrer" class="font-mono text-blue-600 dark:text-blue-400 hover:underline">jwforres/rfe-creator</a>
+                </p>
+              </div>
+            </div>
+
+            <!-- Autofix Tab -->
+            <div v-if="activeTab === 'autofix'" class="space-y-5">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Jira Autofix Pipeline</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300">
+                  The Jira Autofix pipeline automatically triages incoming Jira issues and generates code fixes using AI. Issues are first assessed for suitability, then eligible ones are picked up by the autofix bot which creates merge requests with proposed fixes.
+                </p>
+              </div>
+
+              <!-- Flow diagram -->
+              <div>
+                <h4 class="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">Workflow</h4>
+                <div class="flex items-center gap-2 text-xs flex-wrap">
+                  <span class="px-2.5 py-1.5 rounded-md bg-blue-100 dark:bg-blue-800/60 text-blue-700 dark:text-blue-200 font-medium">Issue Filed</span>
+                  <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                  <span class="px-2.5 py-1.5 rounded-md bg-purple-100 dark:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-medium">AI Triage</span>
+                  <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                  <span class="px-2.5 py-1.5 rounded-md bg-purple-100 dark:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-medium">Autofix Bot</span>
+                  <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                  <span class="px-2.5 py-1.5 rounded-md bg-green-100 dark:bg-green-800/60 text-green-700 dark:text-green-200 font-medium">MR Merged</span>
+                </div>
+              </div>
+
+              <!-- Pipeline States -->
+              <div>
+                <h4 class="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">Triage Outcomes</h4>
+                <div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <table class="w-full text-sm">
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td class="px-4 py-2.5 font-semibold text-gray-900 dark:text-gray-100 w-32">Ready for AI</td>
+                        <td class="px-4 py-2.5 text-gray-600 dark:text-gray-300">Issue qualifies for automated fixing</td>
+                      </tr>
+                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td class="px-4 py-2.5 font-semibold text-gray-900 dark:text-gray-100">Missing Info</td>
+                        <td class="px-4 py-2.5 text-gray-600 dark:text-gray-300">Ticket incomplete, waiting on reporter</td>
+                      </tr>
+                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td class="px-4 py-2.5 font-semibold text-gray-900 dark:text-gray-100">Not AI-Fixable</td>
+                        <td class="px-4 py-2.5 text-gray-600 dark:text-gray-300">Not suitable for automated fixing</td>
+                      </tr>
+                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td class="px-4 py-2.5 font-semibold text-gray-900 dark:text-gray-100">Stale</td>
+                        <td class="px-4 py-2.5 text-gray-600 dark:text-gray-300">No response for 14+ days</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Status indicators -->
+              <div>
+                <h4 class="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">Autofix States</h4>
+                <div class="space-y-2 text-sm">
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200">Queued / AI Working</span>
+                    <span class="text-gray-600 dark:text-gray-300">Waiting for or actively being processed by the bot</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">AI Fix Under Review</span>
+                    <span class="text-gray-600 dark:text-gray-300">MR/PR created, awaiting human code review</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200">AI Fix Merged</span>
+                    <span class="text-gray-600 dark:text-gray-300">Fix landed successfully</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200">AI Researched</span>
+                    <span class="text-gray-600 dark:text-gray-300">Spike completed, findings posted to the issue</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">AI Fix CI Failing</span>
+                    <span class="text-gray-600 dark:text-gray-300">MR/PR exists but CI is red</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200">AI Fix Rejected</span>
+                    <span class="text-gray-600 dark:text-gray-300">MR/PR closed without merge</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200">AI Blocked</span>
+                    <span class="text-gray-600 dark:text-gray-300">Bot stuck, needs human intervention</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Enablement link -->
+              <div class="rounded-lg bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700 px-4 py-3">
+                <h4 class="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">Enablement Materials</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-300">
+                  Recordings, slides, and notes for the Jira Autofix pipeline and other AI SDLC tools are available in the
+                  <a href="#/about?tab=docs" @click="handleClose" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">About &gt; Docs</a> section.
                 </p>
               </div>
             </div>
