@@ -4,14 +4,14 @@ kind: Kustomization
 namespace: ambient-code--team-tracker
 
 resources:
-  - ../../base
+- ../../base
 
 patches:
-  - path: route-patch.yaml
-  - path: api-route-patch.yaml
+- path: route-patch.yaml
+- path: api-route-patch.yaml
 
 images:
-  - name: quay.io/org-pulse/team-tracker-backend
-    newTag: "660dd17dfab54ce5d2f9c289dc238230a5643aff"
-  - name: quay.io/org-pulse/team-tracker-frontend
-    newTag: "660dd17dfab54ce5d2f9c289dc238230a5643aff"
+- name: quay.io/org-pulse/team-tracker-backend
+  newTag: 15b60348ee04d20f94b094f453dedf2c261565cc
+- name: quay.io/org-pulse/team-tracker-frontend
+  newTag: 15b60348ee04d20f94b094f453dedf2c261565cc
