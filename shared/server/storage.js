@@ -61,6 +61,11 @@ function writeToStorage(key, data) {
     console.error(`[storage] Blocked path traversal attempt: ${key}`);
     return;
   }
+  if (data === null || data === undefined) {
+    try { fs.unlinkSync(filePath); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    console.log(`Deleted ${key} from local storage`);
+    return;
+  }
   ensureDir(filePath);
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
   console.log(`Wrote ${key} to local storage`);

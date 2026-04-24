@@ -9,7 +9,11 @@ const DEFAULT_CONFIG = {
   lookbackMonths: 12,
   trendThresholdPp: 2,
   autofixProjects: ['AIPCC', 'RHOAIENG'],
-  autofixCreatedAfter: null
+  autofixCreatedAfter: null,
+  prRepos: [],
+  prLookbackDays: 90,
+  prBotUsernames: ['coderabbitai'],
+  coderabbitApiKeyEnvVar: ''
 };
 
 // Characters that could enable JQL injection when interpolated into queries
@@ -103,6 +107,50 @@ function saveConfig(writeToStorage, config) {
       validateJqlSafeString(p, 'autofixProjects entry');
     }
     merged.autofixProjects = config.autofixProjects;
+  }
+
+  // prRepos — must be array of "owner/repo" strings
+  if (config.prRepos !== undefined) {
+    if (!Array.isArray(config.prRepos)) {
+      throw new Error('prRepos must be an array');
+    }
+    const repoPattern = /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/;
+    for (const r of config.prRepos) {
+      if (typeof r !== 'string' || !repoPattern.test(r)) {
+        throw new Error(`prRepos entry must match owner/repo format: "${r}"`);
+      }
+    }
+    merged.prRepos = config.prRepos;
+  }
+
+  // prLookbackDays — integer 1-365
+  if (config.prLookbackDays !== undefined) {
+    const val = Number(config.prLookbackDays);
+    if (!Number.isInteger(val) || val < 1 || val > 365) {
+      throw new Error('prLookbackDays must be an integer between 1 and 365');
+    }
+    merged.prLookbackDays = val;
+  }
+
+  // prBotUsernames — array of non-empty strings
+  if (config.prBotUsernames !== undefined) {
+    if (!Array.isArray(config.prBotUsernames)) {
+      throw new Error('prBotUsernames must be an array');
+    }
+    for (const u of config.prBotUsernames) {
+      if (typeof u !== 'string' || u.length === 0) {
+        throw new Error('prBotUsernames entries must be non-empty strings');
+      }
+    }
+    merged.prBotUsernames = config.prBotUsernames;
+  }
+
+  // coderabbitApiKeyEnvVar — string (reserved for future use)
+  if (config.coderabbitApiKeyEnvVar !== undefined) {
+    if (typeof config.coderabbitApiKeyEnvVar !== 'string') {
+      throw new Error('coderabbitApiKeyEnvVar must be a string');
+    }
+    merged.coderabbitApiKeyEnvVar = config.coderabbitApiKeyEnvVar;
   }
 
   writeToStorage('ai-impact/config.json', merged);

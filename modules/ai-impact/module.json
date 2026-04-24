@@ -7,7 +7,7 @@
   "client": {
     "entry": "./client/index.js",
     "navItems": [
-      { "id": "main", "label": "AI Impact", "icon": "Wand2", "default": true }
+      { "id": "rfe-review", "label": "AI Impact", "icon": "Wand2", "default": true }
     ],
     "settingsComponent": "./client/components/AIImpactSettings.vue"
   },

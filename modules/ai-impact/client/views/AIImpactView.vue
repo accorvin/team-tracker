@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, inject } from 'vue'
 import { useAIImpact } from '../composables/useAIImpact.js'
 import { useAutofix } from '../composables/useAutofix.js'
 import { useAssessments } from '../composables/useAssessments.js'
@@ -7,19 +7,29 @@ import { useFeatures } from '../composables/useFeatures.js'
 import PhaseSidebar from '../components/PhaseSidebar.vue'
 import PhaseContent from '../components/PhaseContent.vue'
 import AutofixContent from '../components/AutofixContent.vue'
+import PullRequestsContent from '../components/PullRequestsContent.vue'
 import ComingSoonPlaceholder from '../components/ComingSoonPlaceholder.vue'
 import RFEDetailPanel from '../components/RFEDetailPanel.vue'
 import FeatureReviewContent from '../components/FeatureReviewContent.vue'
 import FeatureDetailPanel from '../components/FeatureDetailPanel.vue'
 import AssessmentGuideModal from '../components/AssessmentGuideModal.vue'
 
+const nav = inject('moduleNav')
+
 const GUIDE_DISMISSED_KEY = 'ai-impact-guide-dismissed'
 const showGuideModal = ref(false)
 
 onMounted(() => {
+  document.documentElement.style.overflow = 'hidden'
   if (localStorage.getItem(GUIDE_DISMISSED_KEY) !== 'true') {
     showGuideModal.value = true
   }
+  window.addEventListener('hashchange', onHashChange)
+})
+
+onUnmounted(() => {
+  document.documentElement.style.overflow = ''
+  window.removeEventListener('hashchange', onHashChange)
 })
 
 function closeGuide(dismiss) {
@@ -29,7 +39,42 @@ function closeGuide(dismiss) {
   }
 }
 
-const selectedPhase = ref('rfe-review')
+const phases = [
+  { id: 'rfe-review', name: 'RFE Review', order: 1, status: 'active' },
+  { id: 'feature-review', name: 'Feature Review', order: 2, status: 'active' },
+  { id: 'implementation', name: 'Implementation', order: 3, status: 'coming-soon' },
+  { id: 'qe-validation', name: 'QE / Validation', order: 4, status: 'coming-soon' },
+  { id: 'security', name: 'Security Review', order: 5, status: 'coming-soon' },
+  { id: 'documentation', name: 'Documentation', order: 6, status: 'coming-soon' },
+  { id: 'build-release', name: 'Build & Release', order: 7, status: 'coming-soon' },
+]
+
+const workflows = [
+  { id: 'autofix', name: 'Jira AutoFix', status: 'active' },
+  { id: 'pull-requests', name: 'Pull Requests', status: 'active' }
+]
+
+const allSectionIds = [...phases.map(p => p.id), ...workflows.map(w => w.id)]
+const DEFAULT_SECTION = 'rfe-review'
+
+function getViewIdFromHash() {
+  const raw = (window.location.hash || '#/').slice(2).split('?')[0]
+  const viewId = raw.split('/').filter(Boolean)[1]
+  if (viewId && allSectionIds.includes(viewId)) return viewId
+  return DEFAULT_SECTION
+}
+
+function onHashChange() {
+  const viewId = getViewIdFromHash()
+  if (viewId !== selectedPhase.value) {
+    selectedPhase.value = viewId
+    selectedRFE.value = null
+    selectedFeature.value = null
+  }
+}
+
+const selectedPhase = ref(getViewIdFromHash())
+
 const selectedRFE = ref(null)
 const selectedFeature = ref(null)
 const timeWindow = ref('week')
@@ -60,23 +105,11 @@ loadFeatures()
 const autofixTimeWindow = ref('month')
 const { autofixData, loading: autofixLoading, error: autofixError, load: autofixLoad } = useAutofix(autofixTimeWindow)
 
+const prTimeWindow = ref('month')
+
 const metrics = computed(() => rfeData.value?.metrics || null)
 const trendData = computed(() => rfeData.value?.trendData || [])
 const breakdown = computed(() => rfeData.value?.breakdown || [])
-
-const phases = [
-  { id: 'rfe-review', name: 'RFE Review', order: 1, status: 'active' },
-  { id: 'feature-review', name: 'Feature Review', order: 2, status: 'active' },
-  { id: 'implementation', name: 'Implementation', order: 3, status: 'coming-soon' },
-  { id: 'qe-validation', name: 'QE / Validation', order: 4, status: 'coming-soon' },
-  { id: 'security', name: 'Security Review', order: 5, status: 'coming-soon' },
-  { id: 'documentation', name: 'Documentation', order: 6, status: 'coming-soon' },
-  { id: 'build-release', name: 'Build & Release', order: 7, status: 'coming-soon' },
-]
-
-const workflows = [
-  { id: 'autofix', name: 'Jira AutoFix', status: 'active' }
-]
 
 const isPhase = computed(() => phases.some(p => p.id === selectedPhase.value))
 const isWorkflow = computed(() => workflows.some(w => w.id === selectedPhase.value))
@@ -133,6 +166,11 @@ const filteredAssessments = computed(() => {
   return result
 })
 
+function navigateToSection(sectionId) {
+  selectedPhase.value = sectionId
+  if (nav) nav.navigateTo(sectionId)
+}
+
 function handleRetry() {
   load()
   loadAssessments()
@@ -143,13 +181,12 @@ function handleFeatureRetry() {
 }
 
 function handleSelect(id) {
-  selectedPhase.value = id
   selectedRFE.value = null
   selectedFeature.value = null
+  navigateToSection(id)
 }
 
 function handleNavigateToFeature(featureKey) {
-  // Cross-link: switch to Feature Review phase and select the linked feature
   featureSearchQuery.value = ''
   featureRecommendationFilter.value = 'all'
   featurePriorityFilter.value = 'all'
@@ -157,8 +194,8 @@ function handleNavigateToFeature(featureKey) {
   featureNeedsAttentionFilter.value = 'all'
   featureSortBy.value = 'default'
 
-  selectedPhase.value = 'feature-review'
   selectedRFE.value = null
+  navigateToSection('feature-review')
 
   const featureList = Object.values(features.value)
   const feature = featureList.find(f => f.key === featureKey)
@@ -173,25 +210,21 @@ function handleNavigateToFeature(featureKey) {
 }
 
 function handleNavigateToRFE(rfeKey) {
-  // Cross-link: switch to RFE Review phase and select the source RFE
-  // Reset filters so the RFE is visible in the list
   filter.value = 'all'
   searchQuery.value = ''
   passFailFilter.value = 'all'
   priorityFilter.value = 'all'
   statusFilter.value = 'all'
 
-  selectedPhase.value = 'rfe-review'
   selectedFeature.value = null
+  navigateToSection('rfe-review')
 
-  // Try to find the RFE in current data first
   const rfe = rfeData.value?.issues?.find(r => r.key === rfeKey)
   if (rfe) {
     selectedRFE.value = rfe
     return
   }
 
-  // If not found and not already at widest window, expand and wait for reload
   if (timeWindow.value !== '3months') {
     timeWindow.value = '3months'
     const unwatch = watch(loading, (isLoading) => {
@@ -207,7 +240,6 @@ function handleNavigateToRFE(rfeKey) {
       }
     })
   } else {
-    // Already at widest window and not found — fall back to Jira
     const jiraHost = rfeData.value?.jiraHost
     if (jiraHost) window.open(`${jiraHost}/browse/${rfeKey}`, '_blank')
   }
@@ -216,7 +248,7 @@ function handleNavigateToRFE(rfeKey) {
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+  <div class="flex h-[calc(100vh-7rem-1px)] overflow-hidden bg-gray-50 dark:bg-gray-900 rounded-lg">
     <PhaseSidebar
       :phases="phases"
       :workflows="workflows"
@@ -313,6 +345,12 @@ function handleNavigateToRFE(rfeKey) {
       :timeWindow="autofixTimeWindow"
       @update:timeWindow="autofixTimeWindow = $event"
       @retry="autofixLoad"
+    />
+
+    <PullRequestsContent
+      v-else-if="isWorkflow && selectedPhase === 'pull-requests'"
+      :timeWindow="prTimeWindow"
+      @update:timeWindow="prTimeWindow = $event"
     />
 
     <!-- Coming soon placeholder for inactive phases -->

@@ -7,5 +7,8 @@
   "linkTypeName": "Cloners",
   "excludedStatuses": ["Closed"],
   "lookbackMonths": 12,
-  "trendThresholdPp": 2
+  "trendThresholdPp": 2,
+  "prRepos": ["rhai-org/model-serving", "rhai-org/dashboard", "rhai-org/data-pipeline"],
+  "prLookbackDays": 90,
+  "prBotUsernames": ["coderabbitai[bot]"]
 }
