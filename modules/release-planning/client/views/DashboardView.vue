@@ -88,7 +88,7 @@ function escapeCell(val) {
 
 function escapeCsv(val) {
   var s = String(val)
-  if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+  if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1 || s.indexOf('\r') !== -1) {
     return '"' + s.replace(/"/g, '""') + '"'
   }
   return s
