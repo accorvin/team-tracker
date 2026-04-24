@@ -12,9 +12,29 @@
  */
 
 const fetch = require('node-fetch');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 
 const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
 const REPO_DELAY_MS = 2000;
+
+function getFetchOptions(query, variables) {
+  const options = {
+    method: 'POST',
+    headers: {
+      'Authorization': `bearer ${getToken()}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'org-pulse-pr-analytics'
+    },
+    body: JSON.stringify({ query, variables })
+  };
+
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+  if (proxyUrl) {
+    options.agent = new HttpsProxyAgent(proxyUrl);
+  }
+
+  return options;
+}
 
 function getToken() {
   const token = process.env.GITHUB_TOKEN;
@@ -25,15 +45,7 @@ function getToken() {
 }
 
 async function graphqlRequest(query, variables) {
-  const response = await fetch(GITHUB_GRAPHQL_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `bearer ${getToken()}`,
-      'Content-Type': 'application/json',
-      'User-Agent': 'org-pulse-pr-analytics'
-    },
-    body: JSON.stringify({ query, variables })
-  });
+  const response = await fetch(GITHUB_GRAPHQL_URL, getFetchOptions(query, variables));
 
   if (!response.ok) {
     throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);

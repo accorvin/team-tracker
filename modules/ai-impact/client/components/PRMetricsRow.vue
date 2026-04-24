@@ -122,7 +122,7 @@ const humanDelta = computed(() => aiReviewDelta(humanPct.value, priorHumanPct.va
             class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"
           ><path stroke-linecap="round" stroke-linejoin="round" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
           <span :class="aiDelta.improved ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-            {{ aiDelta.improved ? '+' : '−' }}{{ Math.abs(aiDelta.diff) }}pp
+            {{ aiDelta.improved ? '+' : '−' }}{{ Math.abs(aiDelta.diff) }}%
           </span>
         </template>
         <span v-else class="text-gray-400 dark:text-gray-500">of {{ metrics.aiThreadCount + metrics.humanThreadCount }} threads</span>
@@ -146,7 +146,7 @@ const humanDelta = computed(() => aiReviewDelta(humanPct.value, priorHumanPct.va
             class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"
           ><path stroke-linecap="round" stroke-linejoin="round" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
           <span :class="humanDelta.improved ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-            {{ humanDelta.improved ? '+' : '−' }}{{ Math.abs(humanDelta.diff) }}pp
+            {{ humanDelta.improved ? '+' : '−' }}{{ Math.abs(humanDelta.diff) }}%
           </span>
         </template>
         <span v-else class="text-gray-400 dark:text-gray-500">of {{ metrics.aiThreadCount + metrics.humanThreadCount }} threads</span>

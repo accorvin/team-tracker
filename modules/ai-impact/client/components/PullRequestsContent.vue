@@ -18,6 +18,10 @@ const knownRepos = ref([])
 
 const { prData, loading, error, load, isAggregate } = usePullRequests(timeWindowRef, selectedRepo)
 
+function goToSettings() {
+  window.location.hash = '#/settings?tab=ai-impact'
+}
+
 watch(prData, (data) => {
   if (!data) return
   // Update known repos from aggregate response (which includes the repos array)
@@ -97,9 +101,13 @@ const pullRequests = computed(() => prData.value?.pullRequests || [])
             </svg>
           </div>
           <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Configure repos to get started</h3>
-          <p class="text-gray-500 dark:text-gray-400 mt-1">
-            Add GitHub repos in Settings &gt; AI Impact to begin tracking PR analytics.
-          </p>
+          <p class="text-gray-500 dark:text-gray-400 mt-2">Add GitHub repos in Settings to begin tracking PR analytics.</p>
+          <button
+            @click="goToSettings"
+            class="mt-3 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors"
+          >
+            Go to AI Impact Settings
+          </button>
         </div>
       </div>
 
@@ -111,9 +119,13 @@ const pullRequests = computed(() => prData.value?.pullRequests || [])
             </svg>
           </div>
           <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">No PR data yet</h3>
-          <p class="text-gray-500 dark:text-gray-400 mt-1">
-            An admin can trigger a PR data refresh from Settings &gt; AI Impact.
-          </p>
+          <p class="text-gray-500 dark:text-gray-400 mt-2">An admin can trigger a PR data refresh from Settings.</p>
+          <button
+            @click="goToSettings"
+            class="mt-3 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors"
+          >
+            Go to AI Impact Settings
+          </button>
         </div>
       </div>
 
