@@ -372,14 +372,9 @@ function handleCancelDelete() {
 // ─── Reorder handler ───
 
 async function handleReorder(orderedNames) {
-  var previousBigRocks = bigRocks.value.slice()
-  var rocksByName = {}
-  for (var i = 0; i < previousBigRocks.length; i++) {
-    rocksByName[previousBigRocks[i].name] = previousBigRocks[i]
-  }
-  var optimistic = orderedNames.map(function(name, idx) {
-    return Object.assign({}, rocksByName[name], { priority: idx + 1 })
-  })
+  const previousBigRocks = bigRocks.value.slice()
+  const rocksByName = Object.fromEntries(previousBigRocks.map(r => [r.name, r]))
+  const optimistic = orderedNames.map((name, idx) => ({ ...rocksByName[name], priority: idx + 1 }))
   updateBigRocksInPlace(optimistic)
 
   try {
