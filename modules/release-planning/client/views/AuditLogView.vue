@@ -3,16 +3,16 @@ import { ref, computed, watch, onMounted, inject } from 'vue'
 import { useAuditLog } from '../composables/useAuditLog'
 import { useReleases } from '../composables/useReleasePlanning'
 
-var moduleNav = inject('moduleNav')
-var { entries, total, loading, error, loadAuditLog } = useAuditLog()
-var { releases, loadReleases } = useReleases()
+const moduleNav = inject('moduleNav')
+const { entries, total, loading, error, loadAuditLog } = useAuditLog()
+const { releases, loadReleases } = useReleases()
 
-var selectedVersion = ref('')
-var selectedAction = ref('')
-var currentPage = ref(1)
-var pageSize = 25
+const selectedVersion = ref('')
+const selectedAction = ref('')
+const currentPage = ref(1)
+const pageSize = 25
 
-var ACTION_OPTIONS = [
+const ACTION_OPTIONS = [
   { value: '', label: 'All actions' },
   { value: 'create_rock', label: 'Created Big Rock' },
   { value: 'update_rock', label: 'Updated Big Rock' },
@@ -27,7 +27,7 @@ var ACTION_OPTIONS = [
   { value: 'seed', label: 'Seeded data' }
 ]
 
-var ACTION_COLORS = {
+const ACTION_COLORS = {
   create_rock: 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400',
   update_rock: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
   delete_rock: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
@@ -46,13 +46,13 @@ function actionColor(action) {
 }
 
 function actionLabel(action) {
-  var opt = ACTION_OPTIONS.find(function(o) { return o.value === action })
+  const opt = ACTION_OPTIONS.find(function(o) { return o.value === action })
   return opt ? opt.label : action
 }
 
 function shortUser(email) {
   if (!email) return 'System'
-  var at = email.indexOf('@')
+  const at = email.indexOf('@')
   return at > 0 ? email.substring(0, at) : email
 }
 
@@ -67,7 +67,7 @@ function formatTimestamp(iso) {
   })
 }
 
-var totalPages = computed(function() {
+const totalPages = computed(function() {
   return Math.max(1, Math.ceil(total.value / pageSize))
 })
 
@@ -76,7 +76,7 @@ function goBack() {
 }
 
 function fetchPage() {
-  var opts = {
+  const opts = {
     limit: pageSize,
     offset: (currentPage.value - 1) * pageSize
   }
@@ -94,7 +94,7 @@ watch(currentPage, fetchPage)
 
 onMounted(async function() {
   await loadReleases()
-  var params = moduleNav ? moduleNav.params : {}
+  const params = moduleNav ? moduleNav.params : {}
   if (params && params.version) {
     selectedVersion.value = params.version
   } else {

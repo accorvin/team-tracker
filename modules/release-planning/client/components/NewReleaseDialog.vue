@@ -34,8 +34,8 @@ const unconfiguredSmartSheetReleases = computed(function() {
 })
 
 const docId = computed(function() {
-  var input = docUrl.value.trim()
-  var urlMatch = input.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/)
+  const input = docUrl.value.trim()
+  const urlMatch = input.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/)
   if (urlMatch) return urlMatch[1]
   if (/^[a-zA-Z0-9_-]{10,}$/.test(input)) return input
   return null
@@ -85,7 +85,7 @@ watch(mode, function(newMode) {
 async function loadSmartSheetReleases() {
   smartSheetLoading.value = true
   try {
-    var data = await fetchSmartSheetReleases()
+    const data = await fetchSmartSheetReleases()
     if (data && data.available && data.available.length > 0) {
       smartSheetReleases.value = data.available
       smartSheetAvailable.value = true
@@ -117,7 +117,7 @@ async function loadPreview() {
   previewData.value = null
 
   try {
-    var data = await previewDocImport(version.value.trim(), docId.value)
+    const data = await previewDocImport(version.value.trim(), docId.value)
     previewData.value = data
   } catch (err) {
     previewError.value = err.message || 'Failed to load preview'
@@ -132,9 +132,9 @@ async function handleCreate() {
   errorMsg.value = ''
 
   try {
-    var result
+    let result
     if (!releaseCreated.value) {
-      var cloneSource = mode.value === 'clone' ? cloneFrom.value : null
+      const cloneSource = mode.value === 'clone' ? cloneFrom.value : null
       result = await createRelease(version.value.trim(), cloneSource)
 
       if (result.status === 'skipped') {

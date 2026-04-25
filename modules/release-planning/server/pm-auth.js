@@ -7,7 +7,7 @@
 
 function createRequirePM(readFromStorage) {
   function isPM(email) {
-    var pmList = readFromStorage('release-planning/pm-users.json')
+    const pmList = readFromStorage('release-planning/pm-users.json')
     return pmList && pmList.emails && pmList.emails.includes(email.toLowerCase())
   }
 
@@ -20,13 +20,13 @@ function createRequirePM(readFromStorage) {
 }
 
 function getPMUsers(readFromStorage) {
-  var data = readFromStorage('release-planning/pm-users.json')
+  const data = readFromStorage('release-planning/pm-users.json')
   return (data && data.emails) || []
 }
 
 function addPMUser(readFromStorage, writeToStorage, email) {
-  var normalized = email.toLowerCase()
-  var data = readFromStorage('release-planning/pm-users.json') || { emails: [] }
+  const normalized = email.toLowerCase()
+  const data = readFromStorage('release-planning/pm-users.json') || { emails: [] }
   if (!data.emails.includes(normalized)) {
     data.emails.push(normalized)
     writeToStorage('release-planning/pm-users.json', data)
@@ -35,15 +35,15 @@ function addPMUser(readFromStorage, writeToStorage, email) {
 }
 
 function removePMUser(readFromStorage, writeToStorage, email) {
-  var normalized = email.toLowerCase()
-  var data = readFromStorage('release-planning/pm-users.json') || { emails: [] }
+  const normalized = email.toLowerCase()
+  const data = readFromStorage('release-planning/pm-users.json') || { emails: [] }
   data.emails = data.emails.filter(function(e) { return e !== normalized })
   writeToStorage('release-planning/pm-users.json', data)
   return data.emails
 }
 
 function isPM(email, readFromStorage) {
-  var pmList = readFromStorage('release-planning/pm-users.json')
+  const pmList = readFromStorage('release-planning/pm-users.json')
   return !!(pmList && pmList.emails && pmList.emails.includes(email.toLowerCase()))
 }
 

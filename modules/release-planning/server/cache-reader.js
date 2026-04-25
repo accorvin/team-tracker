@@ -59,7 +59,7 @@ function getComponents(item) {
 
 // ─── Phase Extraction ───
 
-var RELEASE_TYPE_MAP = {
+const RELEASE_TYPE_MAP = {
   'Tech Preview': 'TP',
   'Developer Preview': 'DP',
   'General Availability': 'GA',
@@ -71,16 +71,16 @@ var RELEASE_TYPE_MAP = {
 function getPhase(item, fixVersions) {
   // Prefer explicit releaseType field from Jira (customfield_10851)
   if (item.releaseType) {
-    var mapped = RELEASE_TYPE_MAP[item.releaseType]
+    const mapped = RELEASE_TYPE_MAP[item.releaseType]
     if (mapped) return mapped
   }
   // Fall back to deriving from fixVersions
-  for (var i = 0; i < fixVersions.length; i++) {
-    var v = fixVersions[i].toUpperCase()
+  for (let i = 0; i < fixVersions.length; i++) {
+    const v = fixVersions[i].toUpperCase()
     if (v.indexOf('GA') !== -1) return 'GA'
   }
-  for (var j = 0; j < fixVersions.length; j++) {
-    var v2 = fixVersions[j].toUpperCase().replace(/[^A-Z0-9]/g, '')
+  for (let j = 0; j < fixVersions.length; j++) {
+    const v2 = fixVersions[j].toUpperCase().replace(/[^A-Z0-9]/g, '')
     if (v2.indexOf('EA2') !== -1 || v2.indexOf('DP2') !== -1) return 'DP'
     if (v2.indexOf('EA1') !== -1 || v2.indexOf('DP1') !== -1 || v2.indexOf('TP') !== -1) return 'TP'
   }
@@ -95,10 +95,10 @@ function getPhase(item, fixVersions) {
  * detail files (objects with displayName).
  */
 function mapToCandidate(item, bigRockName, sourcePass) {
-  var components = getComponents(item)
-  var targetVersions = getTargetVersions(item)
-  var fixVersions = getFixVersions(item)
-  var labels = getLabels(item)
+  const components = getComponents(item)
+  const targetVersions = getTargetVersions(item)
+  const fixVersions = getFixVersions(item)
+  const labels = getLabels(item)
 
   return {
     bigRock: bigRockName,
@@ -129,8 +129,8 @@ function mapToCandidate(item, bigRockName, sourcePass) {
  */
 function findRfeFromLinks(issueLinks) {
   if (!Array.isArray(issueLinks)) return { key: '', status: '' }
-  for (var i = 0; i < issueLinks.length; i++) {
-    var link = issueLinks[i]
+  for (let i = 0; i < issueLinks.length; i++) {
+    const link = issueLinks[i]
     if (link.linkedKey && link.linkedKey.startsWith('RHAIRFE-')) {
       return { key: link.linkedKey, status: link.linkedStatus || '' }
     }
@@ -143,7 +143,7 @@ function findRfeFromLinks(issueLinks) {
  */
 function rfeLinksToOutcome(issueLinks, outcomeSet) {
   if (!Array.isArray(issueLinks)) return false
-  for (var i = 0; i < issueLinks.length; i++) {
+  for (let i = 0; i < issueLinks.length; i++) {
     if (outcomeSet.has(issueLinks[i].linkedKey)) return true
   }
   return false
@@ -156,22 +156,22 @@ function rfeLinksToOutcome(issueLinks, outcomeSet) {
  * Uses parentKey from the index to identify outcome children.
  */
 function findTier1Features(readFromStorage, index, outcomeKeys) {
-  var outcomeSet = new Set(outcomeKeys)
-  var results = []
+  const outcomeSet = new Set(outcomeKeys)
+  const results = []
 
-  var features = index.features || []
-  for (var i = 0; i < features.length; i++) {
-    var f = features[i]
+  const features = index.features || []
+  for (let i = 0; i < features.length; i++) {
+    const f = features[i]
     if (!f.parentKey || !outcomeSet.has(f.parentKey)) continue
 
-    var versions = getTargetVersions(f)
+    const versions = getTargetVersions(f)
     if (versions.length === 0) continue
 
-    var status = f.status || ''
+    const status = f.status || ''
     if (CLOSED_STATUSES.indexOf(status) !== -1) continue
 
     // Load detail for components and issueLinks
-    var detail = loadFeatureDetail(readFromStorage, f.key)
+    const detail = loadFeatureDetail(readFromStorage, f.key)
     if (detail) {
       detail._indexEntry = f
     }
@@ -189,22 +189,22 @@ function findTier1Features(readFromStorage, index, outcomeKeys) {
  * issueLinks to find connections to outcome keys.
  */
 function findTier1Rfes(readFromStorage, index, outcomeKeys, release) {
-  var outcomeSet = new Set(outcomeKeys)
-  var results = []
-  var candidateLabel = release + '-candidate'
+  const outcomeSet = new Set(outcomeKeys)
+  const results = []
+  const candidateLabel = release + '-candidate'
 
-  var rfes = index.rfes || []
-  for (var i = 0; i < rfes.length; i++) {
-    var r = rfes[i]
-    var status = r.status || ''
+  const rfes = index.rfes || []
+  for (let i = 0; i < rfes.length; i++) {
+    const r = rfes[i]
+    const status = r.status || ''
     if (CLOSED_STATUSES.indexOf(status) !== -1) continue
     if (status === 'Approved') continue
 
-    var labels = getLabels(r)
+    const labels = getLabels(r)
     if (labels.indexOf(candidateLabel) === -1) continue
 
     // Need detail file to check issueLinks
-    var detail = loadRfeDetail(readFromStorage, r.key)
+    const detail = loadRfeDetail(readFromStorage, r.key)
     if (!detail) continue
 
     if (!rfeLinksToOutcome(detail.issueLinks, outcomeSet)) continue
@@ -220,12 +220,12 @@ function findTier1Rfes(readFromStorage, index, outcomeKeys, release) {
  * Outcomes are RHAISTRAT issues that may appear in the features list.
  */
 function findOutcomeSummaries(index, outcomeKeys) {
-  var summaries = {}
+  const summaries = {}
   if (!outcomeKeys || outcomeKeys.length === 0) return summaries
 
-  var keySet = new Set(outcomeKeys)
-  var features = index.features || []
-  for (var i = 0; i < features.length; i++) {
+  const keySet = new Set(outcomeKeys)
+  const features = index.features || []
+  for (let i = 0; i < features.length; i++) {
     if (keySet.has(features[i].key)) {
       summaries[features[i].key] = features[i].summary || ''
     }
@@ -239,16 +239,16 @@ function findOutcomeSummaries(index, outcomeKeys) {
  * excluding already-discovered Tier 1 keys.
  */
 function findTier2Features(readFromStorage, index, release, excludeKeys) {
-  var results = []
-  var features = index.features || []
+  const results = []
+  const features = index.features || []
 
-  for (var i = 0; i < features.length; i++) {
-    var f = features[i]
+  for (let i = 0; i < features.length; i++) {
+    const f = features[i]
     if (excludeKeys.has(f.key)) continue
 
-    var versions = getTargetVersions(f)
-    var matchesRelease = false
-    for (var j = 0; j < versions.length; j++) {
+    const versions = getTargetVersions(f)
+    let matchesRelease = false
+    for (let j = 0; j < versions.length; j++) {
       if (versions[j].indexOf(release) !== -1) {
         matchesRelease = true
         break
@@ -256,10 +256,10 @@ function findTier2Features(readFromStorage, index, release, excludeKeys) {
     }
     if (!matchesRelease) continue
 
-    var status = f.status || ''
+    const status = f.status || ''
     if (CLOSED_STATUSES.indexOf(status) !== -1) continue
 
-    var detail = loadFeatureDetail(readFromStorage, f.key)
+    const detail = loadFeatureDetail(readFromStorage, f.key)
     results.push(detail || f)
   }
 
@@ -271,22 +271,22 @@ function findTier2Features(readFromStorage, index, release, excludeKeys) {
  * not closed, not Approved, excluding Tier 1 keys.
  */
 function findTier2Rfes(readFromStorage, index, release, excludeKeys) {
-  var results = []
-  var candidateLabel = release + '-candidate'
-  var rfes = index.rfes || []
+  const results = []
+  const candidateLabel = release + '-candidate'
+  const rfes = index.rfes || []
 
-  for (var i = 0; i < rfes.length; i++) {
-    var r = rfes[i]
+  for (let i = 0; i < rfes.length; i++) {
+    const r = rfes[i]
     if (excludeKeys.has(r.key)) continue
 
-    var status = r.status || ''
+    const status = r.status || ''
     if (CLOSED_STATUSES.indexOf(status) !== -1) continue
     if (status === 'Approved') continue
 
-    var labels = getLabels(r)
+    const labels = getLabels(r)
     if (labels.indexOf(candidateLabel) === -1) continue
 
-    var detail = loadRfeDetail(readFromStorage, r.key)
+    const detail = loadRfeDetail(readFromStorage, r.key)
     results.push(detail || r)
   }
 
@@ -297,22 +297,22 @@ function findTier2Rfes(readFromStorage, index, release, excludeKeys) {
  * Find Tier 3 features: In Progress, no target version, no fix version.
  */
 function findTier3Features(readFromStorage, index, excludeKeys) {
-  var results = []
-  var features = index.features || []
+  const results = []
+  const features = index.features || []
 
-  for (var i = 0; i < features.length; i++) {
-    var f = features[i]
+  for (let i = 0; i < features.length; i++) {
+    const f = features[i]
     if (excludeKeys.has(f.key)) continue
 
     if (f.status !== 'In Progress') continue
 
-    var versions = getTargetVersions(f)
+    const versions = getTargetVersions(f)
     if (versions.length > 0) continue
 
-    var fixVersions = getFixVersions(f)
+    const fixVersions = getFixVersions(f)
     if (fixVersions.length > 0) continue
 
-    var detail = loadFeatureDetail(readFromStorage, f.key)
+    const detail = loadFeatureDetail(readFromStorage, f.key)
     results.push(detail || f)
   }
 
@@ -324,21 +324,21 @@ function findTier3Features(readFromStorage, index, excludeKeys) {
  * Returns { key: { valid, summary?, error? } } for each key.
  */
 function validateKeysFromCache(index, keys) {
-  var results = {}
-  var keyMap = {}
+  const results = {}
+  const keyMap = {}
 
-  var features = index.features || []
-  for (var i = 0; i < features.length; i++) {
+  const features = index.features || []
+  for (let i = 0; i < features.length; i++) {
     keyMap[features[i].key] = features[i].summary || ''
   }
 
-  var rfes = index.rfes || []
-  for (var j = 0; j < rfes.length; j++) {
+  const rfes = index.rfes || []
+  for (let j = 0; j < rfes.length; j++) {
     keyMap[rfes[j].key] = rfes[j].summary || ''
   }
 
-  for (var k = 0; k < keys.length; k++) {
-    var key = keys[k]
+  for (let k = 0; k < keys.length; k++) {
+    const key = keys[k]
     if (keyMap[key] !== undefined) {
       results[key] = { valid: true, summary: keyMap[key] }
     } else {

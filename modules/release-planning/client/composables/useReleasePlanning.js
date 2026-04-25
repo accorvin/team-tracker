@@ -150,7 +150,7 @@ export function useReleasePlanning() {
   }
 
   async function createRelease(version, cloneFrom) {
-    var body = { version: version }
+    const body = { version: version }
     if (cloneFrom) {
       body.cloneFrom = cloneFrom
     }
@@ -169,7 +169,7 @@ export function useReleasePlanning() {
   }
 
   async function seedFromFixture() {
-    var fixture = await apiRequest(`${API_BASE}/admin/seed/fixture`)
+    const fixture = await apiRequest(`${API_BASE}/admin/seed/fixture`)
     return apiRequest(`${API_BASE}/admin/seed`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -179,7 +179,7 @@ export function useReleasePlanning() {
 
   async function fetchSmartSheetReleases() {
     try {
-      var data = await apiRequest(`${API_BASE}/smartsheet/releases`)
+      const data = await apiRequest(`${API_BASE}/smartsheet/releases`)
       return data
     } catch {
       return { available: [], configured: [] }

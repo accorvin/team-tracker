@@ -163,14 +163,14 @@ function deleteBigRock(readFromStorage, writeToStorage, version, name) {
  * @returns {object} { bigRocks } - The reordered list with new priorities
  */
 function reorderBigRocks(readFromStorage, writeToStorage, version, orderedNames) {
-  var config = getConfig(readFromStorage)
+  const config = getConfig(readFromStorage)
 
   if (!config.releases[version]) {
     throw new Error('Release ' + version + ' not found')
   }
 
-  var bigRocks = config.releases[version].bigRocks || []
-  var currentNames = bigRocks.map(function(r) { return r.name })
+  const bigRocks = config.releases[version].bigRocks || []
+  const currentNames = bigRocks.map(function(r) { return r.name })
 
   // Validate: orderedNames must be an array
   if (!Array.isArray(orderedNames)) {
@@ -186,12 +186,12 @@ function reorderBigRocks(readFromStorage, writeToStorage, version, orderedNames)
   }
 
   // Validate: same set of names (no duplicates, no extras, no missing)
-  var currentSet = Object.create(null)
-  for (var i = 0; i < currentNames.length; i++) {
+  const currentSet = Object.create(null)
+  for (let i = 0; i < currentNames.length; i++) {
     currentSet[currentNames[i]] = true
   }
-  var submittedSet = Object.create(null)
-  for (var j = 0; j < orderedNames.length; j++) {
+  const submittedSet = Object.create(null)
+  for (let j = 0; j < orderedNames.length; j++) {
     if (submittedSet[orderedNames[j]]) {
       throw Object.assign(
         new Error('Order list contains duplicate name: ' + orderedNames[j] + '. Expected names: ' + JSON.stringify(currentNames)),
@@ -208,13 +208,13 @@ function reorderBigRocks(readFromStorage, writeToStorage, version, orderedNames)
   }
 
   // Build a lookup map for fast access
-  var rockByName = Object.create(null)
-  for (var k = 0; k < bigRocks.length; k++) {
+  const rockByName = Object.create(null)
+  for (let k = 0; k < bigRocks.length; k++) {
     rockByName[bigRocks[k].name] = bigRocks[k]
   }
 
   // Reorder
-  var reordered = orderedNames.map(function(name) { return rockByName[name] })
+  const reordered = orderedNames.map(function(name) { return rockByName[name] })
 
   // Renumber priorities
   renumberPriorities(reordered)
@@ -238,7 +238,7 @@ function createRelease(readFromStorage, writeToStorage, version) {
     throw new Error('Version is required')
   }
 
-  var config = getConfig(readFromStorage)
+  const config = getConfig(readFromStorage)
 
   if (config.releases[version]) {
     throw Object.assign(
@@ -267,7 +267,7 @@ function cloneRelease(readFromStorage, writeToStorage, version, cloneFrom) {
     throw new Error('Version is required')
   }
 
-  var config = getConfig(readFromStorage)
+  const config = getConfig(readFromStorage)
 
   if (config.releases[version]) {
     throw Object.assign(
@@ -284,8 +284,8 @@ function cloneRelease(readFromStorage, writeToStorage, version, cloneFrom) {
   }
 
   // Deep-copy the bigRocks array so edits to the clone don't affect the source
-  var sourceBigRocks = config.releases[cloneFrom].bigRocks || []
-  var clonedBigRocks = JSON.parse(JSON.stringify(sourceBigRocks))
+  const sourceBigRocks = config.releases[cloneFrom].bigRocks || []
+  const clonedBigRocks = JSON.parse(JSON.stringify(sourceBigRocks))
 
   config.releases[version] = { release: version, bigRocks: clonedBigRocks }
   writeToStorage('release-planning/config.json', config)
@@ -302,7 +302,7 @@ function cloneRelease(readFromStorage, writeToStorage, version, cloneFrom) {
  * @returns {object} { deleted }
  */
 function deleteRelease(readFromStorage, writeToStorage, version) {
-  var config = getConfig(readFromStorage)
+  const config = getConfig(readFromStorage)
 
   if (!config.releases[version]) {
     throw Object.assign(
@@ -322,7 +322,7 @@ function deleteRelease(readFromStorage, writeToStorage, version) {
  * Modifies the array in place.
  */
 function renumberPriorities(bigRocks) {
-  for (var i = 0; i < bigRocks.length; i++) {
+  for (let i = 0; i < bigRocks.length; i++) {
     bigRocks[i].priority = i + 1
   }
 }

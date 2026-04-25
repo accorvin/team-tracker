@@ -12,16 +12,16 @@ const {
 } = require('./cache-reader')
 
 function sortByPriority(a, b) {
-  var pa = PRIORITY_ORDER[a.priority] !== undefined ? PRIORITY_ORDER[a.priority] : 99
-  var pb = PRIORITY_ORDER[b.priority] !== undefined ? PRIORITY_ORDER[b.priority] : 99
+  const pa = PRIORITY_ORDER[a.priority] !== undefined ? PRIORITY_ORDER[a.priority] : 99
+  const pb = PRIORITY_ORDER[b.priority] !== undefined ? PRIORITY_ORDER[b.priority] : 99
   if (pa !== pb) return pa - pb
   return a.issueKey.localeCompare(b.issueKey)
 }
 
 function runPipeline(config, bigRocks, release, readFromStorage, opts) {
-  var rockFilter = opts && opts.rockFilter
+  const rockFilter = opts && opts.rockFilter
 
-  var rocksToProcess = rockFilter
+  const rocksToProcess = rockFilter
     ? bigRocks.filter(function(r) { return r.name === rockFilter })
     : bigRocks
 
@@ -29,41 +29,41 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
     throw new Error('No matching rock found for filter: ' + rockFilter + '. Available: ' + bigRocks.map(function(r) { return r.name }).join(', '))
   }
 
-  var rocksWithOutcomes = rocksToProcess.filter(function(r) { return r.outcomeKeys && r.outcomeKeys.length > 0 })
-  var rocksWithout = rocksToProcess.filter(function(r) { return !r.outcomeKeys || r.outcomeKeys.length === 0 })
+  const rocksWithOutcomes = rocksToProcess.filter(function(r) { return r.outcomeKeys && r.outcomeKeys.length > 0 })
+  const rocksWithout = rocksToProcess.filter(function(r) { return !r.outcomeKeys || r.outcomeKeys.length === 0 })
 
-  for (var w = 0; w < rocksWithout.length; w++) {
+  for (let w = 0; w < rocksWithout.length; w++) {
     console.warn('[release-planning] Skipping ' + rocksWithout[w].name + ': no outcomeKeys defined')
   }
 
   // Load the feature-traffic index once
-  var index = loadIndex(readFromStorage)
+  const index = loadIndex(readFromStorage)
 
   // Collect all outcome keys
-  var allOutcomeKeys = []
-  for (var r = 0; r < rocksWithOutcomes.length; r++) {
+  const allOutcomeKeys = []
+  for (let r = 0; r < rocksWithOutcomes.length; r++) {
     allOutcomeKeys.push.apply(allOutcomeKeys, rocksWithOutcomes[r].outcomeKeys)
   }
 
   // Fetch outcome summaries from cache
-  var outcomeSummaries = findOutcomeSummaries(index, allOutcomeKeys)
+  const outcomeSummaries = findOutcomeSummaries(index, allOutcomeKeys)
 
   // Phase A: Discover children for each rock's outcomes
   // Maps: issueKey -> { candidate, rockSet: Set<"priority:name"> }
-  var featureMap = new Map()
-  var rfeMap = new Map()
-  var skippedCount = 0
-  var terminalFilteredCount = 0
+  const featureMap = new Map()
+  const rfeMap = new Map()
+  let skippedCount = 0
+  let terminalFilteredCount = 0
 
-  for (var ri = 0; ri < rocksWithOutcomes.length; ri++) {
-    var rock = rocksWithOutcomes[ri]
-    var rockChildCount = 0
+  for (let ri = 0; ri < rocksWithOutcomes.length; ri++) {
+    const rock = rocksWithOutcomes[ri]
+    let rockChildCount = 0
 
     // Find Tier 1 features for this rock's outcomes
-    var rawFeatures = findTier1Features(readFromStorage, index, rock.outcomeKeys)
-    for (var fi = 0; fi < rawFeatures.length; fi++) {
-      var feat = rawFeatures[fi]
-      var candidate = mapToCandidate(feat, rock.name, 'outcome')
+    const rawFeatures = findTier1Features(readFromStorage, index, rock.outcomeKeys)
+    for (let fi = 0; fi < rawFeatures.length; fi++) {
+      const feat = rawFeatures[fi]
+      const candidate = mapToCandidate(feat, rock.name, 'outcome')
 
       // Filter by release match
       if (!candidate.targetRelease.includes(release)) {
@@ -78,14 +78,14 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
       }
 
       // Enrich with RFE link from issueLinks
-      var issueLinks = feat.issueLinks || feat._indexEntry && feat._indexEntry.issueLinks || []
-      var rfeLink = findRfeFromLinks(issueLinks)
+      const issueLinks = feat.issueLinks || feat._indexEntry && feat._indexEntry.issueLinks || []
+      const rfeLink = findRfeFromLinks(issueLinks)
       if (rfeLink.key) {
         candidate.rfe = rfeLink.key
         candidate.rfeStatus = rfeLink.status
       }
 
-      var key = candidate.issueKey
+      const key = candidate.issueKey
       if (featureMap.has(key)) {
         featureMap.get(key).rockSet.add(rock.priority + ':' + rock.name)
       } else {
@@ -95,12 +95,12 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
     }
 
     // Find Tier 1 RFEs for this rock's outcomes
-    var rawRfes = findTier1Rfes(readFromStorage, index, rock.outcomeKeys, release)
-    for (var rfi = 0; rfi < rawRfes.length; rfi++) {
-      var rfe = rawRfes[rfi]
-      var rfeCandidate = mapToCandidate(rfe, rock.name, 'outcome')
+    const rawRfes = findTier1Rfes(readFromStorage, index, rock.outcomeKeys, release)
+    for (let rfi = 0; rfi < rawRfes.length; rfi++) {
+      const rfe = rawRfes[rfi]
+      const rfeCandidate = mapToCandidate(rfe, rock.name, 'outcome')
 
-      var rfeKey = rfeCandidate.issueKey
+      const rfeKey = rfeCandidate.issueKey
       if (rfeMap.has(rfeKey)) {
         rfeMap.get(rfeKey).rockSet.add(rock.priority + ':' + rock.name)
       } else {
@@ -115,59 +115,59 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
   }
 
   // Phase B: Merge Big Rock names and build Tier 1 lists
-  var rockPriority = {}
-  for (var bp = 0; bp < bigRocks.length; bp++) {
+  const rockPriority = {}
+  for (let bp = 0; bp < bigRocks.length; bp++) {
     rockPriority[bigRocks[bp].name] = bigRocks[bp].priority
   }
 
   function mergeRockNames(rockSet) {
-    var pairs = []
+    const pairs = []
     rockSet.forEach(function(s) {
-      var idx = s.indexOf(':')
+      const idx = s.indexOf(':')
       pairs.push([parseInt(s.slice(0, idx), 10), s.slice(idx + 1)])
     })
     pairs.sort(function(a, b) { return a[0] - b[0] })
     return pairs.map(function(p) { return p[1] }).join(', ')
   }
 
-  var tier1Features = []
+  const tier1Features = []
   featureMap.forEach(function(entry) {
-    var merged = mergeRockNames(entry.rockSet)
+    const merged = mergeRockNames(entry.rockSet)
     tier1Features.push(Object.assign({}, entry.candidate, { bigRock: merged, tier: 1 }))
   })
 
-  var tier1Rfes = []
+  const tier1Rfes = []
   rfeMap.forEach(function(entry) {
-    var merged = mergeRockNames(entry.rockSet)
+    const merged = mergeRockNames(entry.rockSet)
     tier1Rfes.push(Object.assign({}, entry.candidate, { bigRock: merged, tier: 1 }))
   })
 
   // Sort Tier 1
   tier1Features.sort(function(a, b) {
-    var ra = rockPriority[a.bigRock.split(', ')[0]] || 999
-    var rb = rockPriority[b.bigRock.split(', ')[0]] || 999
+    const ra = rockPriority[a.bigRock.split(', ')[0]] || 999
+    const rb = rockPriority[b.bigRock.split(', ')[0]] || 999
     if (ra !== rb) return ra - rb
     return sortByPriority(a, b)
   })
   tier1Rfes.sort(function(a, b) {
-    var ra = rockPriority[a.bigRock.split(', ')[0]] || 999
-    var rb = rockPriority[b.bigRock.split(', ')[0]] || 999
+    const ra = rockPriority[a.bigRock.split(', ')[0]] || 999
+    const rb = rockPriority[b.bigRock.split(', ')[0]] || 999
     if (ra !== rb) return ra - rb
     return sortByPriority(a, b)
   })
 
   // Phase C: Tier 2 discovery
-  var tier1FeatureKeys = new Set(tier1Features.map(function(c) { return c.issueKey }))
-  var tier1RfeKeys = new Set(tier1Rfes.map(function(c) { return c.issueKey }))
+  const tier1FeatureKeys = new Set(tier1Features.map(function(c) { return c.issueKey }))
+  const tier1RfeKeys = new Set(tier1Rfes.map(function(c) { return c.issueKey }))
 
-  var rawTier2Features = findTier2Features(readFromStorage, index, release, tier1FeatureKeys)
-  var rawTier2Rfes = findTier2Rfes(readFromStorage, index, release, tier1RfeKeys)
+  const rawTier2Features = findTier2Features(readFromStorage, index, release, tier1FeatureKeys)
+  const rawTier2Rfes = findTier2Rfes(readFromStorage, index, release, tier1RfeKeys)
 
   // Post-filter terminal statuses on Tier 2 features
-  var tier2Features = []
-  for (var t2i = 0; t2i < rawTier2Features.length; t2i++) {
-    var t2f = rawTier2Features[t2i]
-    var t2candidate = mapToCandidate(t2f, '', 'tier2')
+  const tier2Features = []
+  for (let t2i = 0; t2i < rawTier2Features.length; t2i++) {
+    const t2f = rawTier2Features[t2i]
+    const t2candidate = mapToCandidate(t2f, '', 'tier2')
 
     if (TERMINAL_STATUSES.indexOf(t2candidate.status) !== -1) {
       terminalFilteredCount++
@@ -175,8 +175,8 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
     }
 
     // Enrich with RFE link
-    var t2links = t2f.issueLinks || []
-    var t2rfeLink = findRfeFromLinks(t2links)
+    const t2links = t2f.issueLinks || []
+    const t2rfeLink = findRfeFromLinks(t2links)
     if (t2rfeLink.key) {
       t2candidate.rfe = t2rfeLink.key
       t2candidate.rfeStatus = t2rfeLink.status
@@ -186,23 +186,23 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
   }
   tier2Features.sort(sortByPriority)
 
-  var tier2RfesTagged = rawTier2Rfes.map(function(rfe) {
+  const tier2RfesTagged = rawTier2Rfes.map(function(rfe) {
     return Object.assign({}, mapToCandidate(rfe, '', 'tier2'), { tier: 2 })
   })
   tier2RfesTagged.sort(sortByPriority)
 
   // Phase D: Tier 3 discovery
-  var tier2FeatureKeys = new Set(tier2Features.map(function(c) { return c.issueKey }))
-  var tier3Exclude = new Set()
+  const tier2FeatureKeys = new Set(tier2Features.map(function(c) { return c.issueKey }))
+  const tier3Exclude = new Set()
   tier1FeatureKeys.forEach(function(k) { tier3Exclude.add(k) })
   tier2FeatureKeys.forEach(function(k) { tier3Exclude.add(k) })
 
-  var rawTier3Features = findTier3Features(readFromStorage, index, tier3Exclude)
+  const rawTier3Features = findTier3Features(readFromStorage, index, tier3Exclude)
 
-  var tier3Features = []
-  for (var t3i = 0; t3i < rawTier3Features.length; t3i++) {
-    var t3f = rawTier3Features[t3i]
-    var t3candidate = mapToCandidate(t3f, '', 'tier3')
+  const tier3Features = []
+  for (let t3i = 0; t3i < rawTier3Features.length; t3i++) {
+    const t3f = rawTier3Features[t3i]
+    const t3candidate = mapToCandidate(t3f, '', 'tier3')
 
     if (TERMINAL_STATUSES.indexOf(t3candidate.status) !== -1) {
       terminalFilteredCount++
@@ -212,8 +212,8 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
     if (t3candidate.targetRelease || t3candidate.fixVersion) continue
 
     // Enrich with RFE link
-    var t3links = t3f.issueLinks || []
-    var t3rfeLink = findRfeFromLinks(t3links)
+    const t3links = t3f.issueLinks || []
+    const t3rfeLink = findRfeFromLinks(t3links)
     if (t3rfeLink.key) {
       t3candidate.rfe = t3rfeLink.key
       t3candidate.rfeStatus = t3rfeLink.status
@@ -223,15 +223,15 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
   }
   tier3Features.sort(sortByPriority)
 
-  var allFeatures = tier1Features.concat(tier2Features, tier3Features)
-  var allRfes = tier1Rfes.concat(tier2RfesTagged)
+  const allFeatures = tier1Features.concat(tier2Features, tier3Features)
+  const allRfes = tier1Rfes.concat(tier2RfesTagged)
 
   // Per-rock stats
-  var perRockStats = {}
-  for (var si = 0; si < rocksWithOutcomes.length; si++) {
-    var statRock = rocksWithOutcomes[si]
-    var rockFeatures = tier1Features.filter(function(c) { return c.bigRock.split(', ')[0] === statRock.name }).length
-    var rockRfes = tier1Rfes.filter(function(c) { return c.bigRock.split(', ')[0] === statRock.name }).length
+  const perRockStats = {}
+  for (let si = 0; si < rocksWithOutcomes.length; si++) {
+    const statRock = rocksWithOutcomes[si]
+    const rockFeatures = tier1Features.filter(function(c) { return c.bigRock.split(', ')[0] === statRock.name }).length
+    const rockRfes = tier1Rfes.filter(function(c) { return c.bigRock.split(', ')[0] === statRock.name }).length
     perRockStats[statRock.name] = { features: rockFeatures, rfes: rockRfes }
   }
 
@@ -253,36 +253,36 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
 }
 
 function buildCandidateResponse(pipelineResult, version, bigRocks, demoMode) {
-  var features = pipelineResult.features
-  var rfes = pipelineResult.rfes
-  var outcomeSummaries = pipelineResult.outcomeSummaries
-  var perRockStats = pipelineResult.perRockStats
+  const features = pipelineResult.features
+  const rfes = pipelineResult.rfes
+  const outcomeSummaries = pipelineResult.outcomeSummaries
+  const perRockStats = pipelineResult.perRockStats
 
-  var allStatuses = new Set()
-  var allTeams = new Set()
-  var allPriorities = new Set()
-  var allPillars = new Set()
+  const allStatuses = new Set()
+  const allTeams = new Set()
+  const allPriorities = new Set()
+  const allPillars = new Set()
 
-  for (var fi = 0; fi < features.length; fi++) {
+  for (let fi = 0; fi < features.length; fi++) {
     if (features[fi].status) allStatuses.add(features[fi].status)
     if (features[fi].components) {
-      var parts = features[fi].components.split(', ')
-      for (var pi = 0; pi < parts.length; pi++) {
-        var trimmed = parts[pi].trim()
+      const parts = features[fi].components.split(', ')
+      for (let pi = 0; pi < parts.length; pi++) {
+        const trimmed = parts[pi].trim()
         if (trimmed) allTeams.add(trimmed)
       }
     }
     if (features[fi].priority) allPriorities.add(features[fi].priority)
   }
-  for (var ri = 0; ri < rfes.length; ri++) {
+  for (let ri = 0; ri < rfes.length; ri++) {
     if (rfes[ri].status) allStatuses.add(rfes[ri].status)
     if (rfes[ri].priority) allPriorities.add(rfes[ri].priority)
   }
-  for (var bi = 0; bi < bigRocks.length; bi++) {
+  for (let bi = 0; bi < bigRocks.length; bi++) {
     if (bigRocks[bi].pillar) allPillars.add(bigRocks[bi].pillar)
   }
 
-  var rockSummaries = bigRocks.map(function(rock) {
+  const rockSummaries = bigRocks.map(function(rock) {
     return {
       priority: rock.priority,
       name: rock.name,
@@ -299,10 +299,10 @@ function buildCandidateResponse(pipelineResult, version, bigRocks, demoMode) {
   })
 
   // Fill in outcome descriptions
-  for (var si = 0; si < rockSummaries.length; si++) {
-    var rockSum = rockSummaries[si]
-    for (var ki = 0; ki < rockSum.outcomeKeys.length; ki++) {
-      var oKey = rockSum.outcomeKeys[ki]
+  for (let si = 0; si < rockSummaries.length; si++) {
+    const rockSum = rockSummaries[si]
+    for (let ki = 0; ki < rockSum.outcomeKeys.length; ki++) {
+      const oKey = rockSum.outcomeKeys[ki]
       if (outcomeSummaries[oKey]) {
         rockSum.outcomeDescriptions[oKey] = outcomeSummaries[oKey]
       }

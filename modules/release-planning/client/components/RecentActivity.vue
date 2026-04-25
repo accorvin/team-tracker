@@ -2,15 +2,15 @@
 import { ref, computed, watch, inject } from 'vue'
 import { useAuditLog } from '../composables/useAuditLog'
 
-var props = defineProps({
+const props = defineProps({
   version: { type: String, default: '' }
 })
 
-var moduleNav = inject('moduleNav')
-var { entries, loading, loadAuditLog } = useAuditLog()
-var collapsed = ref(true)
+const moduleNav = inject('moduleNav')
+const { entries, loading, loadAuditLog } = useAuditLog()
+const collapsed = ref(true)
 
-var ACTION_META = {
+const ACTION_META = {
   create_rock: { icon: 'plus', label: 'Created', color: 'text-green-600 dark:text-green-400' },
   update_rock: { icon: 'pencil', label: 'Updated', color: 'text-blue-600 dark:text-blue-400' },
   delete_rock: { icon: 'trash', label: 'Deleted', color: 'text-red-600 dark:text-red-400' },
@@ -29,38 +29,38 @@ function actionMeta(action) {
 }
 
 function formatRelativeTime(iso) {
-  var now = Date.now()
-  var then = new Date(iso).getTime()
-  var diff = now - then
-  var minutes = Math.floor(diff / 60000)
+  const now = Date.now()
+  const then = new Date(iso).getTime()
+  const diff = now - then
+  const minutes = Math.floor(diff / 60000)
   if (minutes < 1) return 'just now'
   if (minutes < 60) return minutes + 'm ago'
-  var hours = Math.floor(minutes / 60)
+  const hours = Math.floor(minutes / 60)
   if (hours < 24) return hours + 'h ago'
-  var days = Math.floor(hours / 24)
+  const days = Math.floor(hours / 24)
   if (days < 7) return days + 'd ago'
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function shortUser(email) {
   if (!email) return 'System'
-  var at = email.indexOf('@')
+  const at = email.indexOf('@')
   return at > 0 ? email.substring(0, at) : email
 }
 
-var recentEntries = computed(function() {
+const recentEntries = computed(function() {
   return entries.value.slice(0, 5)
 })
 
-var hasEntries = computed(function() {
+const hasEntries = computed(function() {
   return entries.value.length > 0
 })
 
-var activitySummary = computed(function() {
-  var count = entries.value.length
+const activitySummary = computed(function() {
+  const count = entries.value.length
   if (count === 0) return ''
-  var recent = entries.value[0]
-  var age = formatRelativeTime(recent.timestamp)
+  const recent = entries.value[0]
+  const age = formatRelativeTime(recent.timestamp)
   return count + ' change' + (count !== 1 ? 's' : '') + ' · latest ' + age
 })
 

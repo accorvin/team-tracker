@@ -181,7 +181,7 @@ describe('extractBigRocksFromDoc', () => {
 
   it('assigns sequential priorities', () => {
     const result = extractBigRocksFromDoc(fixture)
-    for (var i = 0; i < result.bigRocks.length; i++) {
+    for (let i = 0; i < result.bigRocks.length; i++) {
       expect(result.bigRocks[i].priority).toBe(i + 1)
     }
   })
@@ -200,7 +200,7 @@ describe('extractBigRocksFromDoc', () => {
   it('generates warnings for all rocks without outcome keys', () => {
     const result = extractBigRocksFromDoc(fixture)
     // Expected: Big Rocks #3, #4, #12, #13, #14 have no outcome keys
-    var noKeyRocks = result.bigRocks.filter(function(r) { return r.outcomeKeys.length === 0 })
+    const noKeyRocks = result.bigRocks.filter(function(r) { return r.outcomeKeys.length === 0 })
     expect(noKeyRocks.length).toBe(result.warnings.length)
   })
 

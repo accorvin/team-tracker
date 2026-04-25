@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 
-var props = defineProps({
+const props = defineProps({
   filterOptions: { type: Object, default: () => ({}) },
   activeTab: { type: String, default: 'big-rocks' },
   selectedPillar: { type: String, default: '' },
@@ -13,7 +13,7 @@ var props = defineProps({
   hasActiveFilters: { type: Boolean, default: false }
 })
 
-var emit = defineEmits([
+const emit = defineEmits([
   'update:selectedPillar',
   'update:selectedRock',
   'update:selectedStatus',
@@ -23,20 +23,20 @@ var emit = defineEmits([
   'clearFilters'
 ])
 
-var selectClass = 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500'
+const selectClass = 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500'
 
-var teamsOpen = ref(false)
-var teamsDropdownRef = ref(null)
+const teamsOpen = ref(false)
+const teamsDropdownRef = ref(null)
 
-var teamsLabel = computed(function() {
+const teamsLabel = computed(function() {
   if (props.selectedTeams.length === 0) return 'Component Teams'
   if (props.selectedTeams.length === 1) return props.selectedTeams[0]
   return props.selectedTeams.length + ' teams selected'
 })
 
 function toggleTeam(team) {
-  var current = props.selectedTeams.slice()
-  var idx = current.indexOf(team)
+  const current = props.selectedTeams.slice()
+  const idx = current.indexOf(team)
   if (idx >= 0) {
     current.splice(idx, 1)
   } else {

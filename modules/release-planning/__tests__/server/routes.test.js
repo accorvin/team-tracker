@@ -35,12 +35,12 @@ vi.mock('../../server/cache-reader', () => ({
   validateKeysFromCache: vi.fn().mockReturnValue({})
 }))
 
-var registerRoutes = require('../../server/index')
+const registerRoutes = require('../../server/index')
 
 function makeStorage(data) {
-  var store = {}
+  const store = {}
   if (data) {
-    for (var k in data) store[k] = data[k]
+    for (const k in data) store[k] = data[k]
   }
   return {
     readFromStorage: function(key) {
@@ -56,10 +56,10 @@ function makeStorage(data) {
 }
 
 function makeRouter() {
-  var routes = {}
+  const routes = {}
   function reg(method) {
     return function(path) {
-      var handlers = Array.prototype.slice.call(arguments, 1)
+      const handlers = Array.prototype.slice.call(arguments, 1)
       routes[method + ' ' + path] = handlers
     }
   }
@@ -74,7 +74,7 @@ function makeRouter() {
 }
 
 function makeRes() {
-  var res = {
+  const res = {
     _status: 200,
     _json: null,
     status: function(code) { res._status = code; return res },
@@ -88,12 +88,12 @@ function makeReq(overrides) {
 }
 
 function callRoute(routes, method, path, req) {
-  var key = method + ' ' + path
-  var handlers = routes[key]
+  const key = method + ' ' + path
+  const handlers = routes[key]
   if (!handlers) throw new Error('No route registered: ' + key)
-  var handler = handlers[handlers.length - 1]
-  var res = makeRes()
-  var result = handler(req || makeReq(), res)
+  const handler = handlers[handlers.length - 1]
+  const res = makeRes()
+  const result = handler(req || makeReq(), res)
   if (result && typeof result.then === 'function') {
     return result.then(function() { return res })
   }
@@ -101,12 +101,12 @@ function callRoute(routes, method, path, req) {
 }
 
 function makeConfig(version, bigRocks) {
-  var releases = {}
+  const releases = {}
   releases[version] = { release: version, bigRocks: bigRocks || [] }
   return { releases: releases }
 }
 
-var VALID_ROCK = {
+const VALID_ROCK = {
   name: 'Test Rock',
   fullName: 'Test Rock Full',
   pillar: 'Platform',
@@ -119,7 +119,7 @@ var VALID_ROCK = {
 }
 
 describe('release-planning routes', function() {
-  var router, storage, context
+  let router, storage, context
 
   beforeEach(function() {
     vi.clearAllMocks()
@@ -141,7 +141,7 @@ describe('release-planning routes', function() {
 
   describe('route registration', function() {
     it('registers all expected routes', function() {
-      var expected = [
+      const expected = [
         'GET /releases',
         'GET /releases/:version/candidates',
         'POST /releases/:version/refresh',
@@ -160,7 +160,7 @@ describe('release-planning routes', function() {
         'DELETE /pm-users/:email',
         'GET /audit-log'
       ]
-      for (var i = 0; i < expected.length; i++) {
+      for (let i = 0; i < expected.length; i++) {
         expect(router._routes[expected[i]], 'Missing route: ' + expected[i]).toBeDefined()
       }
     })
@@ -170,7 +170,7 @@ describe('release-planning routes', function() {
 
   describe('auth guards', function() {
     it('uses requireAuth on GET /releases', function() {
-      var handlers = router._routes['GET /releases']
+      const handlers = router._routes['GET /releases']
       expect(handlers.length).toBeGreaterThan(1)
     })
 
@@ -195,13 +195,13 @@ describe('release-planning routes', function() {
 
   describe('GET /releases', function() {
     it('returns configured releases', function() {
-      var res = callRoute(router._routes, 'GET', '/releases')
+      const res = callRoute(router._routes, 'GET', '/releases')
       expect(res._json).toEqual([{ version: '3.5', bigRockCount: 0 }])
     })
 
     it('returns empty array when no releases configured', function() {
       storage._store['release-planning/config.json'] = { releases: {} }
-      var res = callRoute(router._routes, 'GET', '/releases')
+      const res = callRoute(router._routes, 'GET', '/releases')
       expect(res._json).toEqual([])
     })
   })
@@ -210,8 +210,8 @@ describe('release-planning routes', function() {
 
   describe('GET /releases/:version/candidates', function() {
     it('rejects invalid version format', function() {
-      var req = makeReq({ params: { version: '../etc/passwd' } })
-      var res = callRoute(router._routes, 'GET', '/releases/:version/candidates', req)
+      const req = makeReq({ params: { version: '../etc/passwd' } })
+      const res = callRoute(router._routes, 'GET', '/releases/:version/candidates', req)
       expect(res._status).toBe(400)
       expect(res._json.error).toMatch(/Invalid version/)
     })
@@ -221,14 +221,14 @@ describe('release-planning routes', function() {
         cachedAt: new Date().toISOString(),
         data: { features: [{ issueKey: 'TEST-1' }], rfes: [], bigRocks: [], summary: null }
       }
-      var req = makeReq({ params: { version: '3.5' }, query: {} })
-      var res = callRoute(router._routes, 'GET', '/releases/:version/candidates', req)
+      const req = makeReq({ params: { version: '3.5' }, query: {} })
+      const res = callRoute(router._routes, 'GET', '/releases/:version/candidates', req)
       expect(res._json.features).toHaveLength(1)
     })
 
     it('returns 202 when no cache exists', function() {
-      var req = makeReq({ params: { version: '3.5' }, query: {} })
-      var res = callRoute(router._routes, 'GET', '/releases/:version/candidates', req)
+      const req = makeReq({ params: { version: '3.5' }, query: {} })
+      const res = callRoute(router._routes, 'GET', '/releases/:version/candidates', req)
       expect(res._status).toBe(202)
       expect(res._json._noCache).toBe(true)
     })
@@ -238,20 +238,20 @@ describe('release-planning routes', function() {
 
   describe('version validation', function() {
     it('rejects reserved version names', async function() {
-      var req = makeReq({ params: { version: '__proto__' } })
-      var res = callRoute(router._routes, 'POST', '/releases/:version/refresh', req)
+      const req = makeReq({ params: { version: '__proto__' } })
+      const res = callRoute(router._routes, 'POST', '/releases/:version/refresh', req)
       expect(res._status).toBe(400)
     })
 
     it('rejects versions with special characters', async function() {
-      var req = makeReq({ params: { version: 'v1;rm -rf' } })
-      var res = callRoute(router._routes, 'POST', '/releases/:version/refresh', req)
+      const req = makeReq({ params: { version: 'v1;rm -rf' } })
+      const res = callRoute(router._routes, 'POST', '/releases/:version/refresh', req)
       expect(res._status).toBe(400)
     })
 
     it('accepts valid version formats', async function() {
-      var req = makeReq({ params: { version: '3.5' } })
-      var res = callRoute(router._routes, 'POST', '/releases/:version/refresh', req)
+      const req = makeReq({ params: { version: '3.5' } })
+      const res = callRoute(router._routes, 'POST', '/releases/:version/refresh', req)
       expect(res._status).toBe(200)
     })
   })
@@ -260,39 +260,39 @@ describe('release-planning routes', function() {
 
   describe('POST /releases/:version/big-rocks', function() {
     it('creates a new big rock', async function() {
-      var req = makeReq({
+      const req = makeReq({
         params: { version: '3.5' },
         body: VALID_ROCK
       })
-      var res = await callRoute(router._routes, 'POST', '/releases/:version/big-rocks', req)
+      const res = await callRoute(router._routes, 'POST', '/releases/:version/big-rocks', req)
       expect(res._status).toBe(201)
     })
 
     it('rejects invalid version', async function() {
-      var req = makeReq({
+      const req = makeReq({
         params: { version: '../../bad' },
         body: VALID_ROCK
       })
-      var res = await callRoute(router._routes, 'POST', '/releases/:version/big-rocks', req)
+      const res = await callRoute(router._routes, 'POST', '/releases/:version/big-rocks', req)
       expect(res._status).toBe(400)
     })
 
     it('rejects missing name', async function() {
-      var req = makeReq({
+      const req = makeReq({
         params: { version: '3.5' },
         body: { pillar: 'Test' }
       })
-      var res = await callRoute(router._routes, 'POST', '/releases/:version/big-rocks', req)
+      const res = await callRoute(router._routes, 'POST', '/releases/:version/big-rocks', req)
       expect(res._status).toBe(400)
     })
 
     it('writes audit log entry on success', async function() {
-      var req = makeReq({
+      const req = makeReq({
         params: { version: '3.5' },
         body: VALID_ROCK
       })
       await callRoute(router._routes, 'POST', '/releases/:version/big-rocks', req)
-      var log = storage._store['release-planning/audit-log.json']
+      const log = storage._store['release-planning/audit-log.json']
       expect(log).toBeDefined()
       expect(log.entries).toHaveLength(1)
       expect(log.entries[0].action).toBe('create_rock')
@@ -308,30 +308,30 @@ describe('release-planning routes', function() {
     })
 
     it('updates an existing big rock', async function() {
-      var req = makeReq({
+      const req = makeReq({
         params: { version: '3.5', name: 'Test Rock' },
         body: Object.assign({}, VALID_ROCK, { notes: 'Updated' })
       })
-      var res = await callRoute(router._routes, 'PUT', '/releases/:version/big-rocks/:name', req)
+      const res = await callRoute(router._routes, 'PUT', '/releases/:version/big-rocks/:name', req)
       expect(res._status).toBe(200)
     })
 
     it('writes audit log on update', async function() {
-      var req = makeReq({
+      const req = makeReq({
         params: { version: '3.5', name: 'Test Rock' },
         body: Object.assign({}, VALID_ROCK, { notes: 'Updated' })
       })
       await callRoute(router._routes, 'PUT', '/releases/:version/big-rocks/:name', req)
-      var log = storage._store['release-planning/audit-log.json']
+      const log = storage._store['release-planning/audit-log.json']
       expect(log.entries[0].action).toBe('update_rock')
     })
 
     it('handles malformed URI encoding', async function() {
-      var req = makeReq({
+      const req = makeReq({
         params: { version: '3.5', name: '%E0%A4%A' },
         body: VALID_ROCK
       })
-      var res = await callRoute(router._routes, 'PUT', '/releases/:version/big-rocks/:name', req)
+      const res = await callRoute(router._routes, 'PUT', '/releases/:version/big-rocks/:name', req)
       expect(res._status).toBe(400)
       expect(res._json.error).toMatch(/Invalid parameter encoding/)
     })
@@ -345,21 +345,21 @@ describe('release-planning routes', function() {
     })
 
     it('deletes a big rock', async function() {
-      var req = makeReq({ params: { version: '3.5', name: 'Test Rock' } })
-      var res = await callRoute(router._routes, 'DELETE', '/releases/:version/big-rocks/:name', req)
+      const req = makeReq({ params: { version: '3.5', name: 'Test Rock' } })
+      const res = await callRoute(router._routes, 'DELETE', '/releases/:version/big-rocks/:name', req)
       expect(res._status).toBe(200)
     })
 
     it('returns 404 for nonexistent rock', async function() {
-      var req = makeReq({ params: { version: '3.5', name: 'Nonexistent' } })
-      var res = await callRoute(router._routes, 'DELETE', '/releases/:version/big-rocks/:name', req)
+      const req = makeReq({ params: { version: '3.5', name: 'Nonexistent' } })
+      const res = await callRoute(router._routes, 'DELETE', '/releases/:version/big-rocks/:name', req)
       expect(res._status).toBe(404)
     })
 
     it('writes audit log on delete', async function() {
-      var req = makeReq({ params: { version: '3.5', name: 'Test Rock' } })
+      const req = makeReq({ params: { version: '3.5', name: 'Test Rock' } })
       await callRoute(router._routes, 'DELETE', '/releases/:version/big-rocks/:name', req)
-      var log = storage._store['release-planning/audit-log.json']
+      const log = storage._store['release-planning/audit-log.json']
       expect(log.entries[0].action).toBe('delete_rock')
     })
   })
@@ -368,34 +368,34 @@ describe('release-planning routes', function() {
 
   describe('POST /releases', function() {
     it('creates a new release', async function() {
-      var req = makeReq({ body: { version: '3.6' } })
-      var res = await callRoute(router._routes, 'POST', '/releases', req)
+      const req = makeReq({ body: { version: '3.6' } })
+      const res = await callRoute(router._routes, 'POST', '/releases', req)
       expect(res._status).toBe(201)
     })
 
     it('rejects missing version', async function() {
-      var req = makeReq({ body: {} })
-      var res = await callRoute(router._routes, 'POST', '/releases', req)
+      const req = makeReq({ body: {} })
+      const res = await callRoute(router._routes, 'POST', '/releases', req)
       expect(res._status).toBe(400)
     })
 
     it('rejects invalid version format', async function() {
-      var req = makeReq({ body: { version: 'a'.repeat(51) } })
-      var res = await callRoute(router._routes, 'POST', '/releases', req)
+      const req = makeReq({ body: { version: 'a'.repeat(51) } })
+      const res = await callRoute(router._routes, 'POST', '/releases', req)
       expect(res._status).toBe(400)
     })
 
     it('writes audit log for create', async function() {
-      var req = makeReq({ body: { version: '3.6' } })
+      const req = makeReq({ body: { version: '3.6' } })
       await callRoute(router._routes, 'POST', '/releases', req)
-      var log = storage._store['release-planning/audit-log.json']
+      const log = storage._store['release-planning/audit-log.json']
       expect(log.entries[0].action).toBe('create_release')
     })
 
     it('writes audit log for clone', async function() {
-      var req = makeReq({ body: { version: '3.6', cloneFrom: '3.5' } })
+      const req = makeReq({ body: { version: '3.6', cloneFrom: '3.5' } })
       await callRoute(router._routes, 'POST', '/releases', req)
-      var log = storage._store['release-planning/audit-log.json']
+      const log = storage._store['release-planning/audit-log.json']
       expect(log.entries[0].action).toBe('clone_release')
     })
   })
@@ -404,15 +404,15 @@ describe('release-planning routes', function() {
 
   describe('DELETE /releases/:version', function() {
     it('deletes a release', async function() {
-      var req = makeReq({ params: { version: '3.5' } })
-      var res = await callRoute(router._routes, 'DELETE', '/releases/:version', req)
+      const req = makeReq({ params: { version: '3.5' } })
+      const res = await callRoute(router._routes, 'DELETE', '/releases/:version', req)
       expect(res._status).toBe(200)
     })
 
     it('writes audit log on delete', async function() {
-      var req = makeReq({ params: { version: '3.5' } })
+      const req = makeReq({ params: { version: '3.5' } })
       await callRoute(router._routes, 'DELETE', '/releases/:version', req)
-      var log = storage._store['release-planning/audit-log.json']
+      const log = storage._store['release-planning/audit-log.json']
       expect(log.entries[0].action).toBe('delete_release')
     })
   })
@@ -421,20 +421,20 @@ describe('release-planning routes', function() {
 
   describe('GET /permissions', function() {
     it('returns canEdit true for admin', function() {
-      var req = makeReq({ isAdmin: true, userEmail: 'admin@test.com' })
-      var res = callRoute(router._routes, 'GET', '/permissions', req)
+      const req = makeReq({ isAdmin: true, userEmail: 'admin@test.com' })
+      const res = callRoute(router._routes, 'GET', '/permissions', req)
       expect(res._json.canEdit).toBe(true)
     })
 
     it('returns canEdit true for PM user', function() {
-      var req = makeReq({ isAdmin: false, userEmail: 'pm@test.com' })
-      var res = callRoute(router._routes, 'GET', '/permissions', req)
+      const req = makeReq({ isAdmin: false, userEmail: 'pm@test.com' })
+      const res = callRoute(router._routes, 'GET', '/permissions', req)
       expect(res._json.canEdit).toBe(true)
     })
 
     it('returns canEdit false for regular user', function() {
-      var req = makeReq({ isAdmin: false, userEmail: 'user@test.com' })
-      var res = callRoute(router._routes, 'GET', '/permissions', req)
+      const req = makeReq({ isAdmin: false, userEmail: 'user@test.com' })
+      const res = callRoute(router._routes, 'GET', '/permissions', req)
       expect(res._json.canEdit).toBe(false)
     })
   })
@@ -443,39 +443,39 @@ describe('release-planning routes', function() {
 
   describe('PM user management', function() {
     it('GET /pm-users returns PM list', function() {
-      var res = callRoute(router._routes, 'GET', '/pm-users')
+      const res = callRoute(router._routes, 'GET', '/pm-users')
       expect(res._json.emails).toEqual(['pm@test.com'])
     })
 
     it('POST /pm-users adds a PM', function() {
-      var req = makeReq({ body: { email: 'new@test.com' } })
-      var res = callRoute(router._routes, 'POST', '/pm-users', req)
+      const req = makeReq({ body: { email: 'new@test.com' } })
+      const res = callRoute(router._routes, 'POST', '/pm-users', req)
       expect(res._json.emails).toContain('new@test.com')
     })
 
     it('POST /pm-users rejects empty email', function() {
-      var req = makeReq({ body: { email: '' } })
-      var res = callRoute(router._routes, 'POST', '/pm-users', req)
+      const req = makeReq({ body: { email: '' } })
+      const res = callRoute(router._routes, 'POST', '/pm-users', req)
       expect(res._status).toBe(400)
     })
 
     it('POST /pm-users writes audit log', function() {
-      var req = makeReq({ body: { email: 'new@test.com' } })
+      const req = makeReq({ body: { email: 'new@test.com' } })
       callRoute(router._routes, 'POST', '/pm-users', req)
-      var log = storage._store['release-planning/audit-log.json']
+      const log = storage._store['release-planning/audit-log.json']
       expect(log.entries[0].action).toBe('add_pm')
     })
 
     it('DELETE /pm-users/:email removes a PM', function() {
-      var req = makeReq({ params: { email: 'pm@test.com' } })
-      var res = callRoute(router._routes, 'DELETE', '/pm-users/:email', req)
+      const req = makeReq({ params: { email: 'pm@test.com' } })
+      const res = callRoute(router._routes, 'DELETE', '/pm-users/:email', req)
       expect(res._json.emails).not.toContain('pm@test.com')
     })
 
     it('DELETE /pm-users/:email writes audit log', function() {
-      var req = makeReq({ params: { email: 'pm@test.com' } })
+      const req = makeReq({ params: { email: 'pm@test.com' } })
       callRoute(router._routes, 'DELETE', '/pm-users/:email', req)
-      var log = storage._store['release-planning/audit-log.json']
+      const log = storage._store['release-planning/audit-log.json']
       expect(log.entries[0].action).toBe('remove_pm')
     })
   })
@@ -484,8 +484,8 @@ describe('release-planning routes', function() {
 
   describe('GET /audit-log', function() {
     it('returns empty entries when no log exists', function() {
-      var req = makeReq({ query: {} })
-      var res = callRoute(router._routes, 'GET', '/audit-log', req)
+      const req = makeReq({ query: {} })
+      const res = callRoute(router._routes, 'GET', '/audit-log', req)
       expect(res._json.entries).toEqual([])
       expect(res._json.total).toBe(0)
     })
@@ -497,8 +497,8 @@ describe('release-planning routes', function() {
           { id: '2', timestamp: '2026-01-02T00:00:00Z', version: '3.6', action: 'create_rock', user: 'a@b.com', summary: 'test2' }
         ]
       }
-      var req = makeReq({ query: { version: '3.5' } })
-      var res = callRoute(router._routes, 'GET', '/audit-log', req)
+      const req = makeReq({ query: { version: '3.5' } })
+      const res = callRoute(router._routes, 'GET', '/audit-log', req)
       expect(res._json.entries).toHaveLength(1)
       expect(res._json.total).toBe(1)
     })
@@ -510,27 +510,27 @@ describe('release-planning routes', function() {
           { id: '2', timestamp: '2026-01-02T00:00:00Z', version: '3.5', action: 'delete_rock', user: 'a@b.com', summary: 'test2' }
         ]
       }
-      var req = makeReq({ query: { action: 'delete_rock' } })
-      var res = callRoute(router._routes, 'GET', '/audit-log', req)
+      const req = makeReq({ query: { action: 'delete_rock' } })
+      const res = callRoute(router._routes, 'GET', '/audit-log', req)
       expect(res._json.entries).toHaveLength(1)
       expect(res._json.entries[0].action).toBe('delete_rock')
     })
 
     it('respects limit and offset', function() {
-      var entries = []
-      for (var i = 0; i < 10; i++) {
+      const entries = []
+      for (let i = 0; i < 10; i++) {
         entries.push({ id: String(i), timestamp: '2026-01-0' + (i + 1) + 'T00:00:00Z', version: '3.5', action: 'create_rock', user: 'a@b.com', summary: 'entry ' + i })
       }
       storage._store['release-planning/audit-log.json'] = { entries: entries }
-      var req = makeReq({ query: { limit: '3', offset: '2' } })
-      var res = callRoute(router._routes, 'GET', '/audit-log', req)
+      const req = makeReq({ query: { limit: '3', offset: '2' } })
+      const res = callRoute(router._routes, 'GET', '/audit-log', req)
       expect(res._json.entries).toHaveLength(3)
       expect(res._json.total).toBe(10)
     })
 
     it('clamps limit to max 500', function() {
-      var req = makeReq({ query: { limit: '1000' } })
-      var res = callRoute(router._routes, 'GET', '/audit-log', req)
+      const req = makeReq({ query: { limit: '1000' } })
+      const res = callRoute(router._routes, 'GET', '/audit-log', req)
       expect(res._json).toBeDefined()
     })
   })
@@ -546,21 +546,21 @@ describe('release-planning routes', function() {
     })
 
     it('rejects non-array order', async function() {
-      var req = makeReq({ params: { version: '3.5' }, body: { order: 'not-array' } })
-      var res = await callRoute(router._routes, 'PUT', '/releases/:version/big-rocks/reorder', req)
+      const req = makeReq({ params: { version: '3.5' }, body: { order: 'not-array' } })
+      const res = await callRoute(router._routes, 'PUT', '/releases/:version/big-rocks/reorder', req)
       expect(res._status).toBe(400)
     })
 
     it('reorders big rocks', async function() {
-      var req = makeReq({ params: { version: '3.5' }, body: { order: ['Rock B', 'Rock A'] } })
-      var res = await callRoute(router._routes, 'PUT', '/releases/:version/big-rocks/reorder', req)
+      const req = makeReq({ params: { version: '3.5' }, body: { order: ['Rock B', 'Rock A'] } })
+      const res = await callRoute(router._routes, 'PUT', '/releases/:version/big-rocks/reorder', req)
       expect(res._status).toBe(200)
     })
 
     it('writes audit log on reorder', async function() {
-      var req = makeReq({ params: { version: '3.5' }, body: { order: ['Rock B', 'Rock A'] } })
+      const req = makeReq({ params: { version: '3.5' }, body: { order: ['Rock B', 'Rock A'] } })
       await callRoute(router._routes, 'PUT', '/releases/:version/big-rocks/reorder', req)
-      var log = storage._store['release-planning/audit-log.json']
+      const log = storage._store['release-planning/audit-log.json']
       expect(log.entries[0].action).toBe('reorder_rocks')
     })
   })
@@ -569,7 +569,7 @@ describe('release-planning routes', function() {
 
   describe('GET /refresh/status', function() {
     it('returns initial refresh state', function() {
-      var res = callRoute(router._routes, 'GET', '/refresh/status')
+      const res = callRoute(router._routes, 'GET', '/refresh/status')
       expect(res._json.running).toBe(false)
     })
   })

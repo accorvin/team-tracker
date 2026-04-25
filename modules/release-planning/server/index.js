@@ -243,17 +243,17 @@ module.exports = function registerRoutes(router, context) {
   // Must be registered BEFORE the :name route so Express doesn't match "reorder" as a name param.
 
   router.put('/releases/:version/big-rocks/reorder', requirePM, async function(req, res) {
-    var version = req.params.version
+    const version = req.params.version
     if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
-    var order = req.body && req.body.order
+    const order = req.body && req.body.order
     if (!Array.isArray(order)) {
       return res.status(400).json({ error: 'order must be an array of Big Rock names' })
     }
 
     try {
-      var result = await withConfigLock(function() {
+      const result = await withConfigLock(function() {
         return reorderBigRocks(readFromStorage, writeToStorage, version, order)
       })
       logAudit(readFromStorage, writeToStorage, {
@@ -265,7 +265,7 @@ module.exports = function registerRoutes(router, context) {
       invalidateCache(version)
       res.json(result)
     } catch (err) {
-      var status = err.statusCode || 500
+      const status = err.statusCode || 500
       res.status(status).json({ error: err.message })
     }
   })
@@ -277,7 +277,7 @@ module.exports = function registerRoutes(router, context) {
     if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
-    var name
+    let name
     try {
       name = decodeURIComponent(req.params.name)
     } catch {
@@ -316,8 +316,8 @@ module.exports = function registerRoutes(router, context) {
       invalidateCache(version)
       res.json(result)
     } catch (err) {
-      var status = err.statusCode || 500
-      var response = { error: err.message }
+      const status = err.statusCode || 500
+      const response = { error: err.message }
       if (err.fields) response.fields = err.fields
       res.status(status).json(response)
     }
@@ -352,7 +352,7 @@ module.exports = function registerRoutes(router, context) {
         return saveBigRock(readFromStorage, writeToStorage, version, null, req.body)
       })
 
-      var newName = req.body && req.body.name
+      const newName = req.body && req.body.name
       logAudit(readFromStorage, writeToStorage, {
         version: version,
         action: 'create_rock',
@@ -363,8 +363,8 @@ module.exports = function registerRoutes(router, context) {
       invalidateCache(version)
       res.status(201).json(result)
     } catch (err) {
-      var status = err.statusCode || 500
-      var response = { error: err.message }
+      const status = err.statusCode || 500
+      const response = { error: err.message }
       if (err.fields) response.fields = err.fields
       res.status(status).json(response)
     }
@@ -377,7 +377,7 @@ module.exports = function registerRoutes(router, context) {
     if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
-    var name
+    let name
     try {
       name = decodeURIComponent(req.params.name)
     } catch {
@@ -414,7 +414,7 @@ module.exports = function registerRoutes(router, context) {
       invalidateCache(version)
       res.json(result)
     } catch (err) {
-      var status = err.statusCode || 500
+      const status = err.statusCode || 500
       res.status(status).json({ error: err.message })
     }
   })
@@ -422,8 +422,8 @@ module.exports = function registerRoutes(router, context) {
   // ─── POST /releases ───
 
   router.post('/releases', requirePM, async function(req, res) {
-    var version = req.body && req.body.version
-    var cloneFrom = req.body && req.body.cloneFrom
+    const version = req.body && req.body.version
+    const cloneFrom = req.body && req.body.cloneFrom
 
     if (!version || typeof version !== 'string') {
       return res.status(400).json({ error: 'version is required' })
@@ -436,7 +436,7 @@ module.exports = function registerRoutes(router, context) {
     }
 
     try {
-      var result = await withConfigLock(function() {
+      const result = await withConfigLock(function() {
         if (cloneFrom) {
           backupConfig(readFromStorage, writeToStorage, listStorageFiles, deleteFromStorage)
           return cloneRelease(readFromStorage, writeToStorage, version, cloneFrom)
@@ -453,7 +453,7 @@ module.exports = function registerRoutes(router, context) {
       })
       res.status(201).json(result)
     } catch (err) {
-      var status = err.statusCode || 500
+      const status = err.statusCode || 500
       res.status(status).json({ error: err.message })
     }
   })
@@ -461,13 +461,13 @@ module.exports = function registerRoutes(router, context) {
   // ─── DELETE /releases/:version ───
 
   router.delete('/releases/:version', requireAdmin, async function(req, res) {
-    var version = req.params.version
+    const version = req.params.version
     if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
 
     try {
-      var result = await withConfigLock(function() {
+      const result = await withConfigLock(function() {
         backupConfig(readFromStorage, writeToStorage, listStorageFiles, deleteFromStorage)
         return deleteRelease(readFromStorage, writeToStorage, version)
       })
@@ -486,7 +486,7 @@ module.exports = function registerRoutes(router, context) {
 
       res.json(result)
     } catch (err) {
-      var status = err.statusCode || 500
+      const status = err.statusCode || 500
       res.status(status).json({ error: err.message })
     }
   })
@@ -506,7 +506,7 @@ module.exports = function registerRoutes(router, context) {
     const keysToValidate = []
 
     // Mark invalid-format keys immediately
-    for (var i = 0; i < keys.length; i++) {
+    for (let i = 0; i < keys.length; i++) {
       if (typeof keys[i] !== 'string' || !/^[A-Z]+-\d+$/.test(keys[i])) {
         results[keys[i]] = { valid: false, error: 'Invalid key format' }
       } else {
@@ -515,8 +515,8 @@ module.exports = function registerRoutes(router, context) {
     }
 
     if (keysToValidate.length > 0) {
-      var index = loadIndex(readFromStorage)
-      var cacheResults = validateKeysFromCache(index, keysToValidate)
+      const index = loadIndex(readFromStorage)
+      const cacheResults = validateKeysFromCache(index, keysToValidate)
       Object.assign(results, cacheResults)
     }
 
@@ -526,16 +526,16 @@ module.exports = function registerRoutes(router, context) {
   // ─── PM User Management ───
 
   router.get('/pm-users', requireAdmin, function(req, res) {
-    var emails = getPMUsers(readFromStorage)
+    const emails = getPMUsers(readFromStorage)
     res.json({ emails: emails })
   })
 
   router.post('/pm-users', requireAdmin, function(req, res) {
-    var email = req.body && req.body.email
+    const email = req.body && req.body.email
     if (!email || typeof email !== 'string' || !email.trim()) {
       return res.status(400).json({ error: 'email is required' })
     }
-    var emails = addPMUser(readFromStorage, writeToStorage, email.trim())
+    const emails = addPMUser(readFromStorage, writeToStorage, email.trim())
     logAudit(readFromStorage, writeToStorage, {
       action: 'add_pm',
       user: req.userEmail,
@@ -545,13 +545,13 @@ module.exports = function registerRoutes(router, context) {
   })
 
   router.delete('/pm-users/:email', requireAdmin, function(req, res) {
-    var email
+    let email
     try {
       email = decodeURIComponent(req.params.email)
     } catch {
       return res.status(400).json({ error: 'Invalid parameter encoding' })
     }
-    var emails = removePMUser(readFromStorage, writeToStorage, email)
+    const emails = removePMUser(readFromStorage, writeToStorage, email)
     logAudit(readFromStorage, writeToStorage, {
       action: 'remove_pm',
       user: req.userEmail,
@@ -563,29 +563,29 @@ module.exports = function registerRoutes(router, context) {
   // ─── Google Doc Import ───
 
   router.post('/releases/:version/import/doc/preview', requirePM, async function(req, res) {
-    var version = req.params.version
+    const version = req.params.version
     if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
-    var docId = req.body && req.body.docId
+    const docId = req.body && req.body.docId
     if (!docId) {
       return res.status(400).json({ error: 'docId is required' })
     }
 
     try {
-      var result = await previewDocImport(docId)
+      const result = await previewDocImport(docId)
 
       // Annotate each rock with duplicate/validation status for the target release
-      var config = getConfig(readFromStorage)
-      var existingRocks = (config.releases[version] && config.releases[version].bigRocks) || []
-      var existingNames = new Set(existingRocks.map(function(r) { return r.name }))
+      const config = getConfig(readFromStorage)
+      const existingRocks = (config.releases[version] && config.releases[version].bigRocks) || []
+      const existingNames = new Set(existingRocks.map(function(r) { return r.name }))
 
-      for (var i = 0; i < result.bigRocks.length; i++) {
-        var rock = result.bigRocks[i]
+      for (let i = 0; i < result.bigRocks.length; i++) {
+        const rock = result.bigRocks[i]
         if (existingNames.has(rock.name)) {
           rock.status = 'duplicate'
         } else {
-          var validation = validateBigRock(rock, {
+          const validation = validateBigRock(rock, {
             existingNames: Array.from(existingNames)
           })
           rock.status = validation.valid ? 'new' : 'validation_error'
@@ -595,18 +595,18 @@ module.exports = function registerRoutes(router, context) {
 
       res.json(result)
     } catch (err) {
-      var status = err.statusCode || 500
+      const status = err.statusCode || 500
       res.status(status).json({ error: err.message, shareWith: err.shareWith })
     }
   })
 
   router.post('/releases/:version/import/doc', requirePM, async function(req, res) {
-    var version = req.params.version
+    const version = req.params.version
     if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
     }
-    var docId = req.body && req.body.docId
-    var mode = req.body && req.body.mode
+    const docId = req.body && req.body.docId
+    const mode = req.body && req.body.mode
     if (!docId) {
       return res.status(400).json({ error: 'docId is required' })
     }
@@ -618,10 +618,10 @@ module.exports = function registerRoutes(router, context) {
       // Fetch and parse the Google Doc OUTSIDE the config lock.
       // The network call can take up to 30s; holding the lock during that
       // time would starve all CRUD operations (lock starvation).
-      var parsedDoc = await previewDocImport(docId)
+      const parsedDoc = await previewDocImport(docId)
 
       // Only hold the lock for the fast, synchronous config read-modify-write.
-      var result = await withConfigLock(function() {
+      const result = await withConfigLock(function() {
         if (mode === 'replace') {
           backupConfig(readFromStorage, writeToStorage, listStorageFiles, deleteFromStorage)
         }
@@ -640,7 +640,7 @@ module.exports = function registerRoutes(router, context) {
       invalidateCache(version)
       res.json(result)
     } catch (err) {
-      var status = err.statusCode || 500
+      const status = err.statusCode || 500
       res.status(status).json({ error: err.message })
     }
   })
@@ -655,11 +655,11 @@ module.exports = function registerRoutes(router, context) {
         })
       }
 
-      var releases = await smartsheetClient.discoverReleases()
-      var configuredVersions = getConfiguredReleases(readFromStorage).map(function(r) { return r.version })
-      var configuredSet = new Set(configuredVersions)
+      const releases = await smartsheetClient.discoverReleases()
+      const configuredVersions = getConfiguredReleases(readFromStorage).map(function(r) { return r.version })
+      const configuredSet = new Set(configuredVersions)
 
-      var available = releases.map(function(rel) {
+      const available = releases.map(function(rel) {
         return {
           version: rel.version,
           ea1Target: rel.ea1Target,
@@ -675,7 +675,7 @@ module.exports = function registerRoutes(router, context) {
         cachedAt: new Date().toISOString()
       })
     } catch (err) {
-      var status = err.statusCode || 500
+      const status = err.statusCode || 500
       res.status(status).json({ error: err.message })
     }
   })
@@ -683,29 +683,29 @@ module.exports = function registerRoutes(router, context) {
   // ─── Admin Seed / Bootstrap ───
 
   router.post('/admin/seed', requireAdmin, async function(req, res) {
-    var config = req.body
+    const config = req.body
     if (!config || typeof config !== 'object' || !config.releases) {
       return res.status(400).json({ error: 'Request body must include a "releases" object' })
     }
 
-    var versions = Object.keys(config.releases)
-    for (var i = 0; i < versions.length; i++) {
+    const versions = Object.keys(config.releases)
+    for (let i = 0; i < versions.length; i++) {
       if (!VERSION_RE.test(versions[i]) || RESERVED_VERSIONS.includes(versions[i])) {
         return res.status(400).json({ error: 'Invalid version: ' + versions[i] })
       }
     }
 
     // Validate each Big Rock in each release
-    for (var vi = 0; vi < versions.length; vi++) {
-      var ver = versions[vi]
-      var rocks = config.releases[ver].bigRocks
+    for (let vi = 0; vi < versions.length; vi++) {
+      const ver = versions[vi]
+      const rocks = config.releases[ver].bigRocks
       if (!rocks) continue
       if (!Array.isArray(rocks)) {
         return res.status(400).json({ error: 'bigRocks must be an array for release ' + ver })
       }
-      var namesInRelease = []
-      for (var ri = 0; ri < rocks.length; ri++) {
-        var validation = validateBigRock(rocks[ri], { existingNames: namesInRelease })
+      const namesInRelease = []
+      for (let ri = 0; ri < rocks.length; ri++) {
+        const validation = validateBigRock(rocks[ri], { existingNames: namesInRelease })
         if (!validation.valid) {
           return res.status(400).json({
             error: 'Invalid Big Rock at index ' + ri + ' in release ' + ver,
@@ -717,11 +717,11 @@ module.exports = function registerRoutes(router, context) {
     }
 
     try {
-      var result = await withConfigLock(function() {
+      const result = await withConfigLock(function() {
         backupConfig(readFromStorage, writeToStorage, listStorageFiles, deleteFromStorage)
 
-        var existing = getConfig(readFromStorage)
-        var merged = {
+        const existing = getConfig(readFromStorage)
+        const merged = {
           ...existing,
           ...config,
           releases: { ...existing.releases, ...config.releases },
@@ -731,7 +731,7 @@ module.exports = function registerRoutes(router, context) {
 
         writeToStorage('release-planning/config.json', merged)
 
-        var seededVersions = versions.map(function(v) {
+        const seededVersions = versions.map(function(v) {
           return { version: v, bigRockCount: (merged.releases[v].bigRocks || []).length }
         })
 
@@ -745,13 +745,13 @@ module.exports = function registerRoutes(router, context) {
       })
       res.json(result)
     } catch (err) {
-      var status = err.statusCode || 500
+      const status = err.statusCode || 500
       res.status(status).json({ error: err.message })
     }
   })
 
   router.get('/admin/seed/fixture', requireAdmin, function(req, res) {
-    var fixture = loadFixture('config.json')
+    const fixture = loadFixture('config.json')
     if (!fixture) {
       return res.status(404).json({ error: 'No fixture data found' })
     }
@@ -761,12 +761,12 @@ module.exports = function registerRoutes(router, context) {
   // ─── Audit Log ───
 
   router.get('/audit-log', requireAuth, function(req, res) {
-    var version = req.query.version || null
-    var action = req.query.action || null
-    var limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 500)
-    var offset = Math.max(parseInt(req.query.offset) || 0, 0)
+    const version = req.query.version || null
+    const action = req.query.action || null
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 500)
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0)
 
-    var result = getAuditLog(readFromStorage, {
+    const result = getAuditLog(readFromStorage, {
       version: version,
       action: action,
       limit: limit,

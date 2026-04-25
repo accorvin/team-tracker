@@ -14,11 +14,11 @@ function createMockStorage(data) {
 
 describe('createRequirePM', () => {
   it('allows admin users through', () => {
-    var storage = createMockStorage({})
-    var requirePM = createRequirePM(storage.readFromStorage)
-    var req = { isAdmin: true, userEmail: 'admin@redhat.com' }
-    var res = { status: vi.fn().mockReturnThis(), json: vi.fn() }
-    var next = vi.fn()
+    const storage = createMockStorage({})
+    const requirePM = createRequirePM(storage.readFromStorage)
+    const req = { isAdmin: true, userEmail: 'admin@redhat.com' }
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() }
+    const next = vi.fn()
 
     requirePM(req, res, next)
 
@@ -27,13 +27,13 @@ describe('createRequirePM', () => {
   })
 
   it('allows listed PM users through', () => {
-    var storage = createMockStorage({
+    const storage = createMockStorage({
       'release-planning/pm-users.json': { emails: ['pm@redhat.com'] }
     })
-    var requirePM = createRequirePM(storage.readFromStorage)
-    var req = { isAdmin: false, userEmail: 'pm@redhat.com' }
-    var res = { status: vi.fn().mockReturnThis(), json: vi.fn() }
-    var next = vi.fn()
+    const requirePM = createRequirePM(storage.readFromStorage)
+    const req = { isAdmin: false, userEmail: 'pm@redhat.com' }
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() }
+    const next = vi.fn()
 
     requirePM(req, res, next)
 
@@ -41,13 +41,13 @@ describe('createRequirePM', () => {
   })
 
   it('blocks non-admin, non-PM users', () => {
-    var storage = createMockStorage({
+    const storage = createMockStorage({
       'release-planning/pm-users.json': { emails: ['pm@redhat.com'] }
     })
-    var requirePM = createRequirePM(storage.readFromStorage)
-    var req = { isAdmin: false, userEmail: 'nobody@redhat.com' }
-    var res = { status: vi.fn().mockReturnThis(), json: vi.fn() }
-    var next = vi.fn()
+    const requirePM = createRequirePM(storage.readFromStorage)
+    const req = { isAdmin: false, userEmail: 'nobody@redhat.com' }
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() }
+    const next = vi.fn()
 
     requirePM(req, res, next)
 
@@ -56,11 +56,11 @@ describe('createRequirePM', () => {
   })
 
   it('handles missing pm-users.json gracefully', () => {
-    var storage = createMockStorage({})
-    var requirePM = createRequirePM(storage.readFromStorage)
-    var req = { isAdmin: false, userEmail: 'pm@redhat.com' }
-    var res = { status: vi.fn().mockReturnThis(), json: vi.fn() }
-    var next = vi.fn()
+    const storage = createMockStorage({})
+    const requirePM = createRequirePM(storage.readFromStorage)
+    const req = { isAdmin: false, userEmail: 'pm@redhat.com' }
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() }
+    const next = vi.fn()
 
     requirePM(req, res, next)
 
@@ -71,33 +71,33 @@ describe('createRequirePM', () => {
 
 describe('getPMUsers', () => {
   it('returns emails from storage', () => {
-    var storage = createMockStorage({
+    const storage = createMockStorage({
       'release-planning/pm-users.json': { emails: ['a@redhat.com', 'b@redhat.com'] }
     })
     expect(getPMUsers(storage.readFromStorage)).toEqual(['a@redhat.com', 'b@redhat.com'])
   })
 
   it('returns empty array when no file exists', () => {
-    var storage = createMockStorage({})
+    const storage = createMockStorage({})
     expect(getPMUsers(storage.readFromStorage)).toEqual([])
   })
 })
 
 describe('addPMUser', () => {
   it('adds a new email', () => {
-    var data = {}
-    var storage = createMockStorage(data)
-    var result = addPMUser(storage.readFromStorage, storage.writeToStorage, 'new@redhat.com')
+    const data = {}
+    const storage = createMockStorage(data)
+    const result = addPMUser(storage.readFromStorage, storage.writeToStorage, 'new@redhat.com')
     expect(result).toContain('new@redhat.com')
     expect(storage.writeToStorage).toHaveBeenCalled()
   })
 
   it('does not duplicate existing email', () => {
-    var data = {
+    const data = {
       'release-planning/pm-users.json': { emails: ['existing@redhat.com'] }
     }
-    var storage = createMockStorage(data)
-    var result = addPMUser(storage.readFromStorage, storage.writeToStorage, 'existing@redhat.com')
+    const storage = createMockStorage(data)
+    const result = addPMUser(storage.readFromStorage, storage.writeToStorage, 'existing@redhat.com')
     expect(result).toEqual(['existing@redhat.com'])
     expect(storage.writeToStorage).not.toHaveBeenCalled()
   })
@@ -105,21 +105,21 @@ describe('addPMUser', () => {
 
 describe('removePMUser', () => {
   it('removes an existing email', () => {
-    var data = {
+    const data = {
       'release-planning/pm-users.json': { emails: ['a@redhat.com', 'b@redhat.com'] }
     }
-    var storage = createMockStorage(data)
-    var result = removePMUser(storage.readFromStorage, storage.writeToStorage, 'a@redhat.com')
+    const storage = createMockStorage(data)
+    const result = removePMUser(storage.readFromStorage, storage.writeToStorage, 'a@redhat.com')
     expect(result).toEqual(['b@redhat.com'])
     expect(storage.writeToStorage).toHaveBeenCalled()
   })
 
   it('handles removing non-existent email gracefully', () => {
-    var data = {
+    const data = {
       'release-planning/pm-users.json': { emails: ['a@redhat.com'] }
     }
-    var storage = createMockStorage(data)
-    var result = removePMUser(storage.readFromStorage, storage.writeToStorage, 'nonexistent@redhat.com')
+    const storage = createMockStorage(data)
+    const result = removePMUser(storage.readFromStorage, storage.writeToStorage, 'nonexistent@redhat.com')
     expect(result).toEqual(['a@redhat.com'])
   })
 })

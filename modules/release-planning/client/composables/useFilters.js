@@ -24,10 +24,10 @@ export function useFilters(features, rfes, bigRocks) {
     if (selectedPriority.value && item.priority !== selectedPriority.value) return false
 
     if (selectedTeams.value.length > 0) {
-      var itemComponents = item.components
+      const itemComponents = item.components
         ? item.components.split(', ').map(function(c) { return c.trim() })
         : []
-      var hasMatch = selectedTeams.value.some(function(team) {
+      const hasMatch = selectedTeams.value.some(function(team) {
         return itemComponents.includes(team)
       })
       if (!hasMatch) return false

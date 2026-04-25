@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 const { parseDocId, executeDocImport } = require('../../server/doc-import')
 
 function createStorageWithConfig(config) {
-  var stored = JSON.parse(JSON.stringify(config))
+  let stored = JSON.parse(JSON.stringify(config))
   return {
     readFromStorage: vi.fn(function() { return stored }),
     writeToStorage: vi.fn(function(key, data) {
@@ -13,7 +13,7 @@ function createStorageWithConfig(config) {
 
 function makeConfig(bigRocks, version) {
   version = version || '3.5'
-  var releases = {}
+  const releases = {}
   releases[version] = { release: version, bigRocks: bigRocks || [] }
   return { releases: releases }
 }
@@ -74,17 +74,17 @@ describe('parseDocId', () => {
 describe('executeDocImport', () => {
   describe('replace mode', () => {
     it('replaces all existing Big Rocks', () => {
-      var config = makeConfig([
+      const config = makeConfig([
         makeRock('Old Rock A', ['RHAISTRAT-100']),
         makeRock('Old Rock B', ['RHAISTRAT-200'])
       ])
-      var storage = createStorageWithConfig(config)
-      var parsedDoc = makeParsedDoc([
+      const storage = createStorageWithConfig(config)
+      const parsedDoc = makeParsedDoc([
         makeRock('New Rock 1', ['RHAISTRAT-300']),
         makeRock('New Rock 2', ['RHAISTRAT-400'])
       ])
 
-      var result = executeDocImport(
+      const result = executeDocImport(
         storage.readFromStorage, storage.writeToStorage,
         '3.5', 'test-doc-id', 'replace', parsedDoc
       )
@@ -100,15 +100,15 @@ describe('executeDocImport', () => {
 
   describe('append mode', () => {
     it('adds new rocks after existing ones', () => {
-      var config = makeConfig([
+      const config = makeConfig([
         makeRock('Existing', ['RHAISTRAT-100'])
       ])
-      var storage = createStorageWithConfig(config)
-      var parsedDoc = makeParsedDoc([
+      const storage = createStorageWithConfig(config)
+      const parsedDoc = makeParsedDoc([
         makeRock('New Rock', ['RHAISTRAT-200'])
       ])
 
-      var result = executeDocImport(
+      const result = executeDocImport(
         storage.readFromStorage, storage.writeToStorage,
         '3.5', 'test-doc-id', 'append', parsedDoc
       )
@@ -120,16 +120,16 @@ describe('executeDocImport', () => {
     })
 
     it('skips duplicate names', () => {
-      var config = makeConfig([
+      const config = makeConfig([
         makeRock('MaaS', ['RHAISTRAT-100'])
       ])
-      var storage = createStorageWithConfig(config)
-      var parsedDoc = makeParsedDoc([
+      const storage = createStorageWithConfig(config)
+      const parsedDoc = makeParsedDoc([
         makeRock('MaaS', ['RHAISTRAT-200']),
         makeRock('New Rock', ['RHAISTRAT-300'])
       ])
 
-      var result = executeDocImport(
+      const result = executeDocImport(
         storage.readFromStorage, storage.writeToStorage,
         '3.5', 'test-doc-id', 'append', parsedDoc
       )
@@ -142,9 +142,9 @@ describe('executeDocImport', () => {
   })
 
   it('throws when no Big Rocks are parsed', () => {
-    var config = makeConfig([])
-    var storage = createStorageWithConfig(config)
-    var parsedDoc = makeParsedDoc([])
+    const config = makeConfig([])
+    const storage = createStorageWithConfig(config)
+    const parsedDoc = makeParsedDoc([])
 
     expect(function() {
       executeDocImport(
@@ -155,9 +155,9 @@ describe('executeDocImport', () => {
   })
 
   it('throws when release version not found', () => {
-    var config = makeConfig([], '3.5')
-    var storage = createStorageWithConfig(config)
-    var parsedDoc = makeParsedDoc([makeRock('Test')])
+    const config = makeConfig([], '3.5')
+    const storage = createStorageWithConfig(config)
+    const parsedDoc = makeParsedDoc([makeRock('Test')])
 
     expect(function() {
       executeDocImport(
@@ -168,16 +168,16 @@ describe('executeDocImport', () => {
   })
 
   it('skips rocks that fail validation', () => {
-    var config = makeConfig([])
-    var storage = createStorageWithConfig(config)
+    const config = makeConfig([])
+    const storage = createStorageWithConfig(config)
     // Name exceeding 100 chars
-    var longName = 'A'.repeat(101)
-    var parsedDoc = makeParsedDoc([
+    const longName = 'A'.repeat(101)
+    const parsedDoc = makeParsedDoc([
       makeRock(longName),
       makeRock('Valid Rock', ['RHAISTRAT-100'])
     ])
 
-    var result = executeDocImport(
+    const result = executeDocImport(
       storage.readFromStorage, storage.writeToStorage,
       '3.5', 'test-doc-id', 'replace', parsedDoc
     )
@@ -189,15 +189,15 @@ describe('executeDocImport', () => {
   })
 
   it('renumbers priorities sequentially', () => {
-    var config = makeConfig([])
-    var storage = createStorageWithConfig(config)
-    var parsedDoc = makeParsedDoc([
+    const config = makeConfig([])
+    const storage = createStorageWithConfig(config)
+    const parsedDoc = makeParsedDoc([
       makeRock('Rock A'),
       makeRock('Rock B'),
       makeRock('Rock C')
     ])
 
-    var result = executeDocImport(
+    const result = executeDocImport(
       storage.readFromStorage, storage.writeToStorage,
       '3.5', 'test-doc-id', 'replace', parsedDoc
     )

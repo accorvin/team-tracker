@@ -44,12 +44,12 @@ const newReleaseDialogOpen = ref(false)
 const seeding = ref(false)
 
 // Refresh polling
-var refreshPollTimer = null
+let refreshPollTimer = null
 
 function startRefreshPolling() {
   stopRefreshPolling()
   refreshPollTimer = setInterval(async function() {
-    var status = await checkRefreshStatus()
+    const status = await checkRefreshStatus()
     if (!status.running) {
       stopRefreshPolling()
       if (selectedVersion.value) {
@@ -117,7 +117,7 @@ function escapeCell(val) {
 }
 
 function escapeCsv(val) {
-  var s = String(val)
+  const s = String(val)
   if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1 || s.indexOf('\r') !== -1) {
     return '"' + s.replace(/"/g, '""') + '"'
   }
@@ -135,15 +135,15 @@ function toggleExportMenu() {
 }
 
 function exportMarkdown() {
-  var lines = []
-  var filename
+  const lines = []
+  let filename
 
   if (activeTab.value === 'big-rocks') {
     lines.push('# Big Rocks - ' + selectedVersion.value)
     lines.push('')
     lines.push('| **Priority** | **Pillar** | **Big Rock** | **Owner** | **Architect** | **Features** | **RFEs** | **Notes** |')
     lines.push('|:--------:|--------|----------|-------|-----------|:--------:|:----:|-------|')
-    for (var rock of bigRocks.value) {
+    for (const rock of bigRocks.value) {
       lines.push('| ' + [
         rock.priority,
         escapeCell(rock.pillar || '-'),
@@ -161,7 +161,7 @@ function exportMarkdown() {
     lines.push('')
     lines.push('| **Big Rock** | **Feature** | **Status** | **Priority** | **Phase** | **Title** | **Components** | **Target Release** | **PM** | **Delivery Owner** | **RFE** | **Fix Version** |')
     lines.push('|----------|---------|--------|----------|-------|-------|------------|----------------|-----|----------------|-----|-------------|')
-    for (var f of filteredFeatures.value) {
+    for (const f of filteredFeatures.value) {
       lines.push('| ' + [
         escapeCell(f.bigRock || '-'),
         f.issueKey,
@@ -183,7 +183,7 @@ function exportMarkdown() {
     lines.push('')
     lines.push('| **Big Rock** | **RFE** | **Status** | **Priority** | **Title** | **Components** | **PM** | **Labels** |')
     lines.push('|----------|-----|--------|----------|-------|------------|-----|--------|')
-    for (var r of filteredRfes.value) {
+    for (const r of filteredRfes.value) {
       lines.push('| ' + [
         escapeCell(r.bigRock || '-'),
         r.issueKey,
@@ -198,9 +198,9 @@ function exportMarkdown() {
     filename = 'rfes-' + selectedVersion.value + '.md'
   }
 
-  var blob = new Blob([lines.join('\n') + '\n'], { type: 'text/markdown' })
-  var url = URL.createObjectURL(blob)
-  var a = document.createElement('a')
+  const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/markdown' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
   a.href = url
   a.download = filename
   a.click()
@@ -209,12 +209,12 @@ function exportMarkdown() {
 
 function exportCsv() {
   closeExportMenu()
-  var rows = []
-  var filename
+  const rows = []
+  let filename
 
   if (activeTab.value === 'big-rocks') {
     rows.push(['Priority', 'Pillar', 'Big Rock', 'Owner', 'Architect', 'Features', 'RFEs', 'Notes'])
-    for (var rock of bigRocks.value) {
+    for (const rock of bigRocks.value) {
       rows.push([
         rock.priority,
         rock.pillar || '',
@@ -229,7 +229,7 @@ function exportCsv() {
     filename = 'big-rocks-' + selectedVersion.value + '.csv'
   } else if (activeTab.value === 'features') {
     rows.push(['Big Rock', 'Feature', 'Status', 'Priority', 'Phase', 'Title', 'Components', 'Target Release', 'PM', 'Delivery Owner', 'RFE', 'Fix Version'])
-    for (var f of filteredFeatures.value) {
+    for (const f of filteredFeatures.value) {
       rows.push([
         f.bigRock || '',
         f.issueKey,
@@ -248,7 +248,7 @@ function exportCsv() {
     filename = 'features-' + selectedVersion.value + '.csv'
   } else {
     rows.push(['Big Rock', 'RFE', 'Status', 'Priority', 'Title', 'Components', 'PM', 'Labels'])
-    for (var r of filteredRfes.value) {
+    for (const r of filteredRfes.value) {
       rows.push([
         r.bigRock || '',
         r.issueKey,
@@ -263,10 +263,10 @@ function exportCsv() {
     filename = 'rfes-' + selectedVersion.value + '.csv'
   }
 
-  var csv = rows.map(function(row) { return row.map(escapeCsv).join(',') }).join('\n')
-  var blob = new Blob([csv + '\n'], { type: 'text/csv' })
-  var url = URL.createObjectURL(blob)
-  var a = document.createElement('a')
+  const csv = rows.map(function(row) { return row.map(escapeCsv).join(',') }).join('\n')
+  const blob = new Blob([csv + '\n'], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
   a.href = url
   a.download = filename
   a.click()
@@ -407,7 +407,7 @@ async function handleSeedFixture() {
   seeding.value = true
   error.value = null
   try {
-    var result = await seedFromFixture()
+    const result = await seedFromFixture()
     await loadReleases()
     if (result.seeded && result.seeded.length > 0) {
       selectedVersion.value = result.seeded[0].version

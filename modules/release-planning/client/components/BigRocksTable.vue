@@ -29,7 +29,7 @@ function handleDeleteClick(event, rock) {
 }
 
 function onDragEnd() {
-  var orderedNames = localRocks.value.map(function(r) { return r.name })
+  const orderedNames = localRocks.value.map(function(r) { return r.name })
   emit('reorder', orderedNames)
 }
 </script>

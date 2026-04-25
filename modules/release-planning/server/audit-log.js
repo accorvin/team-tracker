@@ -1,7 +1,7 @@
-var crypto = require('crypto')
+const crypto = require('crypto')
 
-var STORAGE_KEY = 'release-planning/audit-log.json'
-var MAX_ENTRIES = 5000
+const STORAGE_KEY = 'release-planning/audit-log.json'
+const MAX_ENTRIES = 5000
 
 function generateId() {
   return 'audit-' + Date.now().toString(36) + '-' + crypto.randomBytes(4).toString('hex')
@@ -9,7 +9,7 @@ function generateId() {
 
 function logAudit(readFromStorage, writeToStorage, entry) {
   try {
-    var log = readFromStorage(STORAGE_KEY) || { entries: [] }
+    const log = readFromStorage(STORAGE_KEY) || { entries: [] }
 
     log.entries.push({
       id: generateId(),
@@ -32,8 +32,8 @@ function logAudit(readFromStorage, writeToStorage, entry) {
 }
 
 function getAuditLog(readFromStorage, options) {
-  var log = readFromStorage(STORAGE_KEY) || { entries: [] }
-  var entries = log.entries
+  const log = readFromStorage(STORAGE_KEY) || { entries: [] }
+  let entries = log.entries
 
   if (options && options.version) {
     entries = entries.filter(function(e) { return e.version === options.version })
@@ -43,13 +43,13 @@ function getAuditLog(readFromStorage, options) {
     entries = entries.filter(function(e) { return e.action === options.action })
   }
 
-  var total = entries.length
+  const total = entries.length
 
   // Newest first
   entries = entries.slice().reverse()
 
-  var limit = (options && options.limit) || 100
-  var offset = (options && options.offset) || 0
+  const limit = (options && options.limit) || 100
+  const offset = (options && options.offset) || 0
   entries = entries.slice(offset, offset + limit)
 
   return { entries: entries, total: total }
