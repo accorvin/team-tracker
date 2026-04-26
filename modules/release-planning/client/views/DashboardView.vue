@@ -80,6 +80,7 @@ const filterOptions = computed(() => candidates.value ? candidates.value.filterO
 const jiraBaseUrl = computed(() => candidates.value ? candidates.value.jiraBaseUrl || '' : '')
 const demoMode = computed(() => candidates.value ? candidates.value.demoMode : false)
 const warning = computed(() => candidates.value ? candidates.value.warning : null)
+const pipelineWarnings = computed(() => candidates.value ? candidates.value.pipelineWarnings || [] : [])
 const canEdit = computed(() => !demoMode.value && permissions.value && permissions.value.canEdit)
 
 const {
@@ -487,6 +488,16 @@ onUnmounted(function() {
     <div v-if="warning" class="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/30 rounded-lg px-4 py-2 text-sm text-yellow-700 dark:text-yellow-400">
       {{ warning }}
     </div>
+
+    <!-- Pipeline warnings -->
+    <details v-if="pipelineWarnings.length > 0" class="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg text-sm text-amber-700 dark:text-amber-400">
+      <summary class="px-4 py-2 cursor-pointer select-none">
+        {{ pipelineWarnings.length }} pipeline warning{{ pipelineWarnings.length !== 1 ? 's' : '' }} — data may be incomplete
+      </summary>
+      <ul class="px-4 pb-2 ml-4 list-disc space-y-0.5">
+        <li v-for="(w, i) in pipelineWarnings" :key="i">{{ w }}</li>
+      </ul>
+    </details>
 
     <!-- Cache stale indicator -->
     <div v-if="cacheStale && refreshing" role="status" class="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-lg px-4 py-2 text-sm text-blue-700 dark:text-blue-400">

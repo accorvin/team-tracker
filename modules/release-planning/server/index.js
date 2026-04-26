@@ -73,10 +73,10 @@ module.exports = function registerRoutes(router, context) {
   }
 
   function triggerBackgroundRefresh(version) {
-    var state = getRefreshState(version)
+    const state = getRefreshState(version)
     if (state.running) return
 
-    var runningCount = 0
+    let runningCount = 0
     refreshStates.forEach(function(s) { if (s.running) runningCount++ })
     if (runningCount >= MAX_CONCURRENT_REFRESHES) return
 
@@ -87,8 +87,8 @@ module.exports = function registerRoutes(router, context) {
       lastResult: state.lastResult
     })
 
-    var config = getConfig(readFromStorage)
-    var bigRocks = loadBigRocks(readFromStorage, version)
+    const config = getConfig(readFromStorage)
+    const bigRocks = loadBigRocks(readFromStorage, version)
 
     if (!bigRocks.length) {
       refreshStates.set(version, {
@@ -104,14 +104,14 @@ module.exports = function registerRoutes(router, context) {
     }
 
     function doRefresh(attempt) {
-      var pipeline = new Promise(function(resolve) { resolve(runPipeline(config, bigRocks, version, readFromStorage)) })
-      var timeout = new Promise(function(_, reject) {
+      const pipeline = new Promise(function(resolve) { resolve(runPipeline(config, bigRocks, version, readFromStorage)) })
+      const timeout = new Promise(function(_, reject) {
         setTimeout(function() { reject(new Error('Refresh timed out after 5 minutes')) }, REFRESH_TIMEOUT_MS)
       })
 
       Promise.race([pipeline, timeout])
         .then(function(result) {
-          var response = buildCandidateResponse(result, version, bigRocks, false)
+          const response = buildCandidateResponse(result, version, bigRocks, false)
           writeToStorage(DATA_PREFIX + '/candidates-cache-' + version + '.json', {
             cachedAt: new Date().toISOString(),
             data: response
@@ -249,11 +249,11 @@ module.exports = function registerRoutes(router, context) {
     if (DEMO_MODE) {
       return res.json({ status: 'skipped', message: 'Refresh disabled in demo mode' })
     }
-    var state = getRefreshState(version)
+    const state = getRefreshState(version)
     if (state.running) {
       return res.json({ status: 'already_running' })
     }
-    var runningCount = 0
+    let runningCount = 0
     refreshStates.forEach(function(s) { if (s.running) runningCount++ })
     if (runningCount >= MAX_CONCURRENT_REFRESHES) {
       return res.status(429).json({ error: 'Maximum concurrent refreshes reached. Please try again shortly.' })
@@ -264,13 +264,13 @@ module.exports = function registerRoutes(router, context) {
 
   // GET /refresh/status
   router.get('/refresh/status', requireAuth, function(req, res) {
-    var version = req.query && req.query.version
+    const version = req.query && req.query.version
     if (version) {
       return res.json(getRefreshState(version))
     }
-    var running = false
-    var lastResult = null
-    var activeVersion = null
+    let running = false
+    let lastResult = null
+    let activeVersion = null
     refreshStates.forEach(function(state, ver) {
       if (state.running) {
         running = true
@@ -858,7 +858,7 @@ module.exports = function registerRoutes(router, context) {
           cachedAt: cached ? cached.cachedAt : null
         })
       }
-      var refreshSummary = {}
+      const refreshSummary = {}
       refreshStates.forEach(function(state, ver) {
         refreshSummary[ver] = { running: state.running, lastResult: state.lastResult }
       })

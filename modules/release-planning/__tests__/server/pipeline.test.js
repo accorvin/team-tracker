@@ -277,6 +277,9 @@ describe('runPipeline', () => {
 
     expect(result.features).toHaveLength(0)
     expect(result.rocksWithoutOutcomes).toContain('NoOutcome')
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([expect.stringContaining('NoOutcome')])
+    )
   })
 
   it('filters invalid outcome keys before processing', () => {
@@ -301,6 +304,29 @@ describe('runPipeline', () => {
 
     expect(result.features).toHaveLength(1)
     expect(result.features[0].issueKey).toBe('RHAISTRAT-100')
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([expect.stringContaining('invalid outcome key')])
+    )
+  })
+
+  it('accumulates warnings for missing outcomes and empty index', () => {
+    const index = { features: [], rfes: [] }
+    const readFromStorage = createMockStorage(index)
+
+    const config = makeConfig()
+    const bigRocks = [
+      { priority: 1, name: 'Rock', outcomeKeys: ['KEY-999'], pillar: 'Platform' }
+    ]
+
+    const result = runPipeline(config, bigRocks, '3.5', readFromStorage)
+
+    expect(result.warnings.length).toBeGreaterThanOrEqual(2)
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Feature-traffic index is empty'),
+        expect.stringContaining('KEY-999')
+      ])
+    )
   })
 
   it('discovers RFEs linked to outcomes', () => {
@@ -403,7 +429,8 @@ describe('buildCandidateResponse', () => {
       tier3Features: 0,
       outcomeSummaries: { 'KEY-1': 'MaaS Outcome' },
       perRockStats: { 'MaaS': { features: 1, rfes: 1 } },
-      release: '3.5'
+      release: '3.5',
+      warnings: ['test warning']
     }
 
     const bigRocks = [
@@ -433,5 +460,26 @@ describe('buildCandidateResponse', () => {
     expect(response.rfes).toHaveLength(1)
     expect(response.filterOptions.statuses).toContain('In Progress')
     expect(response.filterOptions.pillars).toContain('Inference')
+    expect(response.pipelineWarnings).toEqual(['test warning'])
+  })
+
+  it('omits pipelineWarnings when empty', () => {
+    const pipelineResult = {
+      features: [],
+      rfes: [],
+      tier1Features: 0,
+      tier1Rfes: 0,
+      tier2Features: 0,
+      tier2Rfes: 0,
+      tier3Features: 0,
+      outcomeSummaries: {},
+      perRockStats: {},
+      release: '3.5',
+      warnings: []
+    }
+
+    const response = buildCandidateResponse(pipelineResult, '3.5', [], false)
+
+    expect(response.pipelineWarnings).toBeUndefined()
   })
 })

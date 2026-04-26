@@ -32,26 +32,34 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
 
   const rocksWithOutcomes = rocksToProcess.filter(function(r) { return r.outcomeKeys && r.outcomeKeys.length > 0 })
   const rocksWithout = rocksToProcess.filter(function(r) { return !r.outcomeKeys || r.outcomeKeys.length === 0 })
+  const warnings = []
 
   for (let w = 0; w < rocksWithout.length; w++) {
-    console.warn('[release-planning] Skipping ' + rocksWithout[w].name + ': no outcomeKeys defined')
+    const msg = 'Big Rock "' + rocksWithout[w].name + '" has no outcome keys and was skipped'
+    warnings.push(msg)
+    console.warn('[release-planning] ' + msg)
   }
 
   // Defense-in-depth: filter outcome keys that don't match the expected pattern
   for (let vi = 0; vi < rocksWithOutcomes.length; vi++) {
-    var rock = rocksWithOutcomes[vi]
-    var filtered = rock.outcomeKeys.filter(function(key) {
+    const rock = rocksWithOutcomes[vi]
+    const filtered = rock.outcomeKeys.filter(function(key) {
       if (typeof key === 'string' && OUTCOME_KEY_PATTERN.test(key)) return true
       console.warn('[release-planning] Skipping invalid outcome key in rock ' + rock.name + ': ' + key)
       return false
     })
     if (filtered.length !== rock.outcomeKeys.length) {
+      warnings.push('Filtered ' + (rock.outcomeKeys.length - filtered.length) + ' invalid outcome key(s) from "' + rock.name + '"')
       rocksWithOutcomes[vi] = Object.assign({}, rock, { outcomeKeys: filtered })
     }
   }
 
   // Load the feature-traffic index once
   const index = loadIndex(readFromStorage)
+
+  if (!index.features || index.features.length === 0) {
+    warnings.push('Feature-traffic index is empty — pipeline data may be incomplete. Run a feature-traffic refresh first.')
+  }
 
   // Collect all outcome keys
   const allOutcomeKeys = []
@@ -61,6 +69,12 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
 
   // Fetch outcome summaries from cache
   const outcomeSummaries = findOutcomeSummaries(index, allOutcomeKeys)
+
+  // Warn about outcome keys not found in index
+  const missingOutcomes = allOutcomeKeys.filter(function(key) { return !outcomeSummaries[key] })
+  if (missingOutcomes.length > 0) {
+    warnings.push(missingOutcomes.length + ' outcome key(s) not found in feature-traffic data: ' + missingOutcomes.join(', '))
+  }
 
   // Phase A: Discover children for each rock's outcomes
   // Maps: issueKey -> { candidate, rockSet: Set<"priority:name"> }
@@ -124,7 +138,9 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
     }
 
     if (rockChildCount === 0 && rock.outcomeKeys.length > 0) {
-      console.warn('[release-planning] Rock \'' + rock.name + '\' has outcomes ' + rock.outcomeKeys.join(', ') + ' but zero qualifying children')
+      const msg = 'Big Rock "' + rock.name + '" has outcomes (' + rock.outcomeKeys.join(', ') + ') but no qualifying features or RFEs for this release'
+      warnings.push(msg)
+      console.warn('[release-planning] ' + msg)
     }
   }
 
@@ -262,7 +278,8 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
     release: release,
     skippedCount: skippedCount,
     terminalFilteredCount: terminalFilteredCount,
-    rocksWithoutOutcomes: rocksWithout.map(function(r) { return r.name })
+    rocksWithoutOutcomes: rocksWithout.map(function(r) { return r.name }),
+    warnings: warnings
   }
 }
 
@@ -363,7 +380,8 @@ function buildCandidateResponse(pipelineResult, version, bigRocks, demoMode) {
       statuses: Array.from(allStatuses).sort(),
       teams: Array.from(allTeams).sort(),
       priorities: Array.from(allPriorities).sort()
-    }
+    },
+    pipelineWarnings: pipelineResult.warnings && pipelineResult.warnings.length > 0 ? pipelineResult.warnings : undefined
   }
 }
 
