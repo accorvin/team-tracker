@@ -189,7 +189,7 @@ describe('release-planning routes', function() {
       expect(handlers.length).toBeGreaterThan(1)
     })
 
-    it('uses requireAdmin on POST /releases/:version/refresh', function() {
+    it('uses requirePM on POST /releases/:version/refresh', function() {
       expect(router.post).toHaveBeenCalledWith(
         '/releases/:version/refresh',
         expect.any(Function),
@@ -623,6 +623,20 @@ describe('release-planning routes', function() {
     it('returns initial refresh state', function() {
       const res = callRoute(router._routes, 'GET', '/refresh/status')
       expect(res._json.running).toBe(false)
+    })
+
+    it('returns aggregate state when no version specified', function() {
+      const req = makeReq({ query: {} })
+      const res = callRoute(router._routes, 'GET', '/refresh/status', req)
+      expect(res._json.running).toBe(false)
+      expect(res._json.lastResult).toBe(null)
+    })
+
+    it('returns per-version state when version specified', function() {
+      const req = makeReq({ query: { version: '3.5' } })
+      const res = callRoute(router._routes, 'GET', '/refresh/status', req)
+      expect(res._json.running).toBe(false)
+      expect(res._json.lastResult).toBe(null)
     })
   })
 })

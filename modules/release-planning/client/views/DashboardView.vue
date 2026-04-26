@@ -426,6 +426,10 @@ watch(selectedVersion, function(newVersion) {
   }
 })
 
+watch(activeTab, function() {
+  error.value = null
+})
+
 function handleClickOutside() {
   exportMenuOpen.value = false
 }

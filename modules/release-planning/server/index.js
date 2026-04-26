@@ -31,7 +31,13 @@ module.exports = function registerRoutes(router, context) {
   // PM role middleware: admins and listed PM users can edit
   const requirePM = createRequirePM(readFromStorage)
 
-  let refreshState = { running: false, lastResult: null }
+  const refreshStates = new Map()
+  const MAX_CONCURRENT_REFRESHES = 2
+  const REFRESH_TIMEOUT_MS = 5 * 60 * 1000
+
+  function getRefreshState(version) {
+    return refreshStates.get(version) || { running: false, lastResult: null }
+  }
 
   function sendJsonWithETag(req, res, data, statusCode) {
     const body = JSON.stringify(data)
@@ -67,51 +73,79 @@ module.exports = function registerRoutes(router, context) {
   }
 
   function triggerBackgroundRefresh(version) {
-    if (refreshState.running) return
-    refreshState = {
-      running: true,
-      version,
-      startedAt: new Date().toISOString(),
-      lastResult: refreshState.lastResult
-    }
+    var state = getRefreshState(version)
+    if (state.running) return
 
-    const config = getConfig(readFromStorage)
-    const bigRocks = loadBigRocks(readFromStorage, version)
+    var runningCount = 0
+    refreshStates.forEach(function(s) { if (s.running) runningCount++ })
+    if (runningCount >= MAX_CONCURRENT_REFRESHES) return
+
+    refreshStates.set(version, {
+      running: true,
+      version: version,
+      startedAt: new Date().toISOString(),
+      lastResult: state.lastResult
+    })
+
+    var config = getConfig(readFromStorage)
+    var bigRocks = loadBigRocks(readFromStorage, version)
 
     if (!bigRocks.length) {
-      refreshState.running = false
-      refreshState.lastResult = {
-        status: 'error',
-        message: `No Big Rocks configured for release ${version}`,
-        completedAt: new Date().toISOString()
-      }
+      refreshStates.set(version, {
+        running: false,
+        lastResult: {
+          status: 'error',
+          version: version,
+          message: 'No Big Rocks configured for release ' + version,
+          completedAt: new Date().toISOString()
+        }
+      })
       return
     }
 
-    Promise.resolve(runPipeline(config, bigRocks, version, readFromStorage))
-      .then(function(result) {
-        const response = buildCandidateResponse(result, version, bigRocks, false)
-        writeToStorage(`${DATA_PREFIX}/candidates-cache-${version}.json`, {
-          cachedAt: new Date().toISOString(),
-          data: response
+    function doRefresh(attempt) {
+      var pipeline = Promise.resolve(runPipeline(config, bigRocks, version, readFromStorage))
+      var timeout = new Promise(function(_, reject) {
+        setTimeout(function() { reject(new Error('Refresh timed out after 5 minutes')) }, REFRESH_TIMEOUT_MS)
+      })
+
+      Promise.race([pipeline, timeout])
+        .then(function(result) {
+          var response = buildCandidateResponse(result, version, bigRocks, false)
+          writeToStorage(DATA_PREFIX + '/candidates-cache-' + version + '.json', {
+            cachedAt: new Date().toISOString(),
+            data: response
+          })
+          refreshStates.set(version, {
+            running: false,
+            lastResult: {
+              status: 'success',
+              version: version,
+              message: 'Pipeline completed: ' + result.features.length + ' features, ' + result.rfes.length + ' RFEs',
+              completedAt: new Date().toISOString()
+            }
+          })
         })
-        refreshState.lastResult = {
-          status: 'success',
-          message: `Pipeline completed: ${result.features.length} features, ${result.rfes.length} RFEs`,
-          completedAt: new Date().toISOString()
-        }
-      })
-      .catch(function(err) {
-        console.error('[release-planning] Background refresh failed:', err)
-        refreshState.lastResult = {
-          status: 'error',
-          message: 'Pipeline refresh failed. Check server logs for details.',
-          completedAt: new Date().toISOString()
-        }
-      })
-      .finally(function() {
-        refreshState.running = false
-      })
+        .catch(function(err) {
+          if (attempt < 3) {
+            console.warn('[release-planning] Refresh attempt ' + attempt + ' failed for ' + version + ', retrying: ' + err.message)
+            setTimeout(function() { doRefresh(attempt + 1) }, attempt * 5000)
+            return
+          }
+          console.error('[release-planning] Background refresh failed for ' + version + ':', err)
+          refreshStates.set(version, {
+            running: false,
+            lastResult: {
+              status: 'error',
+              version: version,
+              message: 'Pipeline refresh failed. Check server logs for details.',
+              completedAt: new Date().toISOString()
+            }
+          })
+        })
+    }
+
+    doRefresh(1)
   }
 
   // GET /releases
@@ -189,14 +223,14 @@ module.exports = function registerRoutes(router, context) {
       return sendJsonWithETag(req, res, {
         ...data,
         _cacheStale: isStale,
-        _refreshing: refreshState.running
+        _refreshing: getRefreshState(version).running
       })
     }
 
     triggerBackgroundRefresh(version)
     sendJsonWithETag(req, res, {
       _cacheStale: true,
-      _refreshing: true,
+      _refreshing: getRefreshState(version).running,
       _noCache: true,
       features: [],
       rfes: [],
@@ -207,7 +241,7 @@ module.exports = function registerRoutes(router, context) {
   })
 
   // POST /releases/:version/refresh
-  router.post('/releases/:version/refresh', requireAdmin, function(req, res) {
+  router.post('/releases/:version/refresh', requirePM, function(req, res) {
     const version = req.params.version
     if (!isValidVersion(version)) {
       return res.status(400).json({ error: 'Invalid version format' })
@@ -215,8 +249,14 @@ module.exports = function registerRoutes(router, context) {
     if (DEMO_MODE) {
       return res.json({ status: 'skipped', message: 'Refresh disabled in demo mode' })
     }
-    if (refreshState.running) {
+    var state = getRefreshState(version)
+    if (state.running) {
       return res.json({ status: 'already_running' })
+    }
+    var runningCount = 0
+    refreshStates.forEach(function(s) { if (s.running) runningCount++ })
+    if (runningCount >= MAX_CONCURRENT_REFRESHES) {
+      return res.status(429).json({ error: 'Maximum concurrent refreshes reached. Please try again shortly.' })
     }
     triggerBackgroundRefresh(version)
     res.json({ status: 'started' })
@@ -224,7 +264,23 @@ module.exports = function registerRoutes(router, context) {
 
   // GET /refresh/status
   router.get('/refresh/status', requireAuth, function(req, res) {
-    res.json(refreshState)
+    var version = req.query && req.query.version
+    if (version) {
+      return res.json(getRefreshState(version))
+    }
+    var running = false
+    var lastResult = null
+    var activeVersion = null
+    refreshStates.forEach(function(state, ver) {
+      if (state.running) {
+        running = true
+        activeVersion = ver
+      }
+      if (state.lastResult && (!lastResult || state.lastResult.completedAt > lastResult.completedAt)) {
+        lastResult = state.lastResult
+      }
+    })
+    res.json({ running: running, version: activeVersion, lastResult: lastResult })
   })
 
   // GET /config
@@ -802,8 +858,12 @@ module.exports = function registerRoutes(router, context) {
           cachedAt: cached ? cached.cachedAt : null
         })
       }
+      var refreshSummary = {}
+      refreshStates.forEach(function(state, ver) {
+        refreshSummary[ver] = { running: state.running, lastResult: state.lastResult }
+      })
       return {
-        refreshState,
+        refreshStates: refreshSummary,
         configuredReleases: releases.length,
         totalBigRocks: releases.reduce(function(sum, r) { return sum + r.bigRockCount }, 0),
         cacheFiles,

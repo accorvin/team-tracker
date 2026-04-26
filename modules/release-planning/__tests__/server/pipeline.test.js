@@ -279,6 +279,30 @@ describe('runPipeline', () => {
     expect(result.rocksWithoutOutcomes).toContain('NoOutcome')
   })
 
+  it('filters invalid outcome keys before processing', () => {
+    const index = {
+      features: [
+        makeFeatureIndex('KEY-1', { summary: 'Valid Outcome', status: 'New' }),
+        makeFeatureIndex('RHAISTRAT-100', { parentKey: 'KEY-1', targetVersions: ['rhoai-3.5'] })
+      ],
+      rfes: []
+    }
+    const details = [
+      makeFeatureDetail('RHAISTRAT-100', { parentKey: 'KEY-1', targetVersions: ['rhoai-3.5'] })
+    ]
+    const readFromStorage = createMockStorage(index, details)
+
+    const config = makeConfig()
+    const bigRocks = [
+      { priority: 1, name: 'Rock', outcomeKeys: ['KEY-1', 'not valid', '', 123, 'KEY-2'], pillar: 'Platform' }
+    ]
+
+    const result = runPipeline(config, bigRocks, '3.5', readFromStorage)
+
+    expect(result.features).toHaveLength(1)
+    expect(result.features[0].issueKey).toBe('RHAISTRAT-100')
+  })
+
   it('discovers RFEs linked to outcomes', () => {
     const index = {
       features: [

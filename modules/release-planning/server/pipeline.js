@@ -1,4 +1,5 @@
 const { TERMINAL_STATUSES, PRIORITY_ORDER } = require('./constants')
+const { OUTCOME_KEY_PATTERN } = require('./validation')
 const {
   loadIndex,
   mapToCandidate,
@@ -34,6 +35,19 @@ function runPipeline(config, bigRocks, release, readFromStorage, opts) {
 
   for (let w = 0; w < rocksWithout.length; w++) {
     console.warn('[release-planning] Skipping ' + rocksWithout[w].name + ': no outcomeKeys defined')
+  }
+
+  // Defense-in-depth: filter outcome keys that don't match the expected pattern
+  for (let vi = 0; vi < rocksWithOutcomes.length; vi++) {
+    var rock = rocksWithOutcomes[vi]
+    var filtered = rock.outcomeKeys.filter(function(key) {
+      if (typeof key === 'string' && OUTCOME_KEY_PATTERN.test(key)) return true
+      console.warn('[release-planning] Skipping invalid outcome key in rock ' + rock.name + ': ' + key)
+      return false
+    })
+    if (filtered.length !== rock.outcomeKeys.length) {
+      rocksWithOutcomes[vi] = Object.assign({}, rock, { outcomeKeys: filtered })
+    }
   }
 
   // Load the feature-traffic index once
