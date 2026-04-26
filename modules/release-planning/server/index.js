@@ -104,7 +104,7 @@ module.exports = function registerRoutes(router, context) {
     }
 
     function doRefresh(attempt) {
-      var pipeline = Promise.resolve(runPipeline(config, bigRocks, version, readFromStorage))
+      var pipeline = new Promise(function(resolve) { resolve(runPipeline(config, bigRocks, version, readFromStorage)) })
       var timeout = new Promise(function(_, reject) {
         setTimeout(function() { reject(new Error('Refresh timed out after 5 minutes')) }, REFRESH_TIMEOUT_MS)
       })
