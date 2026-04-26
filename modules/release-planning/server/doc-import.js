@@ -59,18 +59,6 @@ async function previewDocImport(docIdOrUrl) {
   }
 }
 
-/**
- * Execute the import: validate each rock via validateBigRock, then batch-write
- * all changes in a single config read-modify-write cycle.
- *
- * @param {Function} readFromStorage
- * @param {Function} writeToStorage
- * @param {string} version - Release version
- * @param {string} docIdOrUrl - Google Doc URL or ID (retained for logging/audit)
- * @param {string} mode - "replace" or "append"
- * @param {object} parsedDoc - Pre-fetched parse result from previewDocImport
- * @returns {object} { imported, skipped, skippedNames, validationErrors, mode, bigRocks }
- */
 function normalizeRock(data, priority) {
   return {
     priority: priority,
@@ -86,6 +74,18 @@ function normalizeRock(data, priority) {
   }
 }
 
+/**
+ * Execute the import: validate each rock via validateBigRock, then batch-write
+ * all changes in a single config read-modify-write cycle.
+ *
+ * @param {Function} readFromStorage
+ * @param {Function} writeToStorage
+ * @param {string} version - Release version
+ * @param {string} docIdOrUrl - Google Doc URL or ID (retained for logging/audit)
+ * @param {string} mode - "replace" or "append"
+ * @param {object} parsedDoc - Pre-fetched parse result from previewDocImport
+ * @returns {object} { imported, skipped, skippedNames, validationErrors, mode, bigRocks }
+ */
 function executeDocImport(readFromStorage, writeToStorage, version, docIdOrUrl, mode, parsedDoc) {
   const parsedRocks = parsedDoc.bigRocks
 
