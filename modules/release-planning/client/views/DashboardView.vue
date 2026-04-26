@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, inject, onMounted, onUnmounted, watch } from 'vue'
 import { useReleasePlanning, useReleases } from '../composables/useReleasePlanning'
+import { useReleaseHealth } from '../composables/useReleaseHealth'
 import { useBigRockEditor } from '../composables/useBigRockEditor'
 import { useFilters } from '../composables/useFilters'
 import SummaryCards from '../components/SummaryCards.vue'
@@ -22,6 +23,8 @@ const {
 } = useReleasePlanning()
 
 const { releases, loadReleases } = useReleases()
+
+const { healthData, loadHealth } = useReleaseHealth()
 
 const {
   formData, editingRock, isNewRock,
@@ -79,6 +82,20 @@ const summary = computed(() => candidates.value ? candidates.value.summary : nul
 const filterOptions = computed(() => candidates.value ? candidates.value.filterOptions || {} : {})
 const jiraBaseUrl = computed(() => candidates.value ? candidates.value.jiraBaseUrl || '' : '')
 const demoMode = computed(() => candidates.value ? candidates.value.demoMode : false)
+
+const healthByKey = computed(function() {
+  if (!healthData.value || !healthData.value.features) return {}
+  var map = {}
+  for (var i = 0; i < healthData.value.features.length; i++) {
+    var f = healthData.value.features[i]
+    map[f.key] = f
+  }
+  return map
+})
+
+const healthSummary = computed(function() {
+  return healthData.value ? healthData.value.summary : null
+})
 const warning = computed(() => candidates.value ? candidates.value.warning : null)
 const pipelineWarnings = computed(() => candidates.value ? candidates.value.pipelineWarnings || [] : [])
 const canEdit = computed(() => !demoMode.value && permissions.value && permissions.value.canEdit)
@@ -95,6 +112,8 @@ const {
   hasActiveFilters,
   clearFilters
 } = useFilters(features, rfes, bigRocks)
+
+const moduleNav = inject('moduleNav', null)
 
 const tabs = [
   { id: 'big-rocks', label: 'Big Rocks' },
@@ -424,6 +443,7 @@ watch(selectedVersion, function(newVersion) {
   error.value = null
   if (newVersion) {
     loadCandidates(newVersion)
+    loadHealth(newVersion)
   }
 })
 
@@ -441,6 +461,13 @@ onMounted(async function() {
   await loadReleases()
   if (releases.value.length > 0) {
     selectedVersion.value = releases.value[0].version
+  }
+  if (moduleNav && moduleNav.params && moduleNav.params.value) {
+    var p = moduleNav.params.value
+    if (p.bigRock) {
+      selectedRock.value = p.bigRock
+      activeTab.value = 'features'
+    }
   }
 })
 
@@ -516,7 +543,7 @@ onUnmounted(function() {
 
     <template v-else-if="candidates">
       <!-- Summary -->
-      <SummaryCards :summary="summary" />
+      <SummaryCards :summary="summary" :healthSummary="healthSummary" />
 
       <!-- Recent Activity -->
       <RecentActivity :version="selectedVersion" />
@@ -606,6 +633,8 @@ onUnmounted(function() {
           :bigRocks="bigRocks"
           :jiraBaseUrl="jiraBaseUrl"
           :canEdit="canEdit"
+          :healthByKey="healthByKey"
+          :features="features"
           @editRock="handleEditRock"
           @addRock="handleAddRock"
           @deleteRock="handleDeleteRock"
@@ -618,6 +647,7 @@ onUnmounted(function() {
           :bigRocks="bigRocks"
           :jiraBaseUrl="jiraBaseUrl"
           :summary="summary"
+          :healthByKey="healthByKey"
         />
       </div>
       <div v-if="activeTab === 'rfes'" id="panel-rfes" role="tabpanel" aria-labelledby="tab-rfes">

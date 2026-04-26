@@ -10,6 +10,7 @@ const { createRequirePM, getPMUsers, addPMUser, removePMUser, isPM } = require('
 const { previewDocImport, executeDocImport } = require('./doc-import')
 const { logAudit, getAuditLog } = require('./audit-log')
 const smartsheetClient = require('../../../shared/server/smartsheet')
+const healthRoutes = require('./health/health-routes')
 
 const DEMO_MODE = process.env.DEMO_MODE === 'true'
 const DATA_PREFIX = 'release-planning'
@@ -147,6 +148,16 @@ module.exports = function registerRoutes(router, context) {
 
     doRefresh(1)
   }
+
+  // Mount health routes
+  healthRoutes(router, {
+    storage: storage,
+    requireAuth: requireAuth,
+    requirePM: requirePM,
+    refreshStates: refreshStates,
+    MAX_CONCURRENT_REFRESHES: MAX_CONCURRENT_REFRESHES,
+    sendJsonWithETag: sendJsonWithETag
+  })
 
   // GET /releases
   router.get('/releases', requireAuth, function(req, res) {
@@ -295,8 +306,10 @@ module.exports = function registerRoutes(router, context) {
     // Delete the candidates cache file so next GET re-fetches
     if (deleteFromStorage) {
       deleteFromStorage(`${DATA_PREFIX}/candidates-cache-${version}.json`)
+      // Also delete health cache -- rebuilt lazily on next GET /health request
+      deleteFromStorage(`${DATA_PREFIX}/health-cache-${version}.json`)
     }
-    // Trigger background refresh to rebuild the cache
+    // Trigger background refresh to rebuild the candidates cache
     triggerBackgroundRefresh(version)
   }
 
@@ -544,6 +557,10 @@ module.exports = function registerRoutes(router, context) {
       if (deleteFromStorage) {
         deleteFromStorage(releaseFilePath(version))
         deleteFromStorage(DATA_PREFIX + '/candidates-cache-' + version + '.json')
+        // Clean up health-related files
+        deleteFromStorage(DATA_PREFIX + '/health-cache-' + version + '.json')
+        deleteFromStorage(DATA_PREFIX + '/dor-state-' + version + '.json')
+        deleteFromStorage(DATA_PREFIX + '/health-overrides-' + version + '.json')
       }
 
       res.json(result)

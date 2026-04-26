@@ -1,12 +1,43 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import draggable from 'vuedraggable'
 import BigRockRow from './BigRockRow.vue'
 
 const props = defineProps({
   bigRocks: { type: Array, default: () => [] },
   jiraBaseUrl: { type: String, default: '' },
-  canEdit: { type: Boolean, default: false }
+  canEdit: { type: Boolean, default: false },
+  healthByKey: { type: Object, default: () => ({}) },
+  features: { type: Array, default: () => [] }
+})
+
+const RISK_SEVERITY = { red: 0, yellow: 1, green: 2 }
+
+const hasHealth = computed(function() {
+  return Object.keys(props.healthByKey).length > 0
+})
+
+const rockHealth = computed(function() {
+  if (!hasHealth.value) return {}
+  var result = {}
+  for (var i = 0; i < props.features.length; i++) {
+    var f = props.features[i]
+    var rockName = f.bigRock
+    if (!rockName) continue
+    var h = props.healthByKey[f.issueKey]
+    if (!h || !h.risk) continue
+
+    if (!result[rockName]) {
+      result[rockName] = { worstLevel: 'green', totalFlags: 0, featureCount: 0 }
+    }
+    result[rockName].featureCount++
+    result[rockName].totalFlags += (h.risk.score || 0)
+    var level = h.risk.override ? (h.risk.override.riskOverride || h.risk.level) : h.risk.level
+    if ((RISK_SEVERITY[level] || 2) < (RISK_SEVERITY[result[rockName].worstLevel] || 2)) {
+      result[rockName].worstLevel = level
+    }
+  }
+  return result
 })
 
 const emit = defineEmits(['editRock', 'addRock', 'deleteRock', 'reorder'])
@@ -64,6 +95,7 @@ function onDragEnd() {
             <th scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Architect</th>
             <th scope="col" class="px-3 py-2 text-center text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Features</th>
             <th scope="col" class="px-3 py-2 text-center text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">RFEs</th>
+            <th v-if="hasHealth" scope="col" class="px-3 py-2 text-center text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Health</th>
             <th scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Notes</th>
             <th v-if="canEdit" scope="col" class="px-2 py-2 w-8 border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80"><span class="sr-only">Actions</span></th>
           </tr>
@@ -86,7 +118,7 @@ function onDragEnd() {
                   &#x2807;
                 </span>
               </td>
-              <BigRockRow :rock="rock" :jiraBaseUrl="jiraBaseUrl" />
+              <BigRockRow :rock="rock" :jiraBaseUrl="jiraBaseUrl" :health="rockHealth[rock.name]" :hasHealth="hasHealth" />
               <td class="px-2 py-2 text-center border border-gray-300 dark:border-gray-600">
                 <button
                   @click="handleDeleteClick($event, rock)"
@@ -107,10 +139,10 @@ function onDragEnd() {
             :key="rock.name"
             class="hover:bg-gray-50 dark:hover:bg-gray-700/50"
           >
-            <BigRockRow :rock="rock" :jiraBaseUrl="jiraBaseUrl" />
+            <BigRockRow :rock="rock" :jiraBaseUrl="jiraBaseUrl" :health="rockHealth[rock.name]" :hasHealth="hasHealth" />
           </tr>
           <tr v-if="!bigRocks || bigRocks.length === 0">
-            <td colspan="9" class="px-3 py-8 text-center text-gray-500 border border-gray-300 dark:border-gray-600">
+            <td :colspan="hasHealth ? 10 : 9" class="px-3 py-8 text-center text-gray-500 border border-gray-300 dark:border-gray-600">
               No Big Rocks configured.
             </td>
           </tr>

@@ -174,4 +174,110 @@ function httpGet(url, headers) {
   })
 }
 
-module.exports = { discoverReleases: discoverReleases, isConfigured: isConfigured, SMARTSHEET_SHEET_ID: SMARTSHEET_SHEET_ID }
+/**
+ * Extended version of discoverReleases that includes freeze dates.
+ *
+ * Returns all 6 milestones per release (ea1Freeze, ea1Target, ea2Freeze,
+ * ea2Target, gaFreeze, gaTarget) for use by the health pipeline's risk
+ * engine, which needs freeze dates for phase-completion checks.
+ *
+ * The existing discoverReleases() is left unchanged for backward compatibility.
+ *
+ * @returns {Array<{ version: string, ea1Freeze: string|null, ea1Target: string|null, ea2Freeze: string|null, ea2Target: string|null, gaFreeze: string|null, gaTarget: string|null }>}
+ */
+async function discoverReleasesWithFreezes() {
+  var sheet = await fetchSheet()
+
+  var colMap = {}
+  for (var c = 0; c < sheet.columns.length; c++) {
+    colMap[sheet.columns[c].title] = sheet.columns[c].id
+  }
+  var taskCol = colMap['Task Name']
+  var startCol = colMap['Start']
+
+  var milestones = {}
+
+  for (var r = 0; r < sheet.rows.length; r++) {
+    var row = sheet.rows[r]
+    var cells = {}
+    for (var ci = 0; ci < row.cells.length; ci++) {
+      cells[row.cells[ci].columnId] = row.cells[ci].value
+    }
+    var task = cells[taskCol]
+    var startVal = cells[startCol]
+    if (!task || !startVal) continue
+
+    var dateStr = String(startVal).split('T')[0]
+    var m
+
+    // EA1/EA2 Code Freeze
+    m = task.match(/^(\d+\.\d+)\.(EA[12])\s+(?:RHOAI\s+)?Code\s+Freeze/i)
+    if (m) {
+      var ver = m[1]
+      var phase = m[2].toLowerCase()
+      if (!milestones[ver]) milestones[ver] = {}
+      milestones[ver][phase + '_freeze'] = dateStr
+      continue
+    }
+
+    // EA1/EA2 Release
+    m = task.match(/^(\d+\.\d+)\.(EA[12])\s+(?:RHOAI\s+)?RELEASE/i)
+    if (m) {
+      var ver2 = m[1]
+      var phase2 = m[2].toLowerCase()
+      if (!milestones[ver2]) milestones[ver2] = {}
+      milestones[ver2][phase2 + '_target'] = dateStr
+      continue
+    }
+
+    // GA Code Freeze
+    m = task.match(/^(\d+\.\d+)\s+(?:RHOAI\s+)?Code\s+Freeze$/i)
+    if (m) {
+      if (!milestones[m[1]]) milestones[m[1]] = {}
+      milestones[m[1]].ga_freeze = dateStr
+      continue
+    }
+
+    // GA Release
+    m = task.match(/^(\d+\.\d+)\s+(?:RHOAI\s+)?GA$/i)
+    if (m) {
+      if (!milestones[m[1]]) milestones[m[1]] = {}
+      milestones[m[1]].ga_target = dateStr
+      continue
+    }
+  }
+
+  var REQUIRED_MILESTONES = ['ea1_freeze', 'ea1_target', 'ea2_freeze', 'ea2_target', 'ga_freeze', 'ga_target']
+
+  var releases = Object.keys(milestones)
+    .filter(function(version) {
+      var ms = milestones[version]
+      return REQUIRED_MILESTONES.every(function(key) { return !!ms[key] })
+    })
+    .sort(function(a, b) {
+      var ap = a.split('.').map(Number)
+      var bp = b.split('.').map(Number)
+      return ap[0] - bp[0] || ap[1] - bp[1]
+    })
+    .map(function(version) {
+      var ms = milestones[version]
+      return {
+        version: version,
+        ea1Freeze: ms.ea1_freeze || null,
+        ea1Target: ms.ea1_target || null,
+        ea2Freeze: ms.ea2_freeze || null,
+        ea2Target: ms.ea2_target || null,
+        gaFreeze: ms.ga_freeze || null,
+        gaTarget: ms.ga_target || null
+      }
+    })
+
+  return releases
+}
+
+module.exports = {
+  discoverReleases: discoverReleases,
+  discoverReleasesWithFreezes: discoverReleasesWithFreezes,
+  isConfigured: isConfigured,
+  SMARTSHEET_SHEET_ID: SMARTSHEET_SHEET_ID
+}
