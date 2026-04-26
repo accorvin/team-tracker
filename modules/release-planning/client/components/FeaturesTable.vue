@@ -1,5 +1,6 @@
 <script setup>
 import StatusBadge from './StatusBadge.vue'
+import RiskBadge from './RiskBadge.vue'
 import TierSeparator from './TierSeparator.vue'
 import { computed } from 'vue'
 import { PRIORITY_STYLES } from '../constants'
@@ -8,10 +9,17 @@ const props = defineProps({
   features: { type: Array, default: () => [] },
   bigRocks: { type: Array, default: () => [] },
   jiraBaseUrl: { type: String, default: '' },
-  summary: { type: Object, default: null }
+  summary: { type: Object, default: null },
+  healthByKey: { type: Object, default: () => ({}) }
 })
 
-const COL_COUNT = 11
+const hasHealth = computed(function() {
+  return Object.keys(props.healthByKey).length > 0
+})
+
+const COL_COUNT = computed(function() {
+  return hasHealth.value ? 13 : 11
+})
 
 const tierCounts = computed(() => {
   const counts = {}
@@ -49,6 +57,8 @@ const groupedFeatures = computed(() => {
             <th scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Big Rock</th>
             <th scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Feature</th>
             <th scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Status</th>
+            <th v-if="hasHealth" scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Risk</th>
+            <th v-if="hasHealth" scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">DoR</th>
             <th scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Priority</th>
             <th scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Phase</th>
             <th scope="col" class="px-3 py-2 text-left text-gray-700 dark:text-gray-200 font-semibold uppercase text-xs tracking-wide border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/80">Title</th>
@@ -81,6 +91,24 @@ const groupedFeatures = computed(() => {
                 >{{ item.data.issueKey }}</a>
               </td>
               <td class="px-3 py-2 border border-gray-300 dark:border-gray-600"><StatusBadge :status="item.data.status" /></td>
+              <td v-if="hasHealth" class="px-3 py-2 border border-gray-300 dark:border-gray-600">
+                <RiskBadge
+                  v-if="healthByKey[item.data.issueKey]"
+                  :level="healthByKey[item.data.issueKey].risk ? healthByKey[item.data.issueKey].risk.level : 'green'"
+                  :flagCount="healthByKey[item.data.issueKey].risk ? healthByKey[item.data.issueKey].risk.score : 0"
+                  :flags="healthByKey[item.data.issueKey].risk ? healthByKey[item.data.issueKey].risk.flags : []"
+                  :override="healthByKey[item.data.issueKey].risk ? healthByKey[item.data.issueKey].risk.override : null"
+                />
+                <span v-else class="text-gray-400 dark:text-gray-600 text-xs">-</span>
+              </td>
+              <td v-if="hasHealth" class="px-3 py-2 border border-gray-300 dark:border-gray-600 text-xs text-center">
+                <span
+                  v-if="healthByKey[item.data.issueKey] && healthByKey[item.data.issueKey].dor"
+                  class="font-medium"
+                  :class="healthByKey[item.data.issueKey].dor.completionPct >= 80 ? 'text-green-600 dark:text-green-400' : healthByKey[item.data.issueKey].dor.completionPct >= 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'"
+                >{{ healthByKey[item.data.issueKey].dor.completionPct }}%</span>
+                <span v-else class="text-gray-400 dark:text-gray-600">-</span>
+              </td>
               <td class="px-3 py-2 border border-gray-300 dark:border-gray-600">
                 <span
                   v-if="item.data.priority"

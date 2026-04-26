@@ -1,6 +1,13 @@
 <script setup>
-defineProps({
-  summary: { type: Object, default: null }
+import { computed } from 'vue'
+
+const props = defineProps({
+  summary: { type: Object, default: null },
+  healthSummary: { type: Object, default: null }
+})
+
+const hasHealth = computed(function() {
+  return props.healthSummary && props.healthSummary.byRisk
 })
 </script>
 
@@ -66,6 +73,21 @@ defineProps({
         <div>
           <span class="text-2xl font-bold text-green-700 dark:text-green-400">{{ summary.totalRfes }}</span>
           <span class="text-xs text-green-600/70 dark:text-green-400/70 ml-1">RFEs</span>
+        </div>
+      </div>
+      <!-- Health indicator -->
+      <div v-if="hasHealth" class="flex items-center gap-2 mt-3 pt-2 border-t border-green-200/50 dark:border-green-500/20">
+        <span class="text-[10px] text-green-600/70 dark:text-green-400/70 uppercase tracking-wide">Health</span>
+        <div class="flex items-center gap-1.5">
+          <span class="inline-flex items-center gap-0.5 text-[10px] font-semibold text-green-700 dark:text-green-400">
+            <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>{{ healthSummary.byRisk.green || 0 }}
+          </span>
+          <span class="inline-flex items-center gap-0.5 text-[10px] font-semibold text-yellow-700 dark:text-yellow-400">
+            <span class="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>{{ healthSummary.byRisk.yellow || 0 }}
+          </span>
+          <span class="inline-flex items-center gap-0.5 text-[10px] font-semibold text-red-700 dark:text-red-400">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>{{ healthSummary.byRisk.red || 0 }}
+          </span>
         </div>
       </div>
     </div>

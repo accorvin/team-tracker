@@ -11,7 +11,25 @@ const DEFAULT_CONFIG = {
   customFieldIds: {
     targetVersion: 'customfield_10855',
     productManager: 'customfield_10469',
-    releaseType: 'customfield_10851'
+    releaseType: 'customfield_10851',
+    riceReach: '',
+    riceImpact: '',
+    riceConfidence: '',
+    riceEffort: ''
+  },
+  healthConfig: {
+    enableRice: false,
+    enableJiraEnrichment: true,
+    enrichmentBatchSize: 40,
+    enrichmentThrottleMs: 1000,
+    healthRefreshTimeoutMs: 480000,
+    riskThresholds: {
+      velocityGreenMin: 80,
+      velocityYellowMin: 50,
+      dorGreenMin: 80,
+      dorYellowMin: 50
+    },
+    phaseCompletionExpectations: null
   }
 }
 
@@ -22,11 +40,20 @@ function releaseFilePath(version) {
 function getConfig(readFromStorage) {
   const stored = readFromStorage('release-planning/config.json')
   if (stored && typeof stored === 'object') {
+    const storedHealth = stored.healthConfig || {}
     return {
       ...DEFAULT_CONFIG,
       ...stored,
       fieldMapping: { ...DEFAULT_CONFIG.fieldMapping, ...(stored.fieldMapping || {}) },
-      customFieldIds: { ...DEFAULT_CONFIG.customFieldIds, ...(stored.customFieldIds || {}) }
+      customFieldIds: { ...DEFAULT_CONFIG.customFieldIds, ...(stored.customFieldIds || {}) },
+      healthConfig: {
+        ...DEFAULT_CONFIG.healthConfig,
+        ...storedHealth,
+        riskThresholds: {
+          ...DEFAULT_CONFIG.healthConfig.riskThresholds,
+          ...(storedHealth.riskThresholds || {})
+        }
+      }
     }
   }
   return { ...DEFAULT_CONFIG }
