@@ -177,12 +177,16 @@ function handleFilterByRisk(level) {
 function startRefreshPolling() {
   stopRefreshPolling()
   refreshPollTimer = setInterval(async function() {
-    var status = await checkHealthRefreshStatus(selectedVersion.value, selectedPhase.value || undefined)
-    if (!status.running) {
-      stopRefreshPolling()
-      if (selectedVersion.value) {
-        loadHealth(selectedVersion.value, selectedPhase.value || undefined)
+    try {
+      var status = await checkHealthRefreshStatus(selectedVersion.value, selectedPhase.value || undefined)
+      if (!status.running) {
+        stopRefreshPolling()
+        if (selectedVersion.value) {
+          loadHealth(selectedVersion.value, selectedPhase.value || undefined)
+        }
       }
+    } catch {
+      stopRefreshPolling()
     }
   }, 3000)
 }

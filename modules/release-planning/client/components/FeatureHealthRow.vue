@@ -98,7 +98,7 @@ var flagSeverityClass = {
         >{{ feature.key }}</a>
         <span v-else class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ feature.key }}</span>
         <a
-          :href="'#/feature-traffic/feature-detail?key=' + feature.key"
+          :href="'#/feature-traffic/feature-detail?key=' + encodeURIComponent(feature.key)"
           class="text-gray-400 hover:text-primary-600 dark:hover:text-blue-400"
           title="View in Feature Traffic"
           @click.stop

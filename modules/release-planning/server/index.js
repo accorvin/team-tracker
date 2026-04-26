@@ -306,8 +306,11 @@ module.exports = function registerRoutes(router, context) {
     // Delete the candidates cache file so next GET re-fetches
     if (deleteFromStorage) {
       deleteFromStorage(`${DATA_PREFIX}/candidates-cache-${version}.json`)
-      // Also delete health cache -- rebuilt lazily on next GET /health request
-      deleteFromStorage(`${DATA_PREFIX}/health-cache-${version}.json`)
+      // Delete all phase-specific health caches -- rebuilt lazily on next GET /health request
+      var healthPhases = ['all', 'EA1', 'EA2', 'GA']
+      for (var hp = 0; hp < healthPhases.length; hp++) {
+        deleteFromStorage(`${DATA_PREFIX}/health-cache-${version}-${healthPhases[hp]}.json`)
+      }
     }
     // Trigger background refresh to rebuild the candidates cache
     triggerBackgroundRefresh(version)
@@ -557,8 +560,11 @@ module.exports = function registerRoutes(router, context) {
       if (deleteFromStorage) {
         deleteFromStorage(releaseFilePath(version))
         deleteFromStorage(DATA_PREFIX + '/candidates-cache-' + version + '.json')
-        // Clean up health-related files
-        deleteFromStorage(DATA_PREFIX + '/health-cache-' + version + '.json')
+        // Clean up all phase-specific health caches
+        var delPhases = ['all', 'EA1', 'EA2', 'GA']
+        for (var dp = 0; dp < delPhases.length; dp++) {
+          deleteFromStorage(DATA_PREFIX + '/health-cache-' + version + '-' + delPhases[dp] + '.json')
+        }
         deleteFromStorage(DATA_PREFIX + '/dor-state-' + version + '.json')
         deleteFromStorage(DATA_PREFIX + '/health-overrides-' + version + '.json')
       }
