@@ -27,11 +27,8 @@ var selectedVersion = ref('')
 var activePhase = ref('all')
 
 // Filter state
-var riskFilter = ref('')
-var dorFilter = ref('')
 var bigRockFilter = ref('')
 var selectedComponents = ref([])
-var tierFilter = ref('')
 var searchQuery = ref('')
 
 // Refresh polling
@@ -197,21 +194,6 @@ var filteredFeatures = computed(function() {
   if (!list || list.length === 0) return []
 
   return list.filter(function(f) {
-    // Risk filter
-    if (riskFilter.value) {
-      var featureRisk = f.risk ? f.risk.level : 'green'
-      if (f.risk && f.risk.override) featureRisk = f.risk.override.riskOverride || featureRisk
-      if (featureRisk !== riskFilter.value) return false
-    }
-
-    // DoR filter
-    if (dorFilter.value) {
-      var dorPct = f.dor ? f.dor.completionPct : 0
-      if (dorFilter.value === 'complete' && dorPct < 80) return false
-      if (dorFilter.value === 'partial' && (dorPct < 50 || dorPct >= 80)) return false
-      if (dorFilter.value === 'incomplete' && dorPct >= 50) return false
-    }
-
     // Big Rock filter
     if (bigRockFilter.value && f.bigRock !== bigRockFilter.value) return false
 
@@ -226,9 +208,6 @@ var filteredFeatures = computed(function() {
       if (!hasMatch) return false
     }
 
-    // Tier filter
-    if (tierFilter.value && String(f.tier) !== tierFilter.value) return false
-
     // Search
     if (searchQuery.value) {
       var q = searchQuery.value.toLowerCase()
@@ -241,15 +220,12 @@ var filteredFeatures = computed(function() {
 })
 
 var hasActiveFilters = computed(function() {
-  return !!(riskFilter.value || dorFilter.value || bigRockFilter.value || selectedComponents.value.length > 0 || tierFilter.value || searchQuery.value)
+  return !!(bigRockFilter.value || selectedComponents.value.length > 0 || searchQuery.value)
 })
 
 function clearFilters() {
-  riskFilter.value = ''
-  dorFilter.value = ''
   bigRockFilter.value = ''
   selectedComponents.value = []
-  tierFilter.value = ''
   searchQuery.value = ''
 }
 
@@ -466,11 +442,8 @@ onUnmounted(function() {
 
       <!-- Filters -->
       <HealthFilterBar
-        v-model:riskFilter="riskFilter"
-        v-model:dorFilter="dorFilter"
         v-model:bigRockFilter="bigRockFilter"
         v-model:selectedComponents="selectedComponents"
-        v-model:tierFilter="tierFilter"
         v-model:searchQuery="searchQuery"
         :bigRocks="bigRockOptions"
         :components="componentOptions"

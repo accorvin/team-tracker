@@ -699,6 +699,8 @@ async function runHealthPipeline(version, readFromStorage, writeToStorage, jiraR
       pm: getDisplayName(feature.pm),
       deliveryOwner: getDisplayName(feature.assignee),
       components: components,
+      fixVersions: Array.isArray(feature.fixVersions) ? feature.fixVersions.join(', ') : '',
+      targetRelease: Array.isArray(feature.targetVersions) ? feature.targetVersions.join(', ') : '',
       completionPct: typeof feature.completionPct === 'number' ? feature.completionPct : 0,
       epicCount: feature.epicCount || 0,
       issueCount: feature.issueCount || 0,
