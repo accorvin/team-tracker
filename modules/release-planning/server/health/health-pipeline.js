@@ -2,8 +2,8 @@
  * Health pipeline orchestrator.
  *
  * Coordinates the full health assessment flow:
- *   1. Load feature-traffic index and detail files
- *   2. Load Smartsheet milestone dates (with freeze dates)
+ *   1. Load features from Big Rocks candidates cache
+ *   2. Load Product Pages milestone dates (with freeze dates)
  *   3. Run Jira enrichment (two-pass)
  *   4. Evaluate DoR for each feature
  *   5. Compute risk for each feature
@@ -21,7 +21,6 @@ const { enrichFeatures } = require('./jira-enrichment')
 const { evaluateDor } = require('./dor-checker')
 const { computeFeatureRisk } = require('./risk-engine')
 const { buildRiceResult } = require('./rice-scorer')
-const smartsheetClient = require('../../../../shared/server/smartsheet')
 
 var DATA_PREFIX = 'release-planning'
 
@@ -215,28 +214,46 @@ function getFeaturePhase(feature) {
 }
 
 /**
- * Load milestone data from Smartsheet.
- * Returns milestones for the requested version, or null if unavailable.
+ * Load milestone data from the Product Pages cache (written by release-analysis module).
+ * Maps Product Pages release entries to the milestones shape the health pipeline expects.
  *
+ * @param {Function} readFromStorage
  * @param {string} version - Release version (e.g., '3.5')
- * @returns {Promise<object|null>} Milestone dates or null
+ * @returns {object|null} Milestone dates or null
  */
-async function loadMilestones(version) {
-  if (!smartsheetClient.isConfigured()) {
+function loadMilestones(readFromStorage, version) {
+  var cached = readFromStorage('release-analysis/product-pages-releases-cache.json')
+  if (!cached || !cached.releases || !Array.isArray(cached.releases)) {
     return null
   }
 
-  try {
-    var releases = await smartsheetClient.discoverReleasesWithFreezes()
-    for (var i = 0; i < releases.length; i++) {
-      if (releases[i].version === version) {
-        return releases[i]
-      }
+  var ea1Entry = null
+  var ea2Entry = null
+  var gaEntry = null
+
+  for (var i = 0; i < cached.releases.length; i++) {
+    var r = cached.releases[i]
+    var rn = r.releaseNumber || ''
+    if (rn.indexOf(version + '.EA1') !== -1) {
+      ea1Entry = r
+    } else if (rn.indexOf(version + '.EA2') !== -1) {
+      ea2Entry = r
+    } else if (rn.indexOf(version) !== -1 && rn.indexOf('.EA') === -1) {
+      gaEntry = r
     }
+  }
+
+  if (!ea1Entry && !ea2Entry && !gaEntry) {
     return null
-  } catch (err) {
-    console.warn('[health] Failed to load Smartsheet milestones:', err.message)
-    return null
+  }
+
+  return {
+    ea1Freeze: ea1Entry ? ea1Entry.codeFreezeDate || null : null,
+    ea1Target: ea1Entry ? ea1Entry.dueDate || null : null,
+    ea2Freeze: ea2Entry ? ea2Entry.codeFreezeDate || null : null,
+    ea2Target: ea2Entry ? ea2Entry.dueDate || null : null,
+    gaFreeze: gaEntry ? gaEntry.codeFreezeDate || null : null,
+    gaTarget: gaEntry ? gaEntry.dueDate || null : null
   }
 }
 
@@ -394,10 +411,10 @@ async function runHealthPipeline(version, readFromStorage, writeToStorage, jiraR
 
   console.log('[health] Found ' + features.length + ' features for version ' + version + ' phase ' + phaseKey)
 
-  // Step 2: Load milestone dates from Smartsheet
-  var milestones = await loadMilestones(version)
+  // Step 2: Load milestone dates from Product Pages cache
+  var milestones = loadMilestones(readFromStorage, version)
   if (!milestones) {
-    warnings.push('Smartsheet milestone dates not available -- milestone risk checks will be skipped')
+    warnings.push('Product Pages milestone dates not available -- milestone risk checks will be skipped')
   }
 
   // Step 3: Run Jira enrichment
