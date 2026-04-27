@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { Line, Bar } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -33,6 +33,19 @@ const hasAssessments = computed(() => Object.keys(props.filteredAssessments).len
 
 const emit = defineEmits(['toggle'])
 
+const isDark = ref(false)
+onMounted(() => {
+  isDark.value = document.documentElement.classList.contains('dark')
+  const observer = new MutationObserver(() => {
+    isDark.value = document.documentElement.classList.contains('dark')
+  })
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  onBeforeUnmount(() => observer.disconnect())
+})
+
+const textColor = computed(() => isDark.value ? 'rgba(209, 213, 219, 1)' : 'rgba(107, 114, 128, 1)')
+const gridColor = computed(() => isDark.value ? 'rgba(75, 85, 99, 0.5)' : 'rgba(229, 231, 235, 1)')
+
 const createdPctChartData = computed(() => ({
   labels: props.trendData.map(p => p.date),
   datasets: [{
@@ -45,15 +58,15 @@ const createdPctChartData = computed(() => ({
   }]
 }))
 
-const createdPctChartOptions = {
+const createdPctChartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: { legend: { display: false } },
   scales: {
-    x: { ticks: { font: { size: 10 } } },
-    y: { min: 0, max: 100, ticks: { font: { size: 10 }, callback: v => v + '%' }, title: { display: true, text: '% Created with AI' } }
+    x: { ticks: { font: { size: 10 }, color: textColor.value }, grid: { color: gridColor.value } },
+    y: { min: 0, max: 100, ticks: { font: { size: 10 }, color: textColor.value, callback: v => v + '%' }, title: { display: true, text: '% Created with AI', color: textColor.value }, grid: { color: gridColor.value } }
   }
-}
+}))
 
 const revisedCountChartData = computed(() => ({
   labels: props.trendData.map(p => p.date),
@@ -66,15 +79,15 @@ const revisedCountChartData = computed(() => ({
   }]
 }))
 
-const revisedCountChartOptions = {
+const revisedCountChartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: { legend: { display: false } },
   scales: {
-    x: { ticks: { font: { size: 10 } } },
-    y: { beginAtZero: true, ticks: { font: { size: 10 }, precision: 0 }, title: { display: true, text: 'Revised (count)' } }
+    x: { ticks: { font: { size: 10 }, color: textColor.value }, grid: { color: gridColor.value } },
+    y: { beginAtZero: true, ticks: { font: { size: 10 }, color: textColor.value, precision: 0 }, title: { display: true, text: 'Revised (count)', color: textColor.value }, grid: { color: gridColor.value } }
   }
-}
+}))
 
 const breakdownChartData = computed(() => ({
   labels: props.breakdown.map(b => b.name),
@@ -84,16 +97,16 @@ const breakdownChartData = computed(() => ({
   }]
 }))
 
-const breakdownChartOptions = {
+const breakdownChartOptions = computed(() => ({
   indexAxis: 'y',
   responsive: true,
   maintainAspectRatio: false,
   plugins: { legend: { display: false } },
   scales: {
-    x: { ticks: { font: { size: 10 } } },
-    y: { ticks: { font: { size: 10 } } }
+    x: { ticks: { font: { size: 10 }, color: textColor.value }, grid: { color: gridColor.value } },
+    y: { ticks: { font: { size: 10 }, color: textColor.value }, grid: { color: gridColor.value } }
   }
-}
+}))
 </script>
 
 <template>

@@ -50,8 +50,10 @@ const isEmpty = computed(() => !props.rfeData?.fetchedAt)
         <h2 class="text-lg font-semibold dark:text-gray-100">{{ phase.name }}</h2>
         <p class="text-sm text-gray-500 dark:text-gray-400">AI adoption metrics and RFE tracking</p>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
+        <label for="time-window" class="text-sm text-gray-500 dark:text-gray-400">Showing:</label>
         <select
+          id="time-window"
           :value="timeWindow"
           @change="emit('update:timeWindow', $event.target.value)"
           class="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-300"
