@@ -6,8 +6,7 @@
  *
  * Tries multiple patterns in priority order:
  *   1. Explicit label: "T-Shirt Size: XL" or "Size: M"
- *   2. Bracketed: "[M]" or "(L)" as standalone text
- *   3. Table cell with "size" header
+ *   2. Complexity/effort label: "Complexity: M" or "Effort: L"
  */
 
 var VALID_SIZES = ['XS', 'S', 'M', 'L', 'XL']

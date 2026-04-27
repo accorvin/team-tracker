@@ -219,6 +219,7 @@ async function runPass1(jiraRequest, fetchAllJqlResults, featureKeys, opts) {
             dependencyLinks: [],
             refinementHistory: null,
             rice: null,
+            tshirtSize: null,
             _error: true
           })
         }
