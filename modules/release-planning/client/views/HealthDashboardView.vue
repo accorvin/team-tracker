@@ -127,31 +127,32 @@ var cardCounts = computed(function() {
 
 // ─── Planning deadline (client-side for "all" tab) ───
 
-var activePlanningDeadline = computed(function() {
-  // For phase-specific tabs, use the server-computed deadline
-  if (activePhase.value !== 'all') {
-    return healthData.value && healthData.value.summary ? healthData.value.summary.planningDeadline : null
-  }
+function daysUntil(dateStr, todayStr) {
+  var d = new Date(dateStr + 'T00:00:00Z')
+  var t = new Date(todayStr + 'T00:00:00Z')
+  return Math.ceil((d - t) / (1000 * 60 * 60 * 24))
+}
 
-  // For the "all" tab, find the nearest future planning freeze
-  var pf = healthData.value ? healthData.value.planningFreezes : null
+var activePlanningDeadline = computed(function() {
+  var pf = planningFreezes.value
   if (!pf) return null
 
-  var today = new Date()
-  var todayStr = today.toISOString().split('T')[0]
-  var nearest = null
+  var todayStr = new Date().toISOString().split('T')[0]
 
+  if (activePhase.value !== 'all') {
+    var phaseKey = activePhase.value.toLowerCase()
+    var dateStr = pf[phaseKey]
+    if (!dateStr) return null
+    return { date: dateStr, daysRemaining: daysUntil(dateStr, todayStr) }
+  }
+
+  var nearest = null
   var phases = ['ea1', 'ea2', 'ga']
   for (var i = 0; i < phases.length; i++) {
-    var dateStr = pf[phases[i]]
-    if (!dateStr || dateStr < todayStr) continue
-    if (!nearest || dateStr < nearest.date) {
-      var deadlineDate = new Date(dateStr + 'T00:00:00Z')
-      var todayDate = new Date(todayStr + 'T00:00:00Z')
-      nearest = {
-        date: dateStr,
-        daysRemaining: Math.ceil((deadlineDate - todayDate) / (1000 * 60 * 60 * 24))
-      }
+    var ds = pf[phases[i]]
+    if (!ds || ds < todayStr) continue
+    if (!nearest || ds < nearest.date) {
+      nearest = { date: ds, daysRemaining: daysUntil(ds, todayStr) }
     }
   }
 
