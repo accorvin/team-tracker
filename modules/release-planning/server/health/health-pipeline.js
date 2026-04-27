@@ -272,7 +272,7 @@ function loadMilestones(readFromStorage, version) {
  *
  * @param {Function} readFromStorage
  * @param {string} version - Current version (e.g., '3.5')
- * @returns {string|null} Previous version's GA code freeze date, or null
+ * @returns {Promise<string|null>} Previous version's GA code freeze date, or null
  */
 async function loadPreviousGaFreeze(readFromStorage, version) {
   var parts = version.split('.')
