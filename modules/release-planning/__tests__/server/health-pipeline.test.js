@@ -4,6 +4,7 @@ const {
   runHealthPipeline,
   loadFeaturesForRelease,
   loadFeaturesFromCandidates,
+  loadMilestones,
   computeMilestoneInfo,
   computePlanningDeadline,
   getFeaturePhase,
@@ -350,6 +351,73 @@ describe('loadFeaturesForRelease', function() {
   })
 })
 
+describe('loadMilestones', function() {
+  function ppCache(releases) {
+    return {
+      'release-analysis/product-pages-releases-cache.json': {
+        source: 'api',
+        fetchedAt: '2026-04-26T00:00:00Z',
+        releases: releases
+      }
+    }
+  }
+
+  it('returns milestones from Product Pages cache', function() {
+    var storage = makeStorage(ppCache([
+      { productName: 'rhoai', releaseNumber: 'rhoai-3.5.EA1', dueDate: '2026-05-15', codeFreezeDate: '2026-05-01' },
+      { productName: 'rhoai', releaseNumber: 'rhoai-3.5.EA2', dueDate: '2026-07-01', codeFreezeDate: '2026-06-15' },
+      { productName: 'rhoai', releaseNumber: 'rhoai-3.5', dueDate: '2026-08-15', codeFreezeDate: '2026-08-01' }
+    ]))
+    var result = loadMilestones(storage.readFromStorage, '3.5')
+    expect(result).not.toBeNull()
+    expect(result.ea1Freeze).toBe('2026-05-01')
+    expect(result.ea1Target).toBe('2026-05-15')
+    expect(result.ea2Freeze).toBe('2026-06-15')
+    expect(result.ea2Target).toBe('2026-07-01')
+    expect(result.gaFreeze).toBe('2026-08-01')
+    expect(result.gaTarget).toBe('2026-08-15')
+  })
+
+  it('returns null when cache is missing', function() {
+    var storage = makeStorage({})
+    expect(loadMilestones(storage.readFromStorage, '3.5')).toBeNull()
+  })
+
+  it('returns null when no matching version', function() {
+    var storage = makeStorage(ppCache([
+      { productName: 'rhoai', releaseNumber: 'rhoai-3.4', dueDate: '2026-03-01', codeFreezeDate: '2026-02-15' }
+    ]))
+    expect(loadMilestones(storage.readFromStorage, '3.5')).toBeNull()
+  })
+
+  it('handles missing codeFreezeDate', function() {
+    var storage = makeStorage(ppCache([
+      { productName: 'rhoai', releaseNumber: 'rhoai-3.5.EA1', dueDate: '2026-05-15', codeFreezeDate: null },
+      { productName: 'rhoai', releaseNumber: 'rhoai-3.5', dueDate: '2026-08-15', codeFreezeDate: null }
+    ]))
+    var result = loadMilestones(storage.readFromStorage, '3.5')
+    expect(result).not.toBeNull()
+    expect(result.ea1Freeze).toBeNull()
+    expect(result.ea1Target).toBe('2026-05-15')
+    expect(result.gaFreeze).toBeNull()
+    expect(result.gaTarget).toBe('2026-08-15')
+  })
+
+  it('returns partial milestones when only some phases exist', function() {
+    var storage = makeStorage(ppCache([
+      { productName: 'rhoai', releaseNumber: 'rhoai-3.5', dueDate: '2026-08-15', codeFreezeDate: '2026-08-01' }
+    ]))
+    var result = loadMilestones(storage.readFromStorage, '3.5')
+    expect(result).not.toBeNull()
+    expect(result.ea1Freeze).toBeNull()
+    expect(result.ea1Target).toBeNull()
+    expect(result.ea2Freeze).toBeNull()
+    expect(result.ea2Target).toBeNull()
+    expect(result.gaFreeze).toBe('2026-08-01')
+    expect(result.gaTarget).toBe('2026-08-15')
+  })
+})
+
 describe('runHealthPipeline', function() {
   function makeCandidatesCache(features) {
     return {
@@ -409,15 +477,35 @@ describe('runHealthPipeline', function() {
     expect(Array.isArray(result.enrichmentStatus.warnings)).toBe(true)
   })
 
-  it('returns null milestones when Smartsheet is unavailable', async function() {
+  it('returns null milestones when Product Pages cache is unavailable', async function() {
     var storage = makeStorage(makeCandidatesCache([
       { issueKey: 'T-1', summary: 'F1', status: 'In Progress', components: '', fixVersion: '', deliveryOwner: 'Jane', tier: 1 }
     ]))
     var result = await runHealthPipeline('3.5', storage.readFromStorage, storage.writeToStorage, vi.fn(), vi.fn())
     expect(result.milestones).toBeNull()
     expect(result.enrichmentStatus.warnings).toEqual(
-      expect.arrayContaining([expect.stringContaining('Smartsheet')])
+      expect.arrayContaining([expect.stringContaining('Product Pages')])
     )
+  })
+
+  it('loads milestones from Product Pages cache when available', async function() {
+    var data = makeCandidatesCache([
+      { issueKey: 'T-1', summary: 'F1', status: 'In Progress', components: '', fixVersion: '', deliveryOwner: 'Jane', tier: 1 }
+    ])
+    data['release-analysis/product-pages-releases-cache.json'] = {
+      source: 'api',
+      fetchedAt: '2026-04-26T00:00:00Z',
+      releases: [
+        { productName: 'rhoai', releaseNumber: 'rhoai-3.5.EA1', dueDate: '2026-05-15', codeFreezeDate: '2026-05-01' },
+        { productName: 'rhoai', releaseNumber: 'rhoai-3.5.EA2', dueDate: '2026-07-01', codeFreezeDate: '2026-06-15' },
+        { productName: 'rhoai', releaseNumber: 'rhoai-3.5', dueDate: '2026-08-15', codeFreezeDate: '2026-08-01' }
+      ]
+    }
+    var storage = makeStorage(data)
+    var result = await runHealthPipeline('3.5', storage.readFromStorage, storage.writeToStorage, vi.fn(), vi.fn())
+    expect(result.milestones).not.toBeNull()
+    expect(result.milestones.ea1Freeze).toBe('2026-05-01')
+    expect(result.milestones.gaTarget).toBe('2026-08-15')
   })
 
   it('produces correct cache structure', async function() {

@@ -116,7 +116,7 @@ function expectedCompletionForPhase(currentMilestone, featurePhase, customExpect
  * Compute risk assessment for a single feature.
  *
  * @param {object} feature - Feature data with status, completionPct, etc.
- * @param {object|null} milestones - Smartsheet milestone dates
+ * @param {object|null} milestones - Product Pages milestone dates
  * @param {object} dorStatus - DoR evaluation result from evaluateDor()
  * @param {object|null} enrichment - Jira enrichment data
  * @param {object} opts - Options: { riskThresholds, phaseCompletionExpectations, today, planningDeadline, phase, version }
