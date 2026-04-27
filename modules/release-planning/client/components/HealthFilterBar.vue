@@ -129,7 +129,7 @@ onUnmounted(function() {
       </button>
       <div
         v-if="compOpen"
-        role="listbox"
+        role="group"
         aria-label="Components"
         class="absolute z-50 mt-1 w-64 max-h-60 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg"
         @keydown.escape="compOpen = false"
