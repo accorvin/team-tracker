@@ -173,28 +173,29 @@ describe('computePlanningDeadline', function() {
     ea2Freeze: '2026-06-18',
     gaFreeze: '2026-08-01'
   }
-
-  it('returns null when milestones is null', function() {
-    expect(computePlanningDeadline(null, 'EA1')).toBeNull()
-  })
+  var prevGaFreeze = '2026-04-17'
 
   it('returns null when phase is null', function() {
     expect(computePlanningDeadline(milestones, null)).toBeNull()
   })
 
-  it('computes deadline as freeze minus 7 days for EA1', function() {
-    var result = computePlanningDeadline(milestones, 'EA1')
+  it('computes EA1 deadline from previous version GA freeze minus 7 days', function() {
+    var result = computePlanningDeadline(milestones, 'EA1', prevGaFreeze)
+    expect(result.date).toBe('2026-04-10')
+  })
+
+  it('returns null for EA1 when no previous GA freeze', function() {
+    expect(computePlanningDeadline(milestones, 'EA1', null)).toBeNull()
+  })
+
+  it('computes EA2 deadline from EA1 freeze minus 7 days', function() {
+    var result = computePlanningDeadline(milestones, 'EA2')
     expect(result.date).toBe('2026-04-24')
   })
 
-  it('computes deadline as freeze minus 7 days for EA2', function() {
-    var result = computePlanningDeadline(milestones, 'EA2')
-    expect(result.date).toBe('2026-06-11')
-  })
-
-  it('computes deadline as freeze minus 7 days for GA', function() {
+  it('computes GA deadline from EA2 freeze minus 7 days', function() {
     var result = computePlanningDeadline(milestones, 'GA')
-    expect(result.date).toBe('2026-07-25')
+    expect(result.date).toBe('2026-06-11')
   })
 
   it('returns null for unknown phase', function() {
@@ -712,7 +713,32 @@ describe('runHealthPipeline', function() {
     expect(result.features[0]).toHaveProperty('dor')
   })
 
-  it('includes planningFreezes in cache output when milestones are present', async function() {
+  it('computes planningFreezes from previous phase code freeze minus 7 days', async function() {
+    var data = makeCandidatesCache([
+      { issueKey: 'T-1', summary: 'F1', status: 'In Progress', components: '', fixVersion: '', deliveryOwner: 'Jane', tier: 1 }
+    ])
+    data['release-analysis/product-pages-releases-cache.json'] = {
+      source: 'api',
+      fetchedAt: '2026-04-26T00:00:00Z',
+      releases: [
+        { productName: 'rhoai', releaseNumber: 'rhoai-3.4', dueDate: '2026-04-30', codeFreezeDate: '2026-04-17' },
+        { productName: 'rhoai', releaseNumber: 'rhoai-3.5.EA1', dueDate: '2026-05-15', codeFreezeDate: '2026-05-01' },
+        { productName: 'rhoai', releaseNumber: 'rhoai-3.5.EA2', dueDate: '2026-07-01', codeFreezeDate: '2026-06-15' },
+        { productName: 'rhoai', releaseNumber: 'rhoai-3.5', dueDate: '2026-08-15', codeFreezeDate: '2026-08-01' }
+      ]
+    }
+    var storage = makeStorage(data)
+    var result = await runHealthPipeline('3.5', storage.readFromStorage, storage.writeToStorage, vi.fn(), vi.fn())
+    expect(result.planningFreezes).not.toBeNull()
+    // EA1 planning freeze = previous version (3.4) GA code freeze - 7 = 2026-04-17 - 7 = 2026-04-10
+    expect(result.planningFreezes.ea1).toBe('2026-04-10')
+    // EA2 planning freeze = EA1 code freeze - 7 = 2026-05-01 - 7 = 2026-04-24
+    expect(result.planningFreezes.ea2).toBe('2026-04-24')
+    // GA planning freeze = EA2 code freeze - 7 = 2026-06-15 - 7 = 2026-06-08
+    expect(result.planningFreezes.ga).toBe('2026-06-08')
+  })
+
+  it('returns null ea1 planning freeze when no previous version data', async function() {
     var data = makeCandidatesCache([
       { issueKey: 'T-1', summary: 'F1', status: 'In Progress', components: '', fixVersion: '', deliveryOwner: 'Jane', tier: 1 }
     ])
@@ -727,19 +753,19 @@ describe('runHealthPipeline', function() {
     }
     var storage = makeStorage(data)
     var result = await runHealthPipeline('3.5', storage.readFromStorage, storage.writeToStorage, vi.fn(), vi.fn())
-    expect(result.planningFreezes).not.toBeNull()
-    // Planning freeze = code freeze - 7 days
-    expect(result.planningFreezes.ea1).toBe('2026-04-24')
-    expect(result.planningFreezes.ea2).toBe('2026-06-08')
-    expect(result.planningFreezes.ga).toBe('2026-07-25')
+    expect(result.planningFreezes.ea1).toBeNull()
+    expect(result.planningFreezes.ea2).toBe('2026-04-24')
+    expect(result.planningFreezes.ga).toBe('2026-06-08')
   })
 
-  it('returns null planningFreezes when milestones are null', async function() {
+  it('returns all null planningFreezes when no milestones and no previous version', async function() {
     var storage = makeStorage(makeCandidatesCache([
       { issueKey: 'T-1', summary: 'F1', status: 'In Progress', components: '', fixVersion: '', deliveryOwner: 'Jane', tier: 1 }
     ]))
     var result = await runHealthPipeline('3.5', storage.readFromStorage, storage.writeToStorage, vi.fn(), vi.fn())
-    expect(result.planningFreezes).toBeNull()
+    expect(result.planningFreezes.ea1).toBeNull()
+    expect(result.planningFreezes.ea2).toBeNull()
+    expect(result.planningFreezes.ga).toBeNull()
   })
 
   it('attaches priorityScore and priorityBreakdown to health features', async function() {
