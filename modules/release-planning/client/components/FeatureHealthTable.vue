@@ -26,8 +26,8 @@ var columns = [
   { key: 'rice', label: 'RICE', sortable: true },
   { key: 'components', label: 'Component', sortable: true },
   { key: 'owner', label: 'Owner', sortable: true },
-  { key: 'phase', label: 'Phase', sortable: true },
-  { key: 'tier', label: 'Tier', sortable: true }
+  { key: 'fixVersions', label: 'Fix Version', sortable: true },
+  { key: 'targetRelease', label: 'Target Release', sortable: true }
 ]
 
 var RISK_ORDER = { red: 0, yellow: 1, green: 2 }
@@ -70,12 +70,12 @@ var sortedFeatures = computed(function() {
     } else if (key === 'owner') {
       va = (a.deliveryOwner || '').toLowerCase()
       vb = (b.deliveryOwner || '').toLowerCase()
-    } else if (key === 'phase') {
-      va = a.phase || ''
-      vb = b.phase || ''
-    } else if (key === 'tier') {
-      va = a.tier || ''
-      vb = b.tier || ''
+    } else if (key === 'fixVersions') {
+      va = (a.fixVersions || '').toLowerCase()
+      vb = (b.fixVersions || '').toLowerCase()
+    } else if (key === 'targetRelease') {
+      va = (a.targetRelease || '').toLowerCase()
+      vb = (b.targetRelease || '').toLowerCase()
     } else {
       return 0
     }

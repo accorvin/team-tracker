@@ -194,21 +194,10 @@ var flagSeverityClass = {
     <td class="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600">{{ feature.components || '-' }}</td>
     <!-- Owner -->
     <td class="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600">{{ feature.deliveryOwner || '-' }}</td>
-    <!-- Phase -->
-    <td class="px-3 py-2 border border-gray-300 dark:border-gray-600">
-      <span
-        v-if="feature.phase"
-        class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold"
-        :class="{
-          'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400': feature.phase === 'TP' || feature.phase === 'EA1',
-          'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400': feature.phase === 'DP' || feature.phase === 'EA2',
-          'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': feature.phase === 'GA'
-        }"
-      >{{ feature.phase }}</span>
-      <span v-else class="text-gray-400 dark:text-gray-600 text-xs">-</span>
-    </td>
-    <!-- Tier -->
-    <td class="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600">{{ feature.tier || '-' }}</td>
+    <!-- Fix Version -->
+    <td class="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600">{{ feature.fixVersions || '-' }}</td>
+    <!-- Target Release -->
+    <td class="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600">{{ feature.targetRelease || '-' }}</td>
   </tr>
 
   <!-- Expanded detail row -->
