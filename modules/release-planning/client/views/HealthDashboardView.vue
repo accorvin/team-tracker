@@ -4,8 +4,8 @@ import { useReleaseHealth } from '../composables/useReleaseHealth'
 import { useDorChecklist } from '../composables/useDorChecklist'
 import { useReleases } from '../composables/useReleasePlanning'
 import { useAuth } from '@shared/client'
+import { passesPhaseFilter } from '../utils/phase-filter'
 import ReleaseSelector from '../components/ReleaseSelector.vue'
-import PhaseSelector from '../components/PhaseSelector.vue'
 import MilestoneTimeline from '../components/MilestoneTimeline.vue'
 import HealthSummaryCards from '../components/HealthSummaryCards.vue'
 import HealthFilterBar from '../components/HealthFilterBar.vue'
@@ -22,7 +22,9 @@ var { releases, loadReleases } = useReleases()
 var { isAdmin } = useAuth()
 
 var selectedVersion = ref('')
-var selectedPhase = ref('')
+
+// Phase tabs
+var activePhase = ref('all')
 
 // Filter state
 var riskFilter = ref('')
@@ -42,9 +44,6 @@ var refreshPollTimer = null
 
 var canEdit = computed(function() {
   if (healthData.value && healthData.value.demoMode) return false
-  // PM/admin check -- the health routes enforce requirePM on the server,
-  // but for the UI we check the permissions from the main composable.
-  // For now, we use isAdmin as a proxy. The server will reject if not PM.
   return isAdmin.value
 })
 
@@ -58,12 +57,12 @@ var features = computed(function() {
   return healthData.value ? healthData.value.features || [] : []
 })
 
-var summary = computed(function() {
-  return healthData.value ? healthData.value.summary : null
-})
-
 var milestones = computed(function() {
   return healthData.value ? healthData.value.milestones : null
+})
+
+var planningFreezes = computed(function() {
+  return healthData.value ? healthData.value.planningFreezes : null
 })
 
 var warning = computed(function() {
@@ -78,16 +77,95 @@ var enrichmentStatus = computed(function() {
   return healthData.value ? healthData.value.enrichmentStatus : null
 })
 
-var availablePhases = computed(function() {
+// ─── Phase tabs ───
+
+var phaseTabs = computed(function() {
+  var tabs = [{ id: 'all', label: 'All Features' }]
   var ms = milestones.value
-  if (!ms) return []
-  var phases = []
-  var ver = selectedVersion.value || ''
-  if (ms.ea1Freeze) phases.push({ value: 'EA1', label: 'RHOAI ' + ver + ' EA1' })
-  if (ms.ea2Freeze) phases.push({ value: 'EA2', label: 'RHOAI ' + ver + ' EA2' })
-  if (ms.gaFreeze) phases.push({ value: 'GA', label: 'RHOAI ' + ver + ' GA' })
-  return phases
+  if (!ms) return tabs
+  if (ms.ea1Freeze || ms.ea1Target) tabs.push({ id: 'EA1', label: 'EA1' })
+  if (ms.ea2Freeze || ms.ea2Target) tabs.push({ id: 'EA2', label: 'EA2' })
+  if (ms.gaFreeze || ms.gaTarget) tabs.push({ id: 'GA', label: 'GA' })
+  return tabs
 })
+
+// ─── Phase-filtered features ───
+
+var phasedFeatures = computed(function() {
+  if (activePhase.value === 'all') return features.value
+  return features.value.filter(function(f) {
+    return passesPhaseFilter(f, selectedVersion.value, activePhase.value)
+  })
+})
+
+// ─── Card counts (computed client-side from phasedFeatures) ───
+
+var cardCounts = computed(function() {
+  var feats = phasedFeatures.value
+  var total = feats.length
+  var ownerAssigned = 0
+  var scopeEstimated = 0
+  var riceComplete = 0
+  var dorComplete = 0
+
+  for (var i = 0; i < feats.length; i++) {
+    var f = feats[i]
+    if (f.deliveryOwner) ownerAssigned++
+    if (f.storyPoints) scopeEstimated++
+    if (f.rice && f.rice.score != null) riceComplete++
+    if (f.dor && f.dor.completionPct >= 80) dorComplete++
+  }
+
+  return {
+    total: total,
+    ownerAssigned: ownerAssigned,
+    scopeEstimated: scopeEstimated,
+    riceComplete: riceComplete,
+    dorComplete: dorComplete
+  }
+})
+
+// ─── Planning deadline (client-side for "all" tab) ───
+
+var activePlanningDeadline = computed(function() {
+  // For phase-specific tabs, use the server-computed deadline
+  if (activePhase.value !== 'all') {
+    return healthData.value && healthData.value.summary ? healthData.value.summary.planningDeadline : null
+  }
+
+  // For the "all" tab, find the nearest future planning freeze
+  var pf = healthData.value ? healthData.value.planningFreezes : null
+  if (!pf) return null
+
+  var today = new Date()
+  var todayStr = today.toISOString().split('T')[0]
+  var nearest = null
+
+  var phases = ['ea1', 'ea2', 'ga']
+  for (var i = 0; i < phases.length; i++) {
+    var dateStr = pf[phases[i]]
+    if (!dateStr || dateStr < todayStr) continue
+    if (!nearest || dateStr < nearest.date) {
+      var deadlineDate = new Date(dateStr + 'T00:00:00Z')
+      var todayDate = new Date(todayStr + 'T00:00:00Z')
+      nearest = {
+        date: dateStr,
+        daysRemaining: Math.ceil((deadlineDate - todayDate) / (1000 * 60 * 60 * 24))
+      }
+    }
+  }
+
+  return nearest
+})
+
+// ─── Tab feature counts ───
+
+function phaseFeatureCount(tabId) {
+  if (tabId === 'all') return features.value.length
+  return features.value.filter(function(f) {
+    return passesPhaseFilter(f, selectedVersion.value, tabId)
+  }).length
+}
 
 // ─── Filter options ───
 
@@ -109,10 +187,10 @@ var componentOptions = computed(function() {
   return Object.keys(comps).sort()
 })
 
-// ─── Filtered features ───
+// ─── Filtered features (applied on top of phasedFeatures) ───
 
 var filteredFeatures = computed(function() {
-  var list = features.value
+  var list = phasedFeatures.value
   if (!list || list.length === 0) return []
 
   return list.filter(function(f) {
@@ -164,25 +242,17 @@ function clearFilters() {
   searchQuery.value = ''
 }
 
-function handleFilterByRisk(level) {
-  if (riskFilter.value === level) {
-    riskFilter.value = ''
-  } else {
-    riskFilter.value = level
-  }
-}
-
 // ─── Data refresh ───
 
 function startRefreshPolling() {
   stopRefreshPolling()
   refreshPollTimer = setInterval(async function() {
     try {
-      var status = await checkHealthRefreshStatus(selectedVersion.value, selectedPhase.value || undefined)
+      var status = await checkHealthRefreshStatus(selectedVersion.value)
       if (!status.running) {
         stopRefreshPolling()
         if (selectedVersion.value) {
-          loadHealth(selectedVersion.value, selectedPhase.value || undefined)
+          loadHealth(selectedVersion.value)
         }
       }
     } catch {
@@ -206,7 +276,7 @@ watch(healthRefreshing, function(isRefreshing) {
 
 function handleRefresh() {
   if (selectedVersion.value && !demoMode.value) {
-    triggerHealthRefresh(selectedVersion.value, selectedPhase.value || undefined)
+    triggerHealthRefresh(selectedVersion.value)
   }
 }
 
@@ -247,7 +317,7 @@ function handleNotesUpdate(featureKey, notes) {
 
 function handleRemoveOverride(featureKey) {
   removeRiskOverrideApi(selectedVersion.value, featureKey).then(function() {
-    loadHealth(selectedVersion.value, selectedPhase.value || undefined)
+    loadHealth(selectedVersion.value)
   }).catch(function(err) {
     healthError.value = err.message || 'Failed to remove override'
   })
@@ -294,7 +364,7 @@ function exportCsv() {
   var url = URL.createObjectURL(blob)
   var a = document.createElement('a')
   a.href = url
-  a.download = 'plan-health-' + selectedVersion.value + '-' + (selectedPhase.value || 'all') + '.csv'
+  a.download = 'plan-health-' + selectedVersion.value + '-' + (activePhase.value || 'all') + '.csv'
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -306,7 +376,7 @@ function escapeCell(val) {
 function exportMarkdown() {
   exportMenuOpen.value = false
   var lines = []
-  lines.push('# Release Plan Health - ' + selectedVersion.value + (selectedPhase.value ? ' ' + selectedPhase.value : ''))
+  lines.push('# Release Plan Health - ' + selectedVersion.value + (activePhase.value !== 'all' ? ' ' + activePhase.value : ''))
   lines.push('')
   lines.push('| **Feature** | **Summary** | **Status** | **Risk** | **DoR %** | **RICE** | **Component** | **Phase** |')
   lines.push('|---------|---------|--------|------|-------|------|-----------|-------|')
@@ -329,7 +399,7 @@ function exportMarkdown() {
   var url = URL.createObjectURL(blob)
   var a = document.createElement('a')
   a.href = url
-  a.download = 'plan-health-' + selectedVersion.value + '-' + (selectedPhase.value || 'all') + '.md'
+  a.download = 'plan-health-' + selectedVersion.value + '-' + (activePhase.value !== 'all' ? activePhase.value : 'all') + '.md'
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -357,16 +427,10 @@ function formatDate(iso) {
 
 watch(selectedVersion, function(newVersion) {
   healthError.value = null
-  selectedPhase.value = ''
+  activePhase.value = 'all'
   clearFilters()
   if (newVersion) {
     loadHealth(newVersion)
-  }
-})
-
-watch(selectedPhase, function(newPhase) {
-  if (selectedVersion.value) {
-    loadHealth(selectedVersion.value, newPhase || undefined)
   }
 })
 
@@ -400,11 +464,6 @@ onUnmounted(function() {
           v-if="releases.length > 0"
           :releases="releases"
           v-model="selectedVersion"
-        />
-        <PhaseSelector
-          v-if="availablePhases.length > 0"
-          :phases="availablePhases"
-          v-model="selectedPhase"
         />
         <button
           v-if="selectedVersion && !demoMode"
@@ -485,10 +544,40 @@ onUnmounted(function() {
 
     <template v-else-if="healthData && features.length > 0">
       <!-- Milestone Timeline -->
-      <MilestoneTimeline :milestones="milestones" />
+      <MilestoneTimeline :milestones="milestones" :planningFreezes="planningFreezes" />
+
+      <!-- Phase Tabs -->
+      <div>
+        <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+          <div role="tablist" aria-label="Release phase views" class="flex items-center gap-0 -mb-px">
+            <button
+              v-for="tab in phaseTabs"
+              :key="tab.id"
+              role="tab"
+              :id="'tab-' + tab.id"
+              :aria-selected="activePhase === tab.id"
+              :aria-controls="'panel-' + tab.id"
+              :tabindex="activePhase === tab.id ? 0 : -1"
+              @click="activePhase = tab.id"
+              class="px-4 py-2.5 text-xs font-medium transition-colors flex items-center gap-1.5 border-b-2"
+              :class="activePhase === tab.id
+                ? 'border-primary-600 dark:border-primary-400 text-primary-700 dark:text-primary-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'"
+            >
+              {{ tab.label }}
+              <span
+                class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold"
+                :class="activePhase === tab.id
+                  ? 'bg-primary-100 dark:bg-primary-500/20 text-primary-700 dark:text-primary-400'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'"
+              >{{ phaseFeatureCount(tab.id) }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- Summary Cards -->
-      <HealthSummaryCards :summary="summary" @filterByRisk="handleFilterByRisk" />
+      <HealthSummaryCards :cardCounts="cardCounts" :planningDeadline="activePlanningDeadline" />
 
       <!-- Filters -->
       <HealthFilterBar
