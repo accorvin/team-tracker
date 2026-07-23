@@ -123,6 +123,7 @@ export const viewOwners = {
   // These override the view-level owner when a specific report is selected.
 
   // releases > reports
+  'releases/reports/capacity-commitment':          'Alex Corvin',
   'releases/reports/cve-sustaining':               'Saiesh Prabhu',
   'releases/reports/feature-pressure':             'Dimitri Saridakis',
   'releases/reports/program-hygiene':              'Alex Corvin',

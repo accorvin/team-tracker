@@ -44,5 +44,11 @@ export const reports = [
     icon: 'ShieldAlert',
     tags: ['Security', 'CVE', 'Sustaining'],
     component: defineAsyncComponent(() => import('./CveSustainingReport.vue'))
+  },
+  {
+    id: 'capacity-commitment',
+    label: 'Release Capacity & Feature Commitment',
+    description: 'Key deadlines, team capacity, and feature commitment overview for a selected release.',
+    component: defineAsyncComponent(() => import('./CapacityCommitmentReport.vue'))
   }
 ]
