@@ -360,15 +360,15 @@ function classifyFeatures(features, releases, releaseDates) {
         } else {
           // FV is set — compare each FV against ALL TVs (spec rule 3).
           // This ensures multi-TV features correctly detect unfrozen TVs.
-          var fvRaw = feat.fix_versions.split(',').map(function(s) { return s.trim() }).filter(Boolean)
-          var tvRawAll = feat.target_version.split(',').map(function(s) { return s.trim() }).filter(Boolean)
+          let fvRaw = feat.fix_versions.split(',').map(function(s) { return s.trim() }).filter(Boolean)
+          let tvRawAll = feat.target_version.split(',').map(function(s) { return s.trim() }).filter(Boolean)
 
-          var worstCategory = 'aligned_on_time'
-          var hasSameProductComparison = false
+          let worstCategory = 'aligned_on_time'
+          let hasSameProductComparison = false
 
-          for (var fvi = 0; fvi < fvRaw.length; fvi++) {
-            var fvParsed = parseReleaseName(fvRaw[fvi])
-            var fvProduct = fvParsed ? fvParsed.product : null
+          for (let fvi = 0; fvi < fvRaw.length; fvi++) {
+            let fvParsed = parseReleaseName(fvRaw[fvi])
+            let fvProduct = fvParsed ? fvParsed.product : null
 
             // Unparseable FV = distinct product (spec rule 5) → misaligned
             if (!fvParsed) {
@@ -377,9 +377,9 @@ function classifyFeatures(features, releases, releaseDates) {
             }
 
             // Compare this FV against each TV
-            for (var tvi = 0; tvi < tvRawAll.length; tvi++) {
-              var tvParsed = parseReleaseName(tvRawAll[tvi])
-              var tvProduct = tvParsed ? tvParsed.product : null
+            for (let tvi = 0; tvi < tvRawAll.length; tvi++) {
+              let tvParsed = parseReleaseName(tvRawAll[tvi])
+              let tvProduct = tvParsed ? tvParsed.product : null
 
               // Unparseable TV = distinct product → misaligned
               if (!tvParsed) {
@@ -393,7 +393,7 @@ function classifyFeatures(features, releases, releaseDates) {
               }
 
               hasSameProductComparison = true
-              var cmp = compareReleasesTemporally(fvRaw[fvi], tvRawAll[tvi])
+              let cmp = compareReleasesTemporally(fvRaw[fvi], tvRawAll[tvi])
 
               // compareReleasesTemporally: positive = FV later, negative = FV earlier
               if (cmp !== null && cmp < 0) {
@@ -401,7 +401,7 @@ function classifyFeatures(features, releases, releaseDates) {
                 // Keep current worstCategory
               } else if (cmp !== null && cmp > 0) {
                 // FV after this TV - check freeze
-                var frozen = isReleaseFrozen(tvRawAll[tvi], releaseDates)
+                let frozen = isReleaseFrozen(tvRawAll[tvi], releaseDates)
                 if (!frozen) {
                   // Not frozen = misaligned (worst)
                   worstCategory = 'misaligned'
@@ -431,14 +431,14 @@ function classifyFeatures(features, releases, releaseDates) {
           cat = 'fv_only'
         } else {
           // TV is set — compare FV (= release) against all TVs
-          var tvRaw = feat.target_version.split(',').map(function(s) { return s.trim() }).filter(Boolean)
-          var relParsed2 = parseReleaseName(release)
+          let tvRaw = feat.target_version.split(',').map(function(s) { return s.trim() }).filter(Boolean)
+          let relParsed2 = parseReleaseName(release)
 
-          var worstCategory = 'aligned_on_time'
-          var hasSameProductTV = false
+          let worstCategory = 'aligned_on_time'
+          let hasSameProductTV = false
 
-          for (var tvi = 0; tvi < tvRaw.length; tvi++) {
-            var tvParsed = parseReleaseName(tvRaw[tvi])
+          for (let tvi = 0; tvi < tvRaw.length; tvi++) {
+            let tvParsed = parseReleaseName(tvRaw[tvi])
 
             // Unparseable TV = distinct product (spec rule 5) → misaligned
             if (!tvParsed) {
@@ -458,7 +458,7 @@ function classifyFeatures(features, releases, releaseDates) {
             }
 
             hasSameProductTV = true
-            var cmp = compareReleasesTemporally(release, tvRaw[tvi])  // FV (release) vs TV
+            let cmp = compareReleasesTemporally(release, tvRaw[tvi])  // FV (release) vs TV
 
             // compareReleasesTemporally: positive = FV later, negative = FV earlier
             if (cmp !== null && cmp < 0) {
@@ -466,7 +466,7 @@ function classifyFeatures(features, releases, releaseDates) {
               // Keep current worstCategory
             } else if (cmp !== null && cmp > 0) {
               // FV after TV - check freeze
-              var frozen = isReleaseFrozen(tvRaw[tvi], releaseDates)
+              let frozen = isReleaseFrozen(tvRaw[tvi], releaseDates)
               if (!frozen) {
                 // Any unfrozen TV where FV is after = misaligned (worst)
                 worstCategory = 'misaligned'

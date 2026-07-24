@@ -294,8 +294,6 @@ describe('extractProduct', () => {
 // ---------------------------------------------------------------------------
 
 describe('isReleaseFrozen', () => {
-  const now = new Date('2026-07-24T00:00:00Z');
-
   it('returns true when planning freeze is in the past', () => {
     const releaseDates = {
       'rhoai-3.5': { planningFreezeDate: '2026-06-01', dueDate: '2026-08-01' },
@@ -514,10 +512,7 @@ describe('classifyFeatures', () => {
       'rhoai-3.5': { planningFreezeDate: '2026-06-01' },
       'rhoai-3.6': { planningFreezeDate: '2026-09-01' }, // future
     };
-    const result = classifyFeatures(feats, ['rhoai-3.7'], releaseDates);
-    // FV=rhoai-3.7 doesn't match any TV in the release list, so no classification
-    // Let me fix the test - we're classifying for rhoai-3.7, but TVs are 3.5/3.6
-    // This should classify for rhoai-3.5 and rhoai-3.6, not 3.7
+    // Classify against rhoai-3.5 (a TV that the feature targets)
     const result2 = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result2).toHaveLength(1);
     expect(result2[0].category).toBe('misaligned'); // 3.5 frozen but FV after 3.6 which isn't
