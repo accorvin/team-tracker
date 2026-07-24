@@ -392,6 +392,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { getApiBase } from '@shared/client/services/api'
+import { buildComponentLeadsMap } from '../../composables/componentLeads'
 import ComponentReleaseLoadTable from '../components/ComponentReleaseLoadTable.vue'
 import PillarConfigPanel from '../components/PillarConfigPanel.vue'
 
@@ -779,18 +780,7 @@ var pillarNames = computed(function() {
 })
 
 var componentLeads = computed(function() {
-  var map = {}
-  var pillars = pillarConfig.value.pillars || []
-  for (var pi = 0; pi < pillars.length; pi++) {
-    var comps = pillars[pi].components || []
-    for (var ci = 0; ci < comps.length; ci++) {
-      var c = comps[ci]
-      if (typeof c === 'object' && c !== null && c.name) {
-        map[c.name.toLowerCase()] = { pmLead: c.pmLead || '', engLead: c.engLead || '' }
-      }
-    }
-  }
-  return map
+  return buildComponentLeadsMap(pillarConfig.value)
 })
 
 var filteredPillarNames = computed(function() {

@@ -1,5 +1,6 @@
 <script setup>
 import { reactive, computed } from 'vue'
+import { getComponentLeads } from '../../composables/componentLeads'
 
 const props = defineProps({
   groups: { type: Array, default: () => [] },
@@ -134,14 +135,7 @@ function collapseAll() {
 }
 
 function getLeads(componentName) {
-  var lower = (componentName || '').toLowerCase()
-  var leads = props.componentLeads
-  if (leads[lower]) return leads[lower]
-  var keys = Object.keys(leads)
-  for (var i = 0; i < keys.length; i++) {
-    if (lower.includes(keys[i]) || keys[i].includes(lower)) return leads[keys[i]]
-  }
-  return null
+  return getComponentLeads(props.componentLeads, componentName)
 }
 
 function extractProduct(versionName) {
