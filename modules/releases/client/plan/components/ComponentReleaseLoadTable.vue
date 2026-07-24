@@ -141,15 +141,15 @@ function getLeads(componentName) {
 function extractProduct(versionName) {
   if (!versionName) return versionName
   var lower = versionName.toLowerCase()
-  if (lower.startsWith('rhoai')) return 'RHOAI'
-  if (lower.startsWith('rhelai')) return 'RHELAI'
-  if (lower.startsWith('rhaii')) return 'RHAII'
-  return versionName.split('-')[0] || versionName
+  if (lower.indexOf('rhoai') !== -1) return 'RHOAI'
+  if (lower.indexOf('rhelai') !== -1) return 'RHELAI'
+  if (lower.indexOf('rhaii') !== -1) return 'RHAII'
+  return null
 }
 
 function normalizeVersion(v) {
   if (!v || typeof v !== 'string') return v
-  return v.replace(/^rhoai-/i, '')
+  return v.replace(/\s*(RHOAI|RHELAI|RHAII)\s*RELEASE\s*$/i, '').trim()
 }
 
 var componentGroups = computed(function() {
@@ -294,8 +294,8 @@ defineExpose({ expandAll, collapseAll })
 </script>
 
 <template>
-  <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-    <table class="w-full text-sm border-collapse">
+  <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+    <table class="w-full text-sm border-collapse min-w-[1400px]">
       <tbody>
         <template v-for="comp in componentGroups" :key="comp.component">
           <!-- Component group header -->
