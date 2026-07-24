@@ -207,6 +207,9 @@ const REGISTRY_DATA = {
 // bug fixes only, not features, so they don't appear in TV/FV analysis.
 const JIRA_VERSIONS_DATA = {
   versions: [
+    { name: '3.6 GA RHOAI RELEASE', released: false, releaseDate: '2026-11-19' },
+    { name: '3.6 EA2 RHOAI RELEASE', released: false, releaseDate: '2026-10-15' },
+    { name: '3.6 EA1 RHOAI RELEASE', released: false, releaseDate: '2026-09-17' },
     { name: '3.5 EA1 RHOAI RELEASE', released: false, releaseDate: '2026-07-01' },
     { name: '3.5 EA2 RHOAI RELEASE', released: false, releaseDate: '2026-08-01' },
     { name: '3.5 GA RHOAI RELEASE', released: false, releaseDate: '2026-09-01' },
@@ -342,6 +345,25 @@ async function mockAllApis(page, tvfvData) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ status: 'started' })
+    });
+  });
+
+  // Mock PM Hub pillar-config (component → PM/ENG leads for Component Breakdown)
+  await page.route('**/api/modules/releases/pm-hub/pillar-config', route => {
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        pillars: [
+          {
+            name: 'Inference',
+            components: [
+              { name: 'Serving', pmLead: 'PM Alpha', engLead: 'Eng Alpha' },
+              { name: 'Training', pmLead: 'PM Beta', engLead: 'Eng Beta' },
+            ],
+          },
+        ],
+      }),
     });
   });
 
@@ -1235,9 +1257,34 @@ test.describe('TV/FV Delta — Component Breakdown @tv-fv-delta', () => {
     const compSection = page.locator('details:has(summary:has-text("Component Breakdown"))');
     const headers = compSection.locator('thead th');
 
-    const expectedHeaders = ['Component', 'Total', 'Aligned', 'TV-Only', 'FV-Only', 'Mismatched', 'Alignment'];
+    const expectedHeaders = ['Component', 'PM', 'ENG', 'Total', 'Aligned', 'TV-Only', 'FV-Only', 'Mismatched', 'Alignment'];
     const count = await headers.count();
     expect(count).toBe(expectedHeaders.length);
+    for (let i = 0; i < expectedHeaders.length; i++) {
+      await expect(headers.nth(i)).toHaveText(expectedHeaders[i]);
+    }
+
+    expect(relevantErrors(page)).toHaveLength(0);
+  });
+
+  test('should show PM and ENG leads from PM Hub pillar-config', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=tv-fv-delta');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
+    await page.locator('summary:has-text("Component Breakdown")').click();
+    await page.waitForTimeout(300);
+
+    const compSection = page.locator('details:has(summary:has-text("Component Breakdown"))');
+    const servingRow = compSection.locator('tbody tr', { hasText: 'Serving' });
+    await expect(servingRow).toBeVisible();
+    await expect(servingRow).toContainText('PM Alpha');
+    await expect(servingRow).toContainText('Eng Alpha');
+
+    const trainingRow = compSection.locator('tbody tr', { hasText: 'Training' });
+    await expect(trainingRow).toContainText('PM Beta');
+    await expect(trainingRow).toContainText('Eng Beta');
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
@@ -1537,9 +1584,11 @@ test.describe('TV/FV Delta — Release Picker @tv-fv-delta', () => {
     await page.waitForTimeout(300);
 
     // Should show only 3.4 versions (z-stream rhoai-3.4.1 is filtered out server-side)
-    const dropdownButtons = page.locator('.max-h-64 button');
+    const dropdown = page.locator('div.absolute.z-20').filter({ has: page.getByPlaceholder('Search versions...') });
+    const dropdownButtons = dropdown.locator('button');
     const count = await dropdownButtons.count();
     expect(count).toBe(1);
+    await expect(dropdownButtons.first()).toContainText('rhoai-3.4');
 
     expect(relevantErrors(page)).toHaveLength(0);
   });

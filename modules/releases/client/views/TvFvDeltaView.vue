@@ -4,6 +4,7 @@ import ClickableCount from '../components/ClickableCount.vue'
 import FeatureTable from '../components/FeatureTable.vue'
 import { useReleasePicker } from '../composables/useReleasePicker'
 import { useComponentBreakdown } from '../composables/useComponentBreakdown'
+import { useComponentLeads } from '../composables/useComponentLeads'
 import { useTvFvData } from '../composables/useTvFvData'
 import { useReleaseFamily, getAlignmentTarget, buildNameRollup } from '../composables/useReleaseFamily'
 import { DEFAULT_SELECTED_VERSIONS } from '../composables/tvFvDeltaDefaults'
@@ -96,6 +97,7 @@ function targetForRow(row) {
 }
 
 const { releaseComponentBreakdown } = useComponentBreakdown(data, releaseData)
+const { leadsFor } = useComponentLeads()
 
 /** Compute days until GA from an ISO date string. Returns null if no date. */
 function daysToGa(gaDate) {
@@ -601,6 +603,8 @@ onBeforeUnmount(() => {
             <thead>
               <tr class="bg-gray-50 dark:bg-gray-800/50">
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Component</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">PM</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">ENG</th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Aligned</th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">TV-Only</th>
@@ -616,6 +620,12 @@ onBeforeUnmount(() => {
                 class="hover:bg-gray-50 dark:hover:bg-gray-800/50"
               >
                 <td class="px-4 py-2 text-gray-900 dark:text-gray-100">{{ comp.component }}</td>
+                <td class="px-4 py-2 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                  {{ leadsFor(comp.component)?.pmLead || '—' }}
+                </td>
+                <td class="px-4 py-2 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                  {{ leadsFor(comp.component)?.engLead || '—' }}
+                </td>
                 <td class="px-4 py-2 text-right text-gray-700 dark:text-gray-300">{{ comp.total }}</td>
                 <td class="px-4 py-2 text-right text-green-600 dark:text-green-400">{{ comp.aligned }}</td>
                 <td class="px-4 py-2 text-right text-yellow-600 dark:text-yellow-400">{{ comp.tv_only }}</td>

@@ -55,12 +55,30 @@ function makeTestData() {
   }
 }
 
-async function mountView() {
+var PILLAR_CONFIG = {
+  pillars: [
+    {
+      name: 'Data',
+      components: [
+        { name: 'Training', pmLead: 'PM Lead Training', engLead: 'Eng Lead Training' },
+        { name: 'Serving', pmLead: 'PM Lead Serving', engLead: 'Eng Lead Serving' },
+      ],
+    },
+  ],
+}
+
+async function mountView(extraData) {
   var testData = makeTestData()
+  if (extraData) {
+    Object.assign(testData, extraData)
+    if (extraData.releases) testData.releases = Object.assign({}, testData.releases, extraData.releases)
+    if (extraData.metadata) testData.metadata = Object.assign({}, testData.metadata, extraData.metadata)
+  }
 
   mockApiRequest.mockImplementation(function (url) {
     if (url.includes('/registry')) return Promise.resolve({ releases: [] })
     if (url.includes('/versions')) return Promise.resolve({ versions: [] })
+    if (url.includes('/pillar-config')) return Promise.resolve(PILLAR_CONFIG)
     if (url.includes('/tv-fv-delta')) return Promise.resolve(testData)
     return Promise.resolve({})
   })
@@ -252,5 +270,55 @@ describe('TvFvDeltaView target alignment column', function () {
         expect(classes.some(function (c) { return c.includes('red') })).toBe(true)
       }
     }
+  })
+})
+
+describe('TvFvDeltaView component breakdown PM/ENG columns', function () {
+  beforeEach(function () {
+    mockApiRequest.mockReset()
+  })
+
+  it('shows PM and ENG from PM Hub pillar-config', async function () {
+    var wrapper = await mountView({
+      metadata: {
+        generated_at: '2026-06-17T10:00:00Z',
+        data_timestamp: '2026-06-17T09:55:00Z',
+        releases: DEFAULT_SELECTED_VERSIONS.slice(),
+        all_components: ['Serving', 'Training', 'Unknown Comp'],
+      },
+      releases: {
+        '3.6 GA RHOAI RELEASE': {
+          aligned: [
+            { key: 'RHAISTRAT-1', component: 'Serving' },
+            { key: 'RHAISTRAT-2', component: 'Training' },
+          ],
+          tv_only: [],
+          fv_only: [],
+          mismatched: [],
+        },
+      },
+    })
+
+    var details = wrapper.findAll('details').find(function (d) {
+      return d.text().includes('Component Breakdown')
+    })
+    expect(details).toBeTruthy()
+    // Expand so table is rendered (details content is always in DOM with Vue)
+    var table = details.find('table')
+    var headers = table.findAll('thead th').map(function (th) { return th.text().trim() })
+    expect(headers).toEqual([
+      'Component', 'PM', 'ENG', 'Total', 'Aligned', 'TV-Only', 'FV-Only', 'Mismatched', 'Alignment',
+    ])
+
+    var servingRow = table.findAll('tbody tr').find(function (r) {
+      return r.text().includes('Serving')
+    })
+    expect(servingRow.text()).toContain('PM Lead Serving')
+    expect(servingRow.text()).toContain('Eng Lead Serving')
+
+    var unknownRow = table.findAll('tbody tr').find(function (r) {
+      return r.text().includes('Unknown Comp')
+    })
+    expect(unknownRow.text()).toContain('—')
   })
 })
