@@ -75,7 +75,7 @@ const {
   summaryRollup,
 } = useReleaseFamily(filteredSummary, data)
 
-const SUMMARY_COL_COUNT = 11
+const SUMMARY_COL_COUNT = 13
 
 /** Selected version chips grouped: cycle → milestone → products (numeric desc) */
 const chosenVersionsRollup = computed(() => buildNameRollup(allSelectedVersions.value))
@@ -90,14 +90,21 @@ function versionInfo(name) {
   return availableVersions.value.find(v => v.name === name) || { name, displayName: name, source: 'manual' }
 }
 
-/** Compute target alignment for a row based on days to GA */
+/** Compute target alignment for a row based on days to planning freeze */
 function targetForRow(row) {
-  var d = daysToGa(row.ga_date)
+  var d = daysToFreeze(row.planning_freeze)
   return getAlignmentTarget(d)
 }
 
 const { releaseComponentBreakdown } = useComponentBreakdown(data, releaseData)
 const { leadsFor } = useComponentLeads()
+
+/** Compute days until planning freeze from an ISO date string. Returns null if no date. */
+function daysToFreeze(freezeDate) {
+  if (!freezeDate) return null
+  const diff = new Date(freezeDate + 'T00:00:00Z') - new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z')
+  return Math.ceil(diff / 86400000)
+}
 
 /** Compute days until GA from an ISO date string. Returns null if no date. */
 function daysToGa(gaDate) {
@@ -224,8 +231,11 @@ onBeforeUnmount(() => {
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSummarySort('total')">
                   <span class="inline-flex items-center gap-1 justify-end">Total<svg v-if="summarySortIcon('total') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('total') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
                 </th>
-                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSummarySort('aligned')">
-                  <span class="inline-flex items-center gap-1 justify-end">Aligned<svg v-if="summarySortIcon('aligned') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('aligned') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSummarySort('aligned_on_time')">
+                  <span class="inline-flex items-center gap-1 justify-end">On Time<svg v-if="summarySortIcon('aligned_on_time') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('aligned_on_time') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
+                </th>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSummarySort('aligned_late')">
+                  <span class="inline-flex items-center gap-1 justify-end">Late<svg v-if="summarySortIcon('aligned_late') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('aligned_late') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
                 </th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSummarySort('tv_only')">
                   <span class="inline-flex items-center gap-1 justify-end">TV-Only<svg v-if="summarySortIcon('tv_only') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('tv_only') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
@@ -233,8 +243,8 @@ onBeforeUnmount(() => {
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSummarySort('fv_only')">
                   <span class="inline-flex items-center gap-1 justify-end">FV-Only<svg v-if="summarySortIcon('fv_only') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('fv_only') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
                 </th>
-                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSummarySort('mismatched')">
-                  <span class="inline-flex items-center gap-1 justify-end">Mismatched<svg v-if="summarySortIcon('mismatched') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('mismatched') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSummarySort('misaligned')">
+                  <span class="inline-flex items-center gap-1 justify-end">Misaligned<svg v-if="summarySortIcon('misaligned') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('misaligned') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
                 </th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSummarySort('alignment_pct')">
                   <span class="inline-flex items-center gap-1 justify-end">Alignment<svg v-if="summarySortIcon('alignment_pct') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('alignment_pct') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
@@ -247,6 +257,7 @@ onBeforeUnmount(() => {
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSummarySort('planning_freeze')">
                   <span class="inline-flex items-center gap-1">Planning Freeze<svg v-if="summarySortIcon('planning_freeze') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('planning_freeze') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
                 </th>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Days to Freeze</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -257,10 +268,11 @@ onBeforeUnmount(() => {
                     {{ cycle.label }}
                   </td>
                   <td class="px-4 py-2.5 text-right text-xs font-semibold text-gray-700 dark:text-gray-200">{{ cycle.totals.total }}</td>
-                  <td class="px-4 py-2.5 text-right text-xs font-semibold text-green-700 dark:text-green-400">{{ cycle.totals.aligned }}</td>
+                  <td class="px-4 py-2.5 text-right text-xs font-semibold text-green-700 dark:text-green-400">{{ cycle.totals.aligned_on_time }}</td>
+                  <td class="px-4 py-2.5 text-right text-xs font-semibold text-amber-600 dark:text-amber-400">{{ cycle.totals.aligned_late }}</td>
                   <td class="px-4 py-2.5 text-right text-xs font-semibold text-yellow-700 dark:text-yellow-400">{{ cycle.totals.tv_only }}</td>
                   <td class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400">{{ cycle.totals.fv_only }}</td>
-                  <td class="px-4 py-2.5 text-right text-xs font-semibold text-red-700 dark:text-red-400">{{ cycle.totals.mismatched }}</td>
+                  <td class="px-4 py-2.5 text-right text-xs font-semibold text-red-700 dark:text-red-400">{{ cycle.totals.misaligned }}</td>
                   <td class="px-4 py-2.5 text-right text-xs font-semibold"
                     :class="{
                       'text-red-600 dark:text-red-400': cycle.totals.alignment_pct < 50,
@@ -279,10 +291,11 @@ onBeforeUnmount(() => {
                       <span class="ml-1 text-[10px] font-normal text-gray-400 dark:text-gray-500">(includes {{ ms.rows.length }})</span>
                     </td>
                     <td class="px-4 py-2 text-right text-xs font-medium text-gray-600 dark:text-gray-300">{{ ms.totals.total }}</td>
-                    <td class="px-4 py-2 text-right text-xs font-medium text-green-700 dark:text-green-400">{{ ms.totals.aligned }}</td>
+                    <td class="px-4 py-2 text-right text-xs font-medium text-green-700 dark:text-green-400">{{ ms.totals.aligned_on_time }}</td>
+                    <td class="px-4 py-2 text-right text-xs font-medium text-amber-600 dark:text-amber-400">{{ ms.totals.aligned_late }}</td>
                     <td class="px-4 py-2 text-right text-xs font-medium text-yellow-700 dark:text-yellow-400">{{ ms.totals.tv_only }}</td>
                     <td class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">{{ ms.totals.fv_only }}</td>
-                    <td class="px-4 py-2 text-right text-xs font-medium text-red-700 dark:text-red-400">{{ ms.totals.mismatched }}</td>
+                    <td class="px-4 py-2 text-right text-xs font-medium text-red-700 dark:text-red-400">{{ ms.totals.misaligned }}</td>
                     <td class="px-4 py-2 text-right text-xs font-medium"
                       :class="{
                         'text-red-600 dark:text-red-400': ms.totals.alignment_pct < 50,
@@ -312,7 +325,11 @@ onBeforeUnmount(() => {
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
-                      <ClickableCount v-if="!row._pending" :count="row.aligned" :jql="row.aligned_jql" color="green" label="Aligned" />
+                      <ClickableCount v-if="!row._pending" :count="row.aligned_on_time" :jql="row.aligned_on_time_jql" color="green" label="On Time" />
+                      <span v-else class="text-gray-400">&mdash;</span>
+                    </td>
+                    <td class="px-4 py-2 text-right">
+                      <span v-if="!row._pending" class="text-xs font-medium text-amber-600 dark:text-amber-400">{{ row.aligned_late }}</span>
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
@@ -324,7 +341,7 @@ onBeforeUnmount(() => {
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
-                      <ClickableCount v-if="!row._pending" :count="row.mismatched" :jql="row.mismatched_jql" color="red" label="Mismatched" />
+                      <span v-if="!row._pending" class="text-xs font-medium text-red-600 dark:text-red-400">{{ row.misaligned }}</span>
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
@@ -348,7 +365,7 @@ onBeforeUnmount(() => {
                             'text-red-600 dark:text-red-400': row.alignment_pct < targetForRow(row).target,
                             'text-green-600 dark:text-green-400': row.alignment_pct >= targetForRow(row).target,
                           }"
-                          :title="'Target: ' + targetForRow(row).label + ' (based on ' + daysToGa(row.ga_date) + ' days to GA)'"
+                          :title="'Target: ' + targetForRow(row).label + ' (based on ' + daysToFreeze(row.planning_freeze) + ' days to planning freeze)'"
                         >{{ targetForRow(row).label }}</span>
                       </template>
                       <span v-else class="text-gray-400">&mdash;</span>
@@ -372,6 +389,20 @@ onBeforeUnmount(() => {
                     </td>
                     <td class="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                       {{ row.planning_freeze ? formatDate(row.planning_freeze) : '—' }}
+                    </td>
+                    <td class="px-4 py-2 text-right text-xs whitespace-nowrap"
+                      :class="{
+                        'text-gray-400': row._pending || daysToFreeze(row.planning_freeze) === null,
+                        'text-green-600 dark:text-green-400': daysToFreeze(row.planning_freeze) !== null && daysToFreeze(row.planning_freeze) <= 0,
+                        'text-red-600 dark:text-red-400': daysToFreeze(row.planning_freeze) > 0 && daysToFreeze(row.planning_freeze) <= 30,
+                        'text-yellow-600 dark:text-yellow-400': daysToFreeze(row.planning_freeze) > 30 && daysToFreeze(row.planning_freeze) <= 60,
+                        'text-gray-500 dark:text-gray-400': daysToFreeze(row.planning_freeze) > 60,
+                      }"
+                    >
+                      <template v-if="daysToFreeze(row.planning_freeze) !== null">
+                        {{ daysToFreeze(row.planning_freeze) > 0 ? daysToFreeze(row.planning_freeze) + 'd' : 'Frozen' }}
+                      </template>
+                      <template v-else>&mdash;</template>
                     </td>
                   </tr>
                 </template>
@@ -539,44 +570,18 @@ onBeforeUnmount(() => {
           />
         </details>
 
-        <!-- Mismatched -->
-        <details v-if="releaseData.mismatched.length" class="group bg-white dark:bg-gray-800 rounded-lg border border-red-200 dark:border-red-800 overflow-hidden mb-4">
-          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center justify-between [&::-webkit-details-marker]:hidden">
-            <span class="flex items-center gap-2">
-              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform">&#9654;</span>
-              <span class="text-sm font-semibold text-red-700 dark:text-red-400">
-                Mismatched — TV and FV disagree ({{ releaseData.mismatched.length }})
-              </span>
-            </span>
-            <a
-              v-if="releaseSummary"
-              :href="releaseSummary.mismatched_jql"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-              @click.stop
-            >
-              View in Jira &rarr;
-            </a>
-          </summary>
-          <FeatureTable
-            :features="releaseData.mismatched"
-            :columns="FEATURE_COLS"
-          />
-        </details>
-
-        <!-- Aligned -->
+        <!-- Aligned (on time) -->
         <details class="group bg-white dark:bg-gray-800 rounded-lg border border-green-200 dark:border-green-800 overflow-hidden mb-4">
           <summary class="list-none px-4 py-3 cursor-pointer hover:bg-green-50 dark:hover:bg-green-900/10 flex items-center justify-between [&::-webkit-details-marker]:hidden">
             <span class="flex items-center gap-2">
               <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform">&#9654;</span>
               <span class="text-sm font-semibold text-green-700 dark:text-green-400">
-                Aligned — TV == FV ({{ releaseData.aligned.length }})
+                Aligned (on time) — FV matches or is ahead of TV ({{ releaseData.aligned_on_time.length }})
               </span>
             </span>
             <a
-              v-if="releaseSummary"
-              :href="releaseSummary.aligned_jql"
+              v-if="releaseSummary && releaseSummary.aligned_on_time_jql"
+              :href="releaseSummary.aligned_on_time_jql"
               target="_blank"
               rel="noopener noreferrer"
               class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
@@ -586,7 +591,39 @@ onBeforeUnmount(() => {
             </a>
           </summary>
           <FeatureTable
-            :features="releaseData.aligned"
+            :features="releaseData.aligned_on_time"
+            :columns="FEATURE_COLS"
+          />
+        </details>
+
+        <!-- Aligned (late) -->
+        <details v-if="releaseData.aligned_late.length" class="group bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-800 overflow-hidden mb-4">
+          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/10 flex items-center justify-between [&::-webkit-details-marker]:hidden">
+            <span class="flex items-center gap-2">
+              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform">&#9654;</span>
+              <span class="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                Aligned (late) — FV after TV, but TV planning freeze has passed ({{ releaseData.aligned_late.length }})
+              </span>
+            </span>
+          </summary>
+          <FeatureTable
+            :features="releaseData.aligned_late"
+            :columns="FEATURE_COLS"
+          />
+        </details>
+
+        <!-- Misaligned -->
+        <details v-if="releaseData.misaligned.length" class="group bg-white dark:bg-gray-800 rounded-lg border border-red-200 dark:border-red-800 overflow-hidden mb-4">
+          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center justify-between [&::-webkit-details-marker]:hidden">
+            <span class="flex items-center gap-2">
+              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform">&#9654;</span>
+              <span class="text-sm font-semibold text-red-700 dark:text-red-400">
+                Misaligned — FV after unfrozen TV or cross-product ({{ releaseData.misaligned.length }})
+              </span>
+            </span>
+          </summary>
+          <FeatureTable
+            :features="releaseData.misaligned"
             :columns="FEATURE_COLS"
           />
         </details>
@@ -606,10 +643,11 @@ onBeforeUnmount(() => {
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">PM</th>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">ENG</th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Aligned</th>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">On Time</th>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Late</th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">TV-Only</th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">FV-Only</th>
-                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Mismatched</th>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Misaligned</th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Alignment</th>
               </tr>
             </thead>
@@ -627,10 +665,11 @@ onBeforeUnmount(() => {
                   {{ leadsFor(comp.component)?.engLead || '—' }}
                 </td>
                 <td class="px-4 py-2 text-right text-gray-700 dark:text-gray-300">{{ comp.total }}</td>
-                <td class="px-4 py-2 text-right text-green-600 dark:text-green-400">{{ comp.aligned }}</td>
+                <td class="px-4 py-2 text-right text-green-600 dark:text-green-400">{{ comp.aligned_on_time }}</td>
+                <td class="px-4 py-2 text-right text-amber-600 dark:text-amber-400">{{ comp.aligned_late }}</td>
                 <td class="px-4 py-2 text-right text-yellow-600 dark:text-yellow-400">{{ comp.tv_only }}</td>
                 <td class="px-4 py-2 text-right text-gray-500 dark:text-gray-400">{{ comp.fv_only }}</td>
-                <td class="px-4 py-2 text-right text-red-600 dark:text-red-400">{{ comp.mismatched }}</td>
+                <td class="px-4 py-2 text-right text-red-600 dark:text-red-400">{{ comp.misaligned }}</td>
                 <td class="px-4 py-2 text-right">
                   <span
                     class="font-semibold"
