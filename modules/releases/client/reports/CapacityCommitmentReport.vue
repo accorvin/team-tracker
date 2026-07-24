@@ -145,6 +145,59 @@
           </table>
         </div>
       </div>
+
+      <!-- Feature Status -->
+      <div v-if="hasSelection" class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div v-if="featuresLoading" class="col-span-full text-center py-12 text-sm text-gray-400 dark:text-gray-500">
+          Loading features...
+        </div>
+
+        <template v-else>
+          <div
+            v-for="card in featureStatusCards"
+            :key="card.phase"
+            class="inline-block bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
+          >
+            <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/50 flex items-center gap-2">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300">{{ selection.version }}</span>
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ card.phase }} Feature Status</h3>
+            </div>
+
+            <div v-if="card.total === 0" class="px-4 py-10 text-center text-sm text-gray-400 dark:text-gray-500">
+              No features found for this phase.
+            </div>
+
+            <div v-else class="p-5">
+              <div class="inline-flex items-center gap-8">
+                <!-- Doughnut with center total -->
+                <div class="relative w-36 h-36 flex-shrink-0">
+                  <Doughnut :data="card.chartData" :options="makeDoughnutOptions(card)" />
+                  <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span class="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-none">{{ card.total }}</span>
+                    <span class="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">features</span>
+                  </div>
+                </div>
+                <!-- Legend -->
+                <div class="flex-1 space-y-1.5">
+                  <button
+                    v-for="item in card.distribution"
+                    :key="item.status"
+                    @click="openFeatureList(item.status, card.phase)"
+                    class="w-full flex items-center gap-2 text-sm rounded-md px-2 py-1 -mx-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer text-left"
+                  >
+                    <span
+                      class="w-3 h-3 rounded-full flex-shrink-0"
+                      :style="{ backgroundColor: STATUS_COLORS[item.status] || '#d1d5db' }"
+                    ></span>
+                    <span class="text-gray-700 dark:text-gray-300">{{ item.status }}</span>
+                    <span class="ml-auto whitespace-nowrap font-semibold tabular-nums text-gray-900 dark:text-gray-100">{{ item.count }} <span class="font-normal text-gray-400 dark:text-gray-500">({{ Math.round(item.count / card.total * 100) }}%)</span></span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
     </template>
 
     <!-- Modal -->
@@ -240,12 +293,147 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- Feature list modal -->
+    <Teleport to="body">
+      <div v-if="featureListStatus" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40 dark:bg-black/60" @click="closeFeatureList"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-h-[80vh] flex flex-col" :style="{ maxWidth: featureListMaxWidth }">
+          <!-- Header -->
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+            <div class="flex items-center gap-3">
+              <span
+                class="w-3 h-3 rounded-full"
+                :style="{ backgroundColor: STATUS_COLORS[featureListStatus] || '#d1d5db' }"
+              ></span>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ featureListStatus }}</h3>
+              <span class="text-sm text-gray-500 dark:text-gray-400">({{ featuresForStatus.length }})</span>
+              <span v-if="featureListPhase" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300">{{ selection.version }} {{ featureListPhase }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <!-- Column settings toggle -->
+              <div class="relative">
+                <button
+                  @click.stop="columnSettingsOpen = !columnSettingsOpen"
+                  class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                  title="Configure columns"
+                >
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+                  </svg>
+                </button>
+                <!-- Column settings dropdown -->
+                <div
+                  v-if="columnSettingsOpen"
+                  class="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg z-10"
+                  @click.stop
+                >
+                  <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <span class="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Columns</span>
+                    <button
+                      @click="resetColumns"
+                      class="text-[11px] text-primary-600 dark:text-primary-400 hover:underline"
+                    >Reset</button>
+                  </div>
+                  <div class="py-1">
+                    <div
+                      v-for="(colKey, idx) in columnOrder"
+                      :key="colKey"
+                      draggable="true"
+                      @dragstart="onColDragStart($event, idx)"
+                      @dragover.prevent="onColDragOver($event, idx)"
+                      @drop="onColDrop(idx)"
+                      @dragend="colDragIdx = -1"
+                      class="flex items-center gap-2 px-3 py-1.5 text-sm cursor-grab active:cursor-grabbing select-none"
+                      :class="colDragOverIdx === idx ? 'border-t-2 border-primary-500' : ''"
+                    >
+                      <span class="text-gray-400 dark:text-gray-500 text-xs shrink-0">&#x2807;</span>
+                      <label class="flex items-center gap-2 flex-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          :checked="activeColumnKeys.has(colKey)"
+                          :disabled="colKey === 'key'"
+                          @change="toggleColumn(colKey)"
+                          class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span class="text-gray-700 dark:text-gray-300" :class="colKey === 'key' ? 'opacity-50' : ''">{{ AVAILABLE_COLUMNS.find(c => c.key === colKey).label }}</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button
+                @click="closeFeatureList"
+                class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-auto flex-1">
+            <table class="text-sm" style="table-layout:fixed" :style="{ width: tableWidth }">
+              <colgroup>
+                <col v-for="col in visibleColumns" :key="col.key" :style="{ width: (columnWidths[col.key] || 150) + 'px' }" />
+              </colgroup>
+              <thead class="sticky top-0 bg-gray-50 dark:bg-gray-800/90">
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                  <th
+                    v-for="col in visibleColumns"
+                    :key="col.key"
+                    class="relative px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap"
+                  >{{ col.label }}<span
+                      class="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-gray-300 dark:bg-gray-600 hover:bg-primary-400 dark:hover:bg-primary-500 transition-colors"
+                      @mousedown.prevent="startColResize($event, col.key)"
+                    ></span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="f in featuresForStatus"
+                  :key="f.key"
+                  class="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+                >
+                  <td
+                    v-for="col in visibleColumns"
+                    :key="col.key"
+                    class="px-4 py-2.5 truncate"
+                    :class="col.cellClass || 'text-gray-600 dark:text-gray-400'"
+                  >
+                    <a
+                      v-if="col.key === 'key'"
+                      :href="'https://issues.redhat.com/browse/' + f.key"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                    >{{ f.key }}</a>
+                    <span v-else-if="col.key === 'summary'" class="text-gray-900 dark:text-gray-100">{{ f.summary || '—' }}</span>
+                    <span v-else-if="col.key === 'fixVersions'">{{ (f.fixVersions || []).join(', ') || '—' }}</span>
+                    <span v-else-if="col.key === 'components'">{{ (f.components || []).join(', ') || '—' }}</span>
+                    <span v-else-if="col.key === 'labels'">{{ (f.labels || []).join(', ') || '—' }}</span>
+                    <span v-else-if="col.key === 'completionPct'">{{ f.completionPct != null ? f.completionPct + '%' : '—' }}</span>
+                    <span v-else>{{ f[col.key] || '—' }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, inject } from 'vue'
 import { apiRequest } from '@shared/client/services/api.js'
+import { Doughnut } from 'vue-chartjs'
+import { Chart as ChartJS, ArcElement, Tooltip } from 'chart.js'
+
+ChartJS.register(ArcElement, Tooltip)
 
 // ── Constants ──
 
@@ -509,10 +697,25 @@ function reconcileDraftPhases() {
 
 // Close modal on Escape
 function handleEscape(e) {
-  if (e.key === 'Escape' && modalOpen.value) cancelModal()
+  if (e.key !== 'Escape') return
+  if (columnSettingsOpen.value) { columnSettingsOpen.value = false; return }
+  if (featureListStatus.value) { closeFeatureList(); return }
+  if (modalOpen.value) cancelModal()
 }
-onMounted(() => document.addEventListener('keydown', handleEscape))
-onUnmounted(() => document.removeEventListener('keydown', handleEscape))
+
+function handleClickOutside() {
+  if (columnSettingsOpen.value) columnSettingsOpen.value = false
+}
+onMounted(() => {
+  document.addEventListener('keydown', handleEscape)
+  document.addEventListener('click', handleClickOutside)
+})
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleEscape)
+  document.removeEventListener('click', handleClickOutside)
+  var tooltipEl = document.getElementById('capacity-chart-tooltip')
+  if (tooltipEl) tooltipEl.remove()
+})
 
 // ── Deadline cards ──
 
@@ -579,6 +782,356 @@ const deadlineCards = computed(() => {
     }
   })
 })
+
+// ── Feature status chart ──
+
+const STATUS_COLORS = {
+  'New': '#9ca3af',
+  'Backlog': '#a1a1aa',
+  'To Do': '#d4d4d8',
+  'Refinement': '#a78bfa',
+  'In Progress': '#3b82f6',
+  'Review': '#f59e0b',
+  'Release Pending': '#10b981',
+  'Closed': '#6366f1'
+}
+
+const allFeatures = ref([])
+const featuresLoading = ref(false)
+
+async function fetchFeatures() {
+  featuresLoading.value = true
+  try {
+    const data = await apiRequest('/modules/releases/execution/features')
+    allFeatures.value = data.features || []
+  } catch (e) {
+    console.error('[capacity-report] Failed to fetch features:', e)
+    allFeatures.value = []
+  } finally {
+    featuresLoading.value = false
+  }
+}
+
+onMounted(fetchFeatures)
+
+function normalizeFixVersion(v) {
+  return String(v).replace(/[\s.-]+/g, ' ').replace(/\s*release$/i, '').trim().toLowerCase()
+}
+
+function buildExpectedVersions(version, families, phases) {
+  const patterns = []
+  for (const family of families) {
+    for (const phase of phases) {
+      const f = family.toUpperCase()
+      const p = phase.toUpperCase()
+      // New format: "3.5 GA RHOAI RELEASE" → normalized: "3 5 ga rhoai"
+      patterns.push(normalizeFixVersion(version + ' ' + p + ' ' + f))
+      // Legacy format: "rhoai-3.5.EA1" → normalized: "rhoai 3 5 ea1"
+      patterns.push(normalizeFixVersion(f + '-' + version + '.' + p))
+      patterns.push(normalizeFixVersion(f + '-' + version + ' ' + p))
+      patterns.push(normalizeFixVersion(f + '-' + version + p))
+      // GA can also be the bare version: "rhoai-3.5" → normalized: "rhoai 3 5"
+      if (p === 'GA') {
+        patterns.push(normalizeFixVersion(f + '-' + version))
+      }
+    }
+  }
+  return [...new Set(patterns)]
+}
+
+function matchFeaturesForPhase(phase) {
+  if (allFeatures.value.length === 0) return []
+  const expected = buildExpectedVersions(
+    selection.version,
+    [...selection.families],
+    [phase]
+  )
+  return allFeatures.value.filter(f =>
+    f.fixVersions && f.fixVersions.some(v => expected.includes(normalizeFixVersion(v)))
+  )
+}
+
+function buildDistribution(features) {
+  const counts = {}
+  for (const f of features) {
+    const status = f.status || 'Unknown'
+    counts[status] = (counts[status] || 0) + 1
+  }
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([status, count]) => ({ status, count }))
+}
+
+const featureStatusCards = computed(() => {
+  if (!hasSelection.value) return []
+  const sortedPhases = [...selection.phases].sort((a, b) => PHASE_ORDER.indexOf(a) - PHASE_ORDER.indexOf(b))
+
+  return sortedPhases.map(phase => {
+    const features = matchFeaturesForPhase(phase)
+    const distribution = buildDistribution(features)
+    const total = features.length
+    const chartData = distribution.length > 0 ? {
+      labels: distribution.map(d => d.status),
+      datasets: [{
+        data: distribution.map(d => d.count),
+        backgroundColor: distribution.map(d => STATUS_COLORS[d.status] || '#d1d5db'),
+        borderWidth: 0,
+        hoverOffset: 4
+      }]
+    } : null
+
+    return { phase, features, distribution, total, chartData }
+  })
+})
+
+// ── Feature list modal ──
+
+const featureListStatus = ref(null)
+const columnSettingsOpen = ref(false)
+
+const COLUMNS_STORAGE_KEY = 'tt_cache:capacity-report-columns'
+const AVAILABLE_COLUMNS = [
+  { key: 'key', label: 'Key' },
+  { key: 'summary', label: 'Summary' },
+  { key: 'issueType', label: 'Type' },
+  { key: 'assignee', label: 'Assignee' },
+  { key: 'priority', label: 'Priority' },
+  { key: 'pm', label: 'PM' },
+  { key: 'team', label: 'Team' },
+  { key: 'components', label: 'Components' },
+  { key: 'fixVersions', label: 'Fix Versions' },
+  { key: 'health', label: 'Health' },
+  { key: 'completionPct', label: 'Completion' },
+  { key: 'colorStatus', label: 'Color Status' },
+  { key: 'labels', label: 'Labels' },
+  { key: 'architect', label: 'Architect' }
+]
+const DEFAULT_COLUMN_KEYS = ['key', 'summary', 'assignee', 'priority']
+const ALL_COLUMN_KEYS = AVAILABLE_COLUMNS.map(c => c.key)
+
+// Column order includes all columns (visible + hidden), in user-chosen order
+const columnOrder = ref([...ALL_COLUMN_KEYS])
+const activeColumnKeys = ref(new Set(DEFAULT_COLUMN_KEYS))
+
+function loadColumnPrefs() {
+  try {
+    const stored = localStorage.getItem(COLUMNS_STORAGE_KEY)
+    if (!stored) return
+    const parsed = JSON.parse(stored)
+    if (parsed.order && parsed.active) {
+      // Merge in any new columns added since the prefs were saved
+      const validOrder = parsed.order.filter(k => ALL_COLUMN_KEYS.includes(k))
+      for (const k of ALL_COLUMN_KEYS) {
+        if (!validOrder.includes(k)) validOrder.push(k)
+      }
+      columnOrder.value = validOrder
+      activeColumnKeys.value = new Set(parsed.active.filter(k => ALL_COLUMN_KEYS.includes(k)))
+      // Key is always visible
+      activeColumnKeys.value.add('key')
+    }
+  } catch { /* ignore */ }
+}
+
+function saveColumnPrefs() {
+  localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify({
+    order: columnOrder.value,
+    active: [...activeColumnKeys.value]
+  }))
+}
+
+loadColumnPrefs()
+
+const featureListMaxWidth = computed(() => {
+  const count = activeColumnKeys.value.size
+  // ~200px per column, clamped between 600px and 95vw
+  return Math.min(window.innerWidth * 0.95, Math.max(600, count * 200)) + 'px'
+})
+
+const visibleColumns = computed(() => {
+  return columnOrder.value
+    .filter(k => activeColumnKeys.value.has(k))
+    .map(k => AVAILABLE_COLUMNS.find(c => c.key === k))
+    .filter(Boolean)
+})
+
+function toggleColumn(colKey) {
+  if (colKey === 'key') return
+  const next = new Set(activeColumnKeys.value)
+  if (next.has(colKey)) {
+    next.delete(colKey)
+  } else {
+    next.add(colKey)
+  }
+  activeColumnKeys.value = next
+  saveColumnPrefs()
+}
+
+function resetColumns() {
+  columnOrder.value = [...ALL_COLUMN_KEYS]
+  activeColumnKeys.value = new Set(DEFAULT_COLUMN_KEYS)
+  saveColumnPrefs()
+  Object.assign(columnWidths, DEFAULT_COL_WIDTHS)
+  saveColumnWidths()
+}
+
+// Column drag reorder
+const colDragIdx = ref(-1)
+const colDragOverIdx = ref(-1)
+
+function onColDragStart(event, idx) {
+  colDragIdx.value = idx
+  event.dataTransfer.effectAllowed = 'move'
+}
+
+function onColDragOver(_event, idx) {
+  colDragOverIdx.value = idx
+}
+
+function onColDrop(targetIdx) {
+  const fromIdx = colDragIdx.value
+  if (fromIdx < 0 || fromIdx === targetIdx) {
+    colDragIdx.value = -1
+    colDragOverIdx.value = -1
+    return
+  }
+  const next = [...columnOrder.value]
+  const item = next.splice(fromIdx, 1)[0]
+  next.splice(targetIdx, 0, item)
+  columnOrder.value = next
+  colDragIdx.value = -1
+  colDragOverIdx.value = -1
+  saveColumnPrefs()
+}
+
+// Column resize
+const DEFAULT_COL_WIDTHS = { key: 130, summary: 300, issueType: 100, assignee: 140, priority: 100, pm: 140, team: 140, components: 160, fixVersions: 160, health: 90, completionPct: 110, colorStatus: 120, labels: 160, architect: 140 }
+const WIDTHS_STORAGE_KEY = 'tt_cache:capacity-report-col-widths'
+const columnWidths = reactive({ ...DEFAULT_COL_WIDTHS })
+
+function loadColumnWidths() {
+  try {
+    const stored = localStorage.getItem(WIDTHS_STORAGE_KEY)
+    if (stored) Object.assign(columnWidths, JSON.parse(stored))
+  } catch { /* ignore */ }
+}
+loadColumnWidths()
+
+function saveColumnWidths() {
+  localStorage.setItem(WIDTHS_STORAGE_KEY, JSON.stringify({ ...columnWidths }))
+}
+
+const tableWidth = computed(() => {
+  let total = 0
+  for (const col of visibleColumns.value) {
+    total += columnWidths[col.key] || 150
+  }
+  return total + 'px'
+})
+
+let resizeCol = null
+let resizeStartX = 0
+let resizeStartW = 0
+
+function startColResize(event, colKey) {
+  resizeCol = colKey
+  resizeStartX = event.clientX
+  resizeStartW = columnWidths[colKey] || 150
+  document.addEventListener('mousemove', onColResizeMove)
+  document.addEventListener('mouseup', onColResizeEnd)
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+}
+
+function onColResizeMove(event) {
+  if (!resizeCol) return
+  const diff = event.clientX - resizeStartX
+  columnWidths[resizeCol] = Math.max(60, resizeStartW + diff)
+}
+
+function onColResizeEnd() {
+  document.removeEventListener('mousemove', onColResizeMove)
+  document.removeEventListener('mouseup', onColResizeEnd)
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+  if (resizeCol) saveColumnWidths()
+  resizeCol = null
+}
+
+const featureListPhase = ref(null)
+
+const featuresForStatus = computed(() => {
+  if (!featureListStatus.value) return []
+  const card = featureStatusCards.value.find(c => c.phase === featureListPhase.value)
+  if (!card) return []
+  return card.features
+    .filter(f => (f.status || 'Unknown') === featureListStatus.value)
+    .sort((a, b) => (a.key || '').localeCompare(b.key || ''))
+})
+
+function openFeatureList(status, phase) {
+  featureListStatus.value = status
+  featureListPhase.value = phase || null
+  columnSettingsOpen.value = false
+}
+
+function closeFeatureList() {
+  featureListStatus.value = null
+  featureListPhase.value = null
+  columnSettingsOpen.value = false
+}
+
+function makeDoughnutOptions(card) {
+  return {
+    responsive: true,
+    maintainAspectRatio: true,
+    cutout: '60%',
+    onClick: function (_event, elements) {
+      if (elements.length > 0) {
+        var idx = elements[0].index
+        var item = card.distribution[idx]
+        if (item) openFeatureList(item.status, card.phase)
+      }
+    },
+    onHover: function (event, elements) {
+      event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default'
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        enabled: false,
+        external: function (context) {
+          var tooltipEl = document.getElementById('capacity-chart-tooltip')
+          if (!tooltipEl) {
+            tooltipEl = document.createElement('div')
+            tooltipEl.id = 'capacity-chart-tooltip'
+            tooltipEl.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;background:rgba(0,0,0,0.8);color:#fff;border-radius:6px;padding:6px 10px;font-size:12px;white-space:nowrap;transition:opacity 0.15s;'
+            document.body.appendChild(tooltipEl)
+          }
+
+          var model = context.tooltip
+          if (model.opacity === 0) {
+            tooltipEl.style.opacity = '0'
+            return
+          }
+
+          if (model.body) {
+            var idx = model.dataPoints[0].dataIndex
+            var item = card.distribution[idx]
+            var pct = card.total > 0 ? Math.round(item.count / card.total * 100) : 0
+            tooltipEl.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:' + (STATUS_COLORS[item.status] || '#d1d5db') + '"></span>' + item.status + ': ' + item.count + ' (' + pct + '%)'
+          }
+
+          var canvas = context.chart.canvas
+          var rect = canvas.getBoundingClientRect()
+          tooltipEl.style.opacity = '1'
+          tooltipEl.style.left = rect.left + model.caretX + 'px'
+          tooltipEl.style.top = rect.top + model.caretY + 'px'
+          tooltipEl.style.transform = 'translate(-50%, -120%)'
+        }
+      }
+    }
+  }
+}
 
 // ── Helpers ──
 
