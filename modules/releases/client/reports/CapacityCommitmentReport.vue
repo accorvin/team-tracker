@@ -215,6 +215,59 @@
             </div>
           </template>
         </div>
+
+        <!-- Tab: Features & Initiatives by Color Status -->
+        <div v-if="activeAnalysisTab === 'color-status'" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div v-if="featuresLoading" class="col-span-full text-center py-12 text-sm text-gray-400 dark:text-gray-500">
+            Loading features...
+          </div>
+
+          <template v-else>
+            <div
+              v-for="card in colorStatusCards"
+              :key="card.phase"
+              class="inline-block bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
+            >
+              <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/50 flex items-center gap-2">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300">{{ selection.version }}</span>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ card.phase }} Color Status</h3>
+              </div>
+
+              <div v-if="card.total === 0" class="px-4 py-10 text-center text-sm text-gray-400 dark:text-gray-500">
+                No features found for this phase.
+              </div>
+
+              <div v-else class="p-5">
+                <div class="inline-flex items-center gap-8">
+                  <!-- Doughnut with center total -->
+                  <div class="relative w-36 h-36 flex-shrink-0">
+                    <Doughnut :data="card.chartData" :options="makeDoughnutOptions(card, 'colorStatus')" />
+                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span class="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-none">{{ card.total }}</span>
+                      <span class="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">features</span>
+                    </div>
+                  </div>
+                  <!-- Legend -->
+                  <div class="flex-1 space-y-1.5">
+                    <button
+                      v-for="item in card.distribution"
+                      :key="item.status"
+                      @click="openFeatureList(item.status, card.phase, 'colorStatus')"
+                      class="w-full flex items-center gap-2 text-sm rounded-md px-2 py-1 -mx-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer text-left"
+                    >
+                      <span
+                        class="w-3 h-3 rounded-full flex-shrink-0"
+                        :style="{ backgroundColor: COLOR_STATUS_COLORS[item.status] || '#d1d5db' }"
+                      ></span>
+                      <span class="text-gray-700 dark:text-gray-300">{{ item.status }}</span>
+                      <span class="ml-auto whitespace-nowrap font-semibold tabular-nums text-gray-900 dark:text-gray-100">{{ item.count }} <span class="font-normal text-gray-400 dark:text-gray-500">({{ Math.round(item.count / card.total * 100) }}%)</span></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
     </template>
 
@@ -322,7 +375,7 @@
             <div class="flex items-center gap-3">
               <span
                 class="w-3 h-3 rounded-full"
-                :style="{ backgroundColor: STATUS_COLORS[featureListStatus] || '#d1d5db' }"
+                :style="{ backgroundColor: featureListDotColor }"
               ></span>
               <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ featureListStatus }}</h3>
               <span class="text-sm text-gray-500 dark:text-gray-400">({{ featuresForStatus.length }})</span>
@@ -463,7 +516,8 @@ const MILESTONES = [
 ]
 const PHASE_ORDER = ['EA1', 'EA2', 'GA']
 const analysisTabs = [
-  { id: 'status-charts', label: 'Features & Initiatives by Status' }
+  { id: 'status-charts', label: 'Features & Initiatives by Status' },
+  { id: 'color-status', label: 'Features & Initiatives by Color Status' }
 ]
 
 // ── Core state ──
@@ -906,6 +960,49 @@ const featureStatusCards = computed(() => {
   })
 })
 
+// ── Color status charts ──
+
+const COLOR_STATUS_COLORS = {
+  'Green': '#22c55e',
+  'Yellow': '#eab308',
+  'Red': '#ef4444',
+  'Not Set': '#d1d5db'
+}
+
+function buildColorDistribution(features) {
+  const counts = {}
+  for (const f of features) {
+    const color = f.colorStatus || 'Not Set'
+    counts[color] = (counts[color] || 0) + 1
+  }
+  const order = ['Green', 'Yellow', 'Red', 'Not Set']
+  return order
+    .filter(c => counts[c])
+    .map(c => ({ status: c, count: counts[c] }))
+}
+
+const colorStatusCards = computed(() => {
+  if (!hasSelection.value) return []
+  const sortedPhases = [...selection.phases].sort((a, b) => PHASE_ORDER.indexOf(a) - PHASE_ORDER.indexOf(b))
+
+  return sortedPhases.map(phase => {
+    const features = matchFeaturesForPhase(phase)
+    const distribution = buildColorDistribution(features)
+    const total = features.length
+    const chartData = distribution.length > 0 ? {
+      labels: distribution.map(d => d.status),
+      datasets: [{
+        data: distribution.map(d => d.count),
+        backgroundColor: distribution.map(d => COLOR_STATUS_COLORS[d.status] || '#d1d5db'),
+        borderWidth: 0,
+        hoverOffset: 4
+      }]
+    } : null
+
+    return { phase, features, distribution, total, chartData }
+  })
+})
+
 // ── Feature list modal ──
 
 const featureListStatus = ref(null)
@@ -1080,29 +1177,43 @@ function onColResizeEnd() {
 }
 
 const featureListPhase = ref(null)
+const featureListFilterField = ref('status')
 
 const featuresForStatus = computed(() => {
   if (!featureListStatus.value) return []
-  const card = featureStatusCards.value.find(c => c.phase === featureListPhase.value)
+  const field = featureListFilterField.value
+  const cards = field === 'colorStatus' ? colorStatusCards.value : featureStatusCards.value
+  const card = cards.find(c => c.phase === featureListPhase.value)
   if (!card) return []
   return card.features
-    .filter(f => (f.status || 'Unknown') === featureListStatus.value)
+    .filter(f => {
+      if (field === 'colorStatus') return (f.colorStatus || 'Not Set') === featureListStatus.value
+      return (f.status || 'Unknown') === featureListStatus.value
+    })
     .sort((a, b) => (a.key || '').localeCompare(b.key || ''))
 })
 
-function openFeatureList(status, phase) {
+const featureListDotColor = computed(() => {
+  if (!featureListStatus.value) return '#d1d5db'
+  if (featureListFilterField.value === 'colorStatus') return COLOR_STATUS_COLORS[featureListStatus.value] || '#d1d5db'
+  return STATUS_COLORS[featureListStatus.value] || '#d1d5db'
+})
+
+function openFeatureList(status, phase, field) {
   featureListStatus.value = status
   featureListPhase.value = phase || null
+  featureListFilterField.value = field || 'status'
   columnSettingsOpen.value = false
 }
 
 function closeFeatureList() {
   featureListStatus.value = null
   featureListPhase.value = null
+  featureListFilterField.value = 'status'
   columnSettingsOpen.value = false
 }
 
-function makeDoughnutOptions(card) {
+function makeDoughnutOptions(card, field) {
   return {
     responsive: true,
     maintainAspectRatio: true,
@@ -1111,7 +1222,7 @@ function makeDoughnutOptions(card) {
       if (elements.length > 0) {
         var idx = elements[0].index
         var item = card.distribution[idx]
-        if (item) openFeatureList(item.status, card.phase)
+        if (item) openFeatureList(item.status, card.phase, field)
       }
     },
     onHover: function (event, elements) {
