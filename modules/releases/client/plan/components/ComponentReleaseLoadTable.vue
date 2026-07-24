@@ -149,7 +149,7 @@ function extractProduct(versionName) {
 
 function normalizeVersion(v) {
   if (!v || typeof v !== 'string') return v
-  return v.replace(/\s*(RHOAI|RHELAI|RHAII)\s*RELEASE\s*$/i, '').trim()
+  return v
 }
 
 var componentGroups = computed(function() {
