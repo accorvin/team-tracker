@@ -1372,9 +1372,11 @@ test.describe('TV/FV Delta — Data Completeness @tv-fv-delta', () => {
     await expect(compSection.locator('text=Unused Component A')).toBeVisible();
     await expect(compSection.locator('text=Unused Component B')).toBeVisible();
 
-    // Verify they show 0 counts
+    // Verify they show 0 counts (columns: Component, PM, ENG, Total, …)
     const unusedRow = compSection.locator('tr:has-text("Unused Component A")');
-    await expect(unusedRow.locator('td').nth(1)).toContainText('0'); // Total column
+    await expect(unusedRow.locator('td').nth(3)).toContainText('0'); // Total column
+    await expect(unusedRow.locator('td').nth(1)).toContainText('—'); // PM (no pillar-config lead)
+    await expect(unusedRow.locator('td').nth(2)).toContainText('—'); // ENG
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
