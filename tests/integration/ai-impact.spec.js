@@ -203,6 +203,37 @@ test.describe('AI Impact Views @ai-impact', () => {
     expect(page.errors).toHaveLength(0);
   });
 
+  test('should load Feature Decomposer view', async ({ page }) => {
+    await testView(page, 'feature-decomposer', 'Feature Decomposer');
+  });
+
+  test('Feature Decomposer view loads snapshot data and renders charts', async ({ page }) => {
+    // Monitor the decomposer snapshot endpoint
+    const apiResponses = [];
+    page.on('response', response => {
+      if (response.url().includes('/api/modules/ai-impact/decomposer')) {
+        apiResponses.push({ url: response.url(), status: response.status() });
+      }
+    });
+
+    await page.goto('/#/ai-impact/feature-decomposer');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // The GET /decomposer snapshot endpoint was called and returned data
+    const decompResponse = apiResponses.find(r => r.url.includes('/decomposer'));
+    expect(decompResponse).toBeDefined();
+    expect(decompResponse.status).toBe(200);
+
+    // KPIs, the "Showing" date filter, and charts render from the demo fixture
+    await expect(page.locator('text=Strategies Decomposed')).toBeVisible();
+    await expect(page.locator('#decomposer-showing')).toBeVisible();
+    const canvases = await page.locator('canvas').count();
+    expect(canvases).toBeGreaterThan(0);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
   test('should load Documentation view', async ({ page }) => {
     await testView(page, 'documentation', 'Documentation');
   });
