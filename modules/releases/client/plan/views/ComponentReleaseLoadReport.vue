@@ -567,10 +567,10 @@ function clearAllFilters() {
 function extractProduct(versionName) {
   if (!versionName) return versionName
   var lower = versionName.toLowerCase()
-  if (lower.startsWith('rhoai')) return 'RHOAI'
-  if (lower.startsWith('rhelai')) return 'RHELAI'
-  if (lower.startsWith('rhaii')) return 'RHAII'
-  return versionName.split('-')[0] || versionName
+  if (lower.indexOf('rhoai') !== -1) return 'RHOAI'
+  if (lower.indexOf('rhelai') !== -1) return 'RHELAI'
+  if (lower.indexOf('rhaii') !== -1) return 'RHAII'
+  return null
 }
 
 function flattenFeatures() {
