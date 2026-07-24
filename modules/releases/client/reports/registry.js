@@ -47,8 +47,8 @@ export const reports = [
   },
   {
     id: 'capacity-commitment',
-    label: 'Release Capacity & Feature Commitment',
-    description: 'Key deadlines, team capacity, and feature commitment overview for a selected release.',
+    label: 'Release Capacity & Commitment',
+    description: 'Key deadlines, team capacity, and commitment overview for a selected release.',
     component: defineAsyncComponent(() => import('./CapacityCommitmentReport.vue'))
   }
 ]
