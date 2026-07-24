@@ -729,6 +729,128 @@ Quality assessment data pushed from the rfe-quality-dashboard CI pipeline. Store
 - The file is written atomically (write-to-temp-then-rename) to prevent corruption from mid-write crashes.
 - On DELETE, the file is written as `{ "lastSyncedAt": null, "totalAssessed": 0, "assessments": {} }` (never `null`).
 
+## AI Impact — Feature Decomposer (`data/ai-impact/decomposer.json`)
+
+Epic-decomposition results pushed from the **epic-decomposer pipeline**
+(`gitlab.com/redhat/rhel-ai/agentic-ci/epic-decomposer-results` →
+`epic-decomposer-dashboard`). The dashboard's `generate-dashboard.py` emits a
+canonical `data.json` that feeds both the GitLab-Pages dashboard and Org Pulse.
+The pipeline **pushes the whole `data.json`** to Org Pulse (single-document
+snapshot per run, not a per-item bulk array); Org Pulse stores a **subset** of
+it — the dashboard remains the full-fidelity consumer.
+
+### Canonical `data.json` contract (dashboard superset — what the pipeline pushes)
+
+```json
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-07-24T00:00:00Z",
+  "source": { "data_dir": "…", "pipeline_id": "", "commit_sha": "" },
+  "signal_names": ["change_specificity", "pattern_precedent", "…"],
+  "investigation_signal_names": ["question_specificity", "…"],
+  "counts": { "runs": 9, "strategies": 25 },
+  "runs": [
+    {
+      "run_id": "2026-07-22T18-49-17Z", "started": "…", "completed": "…",
+      "duration_minutes": 10.7, "batch_size": 50,
+      "total": 2, "passed": 2, "failed": 0, "errors": 0,
+      "avg_score": 14, "score_max": 14, "submitted_epics": 9,
+      "results": [{ "strat_id": "RHAISTRAT-1", "status": "passed", "epic_count": 4, "score": 14 }]
+    }
+  ],
+  "strategies": {
+    "RHAISTRAT-1": {
+      "strat_id": "RHAISTRAT-1", "title": "…", "priority": "Major",
+      "labels": ["…"], "epic_count": 4, "critical_path_length": 3, "revised": true,
+      "mermaid_dag": "graph TD…",
+      "review": { "score": 14, "pass": true, "recommendation": "accept", "issues": [], "error": null },
+      "epics": [
+        {
+          "epic_id": "RHAISTRAT-1-E001", "title": "…", "type": "Implementation",
+          "implementation_type": "standard", "priority": "P0", "component": "MLflow",
+          "team": "…", "dependencies": [], "ai_implementability": "High",
+          "ai_implementability_score": 2, "ai_signals": { "change_specificity": 1 },
+          "investigation_signals": {}, "jira_key": "RHAI-137", "branch": null
+        }
+      ],
+      "run_history": [{ "run_id": "…", "score": 14, "status": "passed", "epic_count": 2 }]
+    }
+  },
+  "aggregates": {
+    "unique_strategies": 25, "total_epics": 132, "pass_rate": 96,
+    "avg_score_normalized": 98.3, "avg_epics_per_strategy": 5.5, "avg_critical_path": 3.2,
+    "investigation_epic_count": 7, "strats_with_investigations": 7,
+    "failed_strategies": 1, "recovered_strategies": 5,
+    "failed_ids": ["RHAISTRAT-1939"], "recovered_ids": ["…"],
+    "implementability_distribution": { "High": 111, "Medium": 17, "Low": 4 },
+    "type_distribution": { "Implementation": 124, "Investigation": 8 },
+    "priority_distribution": { "P0": 49, "P1": 26, "P2": 14 },
+    "component_distribution": { "MLflow": 21, "…": 0 },
+    "signal_aggregates": { "change_specificity": { "pos": 59, "zero": 21, "neg": 1 } },
+    "criterion_failure_counts": {}, "severity_counts": { "critical": 1, "major": 0, "minor": 5 }
+  },
+  "epic_bodies": { "RHAISTRAT-1-E001": "# markdown body…" }
+}
+```
+
+### Stored Pulse subset (`data/ai-impact/decomposer.json`)
+
+Org Pulse validates the envelope leniently (`runs` array, `strategies` object,
+`aggregates` object; extra fields tolerated) and projects to this subset —
+dropping `epic_bodies`, per-run `results`, per-epic signal maps, and strategy
+`labels`, while **keeping** `aggregates`, slim `runs`, `mermaid_dag`, and slim
+`epics[]` for the expandable strategy rows:
+
+```json
+{
+  "lastSyncedAt": "2026-07-24T21:21:48.739Z",
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-07-24T00:00:00Z",
+  "source": { "data_dir": "…" },
+  "signalNames": ["…"],
+  "investigationSignalNames": ["…"],
+  "counts": { "runs": 9, "strategies": 25 },
+  "aggregates": { "…": "verbatim from data.json" },
+  "runs": [
+    { "run_id": "…", "started": "…", "completed": "…", "duration_minutes": 10.7,
+      "total": 2, "passed": 2, "failed": 0, "errors": 0, "avg_score": 14,
+      "score_max": 14, "submitted_epics": 9 }
+  ],
+  "strategies": [
+    { "strat_id": "RHAISTRAT-1", "title": "…", "priority": "Major",
+      "epic_count": 4, "critical_path_length": 3, "revised": true,
+      "mermaid_dag": "graph TD…",
+      "review": { "score": 14, "pass": true, "recommendation": "accept" },
+      "epics": [
+        { "epic_id": "RHAISTRAT-1-E001", "title": "…", "type": "Implementation",
+          "implementation_type": "standard", "priority": "P0", "component": "MLflow",
+          "ai_implementability": "High", "jira_key": "RHAI-137", "dependencies": [] }
+      ],
+      "run_history": [{ "run_id": "…", "score": 14, "status": "passed", "epic_count": 2 }] }
+  ]
+}
+```
+
+### API
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/api/modules/ai-impact/decomposer` | `ai-impact:read` | Snapshot for the Feature Decomposer tab (adds `jiraHost` from `JIRA_HOST`). |
+| `GET` | `/api/modules/ai-impact/decomposer/status` | admin, `ai-impact:read` | `{ lastSyncedAt, generatedAt, counts }`. |
+| `POST` | `/api/modules/ai-impact/decomposer` | admin, `ai-impact:write` | Push the canonical `data.json`; stores the projected subset. Returns `{ status: "stored", runs, strategies }`. No-op in demo mode. |
+| `DELETE` | `/api/modules/ai-impact/decomposer` | admin, `ai-impact:write` | Clears the snapshot (writes the empty skeleton, never `null`). |
+
+**Notes:**
+- Push model mirrors strat-creator → `/features/bulk`, but the decomposer store is
+  **self-contained** in `ai-impact` (not forwarded to releases) — decomposition
+  results are an AI-Impact-only concern.
+- The KPI tiles and distribution charts render straight from the pre-computed
+  `aggregates`; Org Pulse does **no** re-aggregation (display-layer only). The
+  "Showing" date filter scopes the strategy list + volume-by-run trend (using
+  `run_history` timestamps); the `aggregates`-backed cards remain all-time.
+- The demo fixture at `fixtures/ai-impact/decomposer.json` is a real subset
+  projected from a pipeline `data.json`.
+
 ## AI Impact — Features (`data/ai-impact/features.json`) — DEPRECATED
 
 > **Deprecated.** Feature review data is now stored in the unified releases

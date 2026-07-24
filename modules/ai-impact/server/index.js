@@ -48,6 +48,10 @@ module.exports = function registerRoutes(router, context) {
   const registerComponentOnboardingRoutes = require('./component-onboarding/routes');
   registerComponentOnboardingRoutes(router, context);
 
+  // Feature Decomposer routes (epic-decomposer pipeline snapshot push)
+  const registerDecomposerRoutes = require('./decomposer/routes');
+  registerDecomposerRoutes(router, context);
+
   // ─── Refresh state (in-memory) ───
 
   const refreshState = {
