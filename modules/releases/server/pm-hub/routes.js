@@ -691,49 +691,90 @@ module.exports = async function registerPmHubRoutes(router, context) {
         return versionGroups[vName].components[cName]
       }
 
-      // Process requested issues (Target Version matches)
+      // Process all issues with OR display logic:
+      // Show issue if selected release matches fixVersion OR targetVersion.
+      // committedFeatures/Count = fixVersion matches only.
+      // requestedFeatures/Count = targetVersion matches only.
+      var allIssues = {}
+
       for (var ri = 0; ri < requestedIssues.length; ri++) {
         var raw = requestedIssues[ri]
-        var f = transformIssue(raw, {})
-        var tvNames = extractTargetVersions(raw)
+        if (!allIssues[raw.key]) allIssues[raw.key] = { raw: raw }
+      }
+      for (var cii = 0; cii < committedIssues.length; cii++) {
+        var rawC = committedIssues[cii]
+        if (!allIssues[rawC.key]) allIssues[rawC.key] = { raw: rawC }
+      }
+
+      var issueKeys = Object.keys(allIssues)
+      for (var ik = 0; ik < issueKeys.length; ik++) {
+        var entry = allIssues[issueKeys[ik]]
+        var rawIssue = entry.raw
+        var f = transformIssue(rawIssue, {})
+        var tvNames = extractTargetVersions(rawIssue)
+        var fvList = f.fixVersions && f.fixVersions.length > 0 ? f.fixVersions : []
         var compList = f.components && f.components.length > 0 ? f.components : ['No Component']
 
-        for (var tvi = 0; tvi < tvNames.length; tvi++) {
-          var tvName = tvNames[tvi]
-          if (versionNames.indexOf(tvName) === -1) continue
+        if (versionNames.length === 0) {
+          // Component-only mode: group by fixVersion, all go into committed
+          var groupFvList = fvList.length > 0 ? fvList : ['Unversioned']
+          for (var ufi = 0; ufi < groupFvList.length; ufi++) {
+            for (var uci = 0; uci < compList.length; uci++) {
+              var ucName = compList[uci]
+              if (componentNames.length > 0 && componentNames.indexOf(ucName) === -1) continue
+              var uGroup = ensureGroup(groupFvList[ufi], ucName)
+              if (!uGroup.committedFeatures.some(function(e) { return e.key === f.key })) {
+                uGroup.committedFeatures.push(buildFeatureObj(f, tvNames))
+                uGroup.committedCount++
+                if (f.isBlocked) uGroup.blockedCount++
+              }
+            }
+          }
+          continue
+        }
 
+        // Determine which selected versions match each field
+        var matchingFv = []
+        var matchingTv = []
+        for (var fvi = 0; fvi < fvList.length; fvi++) {
+          if (versionNames.indexOf(fvList[fvi]) !== -1) matchingFv.push(fvList[fvi])
+        }
+        for (var tvi = 0; tvi < tvNames.length; tvi++) {
+          if (versionNames.indexOf(tvNames[tvi]) !== -1) matchingTv.push(tvNames[tvi])
+        }
+
+        // OR logic: skip if neither field matches any selected version
+        if (matchingFv.length === 0 && matchingTv.length === 0) continue
+
+        // Determine group version keys — use all unique matching versions from either field
+        var groupVersions = {}
+        for (var mf = 0; mf < matchingFv.length; mf++) groupVersions[matchingFv[mf]] = true
+        for (var mt = 0; mt < matchingTv.length; mt++) groupVersions[matchingTv[mt]] = true
+        var groupVersionKeys = Object.keys(groupVersions)
+
+        var isCommitted = matchingFv.length > 0
+        var isRequested = matchingTv.length > 0
+        var featureObj = buildFeatureObj(f, tvNames)
+
+        for (var gvi = 0; gvi < groupVersionKeys.length; gvi++) {
+          var vKey = groupVersionKeys[gvi]
           for (var ci = 0; ci < compList.length; ci++) {
             var cName = compList[ci]
             if (componentNames.length > 0 && componentNames.indexOf(cName) === -1) continue
-            var group = ensureGroup(tvName, cName)
-            if (!group.requestedFeatures.some(function(e) { return e.key === f.key })) {
-              group.requestedFeatures.push(buildFeatureObj(f, tvNames))
-              group.requestedCount++
+            var group = ensureGroup(vKey, cName)
+
+            if (isCommitted && matchingFv.indexOf(vKey) !== -1) {
+              if (!group.committedFeatures.some(function(e) { return e.key === f.key })) {
+                group.committedFeatures.push(featureObj)
+                group.committedCount++
+                if (f.isBlocked) group.blockedCount++
+              }
             }
-          }
-        }
-      }
-
-      // Process committed issues (Fix Version matches)
-      for (var cii = 0; cii < committedIssues.length; cii++) {
-        var rawC = committedIssues[cii]
-        var fc = transformIssue(rawC, {})
-        var tvNamesC = extractTargetVersions(rawC)
-        var fvList = fc.fixVersions && fc.fixVersions.length > 0 ? fc.fixVersions : ['Unversioned']
-        var compListC = fc.components && fc.components.length > 0 ? fc.components : ['No Component']
-
-        for (var fvi = 0; fvi < fvList.length; fvi++) {
-          var fvName = fvList[fvi]
-          if (versionNames.length > 0 && versionNames.indexOf(fvName) === -1) continue
-
-          for (var cci = 0; cci < compListC.length; cci++) {
-            var cNameC = compListC[cci]
-            if (componentNames.length > 0 && componentNames.indexOf(cNameC) === -1) continue
-            var groupC = ensureGroup(fvName, cNameC)
-            if (!groupC.committedFeatures.some(function(e) { return e.key === fc.key })) {
-              groupC.committedFeatures.push(buildFeatureObj(fc, tvNamesC))
-              groupC.committedCount++
-              if (fc.isBlocked) groupC.blockedCount++
+            if (isRequested && matchingTv.indexOf(vKey) !== -1) {
+              if (!group.requestedFeatures.some(function(e) { return e.key === f.key })) {
+                group.requestedFeatures.push(featureObj)
+                group.requestedCount++
+              }
             }
           }
         }

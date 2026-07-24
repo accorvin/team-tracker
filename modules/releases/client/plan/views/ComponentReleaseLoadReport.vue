@@ -752,12 +752,12 @@ var uniqueComponents = computed(function() {
 })
 
 var PORTFOLIO_VERSIONS = [
-  { label: '3.5 EA1', jiraVersions: ['rhoai-3.5.EA1', 'rhelai-3.5 EA1 release', 'RHAII-3.5 EA1'] },
-  { label: '3.5 EA2', jiraVersions: ['rhoai-3.5.EA2', 'rhelai-3.5 EA2 release', 'RHAII-3.5 EA2'] },
-  { label: '3.5', jiraVersions: ['rhoai-3.5', 'rhelai-3.5', 'RHAII-3.5'] },
-  { label: '3.6 EA1', jiraVersions: ['rhoai-3.6.EA1', 'rhelai-3.6 EA1 release', 'RHAII-3.6 EA1'] },
-  { label: '3.6 EA2', jiraVersions: ['rhoai-3.6.EA2', 'rhelai-3.6 EA2 release', 'RHAII-3.6 EA2'] },
-  { label: '3.6', jiraVersions: ['rhoai-3.6', 'rhelai-3.6', 'RHAII-3.6'] }
+  { label: '3.5 EA1', jiraVersions: ['3.5 EA1 RHOAI RELEASE', '3.5 EA1 RHELAI RELEASE', '3.5 EA1 RHAII RELEASE'] },
+  { label: '3.5 EA2', jiraVersions: ['3.5 EA2 RHOAI RELEASE', '3.5 EA2 RHELAI RELEASE', '3.5 EA2 RHAII RELEASE'] },
+  { label: '3.5', jiraVersions: ['3.5 GA RHOAI RELEASE', '3.5 GA RHELAI RELEASE', '3.5 GA RHAII RELEASE'] },
+  { label: '3.6 EA1', jiraVersions: ['3.6 EA1 RHOAI RELEASE', '3.6 EA1 RHELAI RELEASE', '3.6 EA1 RHAII RELEASE'] },
+  { label: '3.6 EA2', jiraVersions: ['3.6 EA2 RHOAI RELEASE', '3.6 EA2 RHELAI RELEASE', '3.6 EA2 RHAII RELEASE'] },
+  { label: '3.6', jiraVersions: ['3.6 GA RHOAI RELEASE', '3.6 GA RHELAI RELEASE', '3.6 GA RHAII RELEASE'] }
 ]
 
 var portfolioVersionLabels = PORTFOLIO_VERSIONS.map(function(v) { return v.label })
