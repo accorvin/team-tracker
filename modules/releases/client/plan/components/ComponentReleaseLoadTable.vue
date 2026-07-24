@@ -147,11 +147,6 @@ function extractProduct(versionName) {
   return null
 }
 
-function normalizeVersion(v) {
-  if (!v || typeof v !== 'string') return v
-  return v.replace(/\s*(RHOAI|RHELAI|RHAII)\s*RELEASE\s*$/i, '').trim()
-}
-
 var componentGroups = computed(function() {
   var compMap = {}
 
@@ -468,7 +463,7 @@ defineExpose({ expandAll, collapseAll })
                     v-for="fv in feature.fixVersions"
                     :key="fv"
                     class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
-                  >{{ normalizeVersion(fv) }}</span>
+                  >{{ fv }}</span>
                 </div>
                 <span v-else class="text-gray-300 dark:text-gray-600 text-xs">--</span>
               </td>
@@ -478,7 +473,7 @@ defineExpose({ expandAll, collapseAll })
                     v-for="tv in feature.targetVersions"
                     :key="tv"
                     class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
-                  >{{ normalizeVersion(tv) }}</span>
+                  >{{ tv }}</span>
                 </div>
                 <span v-else class="text-gray-300 dark:text-gray-600 text-xs">--</span>
               </td>
