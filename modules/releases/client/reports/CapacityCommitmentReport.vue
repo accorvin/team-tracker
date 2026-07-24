@@ -474,13 +474,25 @@
                     class="px-4 py-2.5 truncate"
                     :class="col.cellClass || 'text-gray-600 dark:text-gray-400'"
                   >
-                    <a
-                      v-if="col.key === 'key'"
-                      :href="'https://issues.redhat.com/browse/' + f.key"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
-                    >{{ f.key }}</a>
+                    <span v-if="col.key === 'key'" class="inline-flex items-center gap-1.5">
+                      <a
+                        href="#"
+                        class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                        @click.prevent="navigateToFeature(f.key)"
+                      >{{ f.key }}</a>
+                      <a
+                        :href="'https://issues.redhat.com/browse/' + f.key"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+                        title="Open in Jira"
+                        @click.stop
+                      >
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                        </svg>
+                      </a>
+                    </span>
                     <span v-else-if="col.key === 'summary'" class="text-gray-900 dark:text-gray-100">{{ f.summary || '—' }}</span>
                     <span v-else-if="col.key === 'fixVersions'">{{ (f.fixVersions || []).join(', ') || '—' }}</span>
                     <span v-else-if="col.key === 'components'">{{ (f.components || []).join(', ') || '—' }}</span>
@@ -499,7 +511,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, inject } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, inject } from 'vue'
 import { apiRequest } from '@shared/client/services/api.js'
 import { Doughnut } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Tooltip } from 'chart.js'
@@ -890,6 +902,17 @@ async function fetchFeatures() {
 
 onMounted(fetchFeatures)
 
+// Restore modal state when returning from feature detail
+watch(featuresLoading, (loading) => {
+  if (loading) return
+  const params = nav?.params?.value || {}
+  if (params.modalStatus && params.modalPhase) {
+    openFeatureList(params.modalStatus, params.modalPhase, params.modalField)
+    if (params.modalField === 'colorStatus') activeAnalysisTab.value = 'color-status'
+    nav.updateParams({ modalStatus: undefined, modalPhase: undefined, modalField: undefined })
+  }
+})
+
 function normalizeFixVersion(v) {
   return String(v).replace(/[\s.-]+/g, ' ').replace(/\s*release$/i, '').trim().toLowerCase()
 }
@@ -1211,6 +1234,18 @@ function closeFeatureList() {
   featureListPhase.value = null
   featureListFilterField.value = 'status'
   columnSettingsOpen.value = false
+}
+
+function navigateToFeature(key) {
+  const params = {
+    key,
+    from: 'capacity-report',
+    modalStatus: featureListStatus.value,
+    modalPhase: featureListPhase.value,
+    modalField: featureListFilterField.value
+  }
+  closeFeatureList()
+  nav.navigateTo('feature-detail', params)
 }
 
 function makeDoughnutOptions(card, field) {
