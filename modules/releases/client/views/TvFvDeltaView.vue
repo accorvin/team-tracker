@@ -250,10 +250,6 @@ onBeforeUnmount(() => {
                   <span class="inline-flex items-center gap-1 justify-end">Alignment<svg v-if="summarySortIcon('alignment_pct') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('alignment_pct') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
                 </th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Target</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSummarySort('ga_date')">
-                  <span class="inline-flex items-center gap-1">GA Date<svg v-if="summarySortIcon('ga_date') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('ga_date') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
-                </th>
-                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Days to GA</th>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSummarySort('planning_freeze')">
                   <span class="inline-flex items-center gap-1">Planning Freeze<svg v-if="summarySortIcon('planning_freeze') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('planning_freeze') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
                 </th>

@@ -338,8 +338,6 @@ function classifyFeatures(features, releases, releaseDates) {
   for (let ri = 0; ri < releases.length; ri++) {
     const release = releases[ri]
     const relNorm = normVer(release)
-    const relParsed = parseReleaseName(release)
-    const relProduct = extractProduct(release)
 
     for (let fi = 0; fi < features.length; fi++) {
       const feat = features[fi]
@@ -820,7 +818,7 @@ async function registerRoutes(router, context) {
     }
 
     // No cache — trigger first fetch using planning config if available
-    triggerBackgroundRefresh(await fetchReleasesFromPlanning(storage).releases)
+    triggerBackgroundRefresh((await fetchReleasesFromPlanning(storage)).releases)
     res.status(202).json({
       _refreshing: true,
       _noCache: true,
@@ -860,7 +858,7 @@ async function registerRoutes(router, context) {
       releases = req.body.releases
     } else {
       // Auto-discover from planning module (Smartsheet SSOT)
-      releases = await fetchReleasesFromPlanning(storage).releases
+      releases = (await fetchReleasesFromPlanning(storage)).releases
     }
 
     // Cap releases array to prevent excessive API load
