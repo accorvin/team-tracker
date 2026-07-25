@@ -23,6 +23,7 @@ export const viewOwners = {
   'ai-impact/autofix':                             'Alex Corvin',
   'ai-impact/build-release':                       'Deepak Chourasia',
   'ai-impact/documentation':                       'tarilabs',
+  'ai-impact/feature-decomposer':                  'Eder Ignatowicz',
   'ai-impact/feature-review':                      'Alex Corvin',
   'ai-impact/implementation':                      'Alex Corvin',
   'ai-impact/rfe-review':                          'Alex Corvin',

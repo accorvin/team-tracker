@@ -57,7 +57,7 @@ const filteredSummary = computed(() => {
   for (const name of chosenVersionNames.value) {
     if (!existingReleases.has(name)) {
       rows.push({
-        release: name, total: 0, aligned: 0, tv_only: 0, fv_only: 0, mismatched: 0,
+        release: name, total: 0, aligned_on_time: 0, aligned_late: 0, tv_only: 0, fv_only: 0, misaligned: 0,
         alignment_pct: 0, _pending: true,
       })
     }
