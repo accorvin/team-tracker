@@ -720,14 +720,20 @@ test.describe('TV/FV Delta — Release Tabs @tv-fv-delta', () => {
     await expect(cycleHeaders.nth(1)).toHaveText(/3\.5 Release Cycle/i);
 
     const cycle36 = selector.locator('div.rounded-lg.border').filter({ hasText: '3.6 Release Cycle' }).first();
-    // Milestone headers are buttons: "3.6 EA1 Release all products"
-    const milestoneLabels = (await cycle36.getByRole('button', { name: /all products/ }).allTextContents())
-      .map(t => t.replace(/\s+/g, ' ').trim().replace(/\s+all products$/i, ''));
+    // Milestone "All products" chips expose accessible names like "3.6 EA1 Release all products"
+    const milestoneButtons = cycle36.getByRole('button', { name: /all products/i });
+    const milestoneCount = await milestoneButtons.count();
+    const milestoneLabels = [];
+    for (let i = 0; i < milestoneCount; i++) {
+      const label = await milestoneButtons.nth(i).getAttribute('aria-label');
+      milestoneLabels.push(String(label || '').replace(/\s+all products$/i, '').trim());
+    }
     expect(milestoneLabels).toEqual([
       '3.6 EA1 Release',
       '3.6 EA2 Release',
       '3.6 GA Release',
     ]);
+    await expect(milestoneButtons.first()).toHaveAttribute('aria-pressed', /.+/);
 
     // Product chips under the first milestone (EA1), in product order
     const ea1Group = cycle36.locator('div.border-t').first();
