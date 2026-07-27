@@ -56,4 +56,21 @@ describe('mergeReleaseDetails', function () {
     )
     expect(merged.aligned_on_time).toHaveLength(1)
   })
+
+  it('falls back to legacy aligned/mismatched buckets', function () {
+    var merged = mergeReleaseDetails(
+      {
+        '3.6 EA1 RHOAI RELEASE': {
+          aligned: [{ key: 'LEGACY-A' }],
+          mismatched: [{ key: 'LEGACY-M' }],
+          tv_only: [],
+          fv_only: [],
+        },
+      },
+      ['3.6 EA1 RHOAI RELEASE'],
+    )
+    expect(merged.aligned_on_time.map(function (f) { return f.key })).toEqual(['LEGACY-A'])
+    expect(merged.misaligned.map(function (f) { return f.key })).toEqual(['LEGACY-M'])
+    expect(merged.aligned_late).toEqual([])
+  })
 })

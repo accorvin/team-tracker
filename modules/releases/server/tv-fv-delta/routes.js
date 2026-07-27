@@ -753,6 +753,150 @@ async function fetchAndClassify(releases, storage, jiraProject) {
 }
 
 // ---------------------------------------------------------------------------
+// Legacy cache compatibility (pre-5-category model)
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize a cached TV/FV payload from the old 4-category schema
+ * (`aligned` / `mismatched`) to the current 5-category schema
+ * (`aligned_on_time` / `aligned_late` / `misaligned`).
+ *
+ * Safe to call on already-migrated payloads — returns input unchanged when
+ * new fields are already present.
+ *
+ * @param {object|null} data
+ * @returns {object|null}
+ */
+function normalizeLegacyTvFvCache(data) {
+  if (!data || typeof data !== 'object') return data
+
+  var migrated = false
+  var out = data
+
+  function ensureClone() {
+    if (out === data) {
+      out = Object.assign({}, data)
+      if (data.metadata) out.metadata = Object.assign({}, data.metadata)
+    }
+  }
+
+  // Executive summary rows
+  if (Array.isArray(data.executive_summary)) {
+    var summary = data.executive_summary
+    var needsSummary = false
+    for (var si = 0; si < summary.length; si++) {
+      var row = summary[si]
+      if (!row || typeof row !== 'object') continue
+      if (row.aligned_on_time == null && row.aligned != null) { needsSummary = true; break }
+      if (row.misaligned == null && row.mismatched != null) { needsSummary = true; break }
+      if (row.aligned_late == null && (row.aligned != null || row.mismatched != null)) { needsSummary = true; break }
+    }
+    if (needsSummary) {
+      ensureClone()
+      migrated = true
+      out.executive_summary = summary.map(function (row) {
+        if (!row || typeof row !== 'object') return row
+        var next = Object.assign({}, row)
+        if (next.aligned_on_time == null && next.aligned != null) {
+          next.aligned_on_time = next.aligned
+        }
+        if (next.aligned_on_time_jql == null && next.aligned_jql != null) {
+          next.aligned_on_time_jql = next.aligned_jql
+        }
+        if (next.aligned_late == null) next.aligned_late = 0
+        if (next.misaligned == null && next.mismatched != null) {
+          next.misaligned = next.mismatched
+        }
+        if (next.misaligned_jql == null && next.mismatched_jql != null) {
+          next.misaligned_jql = next.mismatched_jql
+        }
+        var total = next.total || 0
+        var onTime = next.aligned_on_time || 0
+        var late = next.aligned_late || 0
+        next.alignment_pct = total > 0
+          ? Math.round(1000 * (onTime + late) / total) / 10
+          : 0
+        return next
+      })
+    }
+  }
+
+  // Per-release feature buckets
+  if (data.releases && typeof data.releases === 'object') {
+    var releaseNames = Object.keys(data.releases)
+    var needsReleases = false
+    for (var ri = 0; ri < releaseNames.length; ri++) {
+      var bucket = data.releases[releaseNames[ri]]
+      if (!bucket || typeof bucket !== 'object') continue
+      if (!Array.isArray(bucket.aligned_on_time) && Array.isArray(bucket.aligned)) { needsReleases = true; break }
+      if (!Array.isArray(bucket.misaligned) && Array.isArray(bucket.mismatched)) { needsReleases = true; break }
+      if (!Array.isArray(bucket.aligned_late) && (Array.isArray(bucket.aligned) || Array.isArray(bucket.mismatched))) {
+        needsReleases = true
+        break
+      }
+    }
+    if (needsReleases) {
+      ensureClone()
+      migrated = true
+      out.releases = Object.assign({}, data.releases)
+      for (var rj = 0; rj < releaseNames.length; rj++) {
+        var name = releaseNames[rj]
+        var src = data.releases[name]
+        if (!src || typeof src !== 'object') continue
+        var nextBucket = Object.assign({}, src)
+        if (!Array.isArray(nextBucket.aligned_on_time) && Array.isArray(nextBucket.aligned)) {
+          nextBucket.aligned_on_time = nextBucket.aligned
+        }
+        if (!Array.isArray(nextBucket.aligned_late)) nextBucket.aligned_late = []
+        if (!Array.isArray(nextBucket.misaligned) && Array.isArray(nextBucket.mismatched)) {
+          nextBucket.misaligned = nextBucket.mismatched
+        }
+        if (!Array.isArray(nextBucket.aligned_on_time)) nextBucket.aligned_on_time = []
+        if (!Array.isArray(nextBucket.misaligned)) nextBucket.misaligned = []
+        if (!Array.isArray(nextBucket.tv_only)) nextBucket.tv_only = []
+        if (!Array.isArray(nextBucket.fv_only)) nextBucket.fv_only = []
+        out.releases[name] = nextBucket
+      }
+    }
+  }
+
+  // Component breakdown rows
+  if (Array.isArray(data.component_breakdown)) {
+    var comps = data.component_breakdown
+    var needsComps = false
+    for (var ci = 0; ci < comps.length; ci++) {
+      var comp = comps[ci]
+      if (!comp || typeof comp !== 'object') continue
+      if (comp.aligned_on_time == null && comp.aligned != null) { needsComps = true; break }
+      if (comp.misaligned == null && comp.mismatched != null) { needsComps = true; break }
+    }
+    if (needsComps) {
+      ensureClone()
+      migrated = true
+      out.component_breakdown = comps.map(function (comp) {
+        if (!comp || typeof comp !== 'object') return comp
+        var next = Object.assign({}, comp)
+        if (next.aligned_on_time == null && next.aligned != null) next.aligned_on_time = next.aligned
+        if (next.aligned_late == null) next.aligned_late = 0
+        if (next.misaligned == null && next.mismatched != null) next.misaligned = next.mismatched
+        var cTotal = next.total || 0
+        next.alignment_pct = cTotal > 0
+          ? Math.round(1000 * ((next.aligned_on_time || 0) + (next.aligned_late || 0)) / cTotal) / 10
+          : 0
+        return next
+      })
+    }
+  }
+
+  if (migrated) {
+    ensureClone()
+    out.metadata = Object.assign({}, out.metadata || {}, { schema: 'tv-fv-5cat', legacy_migrated: true })
+  }
+
+  return out
+}
+
+// ---------------------------------------------------------------------------
 // Route registration
 // ---------------------------------------------------------------------------
 
@@ -771,6 +915,7 @@ module.exports.isReleaseFrozen = isReleaseFrozen
 module.exports.normalizeIssue = normalizeIssue
 module.exports.classifyFeatures = classifyFeatures
 module.exports.buildExport = buildExport
+module.exports.normalizeLegacyTvFvCache = normalizeLegacyTvFvCache
 module.exports.DEFAULT_RELEASES = DEFAULT_RELEASES
 module.exports.DEFAULT_JIRA_PROJECT = DEFAULT_JIRA_PROJECT
 module.exports.jqlSafePattern = jqlSafePattern
@@ -844,18 +989,30 @@ async function registerRoutes(router, context) {
     const data = await storage.readFromStorage(CACHE_KEY)
 
     if (data) {
+      // Bridge pre-5-category caches so the UI never sees blank aligned/misaligned cells
+      const normalized = normalizeLegacyTvFvCache(data)
+      const healed = normalized !== data
+
       // Check staleness
-      const cachedAt = data.metadata && data.metadata.generated_at
+      const cachedAt = normalized.metadata && normalized.metadata.generated_at
       if (cachedAt) {
         const age = Date.now() - new Date(cachedAt).getTime()
         if (age >= CACHE_MAX_AGE_MS) {
-          const cachedReleases = (data.metadata.releases || DEFAULT_RELEASES)
+          const cachedReleases = (normalized.metadata.releases || DEFAULT_RELEASES)
             .filter(function(r) { return typeof r === 'string' && jqlSafePattern.test(r) })
           triggerBackgroundRefresh(cachedReleases.length ? cachedReleases : DEFAULT_RELEASES)
         }
       }
+
+      // Persist healed schema so subsequent reads don't re-migrate (best-effort)
+      if (healed) {
+        storage.writeToStorage(CACHE_KEY, normalized).catch(function (err) {
+          console.warn('[releases/tv-fv-delta] Failed to persist legacy cache migration:', err.message)
+        })
+      }
+
       return res.json({
-        ...data,
+        ...normalized,
         _refreshing: refreshState.running
       })
     }

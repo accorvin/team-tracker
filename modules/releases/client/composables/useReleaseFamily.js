@@ -177,11 +177,12 @@ function sumRows(rows) {
       continue
     }
     total += r.total || 0
-    alignedOnTime += r.aligned_on_time || 0
+    // Prefer 5-category fields; fall back to pre-migration `aligned` / `mismatched`
+    alignedOnTime += r.aligned_on_time != null ? r.aligned_on_time : (r.aligned || 0)
     alignedLate += r.aligned_late || 0
     tvOnly += r.tv_only || 0
     fvOnly += r.fv_only || 0
-    misaligned += r.misaligned || 0
+    misaligned += r.misaligned != null ? r.misaligned : (r.mismatched || 0)
   }
   var alignmentPct = total > 0 ? Math.round((1000 * (alignedOnTime + alignedLate)) / total) / 10 : 0
   return {

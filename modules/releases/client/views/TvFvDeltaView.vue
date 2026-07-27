@@ -429,11 +429,17 @@ onBeforeUnmount(() => {
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
-                      <ClickableCount v-if="!row._pending" :count="row.aligned_on_time" :jql="row.aligned_on_time_jql" color="green" label="Aligned on time" />
+                      <ClickableCount
+                        v-if="!row._pending"
+                        :count="row.aligned_on_time != null ? row.aligned_on_time : (row.aligned || 0)"
+                        :jql="row.aligned_on_time_jql || row.aligned_jql"
+                        color="green"
+                        label="Aligned on time"
+                      />
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
-                      <span v-if="!row._pending" class="text-xs font-medium text-amber-600 dark:text-amber-400" :title="COLUMN_HELP.aligned_late">{{ row.aligned_late }}</span>
+                      <span v-if="!row._pending" class="text-xs font-medium text-amber-600 dark:text-amber-400" :title="COLUMN_HELP.aligned_late">{{ row.aligned_late || 0 }}</span>
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
@@ -445,7 +451,7 @@ onBeforeUnmount(() => {
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
-                      <span v-if="!row._pending" class="text-xs font-medium text-red-600 dark:text-red-400">{{ row.misaligned }}</span>
+                      <span v-if="!row._pending" class="text-xs font-medium text-red-600 dark:text-red-400">{{ row.misaligned != null ? row.misaligned : (row.mismatched || 0) }}</span>
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
