@@ -128,7 +128,16 @@ async function saveConfig(writeToStorage, config) {
     merged.autofixProjects = config.autofixProjects;
   }
 
-  await writeToStorage('ai-impact/config.json', merged);
+  // Only persist fields that differ from defaults so that future default
+  // changes (e.g. adding new autofix projects) take effect automatically
+  // on deployments that never customized those fields.
+  const delta = {};
+  for (const [key, value] of Object.entries(merged)) {
+    if (JSON.stringify(value) !== JSON.stringify(DEFAULT_CONFIG[key])) {
+      delta[key] = value;
+    }
+  }
+  await writeToStorage('ai-impact/config.json', delta);
 }
 
 module.exports = { DEFAULT_CONFIG, getConfig, saveConfig, validateJqlSafeString };

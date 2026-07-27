@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import ClickableCount from '../components/ClickableCount.vue'
 import FeatureTable from '../components/FeatureTable.vue'
 import { useReleasePicker } from '../composables/useReleasePicker'
@@ -7,9 +7,13 @@ import { useComponentBreakdown } from '../composables/useComponentBreakdown'
 import { useComponentLeads } from '../composables/useComponentLeads'
 import { useTvFvData } from '../composables/useTvFvData'
 import { useReleaseFamily, getAlignmentTarget, buildNameRollup } from '../composables/useReleaseFamily'
+import { mergeReleaseDetails } from '../composables/mergeReleaseDetails'
 import { DEFAULT_SELECTED_VERSIONS } from '../composables/tvFvDeltaDefaults'
 
-const FEATURE_COLS = ['key', 'summary', 'status', 'target_version', 'fix_versions', 'color_status', 'product_manager', 'assignee', 'team', 'component']
+const FEATURE_COLS = [
+  'key', 'summary', 'target_version', 'fix_versions',
+  'status', 'color_status', 'product_manager', 'assignee', 'team', 'component',
+]
 
 // ---------------------------------------------------------------------------
 // Composables
@@ -34,13 +38,82 @@ const {
 // Wrap triggerRefresh to pass the picker's allSelectedVersions
 const doRefresh = () => triggerRefresh(allSelectedVersions)
 
-const releaseData = computed(() => {
-  if (!data.value || !selectedRelease.value) return null
-  return data.value.releases[selectedRelease.value]
+/**
+ * Selection scope:
+ * - product: one release event chip (e.g. 3.6 EA1 RHOAI RELEASE)
+ * - milestone: all products in a release event (e.g. 3.6 EA1 → RHOAI/RHAII/RHELAI)
+ */
+const selectedMilestoneKey = ref(null)
+
+const activeReleaseNames = computed(() => {
+  if (selectedMilestoneKey.value) {
+    for (const cycle of chosenVersionsRollup.value) {
+      for (const ms of cycle.milestones) {
+        if (ms.key === selectedMilestoneKey.value) {
+          return ms.names.filter(n => data.value?.releases?.[n])
+        }
+      }
+    }
+    return []
+  }
+  if (selectedRelease.value && data.value?.releases?.[selectedRelease.value]) {
+    return [selectedRelease.value]
+  }
+  return []
 })
 
-const releaseSummary = computed(() => {
+const selectionLabel = computed(() => {
+  if (selectedMilestoneKey.value) {
+    for (const cycle of chosenVersionsRollup.value) {
+      for (const ms of cycle.milestones) {
+        if (ms.key === selectedMilestoneKey.value) {
+          const n = activeReleaseNames.value.length
+          return ms.label + (n ? ` — all products (${n})` : '')
+        }
+      }
+    }
+  }
+  return selectedRelease.value || ''
+})
+
+function selectProductRelease(name) {
+  if (!name || !isInCurrentData(name)) return
+  selectedMilestoneKey.value = null
+  selectedRelease.value = name
+}
+
+function selectMilestoneGroup(ms) {
+  if (!ms) return
+  // Selector rollup uses .names; executive summary rollup uses .rows[].release
+  const names = ms.names
+    || (ms.rows ? ms.rows.map(function (r) { return r.release }) : [])
+  if (!names.length) return
+  const available = names.filter(n => data.value?.releases?.[n])
+  if (!available.length) return
+  selectedMilestoneKey.value = ms.key
+  selectedRelease.value = available[0]
+}
+
+function isProductSelected(name) {
+  return !selectedMilestoneKey.value && name === selectedRelease.value
+}
+
+function isMilestoneSelected(msKey) {
+  return selectedMilestoneKey.value === msKey
+}
+
+function isReleaseInActiveScope(name) {
+  return activeReleaseNames.value.includes(name)
+}
+
+const releaseData = computed(() => {
   if (!data.value) return null
+  return mergeReleaseDetails(data.value.releases, activeReleaseNames.value)
+})
+
+/** Per-product Jira deep-links only apply in single-product mode */
+const releaseSummary = computed(() => {
+  if (!data.value || selectedMilestoneKey.value || !selectedRelease.value) return null
   return data.value.executive_summary.find(s => s.release === selectedRelease.value)
 })
 
@@ -284,11 +357,16 @@ onBeforeUnmount(() => {
                 </tr>
 
                 <template v-for="ms in cycle.milestones" :key="ms.key">
-                  <!-- Milestone rollup: e.g. 3.6 GA Release -->
-                  <tr class="bg-gray-50 dark:bg-gray-800/70">
+                  <!-- Milestone rollup: e.g. 3.6 GA Release — click to view all products -->
+                  <tr
+                    class="bg-gray-50 dark:bg-gray-800/70 cursor-pointer hover:bg-blue-50/40 dark:hover:bg-blue-900/20"
+                    :class="{ 'ring-1 ring-inset ring-blue-400/60 bg-blue-50/60 dark:bg-blue-900/25': isMilestoneSelected(ms.key) }"
+                    @click="selectMilestoneGroup(ms)"
+                  >
                     <td class="px-4 py-2 pl-8 text-xs font-medium text-gray-700 dark:text-gray-200">
                       {{ ms.label }}
                       <span class="ml-1 text-[10px] font-normal text-gray-400 dark:text-gray-500">(includes {{ ms.rows.length }})</span>
+                      <span class="ml-1.5 text-[10px] font-normal text-blue-600 dark:text-blue-400">all products</span>
                     </td>
                     <td class="px-4 py-2 text-right text-xs font-medium text-gray-600 dark:text-gray-300">{{ ms.totals.total }}</td>
                     <td class="px-4 py-2 text-right text-xs font-medium text-green-700 dark:text-green-400">{{ ms.totals.aligned_on_time }}</td>
@@ -311,8 +389,11 @@ onBeforeUnmount(() => {
                     v-for="row in ms.rows"
                     :key="row.release"
                     class="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
-                    :class="{ 'bg-blue-50/50 dark:bg-blue-900/10': row.release === selectedRelease }"
-                    @click="!row._pending ? selectedRelease = row.release : null"
+                    :class="{
+                      'bg-blue-50/50 dark:bg-blue-900/10': isProductSelected(row.release),
+                      'bg-blue-50/20 dark:bg-blue-900/5': isMilestoneSelected(ms.key) && isReleaseInActiveScope(row.release),
+                    }"
+                    @click="!row._pending ? selectProductRelease(row.release) : null"
                   >
                     <td class="px-4 py-2 pl-12 font-mono text-xs font-medium" :class="row._pending ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-gray-100'">
                       {{ row.release }}
@@ -426,21 +507,33 @@ onBeforeUnmount(() => {
             v-for="ms in cycle.milestones"
             :key="'sel-' + ms.key"
             class="px-3 py-2.5 border-t border-gray-100 dark:border-gray-700/80"
+            :class="{ 'bg-blue-50/40 dark:bg-blue-900/15': isMilestoneSelected(ms.key) }"
           >
-            <div class="text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1.5">
+            <button
+              type="button"
+              class="text-[11px] font-medium mb-1.5 inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 -ml-1.5 transition-colors"
+              :class="isMilestoneSelected(ms.key)
+                ? 'text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40'
+                : 'text-gray-600 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-gray-100 dark:hover:bg-gray-800'"
+              :title="'View all products for ' + ms.label"
+              @click="selectMilestoneGroup(ms)"
+            >
               {{ ms.label }}
-            </div>
+              <span class="text-[10px] font-normal opacity-70">all products</span>
+            </button>
             <div class="flex items-center gap-1.5 flex-wrap">
               <button
                 v-for="name in ms.names"
                 :key="name"
                 class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
                 :class="isInCurrentData(name)
-                  ? (name === selectedRelease
+                  ? (isProductSelected(name)
                     ? 'bg-blue-600 text-white border-blue-600 dark:border-blue-500'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700')
+                    : (isMilestoneSelected(ms.key)
+                      ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700'))
                   : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700 border-dashed'"
-                @click="isInCurrentData(name) ? selectedRelease = name : null"
+                @click="selectProductRelease(name)"
               >
                 {{ name }}
                 <span
@@ -516,8 +609,15 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- Category lists for selected release -->
+      <!-- Category lists for selected release / milestone scope -->
       <div v-if="releaseData">
+        <p
+          v-if="selectionLabel"
+          class="text-sm text-gray-600 dark:text-gray-300 mb-3"
+        >
+          Showing features for
+          <span class="font-medium text-gray-900 dark:text-gray-100">{{ selectionLabel }}</span>
+        </p>
         <!-- TV-Only -->
         <details class="group bg-white dark:bg-gray-800 rounded-lg border border-yellow-200 dark:border-yellow-800 overflow-hidden mb-4">
           <summary class="list-none px-4 py-3 cursor-pointer hover:bg-yellow-50 dark:hover:bg-yellow-900/10 flex items-center justify-between [&::-webkit-details-marker]:hidden">
@@ -541,6 +641,7 @@ onBeforeUnmount(() => {
           <FeatureTable
             :features="releaseData.tv_only"
             :columns="FEATURE_COLS"
+            highlight-version-delta
           />
         </details>
 
@@ -567,6 +668,7 @@ onBeforeUnmount(() => {
           <FeatureTable
             :features="releaseData.fv_only"
             :columns="FEATURE_COLS"
+            highlight-version-delta
           />
         </details>
 
@@ -593,6 +695,7 @@ onBeforeUnmount(() => {
           <FeatureTable
             :features="releaseData.aligned_on_time"
             :columns="FEATURE_COLS"
+            highlight-version-delta
           />
         </details>
 
@@ -625,6 +728,7 @@ onBeforeUnmount(() => {
           <FeatureTable
             :features="releaseData.misaligned"
             :columns="FEATURE_COLS"
+            highlight-version-delta
           />
         </details>
       </div>

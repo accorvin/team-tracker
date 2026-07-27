@@ -236,6 +236,23 @@ test.describe('Package Analysis @package-analysis', () => {
     expect(appErrors).toHaveLength(0);
   });
 
+  test('should load Pre-Built Packages tab via URL', async ({ page }) => {
+    await page.goto('/#/product-builds/package-analysis?tab=pre-built');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const tab = page.getByRole('button', { name: /Pre-Built Packages/ });
+    await expect(tab).toBeVisible();
+
+    const hasData = await page.locator('text=All variants').isVisible();
+    const hasEmpty = await page.locator('text=No pre-built packages found').isVisible();
+    const hasError = await page.locator('text=not configured').isVisible();
+    expect(hasData || hasEmpty || hasError).toBeTruthy();
+
+    const appErrors = page.errors.filter(e => !/status of (429|404|503)/.test(e.message));
+    expect(appErrors).toHaveLength(0);
+  });
+
   test('should click a different pipeline and update details', async ({ page }) => {
     await page.goto('/#/product-builds/package-analysis?tab=nightly');
     await page.waitForLoadState('networkidle');

@@ -2,53 +2,106 @@
   "schemaVersion": 1,
   "releases": [
     {
-      "id": "rhoai-2.14",
-      "displayName": "RHOAI 2.14",
-      "fixVersions": ["RHOAI-2.14", "rhoai-2.14"],
-      "productPagesShortname": "red_hat_openshift_ai",
-      "productPagesVersion": "2.14",
+      "id": "rhai-3.5-ea1",
+      "displayName": "RHAI 3.5 EA1",
+      "fixVersions": ["RHAI-3.5-EA1", "rhai-3.5-ea1"],
+      "productPagesShortname": "rhai",
+      "productPagesVersion": "3.5",
       "milestones": {
-        "planningFreeze": "2026-04-15",
-        "featureFreeze": "2026-05-15",
-        "codeFreeze": "2026-06-01",
-        "ea1": "2026-06-15",
-        "ga": "2026-07-01"
+        "planningFreeze": "2026-04-17",
+        "featureFreeze": null,
+        "codeFreeze": "2026-05-12",
+        "ga": "2026-06-17"
       },
       "state": "active",
       "source": "product-pages",
-      "createdAt": "2026-05-01T00:00:00Z",
-      "updatedAt": "2026-05-01T00:00:00Z"
+      "createdAt": "2026-03-10T00:00:00Z",
+      "updatedAt": "2026-06-17T00:00:00Z"
     },
     {
-      "id": "rhoai-2.15",
-      "displayName": "RHOAI 2.15",
-      "fixVersions": ["RHOAI-2.15", "rhoai-2.15"],
-      "productPagesShortname": "red_hat_openshift_ai",
-      "productPagesVersion": "2.15",
+      "id": "rhai-3.5-ea2",
+      "displayName": "RHAI 3.5 EA2",
+      "fixVersions": ["RHAI-3.5-EA2", "rhai-3.5-ea2"],
+      "productPagesShortname": "rhai",
+      "productPagesVersion": "3.5",
       "milestones": {
-        "planningFreeze": "2026-06-15",
-        "featureFreeze": "2026-07-15",
-        "codeFreeze": "2026-08-01",
-        "ga": "2026-09-01"
+        "planningFreeze": "2026-05-15",
+        "featureFreeze": null,
+        "codeFreeze": "2026-06-09",
+        "ga": "2026-07-15"
       },
       "state": "active",
       "source": "product-pages",
-      "createdAt": "2026-05-01T00:00:00Z",
-      "updatedAt": "2026-05-01T00:00:00Z"
+      "createdAt": "2026-04-30T00:00:00Z",
+      "updatedAt": "2026-07-15T00:00:00Z"
     },
     {
-      "id": "rhoai-2.13",
-      "displayName": "RHOAI 2.13",
-      "fixVersions": ["RHOAI-2.13"],
-      "productPagesShortname": "red_hat_openshift_ai",
-      "productPagesVersion": "2.13",
+      "id": "rhai-3.5-ga",
+      "displayName": "RHAI 3.5 GA",
+      "fixVersions": ["RHAI-3.5-GA", "rhai-3.5-ga", "RHAI-3.5"],
+      "productPagesShortname": "rhai",
+      "productPagesVersion": "3.5",
       "milestones": {
-        "ga": "2026-04-15"
+        "planningFreeze": "2026-06-24",
+        "featureFreeze": "2026-07-17",
+        "codeFreeze": "2026-07-20",
+        "ga": "2026-08-19"
       },
-      "state": "archived",
-      "source": "manual",
-      "createdAt": "2026-03-01T00:00:00Z",
-      "updatedAt": "2026-04-20T00:00:00Z"
+      "state": "active",
+      "source": "product-pages",
+      "createdAt": "2026-06-04T00:00:00Z",
+      "updatedAt": "2026-07-19T00:00:00Z"
+    },
+    {
+      "id": "rhai-3.6-ea1",
+      "displayName": "RHAI 3.6 EA1",
+      "fixVersions": ["RHAI-3.6-EA1", "rhai-3.6-ea1"],
+      "productPagesShortname": "rhai",
+      "productPagesVersion": "3.6",
+      "milestones": {
+        "planningFreeze": "2026-07-29",
+        "featureFreeze": null,
+        "codeFreeze": "2026-08-20",
+        "ga": "2026-09-17"
+      },
+      "state": "active",
+      "source": "product-pages",
+      "createdAt": "2026-06-11T00:00:00Z",
+      "updatedAt": "2026-07-19T00:00:00Z"
+    },
+    {
+      "id": "rhai-3.6-ea2",
+      "displayName": "RHAI 3.6 EA2",
+      "fixVersions": ["RHAI-3.6-EA2", "rhai-3.6-ea2"],
+      "productPagesShortname": "rhai",
+      "productPagesVersion": "3.6",
+      "milestones": {
+        "planningFreeze": "2026-08-26",
+        "featureFreeze": null,
+        "codeFreeze": "2026-09-15",
+        "ga": "2026-10-15"
+      },
+      "state": "active",
+      "source": "product-pages",
+      "createdAt": "2026-06-11T00:00:00Z",
+      "updatedAt": "2026-07-19T00:00:00Z"
+    },
+    {
+      "id": "rhai-3.6-ga",
+      "displayName": "RHAI 3.6 GA",
+      "fixVersions": ["RHAI-3.6-GA", "rhai-3.6-ga", "RHAI-3.6"],
+      "productPagesShortname": "rhai",
+      "productPagesVersion": "3.6",
+      "milestones": {
+        "planningFreeze": "2026-09-23",
+        "featureFreeze": "2026-10-16",
+        "codeFreeze": "2026-10-19",
+        "ga": "2026-11-19"
+      },
+      "state": "active",
+      "source": "product-pages",
+      "createdAt": "2026-06-11T00:00:00Z",
+      "updatedAt": "2026-07-19T00:00:00Z"
     }
   ]
 }

@@ -47,54 +47,88 @@
     </div>
 
     <template v-else>
-      <!-- Next milestone banner -->
-      <div
-        v-if="globalNextMilestone"
-        class="mb-5 rounded-lg border px-4 py-3 flex items-center justify-between"
-        :class="globalNextMilestone.days <= 7
-          ? 'border-blue-200 dark:border-blue-700/50 bg-blue-50/80 dark:bg-blue-900/20'
-          : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'"
-      >
-        <div class="flex items-center gap-3">
-          <span
-            class="inline-flex h-2.5 w-2.5 rounded-full shrink-0"
-            :class="globalNextMilestone.days <= 7
-              ? 'bg-blue-500 animate-pulse'
-              : 'bg-gray-400 dark:bg-gray-500'"
-          ></span>
-          <span class="text-sm text-gray-900 dark:text-gray-100">
-            <span class="font-medium">{{ globalNextMilestone.releaseName }}</span>
-            <span class="text-gray-500 dark:text-gray-400"> · {{ globalNextMilestone.label }}</span>
-          </span>
-        </div>
-        <span
-          class="text-sm font-semibold tabular-nums"
-          :class="globalNextMilestone.days <= 7
-            ? 'text-blue-600 dark:text-blue-400'
-            : 'text-gray-600 dark:text-gray-300'"
+      <!-- Countdown cards -->
+      <div v-if="upcomingMilestoneCards.length" class="flex gap-4 mb-6 flex-wrap">
+        <div
+          v-for="card in upcomingMilestoneCards"
+          :key="card.releaseName + '-' + card.type"
+          class="flex-1 min-w-[140px] bg-white dark:bg-gray-800 border rounded-lg text-center py-5 px-4 transition-all hover:shadow-md"
+          :class="card.days <= 7
+            ? 'border-blue-300 dark:border-blue-600'
+            : 'border-gray-200 dark:border-gray-700'"
         >
-          {{ globalNextMilestone.days === 0 ? 'Today' : globalNextMilestone.days + 'd' }}
-        </span>
+          <div
+            class="text-[42px] font-bold leading-none tabular-nums"
+            :class="card.days <= 7
+              ? 'text-blue-600 dark:text-blue-400'
+              : 'text-gray-900 dark:text-gray-100'"
+          >
+            {{ card.days === 0 ? 'Today' : card.days }}
+          </div>
+          <div
+            v-if="card.days !== 0"
+            class="text-[11px] font-medium uppercase tracking-wider mt-1"
+            :class="card.days <= 7
+              ? 'text-blue-400 dark:text-blue-500'
+              : 'text-gray-400 dark:text-gray-500'"
+          >days</div>
+          <div class="text-[13px] font-semibold text-gray-700 dark:text-gray-300 mt-2">
+            {{ card.releaseName }}
+          </div>
+          <div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+            {{ card.label }} · {{ formatShort(card.date) }}
+          </div>
+          <div v-if="card.days <= 7" class="flex justify-center mt-2">
+            <span class="inline-flex h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
+          </div>
+        </div>
       </div>
 
-      <!-- Product filter -->
+      <!-- Product filter (multi-product) -->
       <div v-if="products.length > 1" class="flex flex-wrap gap-2 mb-5">
         <button
           @click="selectedProduct = null"
-          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border"
+          class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
           :class="!selectedProduct
-            ? 'bg-primary-600 text-white border-primary-600'
-            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-primary-300 dark:hover:border-primary-600'"
+            ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
+            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
         >All</button>
         <button
           v-for="p in products"
           :key="p"
           @click="selectedProduct = p"
-          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border"
+          class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
           :class="selectedProduct === p
-            ? 'bg-primary-600 text-white border-primary-600'
-            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-primary-300 dark:hover:border-primary-600'"
+            ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
+            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
         >{{ p }}</button>
+      </div>
+
+      <!-- Stream filter + hide released toggle (single-product) -->
+      <div v-if="products.length <= 1" class="flex items-center justify-between mb-5">
+        <div v-if="streams.length > 1" class="flex flex-wrap gap-2">
+          <button
+            @click="selectedStream = null"
+            class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
+            :class="!selectedStream
+              ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
+          >All</button>
+          <button
+            v-for="s in streams"
+            :key="s"
+            @click="selectedStream = s"
+            class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
+            :class="selectedStream === s
+              ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
+          >{{ s }}</button>
+        </div>
+        <div v-else></div>
+        <label class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+          <input type="checkbox" v-model="hideReleased" class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500" />
+          Hide released
+        </label>
       </div>
 
       <!-- Releases table -->
@@ -104,6 +138,7 @@
             <thead>
               <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/50">
                 <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Release</th>
+                <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Phase</th>
                 <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Plan Freeze</th>
                 <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Feature Freeze</th>
                 <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Code Freeze</th>
@@ -111,28 +146,37 @@
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="r in allSortedReleases"
-                :key="r.id"
-                class="border-b border-gray-100 dark:border-gray-800 last:border-0 transition-colors"
-                :class="isReleased(r) ? 'opacity-50' : nextMilestoneUrgencyRow(r)"
-              >
-                <td class="px-4 py-3">
-                  <span class="font-semibold text-gray-900 dark:text-gray-100">{{ r.displayName || r.id }}</span>
-                </td>
-                <td class="px-4 py-3">
-                  <MilestoneCell :date="r.milestones?.planningFreeze" :muted="isReleased(r)" />
-                </td>
-                <td class="px-4 py-3">
-                  <MilestoneCell :date="r.milestones?.featureFreeze" :muted="isReleased(r)" />
-                </td>
-                <td class="px-4 py-3">
-                  <MilestoneCell :date="r.milestones?.codeFreeze" :muted="isReleased(r)" />
-                </td>
-                <td class="px-4 py-3">
-                  <MilestoneCell :date="r.milestones?.ga" :muted="isReleased(r)" />
-                </td>
-              </tr>
+              <template v-for="row in groupedRows" :key="row.key">
+                <tr v-if="row.type === 'header'" class="bg-gray-50/60 dark:bg-gray-800/30">
+                  <td colspan="6" class="px-4 py-1.5 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                    RHAI {{ row.stream }}
+                  </td>
+                </tr>
+                <tr
+                  v-else
+                  class="border-b border-gray-100 dark:border-gray-800 last:border-0 transition-colors"
+                  :class="isReleased(row.release) ? 'opacity-50' : nextMilestoneUrgencyRow(row.release)"
+                >
+                  <td class="px-4 py-3">
+                    <span class="font-semibold text-gray-900 dark:text-gray-100">{{ row.release.displayName || row.release.id }}</span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <ReleaseStepper :release="row.release" :muted="isReleased(row.release)" />
+                  </td>
+                  <td class="px-4 py-3">
+                    <MilestoneCell :date="row.release.milestones?.planningFreeze" :prev-date="null" :muted="isReleased(row.release)" />
+                  </td>
+                  <td class="px-4 py-3">
+                    <MilestoneCell :date="row.release.milestones?.featureFreeze" :prev-date="row.release.milestones?.planningFreeze" :muted="isReleased(row.release)" />
+                  </td>
+                  <td class="px-4 py-3">
+                    <MilestoneCell :date="row.release.milestones?.codeFreeze" :prev-date="row.release.milestones?.featureFreeze || row.release.milestones?.planningFreeze" :muted="isReleased(row.release)" />
+                  </td>
+                  <td class="px-4 py-3">
+                    <MilestoneCell :date="row.release.milestones?.ga" :prev-date="row.release.milestones?.codeFreeze" :muted="isReleased(row.release)" />
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
@@ -144,6 +188,14 @@
 <script setup>
 import { ref, computed, onMounted, h } from 'vue'
 import { apiRequest } from '@shared/client/services/api.js'
+import {
+  parseDate, daysFromNow, formatShort as formatShortBase,
+  getProduct, releasePhase, milestoneProgress
+} from '../composables/useScheduleHelpers.js'
+
+function formatShort(dateStr) {
+  return formatShortBase(dateStr, { year: true })
+}
 
 // ── Data ──
 
@@ -151,6 +203,8 @@ const releases = ref([])
 const loading = ref(true)
 const error = ref(null)
 const selectedProduct = ref(null)
+const selectedStream = ref(null)
+const hideReleased = ref(false)
 
 async function fetchRegistry() {
   loading.value = true
@@ -169,38 +223,6 @@ async function fetchRegistry() {
 onMounted(fetchRegistry)
 
 // ── Helpers ──
-
-function parseDate(val) {
-  if (!val) return null
-  const d = new Date(val)
-  return isNaN(d.getTime()) ? null : d
-}
-
-function todayMidnight() {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function daysFromNow(dateStr) {
-  const d = parseDate(dateStr)
-  if (!d) return null
-  const today = todayMidnight()
-  d.setHours(0, 0, 0, 0)
-  return Math.ceil((d.getTime() - today.getTime()) / 86400000)
-}
-
-function formatShort(dateStr) {
-  const d = parseDate(dateStr)
-  if (!d) return '—'
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function getProduct(release) {
-  if (release.productPagesShortname) return release.productPagesShortname
-  const match = release.id.match(/^([a-z]+)-/)
-  return match ? match[1] : release.id
-}
 
 function getGaDate(release) {
   return release.milestones?.ga || null
@@ -233,9 +255,27 @@ const products = computed(() => {
   return Object.keys(set).sort()
 })
 
+const streams = computed(() => {
+  const set = {}
+  for (let i = 0; i < releases.value.length; i++) {
+    const v = releases.value[i].productPagesVersion
+    if (v) set[v] = true
+  }
+  return Object.keys(set).sort()
+})
+
 const filteredReleases = computed(() => {
-  if (!selectedProduct.value) return releases.value
-  return releases.value.filter(r => getProduct(r) === selectedProduct.value)
+  let list = releases.value
+  if (selectedProduct.value) {
+    list = list.filter(r => getProduct(r) === selectedProduct.value)
+  }
+  if (selectedStream.value) {
+    list = list.filter(r => r.productPagesVersion === selectedStream.value)
+  }
+  if (hideReleased.value) {
+    list = list.filter(r => !isReleased(r))
+  }
+  return list
 })
 
 const allSortedReleases = computed(() => {
@@ -249,16 +289,49 @@ const allSortedReleases = computed(() => {
   })
 })
 
-const globalNextMilestone = computed(() => {
-  let best = null
+const groupedRows = computed(() => {
+  const rows = []
+  let lastStream = null
   for (let i = 0; i < allSortedReleases.value.length; i++) {
     const r = allSortedReleases.value[i]
-    const nm = nextMilestone(r)
-    if (nm && (best === null || nm.days < best.days)) {
-      best = { releaseName: r.displayName || r.id, label: nm.label, type: nm.type, days: nm.days }
+    const stream = r.productPagesVersion || ''
+    if (stream !== lastStream && !selectedStream.value) {
+      rows.push({ type: 'header', stream, key: 'h-' + stream })
+      lastStream = stream
+    }
+    rows.push({ type: 'release', release: r, key: r.id })
+  }
+  return rows
+})
+
+const MILESTONE_TYPES = [
+  { key: 'planningFreeze', label: 'Plan Freeze' },
+  { key: 'featureFreeze', label: 'Feature Freeze' },
+  { key: 'codeFreeze', label: 'Code Freeze' },
+  { key: 'ga', label: 'Release Date' }
+]
+
+const upcomingMilestoneCards = computed(() => {
+  const candidates = []
+  for (let i = 0; i < allSortedReleases.value.length; i++) {
+    const r = allSortedReleases.value[i]
+    const ms = r.milestones || {}
+    for (let j = 0; j < MILESTONE_TYPES.length; j++) {
+      const mt = MILESTONE_TYPES[j]
+      const days = daysFromNow(ms[mt.key])
+      if (days !== null && days >= 0) {
+        candidates.push({
+          releaseName: r.displayName || r.id,
+          label: mt.label,
+          type: mt.key,
+          date: ms[mt.key],
+          days
+        })
+      }
     }
   }
-  return best
+  candidates.sort((a, b) => a.days - b.days)
+  return candidates.slice(0, 4)
 })
 
 function isReleased(release) {
@@ -277,9 +350,49 @@ function nextMilestoneUrgencyRow(release) {
 
 // ── Inline sub-components ──
 
+const ReleaseStepper = {
+  props: {
+    release: { type: Object, required: true },
+    muted: { type: Boolean, default: false }
+  },
+  setup(props) {
+    return () => {
+      const { phaseIndex, phases } = releasePhase(props.release)
+      const nodes = []
+
+      for (let i = 0; i < phases.length; i++) {
+        if (i > 0) {
+          const lineClass = props.muted
+            ? 'bg-gray-200 dark:bg-gray-700'
+            : i <= phaseIndex
+              ? 'bg-green-400 dark:bg-green-500'
+              : 'bg-gray-200 dark:bg-gray-700'
+          nodes.push(h('div', { class: 'flex-1 h-0.5 ' + lineClass }))
+        }
+
+        let dotClass = 'w-2.5 h-2.5 rounded-full shrink-0 '
+        if (props.muted) {
+          dotClass += 'bg-gray-300 dark:bg-gray-600'
+        } else if (i < phaseIndex) {
+          dotClass += 'bg-green-500 dark:bg-green-400'
+        } else if (i === phaseIndex) {
+          dotClass += 'bg-blue-500 dark:bg-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+        } else {
+          dotClass += 'bg-gray-200 dark:bg-gray-600 border border-gray-300 dark:border-gray-500'
+        }
+
+        nodes.push(h('div', { class: dotClass, title: phases[i].label }))
+      }
+
+      return h('div', { class: 'flex items-center gap-0 min-w-[120px]' }, nodes)
+    }
+  }
+}
+
 const MilestoneCell = {
   props: {
     date: { type: String, default: null },
+    prevDate: { type: String, default: null },
     muted: { type: Boolean, default: false }
   },
   setup(props) {
@@ -290,9 +403,16 @@ const MilestoneCell = {
       const days = daysFromNow(props.date)
       const dateLabel = formatShort(props.date)
 
-      const dateClass = props.muted
-        ? 'text-gray-500 dark:text-gray-400'
-        : 'text-gray-900 dark:text-gray-100'
+      let dateClass
+      if (props.muted) {
+        dateClass = 'text-gray-400 dark:text-gray-500'
+      } else if (days !== null && days < 0) {
+        dateClass = 'text-gray-500 dark:text-gray-400'
+      } else if (days !== null && days <= 7) {
+        dateClass = 'text-blue-700 dark:text-blue-300 font-semibold'
+      } else {
+        dateClass = 'text-gray-900 dark:text-gray-100'
+      }
 
       let countdownEl = null
       if (days !== null) {
@@ -317,9 +437,29 @@ const MilestoneCell = {
         countdownEl = h('span', { class: countdownClass }, countdownText)
       }
 
+      let progressEl = null
+      if (!props.muted && days !== null && days > 0 && props.prevDate) {
+        const pct = milestoneProgress(props.date, props.prevDate)
+        if (pct !== null) {
+          progressEl = h('div', {
+            class: 'h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mt-1'
+          }, [
+            h('div', {
+              class: 'h-full rounded-full transition-all ' + (
+                days <= 7
+                  ? 'bg-blue-400 dark:bg-blue-500'
+                  : 'bg-gray-400 dark:bg-gray-500'
+              ),
+              style: { width: pct + '%' }
+            })
+          ])
+        }
+      }
+
       return h('div', { class: 'flex flex-col' }, [
         h('span', { class: 'text-sm tabular-nums ' + dateClass }, dateLabel),
-        countdownEl
+        countdownEl,
+        progressEl
       ])
     }
   }
