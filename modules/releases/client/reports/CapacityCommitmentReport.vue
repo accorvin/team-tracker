@@ -2779,17 +2779,27 @@ function makeDoughnutOptions(card, field) {
 
 // ── Helpers ──
 
-function formatDate(dateStr) {
-  if (!dateStr) return '—'
+function toLocalDate(dateStr) {
+  if (!dateStr) return null
+  // Date-only strings (YYYY-MM-DD) are parsed as UTC by JS Date constructor,
+  // which shifts dates back one day in western timezones. Construct as local.
+  if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
   const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return '—'
+  return isNaN(d.getTime()) ? null : d
+}
+
+function formatDate(dateStr) {
+  const d = toLocalDate(dateStr)
+  if (!d) return '—'
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function daysFromNow(dateStr) {
-  if (!dateStr) return null
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return null
+  const d = toLocalDate(dateStr)
+  if (!d) return null
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   d.setHours(0, 0, 0, 0)
