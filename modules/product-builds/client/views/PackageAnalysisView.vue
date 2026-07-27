@@ -7,6 +7,7 @@ const PackageSearchView = defineAsyncComponent(() => import('./PackageSearchView
 const NightlyAnalysisView = defineAsyncComponent(() => import('./NightlyAnalysisView.vue'))
 const VersionMapView = defineAsyncComponent(() => import('./VersionMapView.vue'))
 const PackageTrackerView = defineAsyncComponent(() => import('./PackageTrackerView.vue'))
+const PreBuiltPackagesView = defineAsyncComponent(() => import('./PreBuiltPackagesView.vue'))
 
 const { isAdmin } = useAuth()
 
@@ -64,7 +65,7 @@ function getInitialTab() {
   if (qIdx !== -1) {
     const params = new URLSearchParams(hash.slice(qIdx + 1))
     const tab = params.get('tab')
-    if (tab === 'search' || tab === 'nightly' || tab === 'versions' || tab === 'tracker') return tab
+    if (tab === 'search' || tab === 'nightly' || tab === 'versions' || tab === 'tracker' || tab === 'pre-built') return tab
   }
   return 'onboarded'
 }
@@ -395,6 +396,15 @@ onMounted(() => {
           >
             Tracker
           </button>
+          <button
+            @click="activeTab = 'pre-built'"
+            class="py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2"
+            :class="activeTab === 'pre-built'
+              ? 'border-gray-900 dark:border-gray-100 text-gray-900 dark:text-gray-100'
+              : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+          >
+            Pre-Built Packages
+          </button>
         </nav>
       </div>
 
@@ -525,6 +535,11 @@ onMounted(() => {
       <!-- ==================== PACKAGE TRACKER TAB ==================== -->
       <div v-if="activeTab === 'tracker'">
         <PackageTrackerView />
+      </div>
+
+      <!-- ==================== PRE-BUILT PACKAGES TAB ==================== -->
+      <div v-if="activeTab === 'pre-built'">
+        <PreBuiltPackagesView />
       </div>
 
       <!-- ==================== DAILY REPORT TAB ==================== -->
