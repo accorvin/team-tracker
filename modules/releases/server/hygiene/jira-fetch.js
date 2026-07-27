@@ -84,6 +84,7 @@ function serializeField(field) {
   }
   if (field.name) return field.name
   if (field.value) return field.value
+  if (field.title) return field.title
   return String(field)
 }
 

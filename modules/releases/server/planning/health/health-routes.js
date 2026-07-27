@@ -11,8 +11,9 @@
 
 const { getConfig } = require('../config')
 const { CACHE_MAX_AGE_MS, VALID_PHASES } = require('../constants')
-const { runHealthPipeline, loadMilestones, backfillFreezeDatesFromSmartsheet, deriveFreezeDates, derivePlanningStatus } = require('./health-pipeline')
+const { runHealthPipeline, loadMilestones, derivePlanningStatus } = require('./health-pipeline')
 const { logAudit } = require('../audit-log')
+const { getRegistryReleasesFlat } = require('../../registry')
 var { blockDuringImpersonation } = require('../../../../../shared/server/auth')
 var sharedJira = require('../../../../../shared/server/jira')
 var { computeFPDoRReadiness, extractRubricData } = require('../fpdor')
@@ -75,7 +76,6 @@ async function healthRoutes(router, context) {
   var refreshStates = context.refreshStates
   var MAX_CONCURRENT_REFRESHES = context.MAX_CONCURRENT_REFRESHES
   var sendJsonWithETag = context.sendJsonWithETag
-  var smartsheetClient = context.smartsheet || require('../../../../../shared/server/smartsheet')
   var jiraClient = context.jira || null
   var jiraRequest = jiraClient ? jiraClient.jiraRequest : sharedJira.jiraRequest
   var fetchAllJqlResults = jiraClient ? jiraClient.fetchAllJqlResults : sharedJira.fetchAllJqlResults
@@ -1081,35 +1081,17 @@ async function healthRoutes(router, context) {
     }
 
     try {
-      var ppCache = await readFromStorage('releases/delivery/product-pages-releases-cache.json')
-      var ppEntries = []
-      if (ppCache && ppCache.releases) {
-        ppEntries = ppCache.releases.filter(function(r) {
-          return (r.releaseNumber || '').indexOf(version) !== -1
-        })
-      }
+      var registryReleases = await getRegistryReleasesFlat(readFromStorage)
+      var matchingEntries = registryReleases.filter(function(r) {
+        return (r.releaseNumber || '').indexOf(version) !== -1
+      })
 
-      var ssData = null
-      if (smartsheetClient.isConfigured()) {
-        try {
-          var releases = await smartsheetClient.discoverReleasesPartial()
-          ssData = releases.filter(function(r) { return r.version === version })
-        } catch (err) {
-          ssData = { error: err.message }
-        }
-      }
-
-      var derived = loadMilestones(readFromStorage, version)
-      var backfilled = await backfillFreezeDatesFromSmartsheet(derived, version)
-      var final = deriveFreezeDates(backfilled.milestones)
+      var milestones = await loadMilestones(readFromStorage, version)
 
       res.json({
         version: version,
-        productPages: ppEntries,
-        smartsheet: ssData,
-        afterLoadMilestones: derived,
-        afterBackfill: { milestones: backfilled.milestones, warnings: backfilled.warnings },
-        afterDerive: { milestones: final.milestones, warnings: final.warnings }
+        registry: matchingEntries,
+        milestones: milestones
       })
     } catch (err) {
       console.error('[health] Milestones debug failed:', err)

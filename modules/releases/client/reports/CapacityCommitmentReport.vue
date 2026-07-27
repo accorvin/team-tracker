@@ -79,7 +79,7 @@
             <template v-else>
               Showing features filtered by
               <template v-for="(part, idx) in filterNarrativeParts" :key="part.field">
-                <template v-if="idx > 0 && idx === filterNarrativeParts.length - 1"> and </template>
+                <template v-if="idx > 0 && idx === filterNarrativeParts.length - 1"> {{ crossFieldMode }} </template>
                 <template v-else-if="idx > 0">, </template>
                 <span class="font-semibold text-gray-900 dark:text-gray-100">{{ part.label }}: {{ part.values }}</span>
               </template>.
@@ -810,24 +810,37 @@
           <!-- Tab: Filter Fields -->
           <div v-if="filterModalTab === 'fields'" class="flex flex-1 min-h-0" style="min-height: 320px">
             <!-- Field list (left) -->
-            <div class="w-44 shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto bg-gray-50/50 dark:bg-gray-900/20">
-              <button
-                v-for="f in FILTER_FIELDS"
-                :key="f.key"
-                @click="selectFilterField(f.key)"
-                class="w-full px-4 py-2.5 text-sm text-left transition-colors"
-                :class="filterModalField === f.key
-                  ? 'bg-white dark:bg-gray-800 text-primary-700 dark:text-primary-300 font-medium border-r-2 border-primary-600 dark:border-primary-400'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'"
-              >
-                <div class="flex items-center justify-between gap-2">
-                  <span class="truncate">{{ f.label }}</span>
-                  <span
-                    v-if="activeFilters[f.key]?.length"
-                    class="text-[10px] font-semibold text-primary-600 dark:text-primary-400 bg-primary-100 dark:bg-primary-900/40 px-1.5 py-0.5 rounded-full shrink-0"
-                  >{{ activeFilters[f.key].length }}</span>
-                </div>
-              </button>
+            <div class="w-44 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50/50 dark:bg-gray-900/20">
+              <div class="flex-1 overflow-y-auto">
+                <button
+                  v-for="f in FILTER_FIELDS"
+                  :key="f.key"
+                  @click="selectFilterField(f.key)"
+                  class="w-full px-4 py-2.5 text-sm text-left transition-colors"
+                  :class="filterModalField === f.key
+                    ? 'bg-white dark:bg-gray-800 text-primary-700 dark:text-primary-300 font-medium border-r-2 border-primary-600 dark:border-primary-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'"
+                >
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="truncate">{{ f.label }}</span>
+                    <span
+                      v-if="activeFilters[f.key]?.length"
+                      class="text-[10px] font-semibold text-primary-600 dark:text-primary-400 bg-primary-100 dark:bg-primary-900/40 px-1.5 py-0.5 rounded-full shrink-0"
+                    >{{ activeFilters[f.key].length }}</span>
+                  </div>
+                </button>
+              </div>
+              <!-- Cross-field mode -->
+              <div v-if="activeFieldCount > 1" class="border-t border-gray-200 dark:border-gray-700 px-3 py-2.5">
+                <div class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Across fields</div>
+                <button
+                  @click="crossFieldMode = crossFieldMode === 'and' ? 'or' : 'and'; persistActiveFilters()"
+                  class="w-full px-2 py-1 rounded text-[11px] font-medium text-center transition-colors"
+                  :class="crossFieldMode === 'and'
+                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'"
+                >{{ crossFieldMode === 'and' ? 'ALL fields (AND)' : 'ANY field (OR)' }}</button>
+              </div>
             </div>
 
             <!-- Value list (right) -->
@@ -836,36 +849,68 @@
                 Select a field to filter by
               </div>
               <template v-else>
-                <!-- Search -->
-                <div class="px-4 pt-3 pb-2 shrink-0">
+                <!-- Search + match mode -->
+                <div class="px-4 pt-3 pb-2 shrink-0 space-y-2">
                   <input
                     v-model="filterModalSearch"
                     type="text"
                     :placeholder="'Search ' + filterFieldLabel(filterModalField).toLowerCase() + 's...'"
                     class="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                   />
+                  <div v-if="activeFilters[filterModalField]?.length > 1" class="flex items-center gap-2">
+                    <span class="text-[11px] text-gray-500 dark:text-gray-400">Match:</span>
+                    <button
+                      @click="toggleFilterMode(filterModalField)"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
+                      :class="(filterModes[filterModalField] || 'or') === 'and'
+                        ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'"
+                    >
+                      {{ (filterModes[filterModalField] || 'or') === 'and' ? 'ALL (AND)' : 'ANY (OR)' }}
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Values -->
                 <div class="flex-1 overflow-y-auto px-4 pb-3">
-                  <div v-if="filterModalValues.length === 0" class="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
+                  <div v-if="filterModalValues.selected.length === 0 && filterModalValues.unselected.length === 0" class="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
                     {{ filterModalSearch ? 'No matching values' : 'No values available' }}
                   </div>
-                  <div v-else class="space-y-0.5">
-                    <label
-                      v-for="val in filterModalValues"
-                      :key="val"
-                      class="flex items-center gap-2.5 px-3 py-1.5 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        :checked="isFilterValueActive(filterModalField, val)"
-                        @change="toggleFilterValue(filterModalField, val)"
-                        class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-                      />
-                      <span class="text-gray-700 dark:text-gray-300 truncate">{{ val }}</span>
-                    </label>
-                  </div>
+                  <template v-else>
+                    <!-- Selected values -->
+                    <div v-if="filterModalValues.selected.length > 0" class="space-y-0.5">
+                      <label
+                        v-for="val in filterModalValues.selected"
+                        :key="val"
+                        class="flex items-center gap-2.5 px-3 py-1.5 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked
+                          @change="toggleFilterValue(filterModalField, val)"
+                          class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span class="text-gray-700 dark:text-gray-300 truncate">{{ val }}</span>
+                      </label>
+                    </div>
+                    <!-- Separator -->
+                    <div v-if="filterModalValues.selected.length > 0 && filterModalValues.unselected.length > 0" class="my-2 border-t border-gray-200 dark:border-gray-700"></div>
+                    <!-- Unselected values -->
+                    <div v-if="filterModalValues.unselected.length > 0" class="space-y-0.5">
+                      <label
+                        v-for="val in filterModalValues.unselected"
+                        :key="val"
+                        class="flex items-center gap-2.5 px-3 py-1.5 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          @change="toggleFilterValue(filterModalField, val)"
+                          class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span class="text-gray-700 dark:text-gray-300 truncate">{{ val }}</span>
+                      </label>
+                    </div>
+                  </template>
                 </div>
               </template>
             </div>
@@ -1188,6 +1233,8 @@ const draft = reactive({ version: '', families: new Set(), phases: new Set() })
 
 // ── Filter state ──
 const activeFilters = reactive({})
+const filterModes = reactive({}) // per-field: 'or' (default) or 'and'
+const crossFieldMode = ref('and') // across fields: 'and' (default) or 'or'
 const filterModalOpen = ref(false)
 const filterModalField = ref(null)
 const filterModalSearch = ref('')
@@ -1544,6 +1591,8 @@ const STATUS_COLORS = {
 
 const allFeatures = ref([])
 const featuresLoading = ref(false)
+const knownComponents = ref([])
+const knownTeams = ref([])
 
 async function fetchFeatures() {
   featuresLoading.value = true
@@ -1558,26 +1607,56 @@ async function fetchFeatures() {
   }
 }
 
+async function fetchFieldOptions() {
+  try {
+    const [components, teams] = await Promise.all([
+      apiRequest('/modules/team-tracker/field-options/component'), // eslint-disable-line org-pulse/no-cross-module-imports
+      apiRequest('/modules/team-tracker/field-options/jira_team') // eslint-disable-line org-pulse/no-cross-module-imports
+    ])
+    knownComponents.value = components.values || []
+    knownTeams.value = teams.values || []
+  } catch (e) {
+    error.value = e.message || 'Failed to load field options'
+  }
+}
+
 onMounted(fetchFeatures)
+onMounted(fetchFieldOptions)
 
 // ── Feature filtering ──
 
-const filteredAllFeatures = computed(() => {
-  let features = allFeatures.value
-  for (const [field, values] of Object.entries(activeFilters)) {
-    if (!values || values.length === 0) continue
-    const valSet = new Set(values)
-    features = features.filter(f => {
-      const val = f[field]
-      if (Array.isArray(val)) return val.some(v => valSet.has(v))
-      return valSet.has(val || '')
-    })
+function matchesFieldFilter(feature, field, values) {
+  const valSet = new Set(values)
+  const mode = filterModes[field] || 'or'
+  const val = feature[field]
+  if (mode === 'and') {
+    if (Array.isArray(val)) return [...valSet].every(v => val.includes(v))
+    return valSet.size === 1 && valSet.has(val || '')
   }
-  return features
+  if (Array.isArray(val)) return val.some(v => valSet.has(v))
+  return valSet.has(val || '')
+}
+
+const filteredAllFeatures = computed(() => {
+  const activeEntries = Object.entries(activeFilters).filter(([, v]) => v && v.length > 0)
+  if (activeEntries.length === 0) return allFeatures.value
+
+  if (crossFieldMode.value === 'or') {
+    return allFeatures.value.filter(f =>
+      activeEntries.some(([field, values]) => matchesFieldFilter(f, field, values))
+    )
+  }
+  return allFeatures.value.filter(f =>
+    activeEntries.every(([field, values]) => matchesFieldFilter(f, field, values))
+  )
 })
 
 const hasActiveFilters = computed(() => {
   return Object.values(activeFilters).some(v => v && v.length > 0)
+})
+
+const activeFieldCount = computed(() => {
+  return Object.values(activeFilters).filter(v => v && v.length > 0).length
 })
 
 const activeFilterDisplay = computed(() => {
@@ -1607,6 +1686,11 @@ const availableFilterValues = computed(() => {
   const sortedPhases = [...selection.phases].sort((a, b) => PHASE_ORDER.indexOf(a) - PHASE_ORDER.indexOf(b))
   for (const field of FILTER_FIELDS) {
     const values = new Set()
+    if (field.key === 'components') {
+      knownComponents.value.forEach(v => values.add(v))
+    } else if (field.key === 'team') {
+      knownTeams.value.forEach(v => values.add(v))
+    }
     for (const phase of sortedPhases) {
       const features = matchAllFeaturesForPhase(phase)
       for (const f of features) {
@@ -1624,11 +1708,15 @@ const availableFilterValues = computed(() => {
 })
 
 const filterModalValues = computed(() => {
-  if (!filterModalField.value) return []
+  if (!filterModalField.value) return { selected: [], unselected: [] }
   const all = availableFilterValues.value[filterModalField.value] || []
   const q = filterModalSearch.value.toLowerCase().trim()
-  if (!q) return all
-  return all.filter(v => v.toLowerCase().includes(q))
+  const filtered = q ? all.filter(v => v.toLowerCase().includes(q)) : all
+  const active = activeFilters[filterModalField.value] || []
+  const activeSet = new Set(active)
+  const selected = filtered.filter(v => activeSet.has(v))
+  const unselected = filtered.filter(v => !activeSet.has(v))
+  return { selected, unselected }
 })
 
 function filterFieldLabel(key) {
@@ -1639,10 +1727,6 @@ function filterFieldLabel(key) {
 function formatFilterValues(values) {
   if (values.length <= 2) return values.join(', ')
   return values.slice(0, 2).join(', ') + ' +' + (values.length - 2)
-}
-
-function isFilterValueActive(field, value) {
-  return activeFilters[field]?.includes(value) || false
 }
 
 function toggleFilterValue(field, value) {
@@ -1658,10 +1742,15 @@ function toggleFilterValue(field, value) {
   persistActiveFilters()
 }
 
+function toggleFilterMode(field) {
+  filterModes[field] = (filterModes[field] || 'or') === 'or' ? 'and' : 'or'
+  persistActiveFilters()
+}
+
 function clearAllFilters() {
-  for (const key of Object.keys(activeFilters)) {
-    delete activeFilters[key]
-  }
+  for (const key of Object.keys(activeFilters)) delete activeFilters[key]
+  for (const key of Object.keys(filterModes)) delete filterModes[key]
+  crossFieldMode.value = 'and'
   appliedPresetId.value = null
   editingFilterId.value = null
   persistActiveFilters()
@@ -1695,8 +1784,13 @@ function persistActiveFilters() {
   for (const [k, v] of Object.entries(activeFilters)) {
     if (v && v.length > 0) data[k] = v
   }
-  if (Object.keys(data).length > 0) {
-    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(data))
+  const modes = {}
+  for (const [k, v] of Object.entries(filterModes)) {
+    if (v === 'and') modes[k] = v
+  }
+  const cross = crossFieldMode.value !== 'and' ? crossFieldMode.value : undefined
+  if (Object.keys(data).length > 0 || Object.keys(modes).length > 0) {
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({ filters: data, modes, crossFieldMode: cross }))
   } else {
     localStorage.removeItem(FILTERS_STORAGE_KEY)
   }
@@ -1707,9 +1801,16 @@ function loadActiveFilters() {
     const stored = localStorage.getItem(FILTERS_STORAGE_KEY)
     if (!stored) return
     const parsed = JSON.parse(stored)
-    for (const [k, v] of Object.entries(parsed)) {
+    // Support both old format (flat object) and new format ({ filters, modes })
+    const filters = parsed.filters || (Array.isArray(parsed) ? {} : (!parsed.modes ? parsed : {}))
+    const modes = parsed.modes || {}
+    for (const [k, v] of Object.entries(filters)) {
       if (Array.isArray(v) && v.length > 0) activeFilters[k] = v
     }
+    for (const [k, v] of Object.entries(modes)) {
+      if (v === 'and') filterModes[k] = v
+    }
+    if (parsed.crossFieldMode) crossFieldMode.value = parsed.crossFieldMode
   } catch { /* ignore */ }
 }
 
@@ -1732,6 +1833,10 @@ function saveCurrentFilters() {
   for (const [k, v] of Object.entries(activeFilters)) {
     if (v && v.length > 0) filterData[k] = [...v]
   }
+  const modesData = {}
+  for (const [k, v] of Object.entries(filterModes)) {
+    if (v === 'and') modesData[k] = v
+  }
 
   if (editingFilterId.value) {
     const idx = savedFilters.value.findIndex(f => f.id === editingFilterId.value)
@@ -1740,7 +1845,9 @@ function saveCurrentFilters() {
         ...savedFilters.value[idx],
         name,
         description: savedFilterDescription.value.trim(),
-        filters: filterData
+        filters: filterData,
+        modes: modesData,
+        crossFieldMode: crossFieldMode.value
       }
     }
     editingFilterId.value = null
@@ -1749,7 +1856,9 @@ function saveCurrentFilters() {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       name,
       description: savedFilterDescription.value.trim(),
-      filters: filterData
+      filters: filterData,
+      modes: modesData,
+      crossFieldMode: crossFieldMode.value
     })
   }
 
@@ -1766,13 +1875,20 @@ function cancelSaveForm() {
   savedFilterDescription.value = ''
 }
 
-function applySavedFilter(preset) {
-  for (const key of Object.keys(activeFilters)) {
-    delete activeFilters[key]
-  }
+function restorePresetState(preset) {
+  for (const key of Object.keys(activeFilters)) delete activeFilters[key]
+  for (const key of Object.keys(filterModes)) delete filterModes[key]
   for (const [k, v] of Object.entries(preset.filters)) {
     if (Array.isArray(v) && v.length > 0) activeFilters[k] = [...v]
   }
+  if (preset.modes) {
+    for (const [k, v] of Object.entries(preset.modes)) filterModes[k] = v
+  }
+  crossFieldMode.value = preset.crossFieldMode || 'and'
+}
+
+function applySavedFilter(preset) {
+  restorePresetState(preset)
   appliedPresetId.value = preset.id
   persistActiveFilters()
   editingFilterId.value = null
@@ -1780,12 +1896,7 @@ function applySavedFilter(preset) {
 }
 
 function editSavedFilter(preset) {
-  for (const key of Object.keys(activeFilters)) {
-    delete activeFilters[key]
-  }
-  for (const [k, v] of Object.entries(preset.filters)) {
-    if (Array.isArray(v) && v.length > 0) activeFilters[k] = [...v]
-  }
+  restorePresetState(preset)
   persistActiveFilters()
   editingFilterId.value = preset.id
   savedFilterName.value = preset.name

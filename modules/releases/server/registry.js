@@ -10,6 +10,7 @@
 const { logAudit } = require('./planning/audit-log');
 const { loadRegistryConfig, saveRegistryConfig } = require('./registry-config');
 const { stripZStream, normalizeVersionName } = require('./version-utils');
+const smartsheetClient = require('../../../shared/server/smartsheet');
 
 const REGISTRY_FILE = 'releases/registry.json';
 const SCHEMA_VERSION = 1;
@@ -57,6 +58,33 @@ function validateRelease(release) {
     return `state must be one of: ${VALID_STATES.join(', ')}`;
   }
   return null;
+}
+
+/**
+ * Read releases from the registry in the flat shape that delivery/health/tracking
+ * consumers expect (flat shape with productName, releaseNumber, dueDate, etc.).
+ *
+ * @param {Function} readFromStorage
+ * @param {object} [opts]
+ * @param {string} [opts.state] - Filter by state (e.g. 'active'). Omit for all.
+ * @returns {Promise<Array<{productName, releaseNumber, dueDate, codeFreezeDate, featureFreezeDate, planningFreezeDate}>>}
+ */
+async function getRegistryReleasesFlat(readFromStorage, opts) {
+  const registry = await readRegistry(readFromStorage);
+  const releases = [];
+  for (const r of registry.releases) {
+    if (opts && opts.state && r.state !== opts.state) continue;
+    const m = r.milestones || {};
+    releases.push({
+      productName: r.productPagesShortname || '',
+      releaseNumber: r.productPagesVersion || r.displayName || r.id,
+      dueDate: m.ga || m.gaDate || null,
+      codeFreezeDate: m.codeFreeze || m.codeFreezeDate || null,
+      featureFreezeDate: m.featureFreeze || null,
+      planningFreezeDate: m.planningFreeze || null
+    });
+  }
+  return releases;
 }
 
 /**
@@ -445,18 +473,121 @@ async function runRegistrySync(storage, options) {
     }
   }
 
-  if (created > 0 || updated > 0 || archived > 0) {
+  // Backfill missing freeze dates from Smartsheet + derive from target dates
+  const dateBackfill = await backfillRegistryDates(registry);
+  if (dateBackfill.backfilled > 0 || dateBackfill.derived > 0) {
+    console.log(`[releases/registry] Date backfill: ${dateBackfill.backfilled} from Smartsheet, ${dateBackfill.derived} derived from target dates`);
+  }
+
+  const totalChanges = created + updated + archived + dateBackfill.backfilled + dateBackfill.derived;
+  if (totalChanges > 0) {
     await writeRegistry(writeToStorage, registry);
     await logAudit(readFromStorage, writeToStorage, {
       domain: 'registry',
       action: 'registry_discover',
       user: options.user || 'system',
-      summary: `Synced with Product Pages: ${created} created, ${updated} updated, ${archived} archived`,
-      details: { discovered: discovered.length, created, updated, archived, shortnames }
+      summary: `Synced with Product Pages: ${created} created, ${updated} updated, ${archived} archived` +
+        (dateBackfill.backfilled + dateBackfill.derived > 0
+          ? `, ${dateBackfill.backfilled} freeze dates from Smartsheet, ${dateBackfill.derived} derived`
+          : ''),
+      details: { discovered: discovered.length, created, updated, archived, shortnames, dateBackfill }
     });
   }
 
-  return { status: 'ok', discovered: discovered.length, created, updated, archived, releases: discovered };
+  return { status: 'ok', discovered: discovered.length, created, updated, archived, dateBackfill, releases: discovered };
+}
+
+const FREEZE_OFFSET_DAYS = 30;
+
+/**
+ * Offset a date string by a given number of days.
+ */
+function offsetDate(dateStr, days) {
+  var d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+/**
+ * Backfill missing codeFreeze dates on active registry releases.
+ *
+ * Two-pass approach:
+ *   1. Smartsheet — match registry entries to Smartsheet version+phase freeze dates
+ *   2. Derive — if codeFreeze is still missing but ga (target) date exists,
+ *      derive codeFreeze as ga minus FREEZE_OFFSET_DAYS
+ *
+ * Mutates the registry in place. Returns { backfilled, derived } counts.
+ */
+async function backfillRegistryDates(registry) {
+  var backfilled = 0;
+  var derived = 0;
+
+  var activeReleases = registry.releases.filter(function(r) { return r.state === 'active'; });
+  if (activeReleases.length === 0) return { backfilled, derived };
+
+  // Pass 1: Smartsheet backfill
+  if (smartsheetClient.isConfigured()) {
+    try {
+      var ssReleases = await smartsheetClient.discoverReleasesPartial();
+      var ssByVersion = {};
+      for (var si = 0; si < ssReleases.length; si++) {
+        ssByVersion[ssReleases[si].version] = ssReleases[si];
+      }
+
+      var ea1Re = /(\d+\.\d+)[.\s]EA1/i;
+      var ea2Re = /(\d+\.\d+)[.\s]EA2/i;
+      var gaRe = /(\d+\.\d+)/;
+      var eaExclude = /\bEA\d?\b/i;
+
+      for (var ri = 0; ri < activeReleases.length; ri++) {
+        var rel = activeReleases[ri];
+        var m = rel.milestones || {};
+        if (m.codeFreeze) continue; // already has freeze date
+
+        var displayName = rel.productPagesVersion || rel.displayName || rel.id;
+        var match, ssEntry, freezeDate;
+
+        match = displayName.match(ea1Re);
+        if (match) {
+          ssEntry = ssByVersion[match[1]];
+          freezeDate = ssEntry && ssEntry.ea1Freeze;
+        } else {
+          match = displayName.match(ea2Re);
+          if (match) {
+            ssEntry = ssByVersion[match[1]];
+            freezeDate = ssEntry && ssEntry.ea2Freeze;
+          } else {
+            match = displayName.match(gaRe);
+            if (match && !eaExclude.test(displayName)) {
+              ssEntry = ssByVersion[match[1]];
+              freezeDate = ssEntry && ssEntry.gaFreeze;
+            }
+          }
+        }
+
+        if (freezeDate) {
+          rel.milestones = Object.assign({}, m, { codeFreeze: freezeDate });
+          rel.updatedAt = new Date().toISOString();
+          backfilled++;
+        }
+      }
+    } catch (err) {
+      console.warn('[releases/registry] Smartsheet backfill failed:', err.message);
+    }
+  }
+
+  // Pass 2: Derive missing codeFreeze from ga date (target - FREEZE_OFFSET_DAYS)
+  for (var di = 0; di < activeReleases.length; di++) {
+    var r = activeReleases[di];
+    var ms = r.milestones || {};
+    if (!ms.codeFreeze && ms.ga) {
+      r.milestones = Object.assign({}, ms, { codeFreeze: offsetDate(ms.ga, -FREEZE_OFFSET_DAYS) });
+      r.updatedAt = new Date().toISOString();
+      derived++;
+    }
+  }
+
+  return { backfilled, derived };
 }
 
 /**
@@ -923,7 +1054,7 @@ async function registerRegistryRoutes(router, context) {
 }
 
 module.exports = {
-  registerRegistryRoutes, readRegistry, writeRegistry, validateRelease, normalizeRelease,
-  normalizeVersionName, matchVersionsToReleases, runRegistrySync, migrateNormalizedIds,
-  autoResolveFixVersions, REGISTRY_FILE
+  registerRegistryRoutes, readRegistry, getRegistryReleasesFlat, writeRegistry, validateRelease,
+  normalizeRelease, normalizeVersionName, matchVersionsToReleases, runRegistrySync,
+  migrateNormalizedIds, autoResolveFixVersions, REGISTRY_FILE
 };
