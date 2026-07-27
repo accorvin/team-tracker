@@ -205,8 +205,12 @@ describe('TvFvDeltaView executive summary sorting', function () {
     var wrapper = await mountView()
     var table = findSummaryTable(wrapper)
     var headers = table.findAll('thead th')
-    // Should have: Release, Total, On Time, Late, TV-Only, FV-Only, Misaligned, Alignment, Target, GA Date, Days to GA, Planning Freeze, Days to Freeze
+    // Should have: Release, Total, Aligned On Time, Aligned Late, TV-Only, FV-Only, Misaligned, Alignment %, Align Target, GA Date, Days to GA, Planning Freeze, Days to Freeze
     expect(headers.length).toBe(13)
+    var headerText = headers.map(function (th) { return th.text().replace(/ⓘ/g, '').trim() })
+    expect(headerText).toContain('Aligned On Time')
+    expect(headerText).toContain('Aligned Late')
+    expect(headerText).toContain('Align Target')
   })
 
   it('default view includes 3.6 and 3.5 default versions from data', async function () {
@@ -308,9 +312,9 @@ describe('TvFvDeltaView milestone vs product selection', function () {
     expect(wrapper.text()).toContain('Showing features for')
     expect(wrapper.text()).toContain('3.6 GA Release')
     expect(wrapper.text()).toMatch(/all products \(2\)/)
-    expect(wrapper.text()).toContain('Aligned (on time)')
+    expect(wrapper.text()).toContain('Aligned On Time')
     expect(wrapper.text()).toContain('(2)')
-    expect(wrapper.text()).toContain('TV-Only — PM targeted, no ENG commitment (1)')
+    expect(wrapper.text()).toContain('TV-Only — Target Version set, no Fix Version (1)')
   })
 
   it('selects a single product chip after milestone scope', async function () {
@@ -349,7 +353,7 @@ describe('TvFvDeltaView milestone vs product selection', function () {
     expect(wrapper.text()).toContain('Showing features for')
     expect(wrapper.text()).toContain('3.6 GA RHOAI RELEASE')
     expect(wrapper.text()).not.toMatch(/all products \(2\)/)
-    expect(wrapper.text()).toContain('Aligned (on time)')
+    expect(wrapper.text()).toContain('Aligned On Time')
     expect(wrapper.text()).toContain('(1)')
   })
 })
@@ -389,7 +393,7 @@ describe('TvFvDeltaView component breakdown PM/ENG columns', function () {
     var table = details.find('table')
     var headers = table.findAll('thead th').map(function (th) { return th.text().trim() })
     expect(headers).toEqual([
-      'Component', 'PM', 'ENG', 'Total', 'On Time', 'Late', 'TV-Only', 'FV-Only', 'Misaligned', 'Alignment',
+      'Component', 'PM', 'ENG', 'Total', 'Aligned On Time', 'Aligned Late', 'TV-Only', 'FV-Only', 'Misaligned', 'Alignment %',
     ])
 
     var servingRow = table.findAll('tbody tr').find(function (r) {

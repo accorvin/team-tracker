@@ -97,26 +97,51 @@ const JQL_FIELDS = [
 // Release Name Parsing and Comparison
 // ---------------------------------------------------------------------------
 
-// Release pattern: {product}-{major}.{minor}[.EA{n}]
+// Compact pattern: {product}-{major}.{minor}[.EA{n}]
 var RELEASE_PATTERN = /^(rhoai|rhelai|rhaii)[- _](\d+)\.(\d+)(?:\.EA(\d+))?$/i
+// Jira version pattern: "{major}.{minor} [EA{n}|GA] {PRODUCT} RELEASE"
+var JIRA_RELEASE_PATTERN = /^(\d+)\.(\d+)(?:\s+(EA\d+|GA))?\s+(RHOAI|RHAII|RHELAI)(?:\s+RELEASE)?$/i
+
+var PRODUCT_ALIASES = { rhoai: 'rhoai', rhelai: 'rhelai', rhaii: 'rhaii' }
 
 /**
  * Parse a release name into structured parts.
  * e.g. "rhoai-3.6.EA1" → { product: "rhoai", major: 3, minor: 6, milestone: "EA1", milestoneOrder: 1 }
  * e.g. "rhoai-3.5"     → { product: "rhoai", major: 3, minor: 5, milestone: "GA",  milestoneOrder: 99 }
+ * e.g. "3.6 EA1 RHOAI RELEASE" → same structure (Jira Target/Fix Version format)
  */
 function parseReleaseName(name) {
-  var m = RELEASE_PATTERN.exec(name)
-  if (!m) return null
-  var eaNum = m[4] ? parseInt(m[4], 10) : 0
-  return {
-    product: m[1].toLowerCase(),
-    major: parseInt(m[2], 10),
-    minor: parseInt(m[3], 10),
-    milestone: eaNum ? 'EA' + eaNum : 'GA',
-    milestoneOrder: eaNum || 99,
-    raw: name,
+  if (!name) return null
+  var m = RELEASE_PATTERN.exec(String(name).trim())
+  if (m) {
+    var eaNum = m[4] ? parseInt(m[4], 10) : 0
+    return {
+      product: m[1].toLowerCase(),
+      major: parseInt(m[2], 10),
+      minor: parseInt(m[3], 10),
+      milestone: eaNum ? 'EA' + eaNum : 'GA',
+      milestoneOrder: eaNum || 99,
+      raw: name,
+    }
   }
+
+  var jm = JIRA_RELEASE_PATTERN.exec(String(name).trim())
+  if (jm) {
+    var product = PRODUCT_ALIASES[jm[4].toLowerCase()]
+    if (!product) return null
+    var phaseLabel = jm[3] ? String(jm[3]).toUpperCase() : 'GA'
+    var eaFromJira = /^EA(\d+)$/.test(phaseLabel) ? parseInt(phaseLabel.slice(2), 10) : 0
+    return {
+      product: product,
+      major: parseInt(jm[1], 10),
+      minor: parseInt(jm[2], 10),
+      milestone: eaFromJira ? 'EA' + eaFromJira : 'GA',
+      milestoneOrder: eaFromJira || 99,
+      raw: name,
+    }
+  }
+
+  return null
 }
 
 /**
@@ -162,8 +187,37 @@ function compareReleasesTemporally(a, b) {
  * Returns lowercase: "rhoai", "rhelai", "rhaii", or null.
  */
 function extractProduct(name) {
-  var m = /^(rhoai|rhelai|rhaii)/i.exec(name)
+  var parsed = parseReleaseName(name)
+  if (parsed) return parsed.product
+  var m = /^(rhoai|rhelai|rhaii)/i.exec(name || '')
   return m ? m[1].toLowerCase() : null
+}
+
+/**
+ * Build a release-date lookup map from Product Pages cache entries.
+ * Keys include both the raw releaseNumber and its normVer form so Jira
+ * version names like "3.6 EA1 RHOAI RELEASE" resolve to the same dates.
+ */
+function buildReleaseDatesMap(ppReleases) {
+  var releaseDates = {}
+  if (!Array.isArray(ppReleases)) return releaseDates
+
+  for (var pi = 0; pi < ppReleases.length; pi++) {
+    var ppRel = ppReleases[pi]
+    var releaseNumber = ppRel && ppRel.releaseNumber
+    if (!releaseNumber) continue
+
+    var dates = {
+      dueDate: ppRel.dueDate || null,
+      planningFreezeDate: ppRel.planningFreezeDate || null,
+    }
+    var rawKey = String(releaseNumber).toLowerCase()
+    releaseDates[rawKey] = dates
+    var nv = normVer(releaseNumber)
+    if (nv) releaseDates[nv] = dates
+  }
+
+  return releaseDates
 }
 
 /**
@@ -668,21 +722,9 @@ async function fetchAndClassify(releases, storage, jiraProject) {
   const allComponents = await fetchAllComponents(jiraProject)
   console.log('[releases/tv-fv-delta] Fetched ' + allComponents.length + ' components from Jira')
 
-  // Look up release dates from Product Pages delivery cache (needed for classification)
-  const releaseDates = {}
+  // Look up release dates from Product Pages delivery cache (needed for classification + summary columns)
   const ppCache = await storage.readFromStorage('releases/delivery/product-pages-releases-cache.json')
-  if (ppCache && Array.isArray(ppCache.releases)) {
-    for (let pi = 0; pi < ppCache.releases.length; pi++) {
-      const ppRel = ppCache.releases[pi]
-      const ppKey = (ppRel.releaseNumber || '').toLowerCase()
-      if (ppKey) {
-        releaseDates[ppKey] = {
-          dueDate: ppRel.dueDate || null,
-          planningFreezeDate: ppRel.planningFreezeDate || null,
-        }
-      }
-    }
-  }
+  const releaseDates = buildReleaseDatesMap(ppCache && ppCache.releases)
 
   // Build JQL: features that have TV or FV in any of the target releases
   // Filter resolution: exclude dead features (Duplicate, Obsolete, WontDo)
@@ -724,6 +766,7 @@ module.exports.parseReleaseName = parseReleaseName
 module.exports.compareReleases = compareReleases
 module.exports.compareReleasesTemporally = compareReleasesTemporally
 module.exports.extractProduct = extractProduct
+module.exports.buildReleaseDatesMap = buildReleaseDatesMap
 module.exports.isReleaseFrozen = isReleaseFrozen
 module.exports.normalizeIssue = normalizeIssue
 module.exports.classifyFeatures = classifyFeatures

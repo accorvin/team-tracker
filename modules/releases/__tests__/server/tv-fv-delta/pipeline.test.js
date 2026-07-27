@@ -9,6 +9,7 @@ const {
   compareReleases,
   compareReleasesTemporally,
   extractProduct,
+  buildReleaseDatesMap,
   isReleaseFrozen,
   normalizeIssue,
   classifyFeatures,
@@ -197,6 +198,44 @@ describe('parseReleaseName', () => {
     expect(parseReleaseName('rhoai-3.5').product).toBe('rhoai');
     expect(parseReleaseName('rhelai-3.2').product).toBe('rhelai');
     expect(parseReleaseName('rhaii-3.6').product).toBe('rhaii');
+  });
+
+  it('parses Jira Target/Fix Version names', () => {
+    expect(parseReleaseName('3.6 EA1 RHOAI RELEASE')).toEqual({
+      product: 'rhoai',
+      major: 3,
+      minor: 6,
+      milestone: 'EA1',
+      milestoneOrder: 1,
+      raw: '3.6 EA1 RHOAI RELEASE',
+    });
+    expect(parseReleaseName('3.6 GA RHOAI RELEASE')).toMatchObject({
+      product: 'rhoai',
+      milestone: 'GA',
+      milestoneOrder: 99,
+    });
+    expect(parseReleaseName('3.5 EA2 RHAII RELEASE').product).toBe('rhaii');
+    expect(parseReleaseName('3.6 GA RHELAI RELEASE').product).toBe('rhelai');
+  });
+});
+
+describe('buildReleaseDatesMap', () => {
+  it('indexes Product Pages dates under normVer so Jira release names resolve', () => {
+    const map = buildReleaseDatesMap([
+      {
+        productName: 'rhoai',
+        releaseNumber: 'rhoai-3.6.EA1',
+        dueDate: '2026-09-17',
+        planningFreezeDate: '2026-07-29',
+      },
+    ]);
+    const key = normVer('3.6 EA1 RHOAI RELEASE');
+    expect(key).toBe('rhoai 3 6 ea1');
+    expect(map[key]).toEqual({
+      dueDate: '2026-09-17',
+      planningFreezeDate: '2026-07-29',
+    });
+    expect(map['rhoai-3.6.ea1']).toEqual(map[key]);
   });
 });
 

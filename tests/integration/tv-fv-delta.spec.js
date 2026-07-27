@@ -525,7 +525,7 @@ test.describe('TV/FV Delta — Executive Summary @tv-fv-delta', () => {
     await expect(summaryHeading).toBeVisible();
 
     // Verify all column headers
-    const headers = ['Release', 'Total', 'On Time', 'Late', 'TV-Only', 'FV-Only', 'Misaligned', 'Alignment'];
+    const headers = ['Release', 'Total', 'Aligned On Time', 'Aligned Late', 'TV-Only', 'FV-Only', 'Misaligned', 'Alignment %'];
     for (const header of headers) {
       const th = page.locator('th', { hasText: new RegExp(`^${header}$`, 'i') }).first();
       await expect(th).toBeVisible();
@@ -823,8 +823,8 @@ test.describe('TV/FV Delta — Release Tabs @tv-fv-delta', () => {
     expect(await rhoaiChip.getAttribute('class')).not.toContain('bg-blue-600');
 
     // Merged aligned on time = RHOAI 3 + RHAII 1
-    await expect(page.locator('summary:has-text("Aligned (on time)")')).toContainText('(4)');
-    await page.locator('summary:has-text("Aligned (on time)")').click();
+    await expect(page.locator('summary:has-text("Aligned On Time")')).toContainText('(4)');
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(200);
     await expect(page.locator('text=RHAISTRAT-110')).toBeVisible();
     await expect(page.locator('text=RHAISTRAT-100')).toBeVisible();
@@ -851,7 +851,7 @@ test.describe('TV/FV Delta — Release Tabs @tv-fv-delta', () => {
     expect(await rhoaiChip.getAttribute('class')).toContain('bg-blue-600');
 
     // Single-product aligned on time count is 3 again
-    await expect(page.locator('summary:has-text("Aligned (on time)")')).toContainText('(3)');
+    await expect(page.locator('summary:has-text("Aligned On Time")')).toContainText('(3)');
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
@@ -876,7 +876,7 @@ test.describe('TV/FV Delta — Category Sections @tv-fv-delta', () => {
 
     // EA1 has: aligned_on_time (3), aligned_late (0), tv_only (1), fv_only (0), misaligned (1)
     await expect(page.locator('summary:has-text("TV-Only")')).toBeVisible();
-    await expect(page.locator('summary:has-text("Aligned (on time)")')).toBeVisible();
+    await expect(page.locator('summary:has-text("Aligned On Time")')).toBeVisible();
     await expect(page.locator('summary:has-text("Misaligned")')).toBeVisible();
     // FV-Only should render even with 0 items (empty table)
     await expect(page.locator('summary:has-text("FV-Only")')).toBeVisible();
@@ -891,7 +891,7 @@ test.describe('TV/FV Delta — Category Sections @tv-fv-delta', () => {
     await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
 
     await expect(page.locator('summary:has-text("TV-Only")')).toContainText('(1)');
-    await expect(page.locator('summary:has-text("Aligned (on time)")')).toContainText('(3)');
+    await expect(page.locator('summary:has-text("Aligned On Time")')).toContainText('(3)');
     await expect(page.locator('summary:has-text("Misaligned")')).toContainText('(1)');
 
     expect(relevantErrors(page)).toHaveLength(0);
@@ -909,7 +909,7 @@ test.describe('TV/FV Delta — Category Sections @tv-fv-delta', () => {
     // Switch to GA: tv_only=0, aligned_on_time=3
     await selectVersion(page, DEFAULT_SELECTED_DETAIL_RELEASE);
 
-    await expect(page.locator('summary:has-text("Aligned (on time)")')).toContainText('(3)');
+    await expect(page.locator('summary:has-text("Aligned On Time")')).toContainText('(3)');
     await expect(page.locator('summary:has-text("TV-Only")')).toContainText('(0)');
 
     expect(relevantErrors(page)).toHaveLength(0);
@@ -1001,15 +1001,15 @@ test.describe('TV/FV Delta — Collapsible Behaviour @tv-fv-delta', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Open TV-Only and Aligned (on time) sections
+    // Open TV-Only and Aligned On Time sections
     await page.locator('summary:has-text("TV-Only")').click();
-    await page.locator('summary:has-text("Aligned (on time)")').click();
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(300);
 
     // Verify they're open
     const tvOnlyOpen = await page.locator('details:has(summary:has-text("TV-Only"))').getAttribute('open');
     expect(tvOnlyOpen).not.toBeNull();
-    const alignedOpen = await page.locator('details:has(summary:has-text("Aligned (on time)"))').getAttribute('open');
+    const alignedOpen = await page.locator('details:has(summary:has-text("Aligned On Time"))').getAttribute('open');
     expect(alignedOpen).not.toBeNull();
 
     // FV-Only should still be closed
@@ -1020,10 +1020,10 @@ test.describe('TV/FV Delta — Collapsible Behaviour @tv-fv-delta', () => {
     await versionChip(page, '3.5 EA2 RHOAI RELEASE').click();
     await page.waitForTimeout(500);
 
-    // TV-Only and Aligned (on time) should STILL be open
+    // TV-Only and Aligned On Time should STILL be open
     const tvOnlyStillOpen = await page.locator('details:has(summary:has-text("TV-Only"))').getAttribute('open');
     expect(tvOnlyStillOpen).not.toBeNull();
-    const alignedStillOpen = await page.locator('details:has(summary:has-text("Aligned (on time)"))').getAttribute('open');
+    const alignedStillOpen = await page.locator('details:has(summary:has-text("Aligned On Time"))').getAttribute('open');
     expect(alignedStillOpen).not.toBeNull();
 
     // FV-Only should still be closed
@@ -1064,11 +1064,11 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Expand Aligned (on time) section (has 3 features for EA1)
-    await page.locator('summary:has-text("Aligned (on time)")').click();
+    // Expand Aligned On Time section (has 3 features for EA1)
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(300);
 
-    const alignedDetails = page.locator('details:has(summary:has-text("Aligned (on time)"))');
+    const alignedDetails = page.locator('details:has(summary:has-text("Aligned On Time"))');
     const rows = alignedDetails.locator('tbody tr');
     await expect(rows).toHaveCount(3);
 
@@ -1099,11 +1099,11 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Expand Aligned (on time) section
-    await page.locator('summary:has-text("Aligned (on time)")').click();
+    // Expand Aligned On Time section
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(300);
 
-    const alignedDetails = page.locator('details:has(summary:has-text("Aligned (on time)"))');
+    const alignedDetails = page.locator('details:has(summary:has-text("Aligned On Time"))');
     const headers = alignedDetails.locator('thead th');
 
     // All categories now include: Key, Summary, TV, FV, Status, Color, PM, Assignee, Team, Component
@@ -1125,8 +1125,8 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     // EA1 has Misaligned + TV-Only sections; GA does not
     await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
 
-    // Test that TV-Only, Aligned (on time), and Misaligned all have TV/FV columns
-    const categories = ['TV-Only', 'Aligned (on time)', 'Misaligned'];
+    // Test that TV-Only, Aligned On Time, and Misaligned all have TV/FV columns
+    const categories = ['TV-Only', 'Aligned On Time', 'Misaligned'];
 
     for (const category of categories) {
       await page.locator(`summary:has-text("${category}")`).click();
@@ -1181,11 +1181,11 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Expand Aligned (on time) section
-    await page.locator('summary:has-text("Aligned (on time)")').click();
+    // Expand Aligned On Time section
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(300);
 
-    const alignedDetails = page.locator('details:has(summary:has-text("Aligned (on time)"))');
+    const alignedDetails = page.locator('details:has(summary:has-text("Aligned On Time"))');
     // Color badges have rounded-full class
     const badges = alignedDetails.locator('span.rounded-full');
     const badgeCount = await badges.count();
@@ -1206,11 +1206,11 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
 
-    // Expand Aligned (on time) section (3 features)
-    await page.locator('summary:has-text("Aligned (on time)")').click();
+    // Expand Aligned On Time section (3 features)
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(300);
 
-    const alignedDetails = page.locator('details:has(summary:has-text("Aligned (on time)"))');
+    const alignedDetails = page.locator('details:has(summary:has-text("Aligned On Time"))');
 
     // Get initial key order
     const getKeys = async () => {
@@ -1252,11 +1252,11 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Expand Aligned (on time) section — EA1 has 3 aligned_on_time
-    await page.locator('summary:has-text("Aligned (on time)")').click();
+    // Expand Aligned On Time section — EA1 has 3 aligned_on_time
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(300);
 
-    const alignedDetails = page.locator('details:has(summary:has-text("Aligned (on time)"))');
+    const alignedDetails = page.locator('details:has(summary:has-text("Aligned On Time"))');
     let rows = alignedDetails.locator('tbody tr');
     await expect(rows).toHaveCount(3);
 
