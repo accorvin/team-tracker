@@ -46,23 +46,35 @@ function parseReleaseName(name) {
 
 /**
  * Compare two release names for sorting.
- * Order: cycle desc → milestone GA/EA2/EA1 (desc) → product RHOAI/RHAII/RHELAI.
+ * Order: cycle desc → milestone EA1/EA2/GA (chronological) → product RHOAI/RHAII/RHELAI.
  */
 function compareReleases(a, b) {
   var pa = parseReleaseName(a)
   var pb = parseReleaseName(b)
-  if (!pa && !pb) return a.localeCompare(b)
+  if (!pa && !pb) return String(a || '').localeCompare(String(b || ''))
   if (!pa) return 1
   if (!pb) return -1
 
   if (pa.major !== pb.major) return pb.major - pa.major
   if (pa.minor !== pb.minor) return pb.minor - pa.minor
-  // GA (99) before EA2 before EA1
-  if (pa.milestoneOrder !== pb.milestoneOrder) return pb.milestoneOrder - pa.milestoneOrder
+  // EA1 before EA2 before GA
+  if (pa.milestoneOrder !== pb.milestoneOrder) return pa.milestoneOrder - pb.milestoneOrder
   var oa = PRODUCT_ORDER[pa.product] != null ? PRODUCT_ORDER[pa.product] : 99
   var ob = PRODUCT_ORDER[pb.product] != null ? PRODUCT_ORDER[pb.product] : 99
   if (oa !== ob) return oa - ob
   return pa.product.localeCompare(pb.product)
+}
+
+/**
+ * Sort a comma-separated version list into EA1 → EA2 → GA (within each cycle).
+ * @param {string} value
+ * @returns {string}
+ */
+function formatSortedVersions(value) {
+  if (value == null || value === '') return ''
+  var parts = String(value).split(/,\s*/).map(function (s) { return s.trim() }).filter(Boolean)
+  if (parts.length <= 1) return parts[0] || String(value)
+  return parts.slice().sort(compareReleases).join(', ')
 }
 
 /**
@@ -185,12 +197,12 @@ function compareCycleKeys(a, b) {
 }
 
 function compareMilestoneKeys(a, b) {
-  // "3.6-GA" / "3.6-EA2" — GA first, then higher EA
+  // "3.6-GA" / "3.6-EA2" — EA1 first, then EA2, then GA
   var ma = /-(EA(\d+)|GA)$/.exec(a)
   var mb = /-(EA(\d+)|GA)$/.exec(b)
   var oa = ma && ma[1] === 'GA' ? 99 : (ma ? parseInt(ma[2], 10) : 0)
   var ob = mb && mb[1] === 'GA' ? 99 : (mb ? parseInt(mb[2], 10) : 0)
-  return ob - oa
+  return oa - ob
 }
 
 /**
@@ -455,6 +467,7 @@ export function useReleaseFamily(filteredSummary, data) {
     productLabel,
     getAlignmentTarget,
     buildNameRollup,
+    formatSortedVersions,
   }
 }
 
@@ -472,5 +485,6 @@ export {
   productLabel,
   getAlignmentTarget,
   buildNameRollup,
+  formatSortedVersions,
   ALIGNMENT_TARGETS,
 }
