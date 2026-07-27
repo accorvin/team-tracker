@@ -572,7 +572,7 @@ async function registerRoutes(router, context) {
     }
 
     // No cache — trigger first fetch using planning config if available
-    triggerBackgroundRefresh(await fetchReleasesFromPlanning(storage).releases)
+    triggerBackgroundRefresh((await fetchReleasesFromPlanning(storage)).releases)
     res.status(202).json({
       _refreshing: true,
       _noCache: true,
@@ -612,7 +612,7 @@ async function registerRoutes(router, context) {
       releases = req.body.releases
     } else {
       // Auto-discover from planning module (Smartsheet SSOT)
-      releases = await fetchReleasesFromPlanning(storage).releases
+      releases = (await fetchReleasesFromPlanning(storage)).releases
     }
 
     // Cap releases array to prevent excessive API load
