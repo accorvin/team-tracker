@@ -175,8 +175,8 @@ describe('TvFvDeltaView release cycle filter', function () {
       return labels.findIndex(function (t) { return t.indexOf(needle) !== -1 })
     }
     expect(indexOf('3.6 Release Cycle')).toBeLessThan(indexOf('3.5 Release Cycle'))
-    expect(indexOf('3.6 GA Release')).toBeLessThan(indexOf('3.6 EA2 Release'))
-    expect(indexOf('3.6 EA2 Release')).toBeLessThan(indexOf('3.6 EA1 Release'))
+    expect(indexOf('3.6 EA1 Release')).toBeLessThan(indexOf('3.6 EA2 Release'))
+    expect(indexOf('3.6 EA2 Release')).toBeLessThan(indexOf('3.6 GA Release'))
     expect(indexOf('3.6 GA RHOAI RELEASE')).toBeLessThan(indexOf('3.6 GA RHELAI RELEASE'))
 
     var selector = wrapper.find('div.mb-6.space-y-4')
@@ -191,8 +191,8 @@ describe('TvFvDeltaView release cycle filter', function () {
     }).map(function (b) {
       return b.text().replace(/×/g, '').replace(/\s+/g, ' ').trim()
     })
-    expect(chips[0]).toBe('3.6 GA RHOAI RELEASE')
-    expect(chips.indexOf('3.6 GA RHOAI RELEASE')).toBeLessThan(chips.indexOf('3.5 GA RHOAI RELEASE'))
+    expect(chips[0]).toBe('3.6 EA1 RHOAI RELEASE')
+    expect(chips.indexOf('3.6 EA1 RHOAI RELEASE')).toBeLessThan(chips.indexOf('3.5 EA1 RHOAI RELEASE'))
   })
 })
 
@@ -270,6 +270,81 @@ describe('TvFvDeltaView target alignment column', function () {
         expect(classes.some(function (c) { return c.includes('red') })).toBe(true)
       }
     }
+  })
+})
+
+describe('TvFvDeltaView milestone vs product selection', function () {
+  beforeEach(function () {
+    mockApiRequest.mockReset()
+  })
+
+  it('merges features when selecting a milestone group', async function () {
+    var wrapper = await mountView({
+      releases: {
+        '3.6 GA RHOAI RELEASE': {
+          aligned: [{ key: 'A1', summary: 'rhoai' }],
+          tv_only: [],
+          fv_only: [],
+          mismatched: [],
+        },
+        '3.6 GA RHAII RELEASE': {
+          aligned: [{ key: 'A2', summary: 'rhaii' }],
+          tv_only: [{ key: 'T1', summary: 'tv' }],
+          fv_only: [],
+          mismatched: [],
+        },
+      },
+    })
+
+    var msBtn = wrapper.findAll('button').find(function (b) {
+      return b.text().includes('3.6 GA Release') && b.text().includes('all products')
+    })
+    expect(msBtn).toBeTruthy()
+    await msBtn.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Showing features for')
+    expect(wrapper.text()).toContain('3.6 GA Release')
+    expect(wrapper.text()).toMatch(/all products \(2\)/)
+    expect(wrapper.text()).toContain('Aligned — TV == FV (2)')
+    expect(wrapper.text()).toContain('TV-Only — PM targeted, no ENG commitment (1)')
+  })
+
+  it('selects a single product chip after milestone scope', async function () {
+    var wrapper = await mountView({
+      releases: {
+        '3.6 GA RHOAI RELEASE': {
+          aligned: [{ key: 'A1', summary: 'rhoai' }],
+          tv_only: [],
+          fv_only: [],
+          mismatched: [],
+        },
+        '3.6 GA RHAII RELEASE': {
+          aligned: [{ key: 'A2', summary: 'rhaii' }],
+          tv_only: [],
+          fv_only: [],
+          mismatched: [],
+        },
+      },
+    })
+
+    var msBtn = wrapper.findAll('button').find(function (b) {
+      return b.text().includes('3.6 GA Release') && b.text().includes('all products')
+    })
+    await msBtn.trigger('click')
+    await flushPromises()
+
+    var chips = wrapper.findAll('button').filter(function (b) {
+      return b.find('span[title="Remove"]').exists()
+    })
+    var rhoai = chips.find(function (b) { return b.text().includes('3.6 GA RHOAI RELEASE') })
+    await rhoai.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Showing features for')
+    expect(wrapper.text()).toContain('3.6 GA RHOAI RELEASE')
+    expect(wrapper.text()).not.toMatch(/all products \(2\)/)
+    expect(wrapper.text()).toContain('Aligned — TV == FV (1)')
   })
 })
 

@@ -17,6 +17,7 @@ import {
   productLabel,
   getAlignmentTarget,
   buildNameRollup,
+  formatSortedVersions,
   useReleaseFamily,
 } from '../../../client/composables/useReleaseFamily'
 
@@ -111,7 +112,7 @@ describe('cycleLabel / milestoneGroupLabel', function () {
 })
 
 describe('buildNameRollup', function () {
-  it('groups names cycle → milestone → product in numeric descending order', function () {
+  it('groups names cycle → milestone → product with EA1 before GA', function () {
     var rollup = buildNameRollup([
       '3.5 EA1 RHOAI RELEASE',
       '3.6 GA RHELAI RELEASE',
@@ -120,8 +121,8 @@ describe('buildNameRollup', function () {
       '3.5 GA RHOAI RELEASE',
     ])
     expect(rollup.map(function (c) { return c.key })).toEqual(['3.6', '3.5'])
-    expect(rollup[0].milestones.map(function (m) { return m.key })).toEqual(['3.6-GA', '3.6-EA1'])
-    expect(rollup[0].milestones[0].names).toEqual([
+    expect(rollup[0].milestones.map(function (m) { return m.key })).toEqual(['3.6-EA1', '3.6-GA'])
+    expect(rollup[0].milestones[1].names).toEqual([
       '3.6 GA RHOAI RELEASE',
       '3.6 GA RHELAI RELEASE',
     ])
@@ -151,10 +152,10 @@ describe('productLabel', function () {
 // ═══ compareReleases ═══
 
 describe('compareReleases', function () {
-  it('sorts GA before EA2 before EA1 within same version', function () {
+  it('sorts EA1 before EA2 before GA within same version', function () {
     var names = ['rhoai-3.6', 'rhoai-3.6.EA2', 'rhoai-3.6.EA1']
     var sorted = names.slice().sort(compareReleases)
-    expect(sorted).toEqual(['rhoai-3.6', 'rhoai-3.6.EA2', 'rhoai-3.6.EA1'])
+    expect(sorted).toEqual(['rhoai-3.6.EA1', 'rhoai-3.6.EA2', 'rhoai-3.6'])
   })
 
   it('sorts newer minor versions first (descending)', function () {
@@ -183,7 +184,7 @@ describe('compareReleases', function () {
     expect(sorted).toEqual(['rhoai-3.6', 'rhoai-3.5', 'unknown-1.0'])
   })
 
-  it('handles product-family multi-milestone sort matching default picker order', function () {
+  it('handles product-family multi-milestone sort EA1 → EA2 → GA', function () {
     var names = [
       '3.5 EA1 RHOAI RELEASE',
       '3.6 EA1 RHOAI RELEASE',
@@ -193,12 +194,20 @@ describe('compareReleases', function () {
     ]
     var sorted = names.slice().sort(compareReleases)
     expect(sorted).toEqual([
-      '3.6 GA RHOAI RELEASE',
-      '3.6 EA2 RHOAI RELEASE',
       '3.6 EA1 RHOAI RELEASE',
-      '3.5 GA RHOAI RELEASE',
+      '3.6 EA2 RHOAI RELEASE',
+      '3.6 GA RHOAI RELEASE',
       '3.5 EA1 RHOAI RELEASE',
+      '3.5 GA RHOAI RELEASE',
     ])
+  })
+})
+
+describe('formatSortedVersions', function () {
+  it('orders comma-separated versions EA1 → EA2 → GA', function () {
+    expect(formatSortedVersions('3.6 GA RHOAI RELEASE, 3.6 EA2 RHOAI RELEASE, 3.6 EA1 RHOAI RELEASE')).toBe(
+      '3.6 EA1 RHOAI RELEASE, 3.6 EA2 RHOAI RELEASE, 3.6 GA RHOAI RELEASE',
+    )
   })
 })
 
@@ -251,6 +260,7 @@ function makeProductFamilyRows() {
     { release: '3.6 GA RHOAI RELEASE', total: 10, aligned: 4, tv_only: 3, fv_only: 1, mismatched: 2, alignment_pct: 40 },
     { release: '3.6 GA RHAII RELEASE', total: 5, aligned: 2, tv_only: 2, fv_only: 0, mismatched: 1, alignment_pct: 40 },
     { release: '3.6 GA RHELAI RELEASE', total: 1, aligned: 1, tv_only: 0, fv_only: 0, mismatched: 0, alignment_pct: 100 },
+    { release: '3.6 EA2 RHOAI RELEASE', total: 4, aligned: 1, tv_only: 2, fv_only: 0, mismatched: 1, alignment_pct: 25 },
     { release: '3.6 EA1 RHOAI RELEASE', total: 7, aligned: 2, tv_only: 3, fv_only: 1, mismatched: 1, alignment_pct: 28.6 },
     { release: '3.5 GA RHOAI RELEASE', total: 20, aligned: 10, tv_only: 5, fv_only: 2, mismatched: 3, alignment_pct: 50 },
   ]
@@ -307,8 +317,12 @@ describe('useReleaseFamily composable', function () {
       expect(rollup[1].label).toBe('3.5 Release Cycle')
 
       var milestones = rollup[0].milestones.map(function (m) { return m.label })
-      expect(milestones[0]).toBe('3.6 GA Release')
-      expect(milestones).toContain('3.6 EA1 Release')
+      expect(milestones[0]).toBe('3.6 EA1 Release')
+      expect(milestones).toEqual([
+        '3.6 EA1 Release',
+        '3.6 EA2 Release',
+        '3.6 GA Release',
+      ])
 
       var ga = rollup[0].milestones.find(function (m) { return m.key === '3.6-GA' })
       expect(ga.rows.map(function (r) { return r.release })).toEqual([
@@ -325,18 +339,18 @@ describe('useReleaseFamily composable', function () {
       var summary = ref(rows)
       var rf = useReleaseFamily(summary, makeDataRef(rows))
       var cycle36 = rf.summaryRollup.value[0]
-      // 10+5+1 + 7 = 23
-      expect(cycle36.totals.total).toBe(23)
+      // 10+5+1 + 4 + 7 = 27
+      expect(cycle36.totals.total).toBe(27)
     })
   })
 
   describe('sorting', function () {
-    it('default sort is GA → EA2 → EA1, newer cycle first', function () {
+    it('default sort is EA1 → EA2 → GA, newer cycle first', function () {
       var summary = ref(makeSummaryRows())
       var rf = useReleaseFamily(summary, makeDataRef())
       var names = rf.sortedSummary.value.map(function (r) { return r.release })
-      expect(names.indexOf('rhoai-3.6')).toBeLessThan(names.indexOf('rhoai-3.6.EA2'))
-      expect(names.indexOf('rhoai-3.6.EA2')).toBeLessThan(names.indexOf('rhoai-3.6.EA1'))
+      expect(names.indexOf('rhoai-3.6.EA1')).toBeLessThan(names.indexOf('rhoai-3.6.EA2'))
+      expect(names.indexOf('rhoai-3.6.EA2')).toBeLessThan(names.indexOf('rhoai-3.6'))
       expect(names.indexOf('rhoai-3.6')).toBeLessThan(names.indexOf('rhoai-3.5'))
     })
 
@@ -346,7 +360,7 @@ describe('useReleaseFamily composable', function () {
       rf.selectedFamily.value = '3.6'
       var names = rf.sortedSummary.value.map(function (r) { return r.release })
       expect(names).toEqual([
-        'rhoai-3.6', 'rhoai-3.6.EA2', 'rhoai-3.6.EA1',
+        'rhoai-3.6.EA1', 'rhoai-3.6.EA2', 'rhoai-3.6',
       ])
     })
 

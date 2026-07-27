@@ -72,6 +72,7 @@ const FIXTURE_DATA = {
   executive_summary: [
     ...DEFAULT_FIXTURE_RELEASES.filter(r => ![
       '3.5 EA1 RHOAI RELEASE',
+      '3.5 EA1 RHAII RELEASE',
       '3.5 EA2 RHOAI RELEASE',
       '3.5 GA RHOAI RELEASE',
     ].includes(r)).map(emptySummaryRow),
@@ -84,6 +85,16 @@ const FIXTURE_DATA = {
       tv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-tvonly-ea1',
       fv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-fvonly-ea1',
       mismatched_jql: 'https://redhat.atlassian.net/issues/?jql=test-mismatch-ea1'
+    },
+    {
+      release: '3.5 EA1 RHAII RELEASE',
+      total: 1, aligned: 1, tv_only: 0, fv_only: 0, mismatched: 0,
+      alignment_pct: 100,
+      total_jql: 'https://redhat.atlassian.net/issues/?jql=test-total-ea1-rhaii',
+      aligned_jql: 'https://redhat.atlassian.net/issues/?jql=test-aligned-ea1-rhaii',
+      tv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-tvonly-ea1-rhaii',
+      fv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-fvonly-ea1-rhaii',
+      mismatched_jql: 'https://redhat.atlassian.net/issues/?jql=test-mismatch-ea1-rhaii'
     },
     {
       release: '3.5 EA2 RHOAI RELEASE',
@@ -120,6 +131,14 @@ const FIXTURE_DATA = {
       mismatched: [
         { key: 'RHAISTRAT-300', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-300', summary: 'Mismatched feature Z', status: 'In Progress', color_status: 'Yellow', product_manager: 'PM Alpha', assignee: 'Dev Five', team: 'Team A', component: 'Serving, Training', target_version: '3.5 EA1 RHOAI RELEASE', fix_versions: '3.5 EA2 RHOAI RELEASE' }
       ]
+    },
+    '3.5 EA1 RHAII RELEASE': {
+      aligned: [
+        { key: 'RHAISTRAT-110', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-110', summary: 'RHAII EA1 aligned', status: 'In Progress', color_status: 'Green', product_manager: 'PM Delta', assignee: 'Dev Seven', team: 'Team E', component: 'Serving' }
+      ],
+      tv_only: [],
+      fv_only: [],
+      mismatched: []
     },
     '3.5 EA2 RHOAI RELEASE': {
       aligned: [
@@ -539,15 +558,15 @@ test.describe('TV/FV Delta — Executive Summary @tv-fv-delta', () => {
 
     // Cycles: newer first
     expectBefore(labels, '3.6 Release Cycle', '3.5 Release Cycle');
-    // Within 3.6: GA → EA2 → EA1
-    expectBefore(labels, '3.6 GA Release', '3.6 EA2 Release');
-    expectBefore(labels, '3.6 EA2 Release', '3.6 EA1 Release');
+    // Within 3.6: EA1 → EA2 → GA
+    expectBefore(labels, '3.6 EA1 Release', '3.6 EA2 Release');
+    expectBefore(labels, '3.6 EA2 Release', '3.6 GA Release');
     // Within a milestone: RHOAI → RHAII → RHELAI
     expectBefore(labels, '3.6 GA RHOAI RELEASE', '3.6 GA RHAII RELEASE');
     expectBefore(labels, '3.6 GA RHAII RELEASE', '3.6 GA RHELAI RELEASE');
     // Product rows sit under their milestone header
-    expectBefore(labels, '3.6 GA Release', '3.6 GA RHOAI RELEASE');
-    expectBefore(labels, '3.6 GA RHELAI RELEASE', '3.6 EA2 Release');
+    expectBefore(labels, '3.6 EA1 Release', '3.6 EA1 RHOAI RELEASE');
+    expectBefore(labels, '3.6 EA2 RHELAI RELEASE', '3.6 GA Release');
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
@@ -699,19 +718,19 @@ test.describe('TV/FV Delta — Release Tabs @tv-fv-delta', () => {
       .map(t => t.trim())
       .filter(t => /^(3\.6 (GA|EA\d+) Release)$/.test(t));
     expect(milestoneLabels).toEqual([
-      '3.6 GA Release',
-      '3.6 EA2 Release',
       '3.6 EA1 Release',
+      '3.6 EA2 Release',
+      '3.6 GA Release',
     ]);
 
-    // Product chips under the first milestone (GA), in product order
-    const gaGroup = cycle36.locator('div.border-t').first();
-    const gaChipTexts = (await gaGroup.locator('button').filter({ has: page.locator('span[title="Remove"]') }).allTextContents())
+    // Product chips under the first milestone (EA1), in product order
+    const ea1Group = cycle36.locator('div.border-t').first();
+    const ea1ChipTexts = (await ea1Group.locator('button').filter({ has: page.locator('span[title="Remove"]') }).allTextContents())
       .map(t => t.replace(/×/g, '').replace(/\s+/g, ' ').trim());
-    expect(gaChipTexts).toEqual([
-      '3.6 GA RHOAI RELEASE',
-      '3.6 GA RHAII RELEASE',
-      '3.6 GA RHELAI RELEASE',
+    expect(ea1ChipTexts).toEqual([
+      '3.6 EA1 RHOAI RELEASE',
+      '3.6 EA1 RHAII RELEASE',
+      '3.6 EA1 RHELAI RELEASE',
     ]);
 
     expect(relevantErrors(page)).toHaveLength(0);
@@ -735,7 +754,7 @@ test.describe('TV/FV Delta — Release Tabs @tv-fv-delta', () => {
     expectBefore(cycleLabels, '3.6 Release Cycle', '3.5 Release Cycle');
 
     const milestoneLabels = (await dropdown.locator('div.pt-2').allTextContents()).map(t => t.trim());
-    expectBefore(milestoneLabels, '3.6 GA Release', '3.6 EA1 Release');
+    expectBefore(milestoneLabels, '3.6 EA1 Release', '3.6 GA Release');
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
@@ -776,6 +795,59 @@ test.describe('TV/FV Delta — Release Tabs @tv-fv-delta', () => {
     const ea1Tab = versionChip(page, '3.5 EA1 RHOAI RELEASE');
     const ea1Classes = await ea1Tab.getAttribute('class');
     expect(ea1Classes).not.toContain('bg-blue-600');
+
+    expect(relevantErrors(page)).toHaveLength(0);
+  });
+
+  test('should select milestone group to show all products for a release event', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=tv-fv-delta');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const selector = page.locator('div.mb-6.space-y-4');
+    await selector.getByRole('button', { name: /3\.5 EA1 Release\s+all products/ }).click();
+    await page.waitForTimeout(300);
+
+    await expect(page.getByText(/Showing features for\s+3\.5 EA1 Release/)).toBeVisible();
+    await expect(page.getByText(/all products \(2\)/)).toBeVisible();
+
+    // Product chips in the group get group highlight (not sole solid blue)
+    const rhoaiChip = versionChip(page, '3.5 EA1 RHOAI RELEASE');
+    const rhaiiChip = versionChip(page, '3.5 EA1 RHAII RELEASE');
+    await expect(rhoaiChip).toHaveClass(/bg-blue-100/);
+    await expect(rhaiiChip).toHaveClass(/bg-blue-100/);
+    expect(await rhoaiChip.getAttribute('class')).not.toContain('bg-blue-600');
+
+    // Merged aligned = RHOAI 3 + RHAII 1
+    await expect(page.locator('summary:has-text("Aligned")')).toContainText('(4)');
+    await page.locator('summary:has-text("Aligned")').click();
+    await page.waitForTimeout(200);
+    await expect(page.locator('text=RHAISTRAT-110')).toBeVisible();
+    await expect(page.locator('text=RHAISTRAT-100')).toBeVisible();
+
+    expect(relevantErrors(page)).toHaveLength(0);
+  });
+
+  test('should return to product-specific view when clicking a product chip', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=tv-fv-delta');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const selector = page.locator('div.mb-6.space-y-4');
+    await selector.getByRole('button', { name: /3\.5 EA1 Release\s+all products/ }).click();
+    await page.waitForTimeout(200);
+
+    await versionChip(page, '3.5 EA1 RHOAI RELEASE').click();
+    await page.waitForTimeout(300);
+
+    await expect(page.getByText('Showing features for')).toContainText('3.5 EA1 RHOAI RELEASE');
+    await expect(page.getByText(/all products \(2\)/)).toHaveCount(0);
+
+    const rhoaiChip = versionChip(page, '3.5 EA1 RHOAI RELEASE');
+    expect(await rhoaiChip.getAttribute('class')).toContain('bg-blue-600');
+
+    // Single-product aligned count is 3 again
+    await expect(page.locator('summary:has-text("Aligned")')).toContainText('(3)');
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
@@ -1030,8 +1102,8 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     const alignedDetails = page.locator('details:has(summary:has-text("Aligned"))');
     const headers = alignedDetails.locator('thead th');
 
-    // All categories now include: Key, Summary, Status, TV, FV, Color, PM, Assignee, Team, Component
-    const expectedHeaders = ['Key', 'Summary', 'Status', 'TV', 'FV', 'Color', 'PM', 'Assignee', 'Team', 'Component'];
+    // All categories now include: Key, Summary, TV, FV, Status, Color, PM, Assignee, Team, Component
+    const expectedHeaders = ['Key', 'Summary', 'TV', 'FV', 'Status', 'Color', 'PM', 'Assignee', 'Team', 'Component'];
     const count = await headers.count();
     expect(count).toBe(expectedHeaders.length);
 
@@ -1063,18 +1135,39 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
       // All categories have 10 columns including TV and FV
       expect(count).toBe(10);
 
-      // Verify TV and FV headers exist
+      // Verify TV and FV headers exist immediately after Summary
       const headerTexts = [];
       for (let i = 0; i < count; i++) {
         headerTexts.push(await headers.nth(i).textContent());
       }
-      expect(headerTexts.some(h => h.includes('TV'))).toBe(true);
-      expect(headerTexts.some(h => h.includes('FV'))).toBe(true);
+      expect(headerTexts.map(h => h.trim().replace(/[▲▼]/g, '').trim()).slice(0, 4)).toEqual([
+        'Key', 'Summary', 'TV', 'FV',
+      ]);
 
       // Collapse for next iteration
       await page.locator(`summary:has-text("${category}")`).click();
       await page.waitForTimeout(200);
     }
+
+    expect(relevantErrors(page)).toHaveLength(0);
+  });
+
+  test('should show mismatched TV and FV values side by side', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=tv-fv-delta');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+    await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
+
+    await page.locator('summary:has-text("Mismatched")').click();
+    await page.waitForTimeout(300);
+
+    const mismatchDetails = page.locator('details:has(summary:has-text("Mismatched"))');
+    const row = mismatchDetails.locator('tbody tr', { hasText: 'RHAISTRAT-300' });
+    await expect(row).toBeVisible();
+    const cells = row.locator('td');
+    // Key, Summary, TV, FV
+    await expect(cells.nth(2)).toContainText('3.5 EA1 RHOAI RELEASE');
+    await expect(cells.nth(3)).toContainText('3.5 EA2 RHOAI RELEASE');
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
