@@ -44,7 +44,10 @@ export function mergeReleaseDetails(releasesMap, names) {
     any = true
     for (var ci = 0; ci < cats.length; ci++) {
       var cat = cats[ci]
+      // Fall back to pre-5-category bucket names if present
       var list = rd[cat] || []
+      if (!list.length && cat === 'aligned_on_time' && Array.isArray(rd.aligned)) list = rd.aligned
+      if (!list.length && cat === 'misaligned' && Array.isArray(rd.mismatched)) list = rd.mismatched
       for (var fi = 0; fi < list.length; fi++) {
         var feat = list[fi]
         var key = feat && feat.key

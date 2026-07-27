@@ -14,6 +14,7 @@ const {
   normalizeIssue,
   classifyFeatures,
   buildExport,
+  normalizeLegacyTvFvCache,
   DEFAULT_RELEASES,
   jqlSafePattern,
 } = require('../../../server/tv-fv-delta/routes');
@@ -236,6 +237,63 @@ describe('buildReleaseDatesMap', () => {
       planningFreezeDate: '2026-07-29',
     });
     expect(map['rhoai-3.6.ea1']).toEqual(map[key]);
+  });
+});
+
+describe('normalizeLegacyTvFvCache', () => {
+  it('maps aligned/mismatched summary + buckets to 5-category fields', () => {
+    const legacy = {
+      metadata: { generated_at: '2026-07-27T00:00:00.000Z', releases: ['3.6 EA1 RHOAI RELEASE'] },
+      executive_summary: [{
+        release: '3.6 EA1 RHOAI RELEASE',
+        total: 140,
+        aligned: 49,
+        aligned_jql: 'https://example/aligned',
+        mismatched: 10,
+        mismatched_jql: 'https://example/mismatch',
+        tv_only: 72,
+        fv_only: 9,
+        alignment_pct: 35,
+      }],
+      releases: {
+        '3.6 EA1 RHOAI RELEASE': {
+          aligned: [{ key: 'A-1' }],
+          mismatched: [{ key: 'M-1' }],
+          tv_only: [{ key: 'T-1' }],
+          fv_only: [{ key: 'F-1' }],
+        },
+      },
+      component_breakdown: [{
+        component: 'Serving', total: 10, aligned: 4, mismatched: 1, tv_only: 4, fv_only: 1, alignment_pct: 40,
+      }],
+    };
+
+    const normalized = normalizeLegacyTvFvCache(legacy);
+    expect(normalized).not.toBe(legacy);
+    expect(normalized.executive_summary[0].aligned_on_time).toBe(49);
+    expect(normalized.executive_summary[0].aligned_late).toBe(0);
+    expect(normalized.executive_summary[0].misaligned).toBe(10);
+    expect(normalized.executive_summary[0].aligned_on_time_jql).toBe('https://example/aligned');
+    expect(normalized.executive_summary[0].alignment_pct).toBe(35);
+    expect(normalized.releases['3.6 EA1 RHOAI RELEASE'].aligned_on_time).toEqual([{ key: 'A-1' }]);
+    expect(normalized.releases['3.6 EA1 RHOAI RELEASE'].aligned_late).toEqual([]);
+    expect(normalized.releases['3.6 EA1 RHOAI RELEASE'].misaligned).toEqual([{ key: 'M-1' }]);
+    expect(normalized.component_breakdown[0].aligned_on_time).toBe(4);
+    expect(normalized.component_breakdown[0].misaligned).toBe(1);
+    expect(normalized.metadata.legacy_migrated).toBe(true);
+  });
+
+  it('leaves already-migrated payloads unchanged by reference', () => {
+    const current = {
+      metadata: { generated_at: '2026-07-27T00:00:00.000Z' },
+      executive_summary: [{
+        release: 'x', total: 2, aligned_on_time: 1, aligned_late: 0, tv_only: 0, fv_only: 0, misaligned: 1, alignment_pct: 50,
+      }],
+      releases: {
+        x: { aligned_on_time: [], aligned_late: [], tv_only: [], fv_only: [], misaligned: [] },
+      },
+    };
+    expect(normalizeLegacyTvFvCache(current)).toBe(current);
   });
 });
 
