@@ -15,8 +15,7 @@ const { navigateTo } = useModuleLink()
 const releases = ref([])
 const loading = ref(true)
 const error = ref(null)
-const selectedProduct = ref('')
-const selectedStream = ref('')
+const selectedFilter = ref('')
 
 async function fetchRegistry() {
   loading.value = true
@@ -35,32 +34,23 @@ onMounted(fetchRegistry)
 
 // ── Computed ──
 
-const products = computed(() => {
-  const set = {}
+const filterOptions = computed(() => {
+  const products = {}
   for (const r of releases.value) {
-    set[getProduct(r)] = true
+    products[getProduct(r)] = true
   }
-  return Object.keys(set).sort()
-})
-
-const streams = computed(() => {
-  const set = {}
-  for (const r of releases.value) {
-    const v = r.productPagesVersion
-    if (v) set[v] = true
-  }
-  return Object.keys(set).sort()
+  const keys = Object.keys(products).sort()
+  if (keys.length <= 1) return []
+  return keys.map(p => ({ value: 'product:' + p, label: p.toUpperCase() }))
 })
 
 const filteredReleases = computed(() => {
-  let list = releases.value
-  if (selectedProduct.value) {
-    list = list.filter(r => getProduct(r) === selectedProduct.value)
+  if (!selectedFilter.value) return releases.value
+  const [type, val] = selectedFilter.value.split(':')
+  if (type === 'product') {
+    return releases.value.filter(r => getProduct(r) === val)
   }
-  if (selectedStream.value) {
-    list = list.filter(r => r.productPagesVersion === selectedStream.value)
-  }
-  return list
+  return releases.value
 })
 
 const milestoneTypes = [
@@ -119,22 +109,13 @@ const remainingMilestones = computed(() => upcomingMilestones.value.slice(1))
     </div>
 
     <!-- Release filter -->
-    <div v-if="!loading && !error && (streams.length > 1 || products.length > 1)" class="flex gap-2 mb-3">
+    <div v-if="!loading && !error && filterOptions.length > 0" class="mb-3">
       <select
-        v-if="products.length > 1"
-        v-model="selectedProduct"
-        class="flex-1 text-xs rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        v-model="selectedFilter"
+        class="w-full text-xs rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
       >
-        <option value="">All products</option>
-        <option v-for="p in products" :key="p" :value="p">{{ p }}</option>
-      </select>
-      <select
-        v-if="streams.length > 1"
-        v-model="selectedStream"
-        class="flex-1 text-xs rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
-      >
-        <option value="">All releases</option>
-        <option v-for="s in streams" :key="s" :value="s">RHAI {{ s }}</option>
+        <option value="">All</option>
+        <option v-for="opt in filterOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
       </select>
     </div>
 
