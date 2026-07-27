@@ -65,7 +65,7 @@ function getInitialTab() {
   if (qIdx !== -1) {
     const params = new URLSearchParams(hash.slice(qIdx + 1))
     const tab = params.get('tab')
-    if (tab === 'search' || tab === 'nightly' || tab === 'versions' || tab === 'tracker' || tab === 'pre-built') return tab
+    if (tab === 'daily' || tab === 'search' || tab === 'nightly' || tab === 'versions' || tab === 'tracker' || tab === 'pre-built') return tab
   }
   return 'onboarded'
 }
