@@ -230,7 +230,7 @@ describe('ScheduleWidget', () => {
       const wrapper = mount(ScheduleWidget)
       await flushPromises()
 
-      await wrapper.find('select').setValue('rhoai')
+      await wrapper.find('select').setValue('product:rhoai')
       expect(wrapper.text()).toContain('RHOAI-3.5')
       expect(wrapper.text()).not.toContain('RHELAI-1.0')
       expect(wrapper.text()).not.toContain('RHAII-1.0')
@@ -241,7 +241,7 @@ describe('ScheduleWidget', () => {
       const wrapper = mount(ScheduleWidget)
       await flushPromises()
 
-      await wrapper.find('select').setValue('rhoai')
+      await wrapper.find('select').setValue('product:rhoai')
       await wrapper.find('select').setValue('')
       expect(wrapper.text()).toContain('RHOAI-3.5')
       expect(wrapper.text()).toContain('RHELAI-1.0')
