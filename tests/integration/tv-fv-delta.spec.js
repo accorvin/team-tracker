@@ -714,9 +714,9 @@ test.describe('TV/FV Delta — Release Tabs @tv-fv-delta', () => {
     await expect(cycleHeaders.nth(1)).toHaveText(/3\.5 Release Cycle/i);
 
     const cycle36 = selector.locator('div.rounded-lg.border').filter({ hasText: '3.6 Release Cycle' }).first();
-    const milestoneLabels = (await cycle36.locator('div.border-t > div').allTextContents())
-      .map(t => t.trim())
-      .filter(t => /^(3\.6 (GA|EA\d+) Release)$/.test(t));
+    // Milestone headers are buttons: "3.6 EA1 Release all products"
+    const milestoneLabels = (await cycle36.getByRole('button', { name: /all products/ }).allTextContents())
+      .map(t => t.replace(/\s+/g, ' ').trim().replace(/\s+all products$/i, ''));
     expect(milestoneLabels).toEqual([
       '3.6 EA1 Release',
       '3.6 EA2 Release',
