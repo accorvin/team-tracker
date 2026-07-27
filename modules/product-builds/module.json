@@ -42,12 +42,12 @@
       },
       {
         "key": "NIGHTLY_PIPELINE_GITLAB_PROJECT",
-        "description": "URL-encoded GitLab project path (defaults to redhat%2Frhel-ai%2Frhai%2Fpipeline)",
+        "description": "URL-encoded GitLab project path (defaults to redhat%2Frhel-ai%2Fwheels%2Ffondue)",
         "required": false
       },
       {
         "key": "NIGHTLY_PIPELINE_SCHEDULE_ID",
-        "description": "GitLab pipeline schedule ID (defaults to 4256496)",
+        "description": "GitLab pipeline schedule ID (defaults to 4358047)",
         "required": false
       },
       {
