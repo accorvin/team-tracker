@@ -1349,18 +1349,18 @@ test.describe('TV/FV Delta — Component Breakdown @tv-fv-delta', () => {
     await expect(servingRow).toBeVisible();
 
     // Total (3) and Aligned On Time (2) should be key-in Jira links
-    const totalLink = servingRow.locator('a[href*="key"]').filter({ hasText: /^3$/ });
+    const totalLink = servingRow.getByRole('link', { name: '3', exact: true });
     await expect(totalLink).toBeVisible();
     await expect(totalLink).toHaveAttribute('href', /key%20in|key\+in|key in/);
     await expect(totalLink).toHaveAttribute('href', /RHAISTRAT-100/);
 
-    const alignedLink = servingRow.locator('a[href*="key"]').filter({ hasText: /^2$/ });
+    const alignedLink = servingRow.getByRole('link', { name: '2', exact: true });
     await expect(alignedLink).toBeVisible();
     await expect(alignedLink).toHaveAttribute('href', /RHAISTRAT-100/);
     await expect(alignedLink).toHaveAttribute('href', /RHAISTRAT-102/);
 
     // Zero cells stay plain text (no Jira link)
-    await expect(servingRow.locator('a[href*="key"]').filter({ hasText: /^0$/ })).toHaveCount(0);
+    await expect(servingRow.getByRole('link', { name: '0', exact: true })).toHaveCount(0);
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
@@ -1447,7 +1447,8 @@ test.describe('TV/FV Delta — Component Breakdown @tv-fv-delta', () => {
     await page.waitForTimeout(300);
 
     const compSection = page.locator('details:has(summary:has-text("Component Breakdown"))');
-    const pctSpans = compSection.locator('tbody span.font-semibold');
+    // Alignment % is the last column — avoid matching ClickableCount zero spans
+    const pctSpans = compSection.locator('tbody td:last-child span.font-semibold');
     const count = await pctSpans.count();
     expect(count).toBeGreaterThan(0);
 
