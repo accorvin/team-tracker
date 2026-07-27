@@ -523,6 +523,13 @@ async function fetchScheduleTasks(releaseId, baseUrl, headers) {
  * e.g. (rhelai-3.4, "rhelai-3.4 EA1 release") → "rhelai-3.4.EA1"
  *      (rhelai-3.4, "rhelai-3.4 GA") → "rhelai-3.4"
  *      (RHAIIS-3.4, "rhaiis-3.4 EA2 GA") → "RHAIIS-3.4.EA2"
+ *      (rhai-3.5, "3.5 GA RHOAI RELEASE") → "rhoai-3.5"
+ *      (rhai-3.5, "3.5 EA1 RHELAI Release") → "rhelai-3.5.EA1"
+ *
+ * When the milestone name contains a product family between the phase and
+ * "Release" (e.g. "3.5 GA RHOAI RELEASE"), the family replaces the parent
+ * shortname's product prefix. This handles umbrella products like "rhai"
+ * whose milestones reference sub-products (RHOAI, RHELAI, RHAII).
  *
  * For umbrella products (e.g. rhai), extracts the sub-product name from the
  * milestone name and uses it as the prefix instead of the parent shortname:
