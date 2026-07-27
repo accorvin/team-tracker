@@ -74,11 +74,8 @@ const activeTab = ref(getInitialTab())
 watch(activeTab, (tab) => {
   const hash = window.location.hash || ''
   const base = hash.split('?')[0] || '#/product-builds/package-analysis'
-  if (tab === 'onboarded') {
-    window.location.hash = base
-  } else {
-    window.location.hash = `${base}?tab=${tab}`
-  }
+  const newHash = tab === 'onboarded' ? base : `${base}?tab=${tab}`
+  history.replaceState(null, '', window.location.pathname + window.location.search + newHash)
 })
 
 const reports = ref([])
