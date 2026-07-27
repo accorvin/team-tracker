@@ -188,6 +188,14 @@
 <script setup>
 import { ref, computed, onMounted, h } from 'vue'
 import { apiRequest } from '@shared/client/services/api.js'
+import {
+  parseDate, daysFromNow, formatShort as formatShortBase,
+  getProduct, releasePhase, milestoneProgress
+} from '../composables/useScheduleHelpers.js'
+
+function formatShort(dateStr) {
+  return formatShortBase(dateStr, { year: true })
+}
 
 // ── Data ──
 
@@ -216,38 +224,6 @@ onMounted(fetchRegistry)
 
 // ── Helpers ──
 
-function parseDate(val) {
-  if (!val) return null
-  const d = new Date(val)
-  return isNaN(d.getTime()) ? null : d
-}
-
-function todayMidnight() {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function daysFromNow(dateStr) {
-  const d = parseDate(dateStr)
-  if (!d) return null
-  const today = todayMidnight()
-  d.setHours(0, 0, 0, 0)
-  return Math.ceil((d.getTime() - today.getTime()) / 86400000)
-}
-
-function formatShort(dateStr) {
-  const d = parseDate(dateStr)
-  if (!d) return '—'
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function getProduct(release) {
-  if (release.productPagesShortname) return release.productPagesShortname
-  const match = release.id.match(/^([a-z]+)-/)
-  return match ? match[1] : release.id
-}
-
 function getGaDate(release) {
   return release.milestones?.ga || null
 }
@@ -267,40 +243,6 @@ function nextMilestone(release) {
     }
   }
   return null
-}
-
-function releasePhase(release) {
-  const ms = release.milestones || {}
-  const phases = [
-    { label: 'Planning', until: ms.planningFreeze },
-    { label: 'Feature Dev', until: ms.featureFreeze },
-    { label: 'Code Complete', until: ms.codeFreeze },
-    { label: 'Release Prep', until: ms.ga },
-    { label: 'Released', until: null }
-  ]
-  const today = todayMidnight()
-  let phaseIndex = 0
-  for (let i = 0; i < 4; i++) {
-    const d = parseDate(phases[i].until)
-    if (d && d.getTime() <= today.getTime()) {
-      phaseIndex = i + 1
-    }
-  }
-  return { phaseIndex, phases }
-}
-
-function milestoneProgress(currentDate, prevDate) {
-  const curr = parseDate(currentDate)
-  if (!curr) return null
-  const prev = prevDate ? parseDate(prevDate) : null
-  const today = todayMidnight()
-  if (today.getTime() >= curr.getTime()) return 100
-  if (!prev) return null
-  const total = curr.getTime() - prev.getTime()
-  if (total <= 0) return 100
-  const elapsed = today.getTime() - prev.getTime()
-  if (elapsed <= 0) return 0
-  return Math.min(100, Math.round((elapsed / total) * 100))
 }
 
 // ── Computed ──

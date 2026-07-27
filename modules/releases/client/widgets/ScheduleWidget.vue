@@ -2,6 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { apiRequest } from '@shared/client/services/api.js'
 import { useModuleLink } from '@shared/client/composables/useModuleLink.js'
+import {
+  daysFromNow, formatShort, getProduct, releasePhase
+} from '../composables/useScheduleHelpers.js'
 
 defineProps({
   size: { type: String, default: 'half' }
@@ -29,60 +32,6 @@ async function fetchRegistry() {
 }
 
 onMounted(fetchRegistry)
-
-// ── Helpers ──
-
-function parseDate(val) {
-  if (!val) return null
-  const d = new Date(val)
-  return isNaN(d.getTime()) ? null : d
-}
-
-function todayMidnight() {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function daysFromNow(dateStr) {
-  const d = parseDate(dateStr)
-  if (!d) return null
-  const today = todayMidnight()
-  d.setHours(0, 0, 0, 0)
-  return Math.ceil((d.getTime() - today.getTime()) / 86400000)
-}
-
-function formatShort(dateStr) {
-  const d = parseDate(dateStr)
-  if (!d) return '—'
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function getProduct(release) {
-  if (release.productPagesShortname) return release.productPagesShortname
-  const match = release.id.match(/^([a-z]+)-/i)
-  return match ? match[1] : release.id
-}
-
-function releasePhase(release) {
-  const ms = release.milestones || {}
-  const phases = [
-    { label: 'Planning', until: ms.planningFreeze },
-    { label: 'Feature Dev', until: ms.featureFreeze },
-    { label: 'Code Complete', until: ms.codeFreeze },
-    { label: 'Release Prep', until: ms.ga },
-    { label: 'Released', until: null }
-  ]
-  const today = todayMidnight()
-  let phaseIndex = 0
-  for (let i = 0; i < 4; i++) {
-    const d = parseDate(phases[i].until)
-    if (d && d.getTime() <= today.getTime()) {
-      phaseIndex = i + 1
-    }
-  }
-  return { phaseIndex, phases }
-}
 
 // ── Computed ──
 
