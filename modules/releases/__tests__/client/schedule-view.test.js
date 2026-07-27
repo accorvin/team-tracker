@@ -23,6 +23,10 @@ function makeRelease(id, opts = {}) {
   }
 }
 
+function getReleaseRows(wrapper) {
+  return wrapper.findAll('tbody tr').filter(r => r.findAll('td').length > 1)
+}
+
 describe('ScheduleView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -88,7 +92,7 @@ describe('ScheduleView', () => {
     const wrapper = mount(ScheduleView)
     await flushPromises()
 
-    const rows = wrapper.findAll('tbody tr')
+    const rows = getReleaseRows(wrapper)
     expect(rows[0].text()).toContain('RHOAI-3.4')
     expect(rows[1].text()).toContain('RHOAI-3.5')
     expect(rows[2].text()).toContain('RHOAI-3.6')
@@ -104,7 +108,7 @@ describe('ScheduleView', () => {
     const wrapper = mount(ScheduleView)
     await flushPromises()
 
-    const rows = wrapper.findAll('tbody tr')
+    const rows = getReleaseRows(wrapper)
     expect(rows).toHaveLength(1)
     expect(wrapper.text()).toContain('RHOAI-3.5')
     expect(wrapper.text()).not.toContain('RHOAI-3.4')
@@ -120,7 +124,7 @@ describe('ScheduleView', () => {
     const wrapper = mount(ScheduleView)
     await flushPromises()
 
-    const rows = wrapper.findAll('tbody tr')
+    const rows = getReleaseRows(wrapper)
     const pastRow = rows[0]
     expect(pastRow.classes()).toContain('opacity-50')
   })
@@ -172,7 +176,7 @@ describe('ScheduleView', () => {
     const rhoaiBtn = buttons.find(b => b.text() === 'rhoai')
     await rhoaiBtn.trigger('click')
 
-    const rows = wrapper.findAll('tbody tr')
+    const rows = getReleaseRows(wrapper)
     expect(rows).toHaveLength(1)
     expect(wrapper.text()).toContain('RHOAI-3.5')
     expect(wrapper.text()).not.toContain('RHELAI-1.0')
