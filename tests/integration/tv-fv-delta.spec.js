@@ -1354,7 +1354,7 @@ test.describe('TV/FV Delta — Component Breakdown @tv-fv-delta', () => {
     const compSection = page.locator('details:has(summary:has-text("Component Breakdown"))');
     const headers = compSection.locator('thead th');
 
-    const expectedHeaders = ['Component', 'PM', 'ENG', 'Total', 'On Time', 'Late', 'TV-Only', 'FV-Only', 'Misaligned', 'Alignment'];
+    const expectedHeaders = ['Component', 'PM', 'ENG', 'Total', 'Aligned On Time', 'Aligned Late', 'TV-Only', 'FV-Only', 'Misaligned', 'Alignment %'];
     const count = await headers.count();
     expect(count).toBe(expectedHeaders.length);
     for (let i = 0; i < expectedHeaders.length; i++) {
