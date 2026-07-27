@@ -3,6 +3,8 @@
  * Users can still add/remove versions after load via the release picker.
  *
  * Product-family Jira version names for 3.5 and 3.6 (EA1, EA2, GA).
+ * Display order in the UI is handled by buildNameRollup (EA1 → EA2 → GA).
+ * List order here prefers GA when auto-selecting the initial detail release.
  */
 export const DEFAULT_SELECTED_VERSIONS = [
   '3.6 GA RHOAI RELEASE',
