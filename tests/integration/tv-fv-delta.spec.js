@@ -524,10 +524,12 @@ test.describe('TV/FV Delta — Executive Summary @tv-fv-delta', () => {
     const summaryHeading = page.locator('h2:has-text("Executive Summary")');
     await expect(summaryHeading).toBeVisible();
 
-    // Verify all column headers
+    // Verify bucket/summary column headers (ⓘ help marker may follow the label)
+    const summaryTable = page.locator('div:has(> div > h2:has-text("Executive Summary")) table').first();
     const headers = ['Release', 'Total', 'Aligned On Time', 'Aligned Late', 'TV-Only', 'FV-Only', 'Misaligned', 'Alignment %'];
     for (const header of headers) {
-      const th = page.locator('th', { hasText: new RegExp(`^${header}$`, 'i') }).first();
+      const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const th = summaryTable.locator('th', { hasText: new RegExp(escaped, 'i') }).first();
       await expect(th).toBeVisible();
     }
 
