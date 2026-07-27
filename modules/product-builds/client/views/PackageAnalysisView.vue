@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
 import { apiRequest } from '@shared/client/services/api'
 import { useAuth } from '@shared/client/composables/useAuth'
 
@@ -70,6 +70,17 @@ function getInitialTab() {
   return 'onboarded'
 }
 const activeTab = ref(getInitialTab())
+
+watch(activeTab, (tab) => {
+  const hash = window.location.hash || ''
+  const base = hash.split('?')[0] || '#/product-builds/package-analysis'
+  if (tab === 'onboarded') {
+    window.location.hash = base
+  } else {
+    window.location.hash = `${base}?tab=${tab}`
+  }
+})
+
 const reports = ref([])
 const loading = ref(true)
 const error = ref(null)
