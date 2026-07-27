@@ -17,4 +17,11 @@ describe('buildKeysJqlUrl', function () {
     var jql = decodeURIComponent(url.split('jql=')[1])
     expect(jql).toBe('key in (RHAISTRAT-1, RHAISTRAT-2)')
   })
+
+  it('falls back to /browse/ KEY from url when key is missing', function () {
+    var url = buildKeysJqlUrl([
+      { url: 'https://redhat.atlassian.net/browse/RHAISTRAT-2196' },
+    ])
+    expect(decodeURIComponent(url.split('jql=')[1])).toBe('key in (RHAISTRAT-2196)')
+  })
 })
