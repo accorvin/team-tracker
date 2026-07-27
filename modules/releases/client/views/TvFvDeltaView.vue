@@ -840,12 +840,24 @@ onBeforeUnmount(() => {
                 <td class="px-4 py-2 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
                   {{ leadsFor(comp.component)?.engLead || '—' }}
                 </td>
-                <td class="px-4 py-2 text-right text-gray-700 dark:text-gray-300">{{ comp.total }}</td>
-                <td class="px-4 py-2 text-right text-green-600 dark:text-green-400">{{ comp.aligned_on_time }}</td>
-                <td class="px-4 py-2 text-right text-amber-600 dark:text-amber-400">{{ comp.aligned_late }}</td>
-                <td class="px-4 py-2 text-right text-yellow-600 dark:text-yellow-400">{{ comp.tv_only }}</td>
-                <td class="px-4 py-2 text-right text-gray-500 dark:text-gray-400">{{ comp.fv_only }}</td>
-                <td class="px-4 py-2 text-right text-red-600 dark:text-red-400">{{ comp.misaligned }}</td>
+                <td class="px-4 py-2 text-right">
+                  <ClickableCount :count="comp.total" :jql="comp.total_jql" label="Total features" />
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <ClickableCount :count="comp.aligned_on_time" :jql="comp.aligned_on_time_jql" color="green" label="Aligned on time" />
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <ClickableCount :count="comp.aligned_late" :jql="comp.aligned_late_jql" color="amber" label="Aligned late" />
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <ClickableCount :count="comp.tv_only" :jql="comp.tv_only_jql" color="yellow" label="TV-only" />
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <ClickableCount :count="comp.fv_only" :jql="comp.fv_only_jql" color="muted" label="FV-only" />
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <ClickableCount :count="comp.misaligned" :jql="comp.misaligned_jql" color="red" label="Misaligned" />
+                </td>
                 <td class="px-4 py-2 text-right">
                   <span
                     class="font-semibold"

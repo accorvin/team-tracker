@@ -87,7 +87,7 @@ async function mountView(extraData) {
     global: {
       stubs: {
         ClickableCount: {
-          template: '<span class="clickable-count">{{ count }}</span>',
+          template: '<a v-if="jql" class="clickable-count" :href="jql">{{ count }}</a><span v-else class="clickable-count">{{ count }}</span>',
           props: ['count', 'jql', 'color', 'label'],
         },
       },
@@ -406,6 +406,13 @@ describe('TvFvDeltaView component breakdown PM/ENG columns', function () {
     })
     expect(servingRow.text()).toContain('PM Lead Serving')
     expect(servingRow.text()).toContain('Eng Lead Serving')
+
+    // Non-zero counts link to key-in Jira lists for that component
+    var totalLink = servingRow.findAll('a').find(function (a) {
+      return a.attributes('href') && a.attributes('href').includes('key') && a.text().trim() === '1'
+    })
+    expect(totalLink).toBeTruthy()
+    expect(totalLink.attributes('href')).toContain('RHAISTRAT-1')
 
     var unknownRow = table.findAll('tbody tr').find(function (r) {
       return r.text().includes('Unknown Comp')

@@ -1321,6 +1321,7 @@ test.describe('TV/FV Delta — Component Breakdown @tv-fv-delta', () => {
     await page.goto('/#/releases/reports?report=tv-fv-delta');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+    await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
 
     // Expand Component Breakdown
     await page.locator('summary:has-text("Component Breakdown")').click();
@@ -1330,6 +1331,36 @@ test.describe('TV/FV Delta — Component Breakdown @tv-fv-delta', () => {
     // EA1: Serving appears in RHAISTRAT-100, 102, 300 = 3 features (meets >= 2 threshold)
     const servingRow = compSection.locator('tbody tr', { hasText: 'Serving' });
     await expect(servingRow).toBeVisible();
+
+    expect(relevantErrors(page)).toHaveLength(0);
+  });
+
+  test('should link non-zero component counts to Jira key-in lists', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=tv-fv-delta');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+    await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
+
+    await page.locator('summary:has-text("Component Breakdown")').click();
+    await page.waitForTimeout(300);
+
+    const servingRow = page.locator('details:has(summary:has-text("Component Breakdown"))')
+      .locator('tbody tr', { hasText: 'Serving' });
+    await expect(servingRow).toBeVisible();
+
+    // Total (3) and Aligned On Time (2) should be key-in Jira links
+    const totalLink = servingRow.locator('a[href*="key"]').filter({ hasText: /^3$/ });
+    await expect(totalLink).toBeVisible();
+    await expect(totalLink).toHaveAttribute('href', /key%20in|key\+in|key in/);
+    await expect(totalLink).toHaveAttribute('href', /RHAISTRAT-100/);
+
+    const alignedLink = servingRow.locator('a[href*="key"]').filter({ hasText: /^2$/ });
+    await expect(alignedLink).toBeVisible();
+    await expect(alignedLink).toHaveAttribute('href', /RHAISTRAT-100/);
+    await expect(alignedLink).toHaveAttribute('href', /RHAISTRAT-102/);
+
+    // Zero cells stay plain text (no Jira link)
+    await expect(servingRow.locator('a[href*="key"]').filter({ hasText: /^0$/ })).toHaveCount(0);
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
