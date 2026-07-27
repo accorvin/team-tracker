@@ -94,6 +94,162 @@ const JQL_FIELDS = [
 ].join(',')
 
 // ---------------------------------------------------------------------------
+// Release Name Parsing and Comparison
+// ---------------------------------------------------------------------------
+
+// Compact pattern: {product}-{major}.{minor}[.EA{n}]
+var RELEASE_PATTERN = /^(rhoai|rhelai|rhaii)[- _](\d+)\.(\d+)(?:\.EA(\d+))?$/i
+// Jira version pattern: "{major}.{minor} [EA{n}|GA] {PRODUCT} RELEASE"
+var JIRA_RELEASE_PATTERN = /^(\d+)\.(\d+)(?:\s+(EA\d+|GA))?\s+(RHOAI|RHAII|RHELAI)(?:\s+RELEASE)?$/i
+
+var PRODUCT_ALIASES = { rhoai: 'rhoai', rhelai: 'rhelai', rhaii: 'rhaii' }
+
+/**
+ * Parse a release name into structured parts.
+ * e.g. "rhoai-3.6.EA1" → { product: "rhoai", major: 3, minor: 6, milestone: "EA1", milestoneOrder: 1 }
+ * e.g. "rhoai-3.5"     → { product: "rhoai", major: 3, minor: 5, milestone: "GA",  milestoneOrder: 99 }
+ * e.g. "3.6 EA1 RHOAI RELEASE" → same structure (Jira Target/Fix Version format)
+ */
+function parseReleaseName(name) {
+  if (!name) return null
+  var m = RELEASE_PATTERN.exec(String(name).trim())
+  if (m) {
+    var eaNum = m[4] ? parseInt(m[4], 10) : 0
+    return {
+      product: m[1].toLowerCase(),
+      major: parseInt(m[2], 10),
+      minor: parseInt(m[3], 10),
+      milestone: eaNum ? 'EA' + eaNum : 'GA',
+      milestoneOrder: eaNum || 99,
+      raw: name,
+    }
+  }
+
+  var jm = JIRA_RELEASE_PATTERN.exec(String(name).trim())
+  if (jm) {
+    var product = PRODUCT_ALIASES[jm[4].toLowerCase()]
+    if (!product) return null
+    var phaseLabel = jm[3] ? String(jm[3]).toUpperCase() : 'GA'
+    var eaFromJira = /^EA(\d+)$/.test(phaseLabel) ? parseInt(phaseLabel.slice(2), 10) : 0
+    return {
+      product: product,
+      major: parseInt(jm[1], 10),
+      minor: parseInt(jm[2], 10),
+      milestone: eaFromJira ? 'EA' + eaFromJira : 'GA',
+      milestoneOrder: eaFromJira || 99,
+      raw: name,
+    }
+  }
+
+  return null
+}
+
+/**
+ * Compare two release names for sorting.
+ * Order: product alpha → major desc → minor desc → milestone asc (EA1 < EA2 < GA).
+ */
+function compareReleases(a, b) {
+  var pa = parseReleaseName(a)
+  var pb = parseReleaseName(b)
+  // Unparseable releases sort last, alphabetically
+  if (!pa && !pb) return a.localeCompare(b)
+  if (!pa) return 1
+  if (!pb) return -1
+
+  // Product alphabetical (rhelai < rhaii < rhoai)
+  if (pa.product !== pb.product) return pa.product.localeCompare(pb.product)
+  // Major descending (3.6 before 3.5)
+  if (pa.major !== pb.major) return pb.major - pa.major
+  // Minor descending
+  if (pa.minor !== pb.minor) return pb.minor - pa.minor
+  // Milestone ascending (EA1 before EA2 before GA)
+  return pa.milestoneOrder - pb.milestoneOrder
+}
+
+/**
+ * Compare two releases temporally (earlier release = negative, later = positive).
+ * Unlike compareReleases (which is for display sorting), this gives a consistent
+ * temporal ordering: major ASC → minor ASC → milestone ASC.
+ * Returns null if either release is unparseable or from different products.
+ */
+function compareReleasesTemporally(a, b) {
+  var pa = parseReleaseName(a)
+  var pb = parseReleaseName(b)
+  if (!pa || !pb) return null
+  if (pa.product !== pb.product) return null
+  if (pa.major !== pb.major) return pa.major - pb.major
+  if (pa.minor !== pb.minor) return pa.minor - pb.minor
+  return pa.milestoneOrder - pb.milestoneOrder
+}
+
+/**
+ * Extract the product prefix from a release name.
+ * Returns lowercase: "rhoai", "rhelai", "rhaii", or null.
+ */
+function extractProduct(name) {
+  var parsed = parseReleaseName(name)
+  if (parsed) return parsed.product
+  var m = /^(rhoai|rhelai|rhaii)/i.exec(name || '')
+  return m ? m[1].toLowerCase() : null
+}
+
+/**
+ * Build a release-date lookup map from Product Pages cache entries.
+ * Keys include both the raw releaseNumber and its normVer form so Jira
+ * version names like "3.6 EA1 RHOAI RELEASE" resolve to the same dates.
+ */
+function buildReleaseDatesMap(ppReleases) {
+  var releaseDates = {}
+  if (!Array.isArray(ppReleases)) return releaseDates
+
+  for (var pi = 0; pi < ppReleases.length; pi++) {
+    var ppRel = ppReleases[pi]
+    var releaseNumber = ppRel && ppRel.releaseNumber
+    if (!releaseNumber) continue
+
+    var dates = {
+      dueDate: ppRel.dueDate || null,
+      planningFreezeDate: ppRel.planningFreezeDate || null,
+    }
+    var rawKey = String(releaseNumber).toLowerCase()
+    releaseDates[rawKey] = dates
+    var nv = normVer(releaseNumber)
+    if (nv) releaseDates[nv] = dates
+  }
+
+  return releaseDates
+}
+
+/**
+ * Check if a release has passed planning freeze.
+ * - If planning freeze date exists and is in the past → true
+ * - If no planning freeze but GA date exists and is in the past → true
+ * - Otherwise → false
+ */
+function isReleaseFrozen(releaseName, releaseDates) {
+  if (!releaseDates) return false
+
+  var normName = normVer(releaseName)
+  var dates = releaseDates[releaseName] || releaseDates[normName] || {}
+
+  var now = new Date()
+
+  // Check planning freeze date first
+  if (dates.planningFreezeDate) {
+    var freezeDate = new Date(dates.planningFreezeDate + 'T00:00:00Z')
+    if (freezeDate <= now) return true
+  }
+
+  // Fallback to GA date
+  if (dates.dueDate) {
+    var gaDate = new Date(dates.dueDate + 'T00:00:00Z')
+    if (gaDate <= now) return true
+  }
+
+  return false
+}
+
+// ---------------------------------------------------------------------------
 // Version normalisation
 // ---------------------------------------------------------------------------
 
@@ -230,7 +386,7 @@ function normalizeIssue(issue) {
 // Classification engine
 // ---------------------------------------------------------------------------
 
-function classifyFeatures(features, releases) {
+function classifyFeatures(features, releases, releaseDates) {
   const classifications = []
 
   for (let ri = 0; ri < releases.length; ri++) {
@@ -245,12 +401,145 @@ function classifyFeatures(features, releases) {
       if (!tvMatch && !fvMatch) continue
 
       let cat
+
+      // Case 1: FV matches this release AND TV matches this release
       if (tvMatch && fvMatch) {
-        cat = 'aligned'
-      } else if (tvMatch && !fvMatch) {
-        cat = feat.fv_set.size > 0 ? 'mismatched' : 'tv_only'
-      } else {
-        cat = feat.tv_set.size > 0 ? 'mismatched' : 'fv_only'
+        cat = 'aligned_on_time'
+      }
+      // Case 2: TV matches this release but FV doesn't
+      else if (tvMatch && !fvMatch) {
+        if (feat.fv_set.size === 0) {
+          // No FV at all
+          cat = 'tv_only'
+        } else {
+          // FV is set — compare each FV against ALL TVs (spec rule 3).
+          // This ensures multi-TV features correctly detect unfrozen TVs.
+          let fvRaw = feat.fix_versions.split(',').map(function(s) { return s.trim() }).filter(Boolean)
+          let tvRawAll = feat.target_version.split(',').map(function(s) { return s.trim() }).filter(Boolean)
+
+          let worstCategory = 'aligned_on_time'
+          let hasSameProductComparison = false
+
+          for (let fvi = 0; fvi < fvRaw.length; fvi++) {
+            let fvParsed = parseReleaseName(fvRaw[fvi])
+            let fvProduct = fvParsed ? fvParsed.product : null
+
+            // Unparseable FV = distinct product (spec rule 5) → misaligned
+            if (!fvParsed) {
+              worstCategory = 'misaligned'
+              break
+            }
+
+            // Compare this FV against each TV
+            for (let tvi = 0; tvi < tvRawAll.length; tvi++) {
+              let tvParsed = parseReleaseName(tvRawAll[tvi])
+              let tvProduct = tvParsed ? tvParsed.product : null
+
+              // Unparseable TV = distinct product → misaligned
+              if (!tvParsed) {
+                worstCategory = 'misaligned'
+                break
+              }
+
+              // Different product = misaligned (spec rule 4)
+              if (fvProduct !== tvProduct) {
+                continue // Skip cross-product TVs (spec rule 4: only compare same product)
+              }
+
+              hasSameProductComparison = true
+              let cmp = compareReleasesTemporally(fvRaw[fvi], tvRawAll[tvi])
+
+              // compareReleasesTemporally: positive = FV later, negative = FV earlier
+              if (cmp !== null && cmp < 0) {
+                // FV before this TV (ahead) - aligned_on_time (best)
+                // Keep current worstCategory
+              } else if (cmp !== null && cmp > 0) {
+                // FV after this TV - check freeze
+                let frozen = isReleaseFrozen(tvRawAll[tvi], releaseDates)
+                if (!frozen) {
+                  // Not frozen = misaligned (worst)
+                  worstCategory = 'misaligned'
+                  break
+                } else if (worstCategory !== 'misaligned') {
+                  // Frozen = aligned_late (middle)
+                  worstCategory = 'aligned_late'
+                }
+              }
+            }
+
+            if (worstCategory === 'misaligned') break
+          }
+
+          // No same-product comparisons = all cross-product = misaligned
+          if (!hasSameProductComparison && worstCategory !== 'misaligned') {
+            worstCategory = 'misaligned'
+          }
+
+          cat = worstCategory
+        }
+      }
+      // Case 3: FV matches this release but TV doesn't
+      else if (fvMatch && !tvMatch) {
+        if (feat.tv_set.size === 0) {
+          // No TV at all
+          cat = 'fv_only'
+        } else {
+          // TV is set — compare FV (= release) against all TVs
+          let tvRaw = feat.target_version.split(',').map(function(s) { return s.trim() }).filter(Boolean)
+          let relParsed2 = parseReleaseName(release)
+
+          let worstCategory = 'aligned_on_time'
+          let hasSameProductTV = false
+
+          for (let tvi = 0; tvi < tvRaw.length; tvi++) {
+            let tvParsed = parseReleaseName(tvRaw[tvi])
+
+            // Unparseable TV = distinct product (spec rule 5) → misaligned
+            if (!tvParsed) {
+              worstCategory = 'misaligned'
+              break
+            }
+
+            // Unparseable FV (release) = distinct product → misaligned
+            if (!relParsed2) {
+              worstCategory = 'misaligned'
+              break
+            }
+
+            // Different product = skip (spec rule 4: only compare same product)
+            if (tvParsed.product !== relParsed2.product) {
+              continue
+            }
+
+            hasSameProductTV = true
+            let cmp = compareReleasesTemporally(release, tvRaw[tvi])  // FV (release) vs TV
+
+            // compareReleasesTemporally: positive = FV later, negative = FV earlier
+            if (cmp !== null && cmp < 0) {
+              // FV before TV (ahead) - aligned_on_time (best)
+              // Keep current worstCategory
+            } else if (cmp !== null && cmp > 0) {
+              // FV after TV - check freeze
+              let frozen = isReleaseFrozen(tvRaw[tvi], releaseDates)
+              if (!frozen) {
+                // Any unfrozen TV where FV is after = misaligned (worst)
+                worstCategory = 'misaligned'
+                break
+              } else if (worstCategory !== 'misaligned') {
+                // All TVs frozen = aligned_late (middle)
+                worstCategory = 'aligned_late'
+              }
+            }
+            // else cmp === 0 means same release (shouldn't happen since fvMatch && !tvMatch)
+          }
+
+          // All TVs from different product = misaligned
+          if (!hasSameProductTV && worstCategory !== 'misaligned') {
+            worstCategory = 'misaligned'
+          }
+
+          cat = worstCategory
+        }
       }
 
       classifications.push({
@@ -280,7 +569,7 @@ function classifyFeatures(features, releases) {
 // ---------------------------------------------------------------------------
 
 function buildExport(classifications, releases, fetchTimestamp, allComponents, jiraProject, releaseDates) {
-  const baseJql = 'project = ' + jiraProject + ' AND issuetype = Feature'
+  const baseJql = 'project = ' + jiraProject + ' AND issuetype = Feature AND (resolution = Unresolved OR resolution IN ("Done", "Done-Errata"))'
 
   const executiveSummary = []
   const releaseBuckets = {}
@@ -290,12 +579,12 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
     const items = classifications.filter(function(c) { return c.release === release })
     const nTotal = items.length
 
-    const cats = { aligned: 0, tv_only: 0, fv_only: 0, mismatched: 0 }
+    const cats = { aligned_on_time: 0, aligned_late: 0, misaligned: 0, tv_only: 0, fv_only: 0 }
     for (let i = 0; i < items.length; i++) {
       cats[items[i].category]++
     }
 
-    const alignPct = nTotal > 0 ? Math.round(1000 * cats.aligned / nTotal) / 10 : 0
+    const alignPct = nTotal > 0 ? Math.round(1000 * (cats.aligned_on_time + cats.aligned_late) / nTotal) / 10 : 0
 
     // Look up release dates from Product Pages cache
     let dates = {}
@@ -307,21 +596,23 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
       release: release,
       total: nTotal,
       total_jql: jqlUrl(baseJql + ' AND ("Target Version" in (' + quoteRelease(release) + ') OR fixVersion in (' + quoteRelease(release) + '))'),
-      aligned: cats.aligned,
-      aligned_jql: jqlUrl(baseJql + ' AND "Target Version" in (' + quoteRelease(release) + ') AND fixVersion in (' + quoteRelease(release) + ')'),
+      aligned_on_time: cats.aligned_on_time,
+      aligned_on_time_jql: jqlUrl(baseJql + ' AND "Target Version" in (' + quoteRelease(release) + ') AND fixVersion in (' + quoteRelease(release) + ')'),
+      aligned_late: cats.aligned_late,
+      aligned_late_jql: null, // Cannot express temporal + freeze logic in JQL
+      misaligned: cats.misaligned,
+      misaligned_jql: null, // Cannot express temporal + freeze logic in JQL
       tv_only: cats.tv_only,
       tv_only_jql: jqlUrl(baseJql + ' AND "Target Version" in (' + quoteRelease(release) + ') AND fixVersion is EMPTY'),
       fv_only: cats.fv_only,
       fv_only_jql: jqlUrl(baseJql + ' AND fixVersion in (' + quoteRelease(release) + ') AND "Target Version" is EMPTY'),
-      mismatched: cats.mismatched,
-      mismatched_jql: jqlUrl(baseJql + ' AND (("Target Version" in (' + quoteRelease(release) + ') AND fixVersion is not EMPTY AND fixVersion not in (' + quoteRelease(release) + ')) OR (fixVersion in (' + quoteRelease(release) + ') AND "Target Version" is not EMPTY AND "Target Version" not in (' + quoteRelease(release) + ')))'),
       alignment_pct: alignPct,
       ga_date: dates.dueDate || null,
       planning_freeze: dates.planningFreezeDate || null,
     })
 
     // Per-release feature lists
-    const bucket = { aligned: [], tv_only: [], fv_only: [], mismatched: [] }
+    const bucket = { aligned_on_time: [], aligned_late: [], misaligned: [], tv_only: [], fv_only: [] }
     for (let ci = 0; ci < items.length; ci++) {
       const item = items[ci]
       const row = {
@@ -345,8 +636,8 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
 
   // Component breakdown — deduplicate by issue key per component
   // When a feature appears in multiple releases, pick the worst category:
-  // mismatched > tv_only > fv_only > aligned (show the most actionable state)
-  const CATEGORY_PRIORITY = { mismatched: 3, tv_only: 2, fv_only: 1, aligned: 0 }
+  // misaligned > tv_only > fv_only > aligned_late > aligned_on_time
+  const CATEGORY_PRIORITY = { misaligned: 4, tv_only: 3, fv_only: 2, aligned_late: 1, aligned_on_time: 0 }
   const compMap = {}
   for (let ki = 0; ki < classifications.length; ki++) {
     const cl = classifications[ki]
@@ -372,19 +663,21 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
     const name = allCompNames[cn]
     const data = compMap[name]
     let total = 0
-    let aligned = 0
+    let aligned_on_time = 0
+    let aligned_late = 0
     let tv_only = 0
     let fv_only = 0
-    let mismatched = 0
+    let misaligned = 0
 
     if (data) {
       const entries = Object.values(data)
       total = entries.length
       for (let ei = 0; ei < entries.length; ei++) {
-        if (entries[ei] === 'aligned') aligned++
+        if (entries[ei] === 'aligned_on_time') aligned_on_time++
+        else if (entries[ei] === 'aligned_late') aligned_late++
         else if (entries[ei] === 'tv_only') tv_only++
         else if (entries[ei] === 'fv_only') fv_only++
-        else if (entries[ei] === 'mismatched') mismatched++
+        else if (entries[ei] === 'misaligned') misaligned++
       }
     }
 
@@ -393,11 +686,12 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
       component: name,
       total: total,
       total_jql: jqlUrl(baseJql + ' AND component = ' + compQ + ' AND ("Target Version" in (' + releases.map(quoteRelease).join(', ') + ') OR fixVersion in (' + releases.map(quoteRelease).join(', ') + '))'),
-      aligned: aligned,
+      aligned_on_time: aligned_on_time,
+      aligned_late: aligned_late,
       tv_only: tv_only,
       fv_only: fv_only,
-      mismatched: mismatched,
-      alignment_pct: total > 0 ? Math.round(1000 * aligned / total) / 10 : 0
+      misaligned: misaligned,
+      alignment_pct: total > 0 ? Math.round(1000 * (aligned_on_time + aligned_late) / total) / 10 : 0
     })
   }
   componentBreakdown.sort(function(a, b) { return b.total - a.total || a.component.localeCompare(b.component) })
@@ -428,9 +722,14 @@ async function fetchAndClassify(releases, storage, jiraProject) {
   const allComponents = await fetchAllComponents(jiraProject)
   console.log('[releases/tv-fv-delta] Fetched ' + allComponents.length + ' components from Jira')
 
+  // Look up release dates from Product Pages delivery cache (needed for classification + summary columns)
+  const ppCache = await storage.readFromStorage('releases/delivery/product-pages-releases-cache.json')
+  const releaseDates = buildReleaseDatesMap(ppCache && ppCache.releases)
+
   // Build JQL: features that have TV or FV in any of the target releases
+  // Filter resolution: exclude dead features (Duplicate, Obsolete, WontDo)
   const releaseList = releases.map(quoteRelease).join(', ')
-  const jql = 'project = ' + jiraProject + ' AND issuetype = Feature AND ("Target Version" in (' + releaseList + ') OR fixVersion in (' + releaseList + '))'
+  const jql = 'project = ' + jiraProject + ' AND issuetype = Feature AND (resolution = Unresolved OR resolution IN ("Done", "Done-Errata")) AND ("Target Version" in (' + releaseList + ') OR fixVersion in (' + releaseList + '))'
 
   console.log('[releases/tv-fv-delta] Fetching features: ' + jql)
   const issues = await fetchAllJqlResults(jiraRequest, jql, JQL_FIELDS)
@@ -440,24 +739,8 @@ async function fetchAndClassify(releases, storage, jiraProject) {
   const features = issues.map(normalizeIssue)
 
   // Classify
-  const classifications = classifyFeatures(features, releases)
+  const classifications = classifyFeatures(features, releases, releaseDates)
   console.log('[releases/tv-fv-delta] Classified ' + classifications.length + ' feature-release pairs')
-
-  // Look up release dates from Product Pages delivery cache
-  const releaseDates = {}
-  const ppCache = await storage.readFromStorage('releases/delivery/product-pages-releases-cache.json')
-  if (ppCache && Array.isArray(ppCache.releases)) {
-    for (let pi = 0; pi < ppCache.releases.length; pi++) {
-      const ppRel = ppCache.releases[pi]
-      const ppKey = (ppRel.releaseNumber || '').toLowerCase()
-      if (ppKey) {
-        releaseDates[ppKey] = {
-          dueDate: ppRel.dueDate || null,
-          planningFreezeDate: ppRel.planningFreezeDate || null,
-        }
-      }
-    }
-  }
 
   // Build export
   const result = buildExport(classifications, releases, fetchTimestamp, allComponents, jiraProject, releaseDates)
@@ -479,6 +762,12 @@ module.exports.normVer = normVer
 module.exports.parseVersions = parseVersions
 module.exports.extractVersionNames = extractVersionNames
 module.exports.isZStream = isZStream
+module.exports.parseReleaseName = parseReleaseName
+module.exports.compareReleases = compareReleases
+module.exports.compareReleasesTemporally = compareReleasesTemporally
+module.exports.extractProduct = extractProduct
+module.exports.buildReleaseDatesMap = buildReleaseDatesMap
+module.exports.isReleaseFrozen = isReleaseFrozen
 module.exports.normalizeIssue = normalizeIssue
 module.exports.classifyFeatures = classifyFeatures
 module.exports.buildExport = buildExport
@@ -572,7 +861,7 @@ async function registerRoutes(router, context) {
     }
 
     // No cache — trigger first fetch using planning config if available
-    triggerBackgroundRefresh(await fetchReleasesFromPlanning(storage).releases)
+    triggerBackgroundRefresh((await fetchReleasesFromPlanning(storage)).releases)
     res.status(202).json({
       _refreshing: true,
       _noCache: true,
@@ -612,7 +901,7 @@ async function registerRoutes(router, context) {
       releases = req.body.releases
     } else {
       // Auto-discover from planning module (Smartsheet SSOT)
-      releases = await fetchReleasesFromPlanning(storage).releases
+      releases = (await fetchReleasesFromPlanning(storage)).releases
     }
 
     // Cap releases array to prevent excessive API load
@@ -701,7 +990,7 @@ async function registerRoutes(router, context) {
         return res.json(result)
       }
       const versions = allVersions
-        .filter(function(v) { return !v.archived && !isZStream(v.name) })
+        .filter(function(v) { return !v.archived })
         .sort(function(a, b) { return (a.name || '').localeCompare(b.name || '') })
 
       const result = { versions: versions, fetchedAt: new Date().toISOString() }

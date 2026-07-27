@@ -12,7 +12,7 @@ const { setupErrorTracking, logCapturedErrors } = require('./helpers');
  * - Executive summary table renders with correct columns
  * - Executive summary / selector ordered cycle → milestone → product (numeric desc)
  * - Release tab switching works
- * - Category sections (TV-Only, FV-Only, Mismatched, Aligned) render
+ * - Category sections (TV-Only, FV-Only, Misaligned, Aligned on time, Aligned late) render
  * - Component breakdown updates per release
  * - Collapsible sections work (details/summary)
  * - Feature tables are sortable
@@ -30,13 +30,13 @@ const { setupErrorTracking, logCapturedErrors } = require('./helpers');
 function emptySummaryRow(release) {
   return {
     release,
-    total: 0, aligned: 0, tv_only: 0, fv_only: 0, mismatched: 0,
+    total: 0, aligned_on_time: 0, aligned_late: 0, tv_only: 0, fv_only: 0, misaligned: 0,
     alignment_pct: 0,
     total_jql: 'https://redhat.atlassian.net/issues/?jql=test-empty',
-    aligned_jql: 'https://redhat.atlassian.net/issues/?jql=test-empty',
+    aligned_on_time_jql: 'https://redhat.atlassian.net/issues/?jql=test-empty',
     tv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-empty',
     fv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-empty',
-    mismatched_jql: 'https://redhat.atlassian.net/issues/?jql=test-empty'
+    misaligned_jql: 'https://redhat.atlassian.net/issues/?jql=test-empty'
   };
 }
 
@@ -78,90 +78,94 @@ const FIXTURE_DATA = {
     ].includes(r)).map(emptySummaryRow),
     {
       release: '3.5 EA1 RHOAI RELEASE',
-      total: 5, aligned: 3, tv_only: 1, fv_only: 0, mismatched: 1,
+      total: 5, aligned_on_time: 3, aligned_late: 0, tv_only: 1, fv_only: 0, misaligned: 1,
       alignment_pct: 60,
       total_jql: 'https://redhat.atlassian.net/issues/?jql=test-total-ea1',
-      aligned_jql: 'https://redhat.atlassian.net/issues/?jql=test-aligned-ea1',
+      aligned_on_time_jql: 'https://redhat.atlassian.net/issues/?jql=test-aligned-ea1',
       tv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-tvonly-ea1',
       fv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-fvonly-ea1',
-      mismatched_jql: 'https://redhat.atlassian.net/issues/?jql=test-mismatch-ea1'
+      misaligned_jql: 'https://redhat.atlassian.net/issues/?jql=test-mismatch-ea1'
     },
     {
       release: '3.5 EA1 RHAII RELEASE',
-      total: 1, aligned: 1, tv_only: 0, fv_only: 0, mismatched: 0,
+      total: 1, aligned_on_time: 1, aligned_late: 0, tv_only: 0, fv_only: 0, misaligned: 0,
       alignment_pct: 100,
       total_jql: 'https://redhat.atlassian.net/issues/?jql=test-total-ea1-rhaii',
-      aligned_jql: 'https://redhat.atlassian.net/issues/?jql=test-aligned-ea1-rhaii',
+      aligned_on_time_jql: 'https://redhat.atlassian.net/issues/?jql=test-aligned-ea1-rhaii',
       tv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-tvonly-ea1-rhaii',
       fv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-fvonly-ea1-rhaii',
-      mismatched_jql: 'https://redhat.atlassian.net/issues/?jql=test-mismatch-ea1-rhaii'
+      misaligned_jql: 'https://redhat.atlassian.net/issues/?jql=test-mismatch-ea1-rhaii'
     },
     {
       release: '3.5 EA2 RHOAI RELEASE',
-      total: 4, aligned: 2, tv_only: 1, fv_only: 1, mismatched: 0,
+      total: 4, aligned_on_time: 2, aligned_late: 0, tv_only: 1, fv_only: 1, misaligned: 0,
       alignment_pct: 50,
       total_jql: 'https://redhat.atlassian.net/issues/?jql=test-total-ea2',
-      aligned_jql: 'https://redhat.atlassian.net/issues/?jql=test-aligned-ea2',
+      aligned_on_time_jql: 'https://redhat.atlassian.net/issues/?jql=test-aligned-ea2',
       tv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-tvonly-ea2',
       fv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-fvonly-ea2',
-      mismatched_jql: 'https://redhat.atlassian.net/issues/?jql=test-mismatch-ea2'
+      misaligned_jql: 'https://redhat.atlassian.net/issues/?jql=test-mismatch-ea2'
     },
     {
       release: '3.5 GA RHOAI RELEASE',
-      total: 3, aligned: 3, tv_only: 0, fv_only: 0, mismatched: 0,
+      total: 3, aligned_on_time: 3, aligned_late: 0, tv_only: 0, fv_only: 0, misaligned: 0,
       alignment_pct: 100,
       total_jql: 'https://redhat.atlassian.net/issues/?jql=test-total-35',
-      aligned_jql: 'https://redhat.atlassian.net/issues/?jql=test-aligned-35',
+      aligned_on_time_jql: 'https://redhat.atlassian.net/issues/?jql=test-aligned-35',
       tv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-tvonly-35',
       fv_only_jql: 'https://redhat.atlassian.net/issues/?jql=test-fvonly-35',
-      mismatched_jql: 'https://redhat.atlassian.net/issues/?jql=test-mismatch-35'
+      misaligned_jql: 'https://redhat.atlassian.net/issues/?jql=test-mismatch-35'
     }
   ],
   releases: {
     '3.5 EA1 RHOAI RELEASE': {
-      aligned: [
+      aligned_on_time: [
         { key: 'RHAISTRAT-100', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-100', summary: 'Aligned feature A', status: 'In Progress', color_status: 'Green', product_manager: 'PM Alpha', assignee: 'Dev One', team: 'Team A', component: 'Serving' },
         { key: 'RHAISTRAT-101', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-101', summary: 'Aligned feature B', status: 'New', color_status: 'Yellow', product_manager: 'PM Beta', assignee: 'Dev Two', team: 'Team B', component: 'Training' },
         { key: 'RHAISTRAT-102', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-102', summary: 'Aligned feature C', status: 'In Progress', color_status: 'Green', product_manager: 'PM Alpha', assignee: 'Dev Three', team: 'Team A', component: 'Serving' }
       ],
+      aligned_late: [],
       tv_only: [
         { key: 'RHAISTRAT-200', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-200', summary: 'TV-only feature X', status: 'New', color_status: 'Red', product_manager: 'PM Gamma', assignee: 'Dev Four', team: 'Team C', component: 'Dashboard' }
       ],
       fv_only: [],
-      mismatched: [
-        { key: 'RHAISTRAT-300', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-300', summary: 'Mismatched feature Z', status: 'In Progress', color_status: 'Yellow', product_manager: 'PM Alpha', assignee: 'Dev Five', team: 'Team A', component: 'Serving, Training', target_version: '3.5 EA1 RHOAI RELEASE', fix_versions: '3.5 EA2 RHOAI RELEASE' }
+      misaligned: [
+        { key: 'RHAISTRAT-300', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-300', summary: 'Misaligned feature Z', status: 'In Progress', color_status: 'Yellow', product_manager: 'PM Alpha', assignee: 'Dev Five', team: 'Team A', component: 'Serving, Training', target_version: '3.5 EA1 RHOAI RELEASE', fix_versions: '3.5 EA2 RHOAI RELEASE' }
       ]
     },
     '3.5 EA1 RHAII RELEASE': {
-      aligned: [
+      aligned_on_time: [
         { key: 'RHAISTRAT-110', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-110', summary: 'RHAII EA1 aligned', status: 'In Progress', color_status: 'Green', product_manager: 'PM Delta', assignee: 'Dev Seven', team: 'Team E', component: 'Serving' }
       ],
+      aligned_late: [],
       tv_only: [],
       fv_only: [],
-      mismatched: []
+      misaligned: []
     },
     '3.5 EA2 RHOAI RELEASE': {
-      aligned: [
+      aligned_on_time: [
         { key: 'RHAISTRAT-400', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-400', summary: 'EA2 aligned A', status: 'In Progress', color_status: 'Green', product_manager: 'PM Alpha', assignee: 'Dev One', team: 'Team A', component: 'Serving' },
         { key: 'RHAISTRAT-401', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-401', summary: 'EA2 aligned B', status: 'New', color_status: '', product_manager: 'PM Beta', assignee: 'Dev Two', team: 'Team B', component: 'Notebooks' }
       ],
+      aligned_late: [],
       tv_only: [
         { key: 'RHAISTRAT-500', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-500', summary: 'EA2 TV-only', status: 'Backlog', color_status: '', product_manager: 'PM Gamma', assignee: '', team: '', component: 'Pipelines' }
       ],
       fv_only: [
         { key: 'RHAISTRAT-600', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-600', summary: 'EA2 FV-only', status: 'In Progress', color_status: 'Green', product_manager: '', assignee: 'Dev Six', team: 'Team D', component: 'Model Registry' }
       ],
-      mismatched: []
+      misaligned: []
     },
     '3.5 GA RHOAI RELEASE': {
-      aligned: [
+      aligned_on_time: [
         { key: 'RHAISTRAT-700', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-700', summary: 'GA aligned A', status: 'Done', color_status: 'Green', product_manager: 'PM Alpha', assignee: 'Dev One', team: 'Team A', component: 'Serving' },
         { key: 'RHAISTRAT-701', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-701', summary: 'GA aligned B', status: 'In Progress', color_status: 'Yellow', product_manager: 'PM Beta', assignee: 'Dev Two', team: 'Team B', component: 'Training' },
         { key: 'RHAISTRAT-702', url: 'https://redhat.atlassian.net/browse/RHAISTRAT-702', summary: 'GA aligned C', status: 'In Progress', color_status: 'Green', product_manager: 'PM Alpha', assignee: 'Dev Three', team: 'Team A', component: 'Serving' }
       ],
+      aligned_late: [],
       tv_only: [],
       fv_only: [],
-      mismatched: []
+      misaligned: []
     }
   },
   component_breakdown: []
@@ -520,10 +524,12 @@ test.describe('TV/FV Delta — Executive Summary @tv-fv-delta', () => {
     const summaryHeading = page.locator('h2:has-text("Executive Summary")');
     await expect(summaryHeading).toBeVisible();
 
-    // Verify all column headers
-    const headers = ['Release', 'Total', 'Aligned', 'TV-Only', 'FV-Only', 'Mismatched', 'Alignment'];
+    // Verify bucket/summary column headers (ⓘ help marker may follow the label)
+    const summaryTable = page.locator('div:has(> div > h2:has-text("Executive Summary")) table').first();
+    const headers = ['Release', 'Total', 'Aligned On Time', 'Aligned Late', 'TV-Only', 'FV-Only', 'Misaligned', 'Alignment %'];
     for (const header of headers) {
-      const th = page.locator('th', { hasText: new RegExp(`^${header}$`, 'i') }).first();
+      const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const th = summaryTable.locator('th', { hasText: new RegExp(escaped, 'i') }).first();
       await expect(th).toBeVisible();
     }
 
@@ -591,7 +597,7 @@ test.describe('TV/FV Delta — Executive Summary @tv-fv-delta', () => {
 
     const summarySection = page.locator('div:has(> div > h2:has-text("Executive Summary"))').first();
 
-    // EA1 row: total=5, aligned=3, tv_only=1, fv_only=0, mismatched=1, alignment=60%
+    // EA1 row: total=5, aligned_on_time=3, aligned_late=0, tv_only=1, fv_only=0, misaligned=1, alignment=60%
     const ea1Row = summarySection.locator('tbody tr', { hasText: '3.5 EA1 RHOAI RELEASE' });
     await expect(ea1Row).toContainText('60%');
 
@@ -670,7 +676,7 @@ test.describe('TV/FV Delta — Executive Summary @tv-fv-delta', () => {
     const summarySection = page.locator('div:has(> div > h2:has-text("Executive Summary"))').first();
     const jiraLinks = summarySection.locator('tbody a[href*="atlassian.net"]');
     const linkCount = await jiraLinks.count();
-    // Each row has Total, Aligned, TV-Only, FV-Only, Mismatched = 5 links per row × 18 rows
+    // Each row has Total, On Time, TV-Only, FV-Only = 4 clickable links per row × 18 rows
     expect(linkCount).toBeGreaterThanOrEqual(18);
 
     expect(relevantErrors(page)).toHaveLength(0);
@@ -818,9 +824,9 @@ test.describe('TV/FV Delta — Release Tabs @tv-fv-delta', () => {
     await expect(rhaiiChip).toHaveClass(/bg-blue-100/);
     expect(await rhoaiChip.getAttribute('class')).not.toContain('bg-blue-600');
 
-    // Merged aligned = RHOAI 3 + RHAII 1
-    await expect(page.locator('summary:has-text("Aligned")')).toContainText('(4)');
-    await page.locator('summary:has-text("Aligned")').click();
+    // Merged aligned on time = RHOAI 3 + RHAII 1
+    await expect(page.locator('summary:has-text("Aligned On Time")')).toContainText('(4)');
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(200);
     await expect(page.locator('text=RHAISTRAT-110')).toBeVisible();
     await expect(page.locator('text=RHAISTRAT-100')).toBeVisible();
@@ -846,8 +852,8 @@ test.describe('TV/FV Delta — Release Tabs @tv-fv-delta', () => {
     const rhoaiChip = versionChip(page, '3.5 EA1 RHOAI RELEASE');
     expect(await rhoaiChip.getAttribute('class')).toContain('bg-blue-600');
 
-    // Single-product aligned count is 3 again
-    await expect(page.locator('summary:has-text("Aligned")')).toContainText('(3)');
+    // Single-product aligned on time count is 3 again
+    await expect(page.locator('summary:has-text("Aligned On Time")')).toContainText('(3)');
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
@@ -870,10 +876,10 @@ test.describe('TV/FV Delta — Category Sections @tv-fv-delta', () => {
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
 
-    // EA1 has: aligned (3), tv_only (1), fv_only (0), mismatched (1)
+    // EA1 has: aligned_on_time (3), aligned_late (0), tv_only (1), fv_only (0), misaligned (1)
     await expect(page.locator('summary:has-text("TV-Only")')).toBeVisible();
-    await expect(page.locator('summary:has-text("Aligned")')).toBeVisible();
-    await expect(page.locator('summary:has-text("Mismatched")')).toBeVisible();
+    await expect(page.locator('summary:has-text("Aligned On Time")')).toBeVisible();
+    await expect(page.locator('summary:has-text("Misaligned")')).toBeVisible();
     // FV-Only should render even with 0 items (empty table)
     await expect(page.locator('summary:has-text("FV-Only")')).toBeVisible();
 
@@ -887,8 +893,8 @@ test.describe('TV/FV Delta — Category Sections @tv-fv-delta', () => {
     await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
 
     await expect(page.locator('summary:has-text("TV-Only")')).toContainText('(1)');
-    await expect(page.locator('summary:has-text("Aligned")')).toContainText('(3)');
-    await expect(page.locator('summary:has-text("Mismatched")')).toContainText('(1)');
+    await expect(page.locator('summary:has-text("Aligned On Time")')).toContainText('(3)');
+    await expect(page.locator('summary:has-text("Misaligned")')).toContainText('(1)');
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
@@ -902,10 +908,10 @@ test.describe('TV/FV Delta — Category Sections @tv-fv-delta', () => {
     // EA1: tv_only=1
     await expect(page.locator('summary:has-text("TV-Only")')).toContainText('(1)');
 
-    // Switch to GA: tv_only=0, aligned=3
+    // Switch to GA: tv_only=0, aligned_on_time=3
     await selectVersion(page, DEFAULT_SELECTED_DETAIL_RELEASE);
 
-    await expect(page.locator('summary:has-text("Aligned")')).toContainText('(3)');
+    await expect(page.locator('summary:has-text("Aligned On Time")')).toContainText('(3)');
     await expect(page.locator('summary:has-text("TV-Only")')).toContainText('(0)');
 
     expect(relevantErrors(page)).toHaveLength(0);
@@ -924,18 +930,18 @@ test.describe('TV/FV Delta — Category Sections @tv-fv-delta', () => {
     expect(relevantErrors(page)).toHaveLength(0);
   });
 
-  test('should hide Mismatched section when count is zero', async ({ page }) => {
+  test('should hide Misaligned section when count is zero', async ({ page }) => {
     await page.goto('/#/releases/reports?report=tv-fv-delta');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Switch to EA2 which has 0 mismatched
+    // Switch to EA2 which has 0 misaligned
     await versionChip(page, '3.5 EA2 RHOAI RELEASE').click();
     await page.waitForTimeout(500);
 
-    // Mismatched section should be hidden (v-if="releaseData.mismatched.length")
-    const mismatched = page.locator('summary:has-text("Mismatched")');
-    await expect(mismatched).toHaveCount(0);
+    // Misaligned section should be hidden (v-if="releaseData.misaligned.length")
+    const misaligned = page.locator('summary:has-text("Misaligned")');
+    await expect(misaligned).toHaveCount(0);
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
@@ -997,15 +1003,15 @@ test.describe('TV/FV Delta — Collapsible Behaviour @tv-fv-delta', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Open TV-Only and Aligned sections
+    // Open TV-Only and Aligned On Time sections
     await page.locator('summary:has-text("TV-Only")').click();
-    await page.locator('summary:has-text("Aligned")').click();
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(300);
 
     // Verify they're open
     const tvOnlyOpen = await page.locator('details:has(summary:has-text("TV-Only"))').getAttribute('open');
     expect(tvOnlyOpen).not.toBeNull();
-    const alignedOpen = await page.locator('details:has(summary:has-text("Aligned"))').getAttribute('open');
+    const alignedOpen = await page.locator('details:has(summary:has-text("Aligned On Time"))').getAttribute('open');
     expect(alignedOpen).not.toBeNull();
 
     // FV-Only should still be closed
@@ -1016,10 +1022,10 @@ test.describe('TV/FV Delta — Collapsible Behaviour @tv-fv-delta', () => {
     await versionChip(page, '3.5 EA2 RHOAI RELEASE').click();
     await page.waitForTimeout(500);
 
-    // TV-Only and Aligned should STILL be open
+    // TV-Only and Aligned On Time should STILL be open
     const tvOnlyStillOpen = await page.locator('details:has(summary:has-text("TV-Only"))').getAttribute('open');
     expect(tvOnlyStillOpen).not.toBeNull();
-    const alignedStillOpen = await page.locator('details:has(summary:has-text("Aligned"))').getAttribute('open');
+    const alignedStillOpen = await page.locator('details:has(summary:has-text("Aligned On Time"))').getAttribute('open');
     expect(alignedStillOpen).not.toBeNull();
 
     // FV-Only should still be closed
@@ -1060,11 +1066,11 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Expand Aligned section (has 3 features for EA1)
-    await page.locator('summary:has-text("Aligned")').click();
+    // Expand Aligned On Time section (has 3 features for EA1)
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(300);
 
-    const alignedDetails = page.locator('details:has(summary:has-text("Aligned"))');
+    const alignedDetails = page.locator('details:has(summary:has-text("Aligned On Time"))');
     const rows = alignedDetails.locator('tbody tr');
     await expect(rows).toHaveCount(3);
 
@@ -1095,11 +1101,11 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Expand Aligned section
-    await page.locator('summary:has-text("Aligned")').click();
+    // Expand Aligned On Time section
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(300);
 
-    const alignedDetails = page.locator('details:has(summary:has-text("Aligned"))');
+    const alignedDetails = page.locator('details:has(summary:has-text("Aligned On Time"))');
     const headers = alignedDetails.locator('thead th');
 
     // All categories now include: Key, Summary, TV, FV, Status, Color, PM, Assignee, Team, Component
@@ -1118,11 +1124,11 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     await page.goto('/#/releases/reports?report=tv-fv-delta');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
-    // EA1 has Mismatched + TV-Only sections; GA does not
+    // EA1 has Misaligned + TV-Only sections; GA does not
     await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
 
-    // Test that TV-Only, Aligned, and Mismatched all have TV/FV columns
-    const categories = ['TV-Only', 'Aligned', 'Mismatched'];
+    // Test that TV-Only, Aligned On Time, and Misaligned all have TV/FV columns
+    const categories = ['TV-Only', 'Aligned On Time', 'Misaligned'];
 
     for (const category of categories) {
       await page.locator(`summary:has-text("${category}")`).click();
@@ -1152,16 +1158,16 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     expect(relevantErrors(page)).toHaveLength(0);
   });
 
-  test('should show mismatched TV and FV values side by side', async ({ page }) => {
+  test('should show misaligned TV and FV values side by side', async ({ page }) => {
     await page.goto('/#/releases/reports?report=tv-fv-delta');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
 
-    await page.locator('summary:has-text("Mismatched")').click();
+    await page.locator('summary:has-text("Misaligned")').click();
     await page.waitForTimeout(300);
 
-    const mismatchDetails = page.locator('details:has(summary:has-text("Mismatched"))');
+    const mismatchDetails = page.locator('details:has(summary:has-text("Misaligned"))');
     const row = mismatchDetails.locator('tbody tr', { hasText: 'RHAISTRAT-300' });
     await expect(row).toBeVisible();
     const cells = row.locator('td');
@@ -1177,11 +1183,11 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Expand Aligned section
-    await page.locator('summary:has-text("Aligned")').click();
+    // Expand Aligned On Time section
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(300);
 
-    const alignedDetails = page.locator('details:has(summary:has-text("Aligned"))');
+    const alignedDetails = page.locator('details:has(summary:has-text("Aligned On Time"))');
     // Color badges have rounded-full class
     const badges = alignedDetails.locator('span.rounded-full');
     const badgeCount = await badges.count();
@@ -1202,11 +1208,11 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
 
-    // Expand Aligned section (3 features)
-    await page.locator('summary:has-text("Aligned")').click();
+    // Expand Aligned On Time section (3 features)
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(300);
 
-    const alignedDetails = page.locator('details:has(summary:has-text("Aligned"))');
+    const alignedDetails = page.locator('details:has(summary:has-text("Aligned On Time"))');
 
     // Get initial key order
     const getKeys = async () => {
@@ -1248,15 +1254,15 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Expand Aligned section — EA1 has 3 aligned
-    await page.locator('summary:has-text("Aligned")').click();
+    // Expand Aligned On Time section — EA1 has 3 aligned_on_time
+    await page.locator('summary:has-text("Aligned On Time")').click();
     await page.waitForTimeout(300);
 
-    const alignedDetails = page.locator('details:has(summary:has-text("Aligned"))');
+    const alignedDetails = page.locator('details:has(summary:has-text("Aligned On Time"))');
     let rows = alignedDetails.locator('tbody tr');
     await expect(rows).toHaveCount(3);
 
-    // Switch to EA2 — has 2 aligned
+    // Switch to EA2 — has 2 aligned_on_time
     await versionChip(page, '3.5 EA2 RHOAI RELEASE').click();
     await page.waitForTimeout(500);
 
@@ -1350,7 +1356,7 @@ test.describe('TV/FV Delta — Component Breakdown @tv-fv-delta', () => {
     const compSection = page.locator('details:has(summary:has-text("Component Breakdown"))');
     const headers = compSection.locator('thead th');
 
-    const expectedHeaders = ['Component', 'PM', 'ENG', 'Total', 'Aligned', 'TV-Only', 'FV-Only', 'Mismatched', 'Alignment'];
+    const expectedHeaders = ['Component', 'PM', 'ENG', 'Total', 'Aligned On Time', 'Aligned Late', 'TV-Only', 'FV-Only', 'Misaligned', 'Alignment %'];
     const count = await headers.count();
     expect(count).toBe(expectedHeaders.length);
     for (let i = 0; i < expectedHeaders.length; i++) {
@@ -1426,12 +1432,12 @@ test.describe('TV/FV Delta — Data Completeness @tv-fv-delta', () => {
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
 
-    // Expand Mismatched section (has both TV and FV populated)
-    await page.locator('summary:has-text("Mismatched")').click();
+    // Expand Misaligned section (has both TV and FV populated)
+    await page.locator('summary:has-text("Misaligned")').click();
     await page.waitForTimeout(300);
 
-    const mismatchedDetails = page.locator('details:has(summary:has-text("Mismatched"))');
-    const firstRow = mismatchedDetails.locator('tbody tr').first();
+    const misalignedDetails = page.locator('details:has(summary:has-text("Misaligned"))');
+    const firstRow = misalignedDetails.locator('tbody tr').first();
 
     // Should show 3.5 EA1 RHOAI RELEASE in TV column and 3.5 EA2 RHOAI RELEASE in FV column (from fixture)
     await expect(firstRow).toContainText('3.5 EA1 RHOAI RELEASE');
@@ -1510,12 +1516,12 @@ test.describe('TV/FV Delta — Data Completeness @tv-fv-delta', () => {
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
 
-    // Expand Mismatched section (RHAISTRAT-300 has "Serving, Training")
-    await page.locator('summary:has-text("Mismatched")').click();
+    // Expand Misaligned section (RHAISTRAT-300 has "Serving, Training")
+    await page.locator('summary:has-text("Misaligned")').click();
     await page.waitForTimeout(300);
 
-    const mismatchedDetails = page.locator('details:has(summary:has-text("Mismatched"))');
-    const componentCell = mismatchedDetails.locator('tbody tr:has-text("RHAISTRAT-300")').locator('td').last();
+    const misalignedDetails = page.locator('details:has(summary:has-text("Misaligned"))');
+    const componentCell = misalignedDetails.locator('tbody tr:has-text("RHAISTRAT-300")').locator('td').last();
 
     // Should show both components
     await expect(componentCell).toContainText('Serving');

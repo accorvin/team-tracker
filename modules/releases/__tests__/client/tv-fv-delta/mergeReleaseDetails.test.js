@@ -8,22 +8,24 @@ describe('mergeReleaseDetails', function () {
   it('returns null when no names or missing map', function () {
     expect(mergeReleaseDetails(null, ['a'])).toBeNull()
     expect(mergeReleaseDetails({}, [])).toBeNull()
-    expect(mergeReleaseDetails({ a: { aligned: [] } }, ['missing'])).toBeNull()
+    expect(mergeReleaseDetails({ a: { aligned_on_time: [] } }, ['missing'])).toBeNull()
   })
 
   it('merges categories across products and dedupes by key', function () {
     var releases = {
       '3.6 EA1 RHOAI RELEASE': {
-        aligned: [{ key: 'RHAISTRAT-1', summary: 'A' }],
+        aligned_on_time: [{ key: 'RHAISTRAT-1', summary: 'A' }],
+        aligned_late: [],
         tv_only: [{ key: 'RHAISTRAT-2', summary: 'B' }],
         fv_only: [],
-        mismatched: [],
+        misaligned: [],
       },
       '3.6 EA1 RHAII RELEASE': {
-        aligned: [{ key: 'RHAISTRAT-1', summary: 'A-dup' }, { key: 'RHAISTRAT-3', summary: 'C' }],
+        aligned_on_time: [{ key: 'RHAISTRAT-1', summary: 'A-dup' }, { key: 'RHAISTRAT-3', summary: 'C' }],
+        aligned_late: [{ key: 'RHAISTRAT-5', summary: 'E' }],
         tv_only: [],
         fv_only: [{ key: 'RHAISTRAT-4', summary: 'D' }],
-        mismatched: [],
+        misaligned: [],
       },
     }
 
@@ -32,17 +34,26 @@ describe('mergeReleaseDetails', function () {
       '3.6 EA1 RHAII RELEASE',
     ])
 
-    expect(merged.aligned.map(function (f) { return f.key })).toEqual(['RHAISTRAT-1', 'RHAISTRAT-3'])
+    expect(merged.aligned_on_time.map(function (f) { return f.key })).toEqual(['RHAISTRAT-1', 'RHAISTRAT-3'])
+    expect(merged.aligned_late.map(function (f) { return f.key })).toEqual(['RHAISTRAT-5'])
     expect(merged.tv_only.map(function (f) { return f.key })).toEqual(['RHAISTRAT-2'])
     expect(merged.fv_only.map(function (f) { return f.key })).toEqual(['RHAISTRAT-4'])
-    expect(merged.mismatched).toEqual([])
+    expect(merged.misaligned).toEqual([])
   })
 
   it('skips names without detail data', function () {
     var merged = mergeReleaseDetails(
-      { '3.6 EA1 RHOAI RELEASE': { aligned: [{ key: 'X' }], tv_only: [], fv_only: [], mismatched: [] } },
+      {
+        '3.6 EA1 RHOAI RELEASE': {
+          aligned_on_time: [{ key: 'X' }],
+          aligned_late: [],
+          tv_only: [],
+          fv_only: [],
+          misaligned: [],
+        },
+      },
       ['3.6 EA1 RHOAI RELEASE', '3.6 EA1 RHELAI RELEASE'],
     )
-    expect(merged.aligned).toHaveLength(1)
+    expect(merged.aligned_on_time).toHaveLength(1)
   })
 })
