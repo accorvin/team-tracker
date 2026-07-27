@@ -1156,16 +1156,16 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     expect(relevantErrors(page)).toHaveLength(0);
   });
 
-  test('should show mismatched TV and FV values side by side', async ({ page }) => {
+  test('should show misaligned TV and FV values side by side', async ({ page }) => {
     await page.goto('/#/releases/reports?report=tv-fv-delta');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
 
-    await page.locator('summary:has-text("Mismatched")').click();
+    await page.locator('summary:has-text("Misaligned")').click();
     await page.waitForTimeout(300);
 
-    const mismatchDetails = page.locator('details:has(summary:has-text("Mismatched"))');
+    const mismatchDetails = page.locator('details:has(summary:has-text("Misaligned"))');
     const row = mismatchDetails.locator('tbody tr', { hasText: 'RHAISTRAT-300' });
     await expect(row).toBeVisible();
     const cells = row.locator('td');
