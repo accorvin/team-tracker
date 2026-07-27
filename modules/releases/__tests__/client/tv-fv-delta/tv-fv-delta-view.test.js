@@ -23,25 +23,25 @@ vi.mock('@shared/client', function () {
 // ── Test data (subset of default versions + one extra for family filter) ──
 
 function emptyRow(release) {
-  return { release: release, total: 0, aligned_on_time: 0, aligned_late: 0, tv_only: 0, fv_only: 0, misaligned: 0, alignment_pct: 0, ga_date: null, planning_freeze: null }
+  return { release: release, total: 0, aligned: 0, tv_only: 0, fv_only: 0, mismatched: 0, alignment_pct: 0, ga_date: null }
 }
 
 function makeTestData() {
   var detailed = {
-    '3.6 EA1 RHOAI RELEASE': { release: '3.6 EA1 RHOAI RELEASE', total: 7, aligned_on_time: 2, aligned_late: 0, tv_only: 3, fv_only: 1, misaligned: 1, alignment_pct: 28.6, ga_date: '2026-09-17', planning_freeze: '2026-08-17' },
-    '3.6 EA2 RHOAI RELEASE': { release: '3.6 EA2 RHOAI RELEASE', total: 4, aligned_on_time: 0, aligned_late: 0, tv_only: 2, fv_only: 1, misaligned: 1, alignment_pct: 0, ga_date: '2026-10-15', planning_freeze: '2026-09-15' },
-    '3.6 GA RHOAI RELEASE': { release: '3.6 GA RHOAI RELEASE', total: 12, aligned_on_time: 3, aligned_late: 0, tv_only: 5, fv_only: 2, misaligned: 2, alignment_pct: 25, ga_date: '2026-11-19', planning_freeze: '2026-10-19' },
-    '3.5 GA RHOAI RELEASE': { release: '3.5 GA RHOAI RELEASE', total: 155, aligned_on_time: 50, aligned_late: 0, tv_only: 60, fv_only: 25, misaligned: 20, alignment_pct: 32.3, ga_date: '2026-07-15', planning_freeze: '2026-06-15' },
+    '3.6 EA1 RHOAI RELEASE': { release: '3.6 EA1 RHOAI RELEASE', total: 7, aligned: 2, tv_only: 3, fv_only: 1, mismatched: 1, alignment_pct: 28.6, ga_date: '2026-09-17' },
+    '3.6 EA2 RHOAI RELEASE': { release: '3.6 EA2 RHOAI RELEASE', total: 4, aligned: 0, tv_only: 2, fv_only: 1, mismatched: 1, alignment_pct: 0, ga_date: '2026-10-15' },
+    '3.6 GA RHOAI RELEASE': { release: '3.6 GA RHOAI RELEASE', total: 12, aligned: 3, tv_only: 5, fv_only: 2, mismatched: 2, alignment_pct: 25, ga_date: '2026-11-19' },
+    '3.5 GA RHOAI RELEASE': { release: '3.5 GA RHOAI RELEASE', total: 155, aligned: 50, tv_only: 60, fv_only: 25, mismatched: 20, alignment_pct: 32.3, ga_date: '2026-07-15' },
   }
   var summary = DEFAULT_SELECTED_VERSIONS.map(function (v) {
     return detailed[v] || emptyRow(v)
   })
   // Extra non-default release in cache — must not appear in the default picker
-  summary.push({ release: 'RHELAI-3.2', total: 1, aligned_on_time: 1, aligned_late: 0, tv_only: 0, fv_only: 0, misaligned: 0, alignment_pct: 100, ga_date: null, planning_freeze: null })
+  summary.push({ release: 'RHELAI-3.2', total: 1, aligned: 1, tv_only: 0, fv_only: 0, mismatched: 0, alignment_pct: 100, ga_date: null })
 
   var releases = {}
   DEFAULT_SELECTED_VERSIONS.forEach(function (v) {
-    releases[v] = { aligned_on_time: [], aligned_late: [], tv_only: [], fv_only: [], misaligned: [] }
+    releases[v] = { aligned: [], tv_only: [], fv_only: [], mismatched: [] }
   })
 
   return {
@@ -205,12 +205,8 @@ describe('TvFvDeltaView executive summary sorting', function () {
     var wrapper = await mountView()
     var table = findSummaryTable(wrapper)
     var headers = table.findAll('thead th')
-    // Should have: Release, Total, Aligned On Time, Aligned Late, TV-Only, FV-Only, Misaligned, Alignment %, Align Target, GA Date, Days to GA, Planning Freeze, Days to Freeze
-    expect(headers.length).toBe(13)
-    var headerText = headers.map(function (th) { return th.text().replace(/ⓘ/g, '').trim() })
-    expect(headerText).toContain('Aligned On Time')
-    expect(headerText).toContain('Aligned Late')
-    expect(headerText).toContain('Align Target')
+    // Should have: Release, Total, Aligned, TV-Only, FV-Only, Mismatched, Alignment, Target, GA Date, Days to GA, Planning Freeze
+    expect(headers.length).toBe(11)
   })
 
   it('default view includes 3.6 and 3.5 default versions from data', async function () {
@@ -262,12 +258,12 @@ describe('TvFvDeltaView target alignment column', function () {
   it('colors target red when actual alignment is below target', async function () {
     var wrapper = await mountView()
     var table = findSummaryTable(wrapper)
-    // 3.5 GA RHOAI has alignment_pct: 32.3% and planning_freeze: 2026-06-15 (frozen)
-    // Target for frozen (≤0 days) = 100%*, so actual (32.3%) < target (100%) → red
+    // 3.5 GA RHOAI has alignment_pct: 32.3% and ga_date: 2026-07-15 (~28 days from June 17)
+    // Target for ≤30 days = 100%*, so actual (32.3%) < target (100%) → red
     var rows = table.findAll('tbody tr')
     var row35 = rows.find(function (r) { return r.text().includes('3.5 GA RHOAI RELEASE') })
     if (row35) {
-      var targetCell = row35.findAll('td')[8]
+      var targetCell = row35.findAll('td')[7]
       var targetSpan = targetCell.find('span.font-semibold')
       if (targetSpan.exists()) {
         var classes = targetSpan.classes()
@@ -286,18 +282,16 @@ describe('TvFvDeltaView milestone vs product selection', function () {
     var wrapper = await mountView({
       releases: {
         '3.6 GA RHOAI RELEASE': {
-          aligned_on_time: [{ key: 'A1', summary: 'rhoai' }],
-          aligned_late: [],
+          aligned: [{ key: 'A1', summary: 'rhoai' }],
           tv_only: [],
           fv_only: [],
-          misaligned: [],
+          mismatched: [],
         },
         '3.6 GA RHAII RELEASE': {
-          aligned_on_time: [{ key: 'A2', summary: 'rhaii' }],
-          aligned_late: [],
+          aligned: [{ key: 'A2', summary: 'rhaii' }],
           tv_only: [{ key: 'T1', summary: 'tv' }],
           fv_only: [],
-          misaligned: [],
+          mismatched: [],
         },
       },
     })
@@ -312,27 +306,24 @@ describe('TvFvDeltaView milestone vs product selection', function () {
     expect(wrapper.text()).toContain('Showing features for')
     expect(wrapper.text()).toContain('3.6 GA Release')
     expect(wrapper.text()).toMatch(/all products \(2\)/)
-    expect(wrapper.text()).toContain('Aligned On Time')
-    expect(wrapper.text()).toContain('(2)')
-    expect(wrapper.text()).toContain('TV-Only — Target Version set, no Fix Version (1)')
+    expect(wrapper.text()).toContain('Aligned — TV == FV (2)')
+    expect(wrapper.text()).toContain('TV-Only — PM targeted, no ENG commitment (1)')
   })
 
   it('selects a single product chip after milestone scope', async function () {
     var wrapper = await mountView({
       releases: {
         '3.6 GA RHOAI RELEASE': {
-          aligned_on_time: [{ key: 'A1', summary: 'rhoai' }],
-          aligned_late: [],
+          aligned: [{ key: 'A1', summary: 'rhoai' }],
           tv_only: [],
           fv_only: [],
-          misaligned: [],
+          mismatched: [],
         },
         '3.6 GA RHAII RELEASE': {
-          aligned_on_time: [{ key: 'A2', summary: 'rhaii' }],
-          aligned_late: [],
+          aligned: [{ key: 'A2', summary: 'rhaii' }],
           tv_only: [],
           fv_only: [],
-          misaligned: [],
+          mismatched: [],
         },
       },
     })
@@ -353,8 +344,7 @@ describe('TvFvDeltaView milestone vs product selection', function () {
     expect(wrapper.text()).toContain('Showing features for')
     expect(wrapper.text()).toContain('3.6 GA RHOAI RELEASE')
     expect(wrapper.text()).not.toMatch(/all products \(2\)/)
-    expect(wrapper.text()).toContain('Aligned On Time')
-    expect(wrapper.text()).toContain('(1)')
+    expect(wrapper.text()).toContain('Aligned — TV == FV (1)')
   })
 })
 
@@ -373,14 +363,13 @@ describe('TvFvDeltaView component breakdown PM/ENG columns', function () {
       },
       releases: {
         '3.6 GA RHOAI RELEASE': {
-          aligned_on_time: [
+          aligned: [
             { key: 'RHAISTRAT-1', component: 'Serving' },
             { key: 'RHAISTRAT-2', component: 'Training' },
           ],
-          aligned_late: [],
           tv_only: [],
           fv_only: [],
-          misaligned: [],
+          mismatched: [],
         },
       },
     })
@@ -393,7 +382,7 @@ describe('TvFvDeltaView component breakdown PM/ENG columns', function () {
     var table = details.find('table')
     var headers = table.findAll('thead th').map(function (th) { return th.text().trim() })
     expect(headers).toEqual([
-      'Component', 'PM', 'ENG', 'Total', 'Aligned On Time', 'Aligned Late', 'TV-Only', 'FV-Only', 'Misaligned', 'Alignment %',
+      'Component', 'PM', 'ENG', 'Total', 'Aligned', 'TV-Only', 'FV-Only', 'Mismatched', 'Alignment',
     ])
 
     var servingRow = table.findAll('tbody tr').find(function (r) {

@@ -129,15 +129,11 @@ var ALIGNMENT_TARGETS = [
   { maxDays: 90, target: 90, label: '90%*' },
 ]
 
-/**
- * Get the target alignment percentage for a given number of days (to planning freeze or GA).
- * Returns { target, label } or null if no target applies (>90 days out).
- */
-function getAlignmentTarget(days) {
-  if (days === null || days === undefined) return null
-  if (days <= 0) return { target: 100, label: '100%*', maxDays: 0 }
+function getAlignmentTarget(daysToGa) {
+  if (daysToGa === null || daysToGa === undefined) return null
+  if (daysToGa <= 0) return { target: 100, label: '100%*', maxDays: 0 }
   for (var i = 0; i < ALIGNMENT_TARGETS.length; i++) {
-    if (days <= ALIGNMENT_TARGETS[i].maxDays) return ALIGNMENT_TARGETS[i]
+    if (daysToGa <= ALIGNMENT_TARGETS[i].maxDays) return ALIGNMENT_TARGETS[i]
   }
   return null
 }
@@ -164,11 +160,10 @@ function familyLabel(familyKey) {
 
 function sumRows(rows) {
   var total = 0
-  var alignedOnTime = 0
-  var alignedLate = 0
+  var aligned = 0
   var tvOnly = 0
   var fvOnly = 0
-  var misaligned = 0
+  var mismatched = 0
   var pending = 0
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i]
@@ -177,20 +172,18 @@ function sumRows(rows) {
       continue
     }
     total += r.total || 0
-    alignedOnTime += r.aligned_on_time || 0
-    alignedLate += r.aligned_late || 0
+    aligned += r.aligned || 0
     tvOnly += r.tv_only || 0
     fvOnly += r.fv_only || 0
-    misaligned += r.misaligned || 0
+    mismatched += r.mismatched || 0
   }
-  var alignmentPct = total > 0 ? Math.round((1000 * (alignedOnTime + alignedLate)) / total) / 10 : 0
+  var alignmentPct = total > 0 ? Math.round((1000 * aligned) / total) / 10 : 0
   return {
     total: total,
-    aligned_on_time: alignedOnTime,
-    aligned_late: alignedLate,
+    aligned: aligned,
     tv_only: tvOnly,
     fv_only: fvOnly,
-    misaligned: misaligned,
+    mismatched: mismatched,
     alignment_pct: alignmentPct,
     _allPending: pending > 0 && pending === rows.length,
   }
@@ -356,8 +349,8 @@ export function useReleaseFamily(filteredSummary, data) {
       if (col === 'release') {
         return compareReleases(a.release, b.release) * dir
       }
-      if (col === 'alignment_pct' || col === 'total' || col === 'aligned_on_time' || col === 'aligned_late' ||
-          col === 'tv_only' || col === 'fv_only' || col === 'misaligned') {
+      if (col === 'alignment_pct' || col === 'total' || col === 'aligned' ||
+          col === 'tv_only' || col === 'fv_only' || col === 'mismatched') {
         va = a[col] ?? 0
         vb = b[col] ?? 0
         return (va - vb) * dir

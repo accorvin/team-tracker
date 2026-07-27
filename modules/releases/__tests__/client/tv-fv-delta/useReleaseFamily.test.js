@@ -245,24 +245,24 @@ describe('familyLabel', function () {
 
 function makeSummaryRows() {
   return [
-    { release: 'rhoai-3.6.EA1', total: 7, aligned_on_time: 2, aligned_late: 0, tv_only: 3, fv_only: 1, misaligned: 1, alignment_pct: 28.6, ga_date: '2026-09-17' },
-    { release: 'rhoai-3.6.EA2', total: 4, aligned_on_time: 0, aligned_late: 0, tv_only: 2, fv_only: 1, misaligned: 1, alignment_pct: 0, ga_date: '2026-10-15' },
-    { release: 'rhoai-3.6', total: 12, aligned_on_time: 3, aligned_late: 0, tv_only: 5, fv_only: 2, misaligned: 2, alignment_pct: 25, ga_date: '2026-11-19' },
-    { release: 'rhoai-3.5', total: 155, aligned_on_time: 50, aligned_late: 0, tv_only: 60, fv_only: 25, misaligned: 20, alignment_pct: 32.3, ga_date: '2026-08-20' },
-    { release: 'rhoai-3.5.EA1', total: 24, aligned_on_time: 14, aligned_late: 0, tv_only: 5, fv_only: 3, misaligned: 2, alignment_pct: 58.3, ga_date: null },
-    { release: 'RHELAI-3.2', total: 1, aligned_on_time: 1, aligned_late: 0, tv_only: 0, fv_only: 0, misaligned: 0, alignment_pct: 100, ga_date: null },
-    { release: 'RHAII-3.2.3', total: 3, aligned_on_time: 2, aligned_late: 0, tv_only: 1, fv_only: 0, misaligned: 0, alignment_pct: 66.7, ga_date: null },
+    { release: 'rhoai-3.6.EA1', total: 7, aligned: 2, tv_only: 3, fv_only: 1, mismatched: 1, alignment_pct: 28.6, ga_date: '2026-09-17' },
+    { release: 'rhoai-3.6.EA2', total: 4, aligned: 0, tv_only: 2, fv_only: 1, mismatched: 1, alignment_pct: 0, ga_date: '2026-10-15' },
+    { release: 'rhoai-3.6', total: 12, aligned: 3, tv_only: 5, fv_only: 2, mismatched: 2, alignment_pct: 25, ga_date: '2026-11-19' },
+    { release: 'rhoai-3.5', total: 155, aligned: 50, tv_only: 60, fv_only: 25, mismatched: 20, alignment_pct: 32.3, ga_date: '2026-08-20' },
+    { release: 'rhoai-3.5.EA1', total: 24, aligned: 14, tv_only: 5, fv_only: 3, mismatched: 2, alignment_pct: 58.3, ga_date: null },
+    { release: 'RHELAI-3.2', total: 1, aligned: 1, tv_only: 0, fv_only: 0, mismatched: 0, alignment_pct: 100, ga_date: null },
+    { release: 'RHAII-3.2.3', total: 3, aligned: 2, tv_only: 1, fv_only: 0, mismatched: 0, alignment_pct: 66.7, ga_date: null },
   ]
 }
 
 function makeProductFamilyRows() {
   return [
-    { release: '3.6 GA RHOAI RELEASE', total: 10, aligned_on_time: 4, aligned_late: 0, tv_only: 3, fv_only: 1, misaligned: 2, alignment_pct: 40 },
-    { release: '3.6 GA RHAII RELEASE', total: 5, aligned_on_time: 2, aligned_late: 0, tv_only: 2, fv_only: 0, misaligned: 1, alignment_pct: 40 },
-    { release: '3.6 GA RHELAI RELEASE', total: 1, aligned_on_time: 1, aligned_late: 0, tv_only: 0, fv_only: 0, misaligned: 0, alignment_pct: 100 },
-    { release: '3.6 EA2 RHOAI RELEASE', total: 4, aligned_on_time: 1, aligned_late: 0, tv_only: 2, fv_only: 0, misaligned: 1, alignment_pct: 25 },
-    { release: '3.6 EA1 RHOAI RELEASE', total: 7, aligned_on_time: 2, aligned_late: 0, tv_only: 3, fv_only: 1, misaligned: 1, alignment_pct: 28.6 },
-    { release: '3.5 GA RHOAI RELEASE', total: 20, aligned_on_time: 10, aligned_late: 0, tv_only: 5, fv_only: 2, misaligned: 3, alignment_pct: 50 },
+    { release: '3.6 GA RHOAI RELEASE', total: 10, aligned: 4, tv_only: 3, fv_only: 1, mismatched: 2, alignment_pct: 40 },
+    { release: '3.6 GA RHAII RELEASE', total: 5, aligned: 2, tv_only: 2, fv_only: 0, mismatched: 1, alignment_pct: 40 },
+    { release: '3.6 GA RHELAI RELEASE', total: 1, aligned: 1, tv_only: 0, fv_only: 0, mismatched: 0, alignment_pct: 100 },
+    { release: '3.6 EA2 RHOAI RELEASE', total: 4, aligned: 1, tv_only: 2, fv_only: 0, mismatched: 1, alignment_pct: 25 },
+    { release: '3.6 EA1 RHOAI RELEASE', total: 7, aligned: 2, tv_only: 3, fv_only: 1, mismatched: 1, alignment_pct: 28.6 },
+    { release: '3.5 GA RHOAI RELEASE', total: 20, aligned: 10, tv_only: 5, fv_only: 2, mismatched: 3, alignment_pct: 50 },
   ]
 }
 
@@ -331,7 +331,7 @@ describe('useReleaseFamily composable', function () {
         '3.6 GA RHELAI RELEASE',
       ])
       expect(ga.totals.total).toBe(16) // 10+5+1
-      expect(ga.totals.aligned_on_time).toBe(7) // 4+2+1
+      expect(ga.totals.aligned).toBe(7) // 4+2+1
     })
 
     it('rolls up cycle totals across milestones', function () {
