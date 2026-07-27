@@ -932,6 +932,14 @@ test.describe('TV/FV Delta — Category Sections @tv-fv-delta', () => {
     const count = await jiraLinks.count();
     // Should have "View in Jira" on each visible category section
     expect(count).toBeGreaterThanOrEqual(3);
+    // Links use exact key-in JQL for the rows shown in the section
+    await expect(jiraLinks.first()).toHaveAttribute('href', /key\+in|key%20in|key in/);
+
+    // Also available in all-products (milestone) scope
+    const selector = page.locator('div.mb-6.space-y-4');
+    await selector.getByRole('button', { name: /3\.5 EA1 Release\s+all products/ }).click();
+    await page.waitForTimeout(300);
+    expect(await page.locator('summary a:has-text("View in Jira")').count()).toBeGreaterThanOrEqual(3);
 
     expect(relevantErrors(page)).toHaveLength(0);
   });

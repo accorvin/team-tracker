@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { countUniqueCategoryTotals } from './mergeReleaseDetails'
 
 // ═══ RELEASE NAME PARSING ═══
 
@@ -427,9 +428,15 @@ export function useReleaseFamily(filteredSummary, data) {
         return compareMilestoneKeys(a, b)
       })
 
+      var releasesMap = data && data.value && data.value.releases
+
       var milestones = c.milestoneOrder.map(function (mk) {
         var ms = c.milestones[mk]
-        var totals = sumRows(ms.rows)
+        var names = ms.rows.map(function (r) { return r.release })
+        // Prefer unique-key totals from detail buckets so multi-product features
+        // are not double-counted (matches all-products section counts).
+        var uniqueTotals = countUniqueCategoryTotals(releasesMap, names)
+        var totals = uniqueTotals || sumRows(ms.rows)
         return {
           key: ms.key,
           label: ms.label,
@@ -439,15 +446,20 @@ export function useReleaseFamily(filteredSummary, data) {
       })
 
       var allRows = []
+      var allNames = []
       for (var mi = 0; mi < milestones.length; mi++) {
         allRows = allRows.concat(milestones[mi].rows)
+        for (var ri = 0; ri < milestones[mi].rows.length; ri++) {
+          allNames.push(milestones[mi].rows[ri].release)
+        }
       }
 
+      var cycleUnique = countUniqueCategoryTotals(releasesMap, allNames)
       return {
         key: c.key,
         label: c.label,
         milestones: milestones,
-        totals: sumRows(allRows),
+        totals: cycleUnique || sumRows(allRows),
       }
     })
   })
