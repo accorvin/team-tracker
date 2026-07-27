@@ -29,6 +29,8 @@ async function fetchRegistry() {
 
 onMounted(fetchRegistry)
 
+// ── Helpers ──
+
 function parseDate(val) {
   if (!val) return null
   const d = new Date(val)
@@ -61,6 +63,28 @@ function getProduct(release) {
   return match ? match[1] : release.id
 }
 
+function releasePhase(release) {
+  const ms = release.milestones || {}
+  const phases = [
+    { label: 'Planning', until: ms.planningFreeze },
+    { label: 'Feature Dev', until: ms.featureFreeze },
+    { label: 'Code Complete', until: ms.codeFreeze },
+    { label: 'Release Prep', until: ms.ga },
+    { label: 'Released', until: null }
+  ]
+  const today = todayMidnight()
+  let phaseIndex = 0
+  for (let i = 0; i < 4; i++) {
+    const d = parseDate(phases[i].until)
+    if (d && d.getTime() <= today.getTime()) {
+      phaseIndex = i + 1
+    }
+  }
+  return { phaseIndex, phases }
+}
+
+// ── Computed ──
+
 const products = computed(() => {
   const set = {}
   for (const r of releases.value) {
@@ -89,7 +113,8 @@ const upcomingMilestones = computed(() => {
       const days = daysFromNow(ms[mt.key])
       if (days !== null && days >= 0) {
         items.push({
-          id: `${r.id}-${mt.key}`,
+          id: r.id + '-' + mt.key,
+          releaseId: r.id,
           release: r.displayName || r.id,
           label: mt.label,
           date: ms[mt.key],
@@ -99,29 +124,27 @@ const upcomingMilestones = computed(() => {
     }
   }
   items.sort((a, b) => a.days - b.days)
-  return items.slice(0, 6)
+  return items.slice(0, 5)
 })
 
-function daysClass(days) {
-  if (days === 0) return 'text-blue-600 dark:text-blue-400 font-semibold'
-  if (days <= 7) return 'text-blue-600 dark:text-blue-400 font-medium'
-  if (days <= 14) return 'text-blue-500 dark:text-blue-400'
-  return 'text-gray-500 dark:text-gray-400'
-}
+const heroMilestone = computed(() => upcomingMilestones.value[0] || null)
 
-function daysLabel(days) {
-  if (days === 0) return 'Today'
-  return days + 'd'
-}
+const heroRelease = computed(() => {
+  if (!heroMilestone.value) return null
+  return filteredReleases.value.find(r => r.id === heroMilestone.value.releaseId) || null
+})
 
-function rowHighlight(days) {
-  if (days <= 7) return 'bg-blue-50/50 dark:bg-blue-900/10'
-  return ''
-}
+const heroPhase = computed(() => {
+  if (!heroRelease.value) return null
+  return releasePhase(heroRelease.value)
+})
+
+const remainingMilestones = computed(() => upcomingMilestones.value.slice(1))
 </script>
 
 <template>
   <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+    <!-- Header -->
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Release Schedule</h3>
       <button
@@ -143,7 +166,8 @@ function rowHighlight(days) {
 
     <!-- Loading -->
     <div v-if="loading" class="space-y-3">
-      <div v-for="i in 4" :key="i" class="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+      <div class="h-20 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+      <div v-for="i in 3" :key="i" class="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
     </div>
 
     <!-- Error -->
@@ -153,26 +177,90 @@ function rowHighlight(days) {
     </div>
 
     <!-- Empty -->
-    <div v-else-if="!upcomingMilestones.length" class="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
+    <div v-else-if="!heroMilestone" class="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
       No upcoming milestones
     </div>
 
-    <!-- Milestone list -->
-    <div v-else class="divide-y divide-gray-100 dark:divide-gray-700/50 -mx-5">
+    <!-- Content -->
+    <template v-else>
+      <!-- Hero card -->
       <div
-        v-for="m in upcomingMilestones"
-        :key="m.id"
-        class="flex items-center justify-between px-5 py-2.5"
-        :class="rowHighlight(m.days)"
+        class="rounded-lg border px-4 py-3.5 mb-4"
+        :class="heroMilestone.days <= 7
+          ? 'border-blue-200 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20'
+          : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'"
       >
-        <div class="min-w-0 flex-1">
-          <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ m.release }}</div>
-          <div class="text-xs text-gray-500 dark:text-gray-400">{{ m.label }} · {{ formatShort(m.date) }}</div>
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0 flex-1">
+            <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ heroMilestone.release }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {{ heroMilestone.label }} · {{ formatShort(heroMilestone.date) }}
+            </div>
+            <!-- Mini stepper -->
+            <div v-if="heroPhase" class="flex items-center gap-0 mt-2.5">
+              <template v-for="(phase, i) in heroPhase.phases" :key="i">
+                <div
+                  v-if="i > 0"
+                  class="h-px flex-1"
+                  :class="i <= heroPhase.phaseIndex
+                    ? 'bg-green-400 dark:bg-green-500'
+                    : 'bg-gray-200 dark:bg-gray-700'"
+                />
+                <div
+                  class="shrink-0 rounded-full"
+                  :class="[
+                    i < heroPhase.phaseIndex
+                      ? 'w-1.5 h-1.5 bg-green-500 dark:bg-green-400'
+                      : i === heroPhase.phaseIndex
+                        ? 'w-2 h-2 bg-blue-500 dark:bg-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                        : 'w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600'
+                  ]"
+                  :title="phase.label"
+                />
+              </template>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <div
+              class="text-3xl font-bold leading-none tabular-nums"
+              :class="heroMilestone.days <= 7
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-gray-900 dark:text-gray-100'"
+            >{{ heroMilestone.days === 0 ? 'Today' : heroMilestone.days }}</div>
+            <div
+              v-if="heroMilestone.days !== 0"
+              class="text-[10px] font-medium uppercase tracking-wider mt-0.5"
+              :class="heroMilestone.days <= 7
+                ? 'text-blue-400 dark:text-blue-500'
+                : 'text-gray-400 dark:text-gray-500'"
+            >days</div>
+            <div v-if="heroMilestone.days <= 7" class="flex justify-end mt-1.5">
+              <span class="inline-flex h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+            </div>
+          </div>
         </div>
-        <span class="text-sm tabular-nums ml-3 shrink-0" :class="daysClass(m.days)">
-          {{ daysLabel(m.days) }}
-        </span>
       </div>
-    </div>
+
+      <!-- Remaining milestones -->
+      <div v-if="remainingMilestones.length" class="divide-y divide-gray-100 dark:divide-gray-700/50 -mx-5">
+        <div
+          v-for="m in remainingMilestones"
+          :key="m.id"
+          class="flex items-center justify-between px-5 py-2.5"
+          :class="m.days <= 7 ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''"
+        >
+          <div class="min-w-0 flex-1">
+            <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ m.release }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">{{ m.label }} · {{ formatShort(m.date) }}</div>
+          </div>
+          <span
+            class="text-xs font-medium tabular-nums ml-3 shrink-0 px-2 py-0.5 rounded-full"
+            :class="m.days <= 14
+              ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'"
+          >{{ m.days === 0 ? 'Today' : m.days + 'd' }}</span>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
