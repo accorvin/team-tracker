@@ -538,18 +538,33 @@ onBeforeUnmount(() => {
             class="px-3 py-2.5 border-t border-gray-100 dark:border-gray-700/80"
             :class="{ 'bg-blue-50/40 dark:bg-blue-900/15': isMilestoneSelected(ms.key) }"
           >
-            <button
-              type="button"
-              class="text-[11px] font-medium mb-1.5 inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 -ml-1.5 transition-colors"
-              :class="isMilestoneSelected(ms.key)
-                ? 'text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40'
-                : 'text-gray-600 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-gray-100 dark:hover:bg-gray-800'"
-              :title="'View all products for ' + ms.label"
-              @click="selectMilestoneGroup(ms)"
-            >
-              {{ ms.label }}
-              <span class="text-[10px] font-normal opacity-70">all products</span>
-            </button>
+            <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span
+                class="text-[11px] font-semibold"
+                :class="isMilestoneSelected(ms.key)
+                  ? 'text-blue-800 dark:text-blue-200'
+                  : 'text-gray-700 dark:text-gray-200'"
+              >{{ ms.label }}</span>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border shadow-sm transition-colors"
+                :class="isMilestoneSelected(ms.key)
+                  ? 'bg-blue-600 text-white border-blue-600 dark:border-blue-500'
+                  : 'bg-white dark:bg-gray-900 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30'"
+                :aria-pressed="isMilestoneSelected(ms.key) ? 'true' : 'false'"
+                :aria-label="ms.label + ' all products'"
+                :title="'Select all products for ' + ms.label"
+                @click="selectMilestoneGroup(ms)"
+              >
+                All products
+                <span
+                  class="inline-flex items-center justify-center min-w-[1.25rem] px-1 rounded text-[10px] font-bold"
+                  :class="isMilestoneSelected(ms.key)
+                    ? 'bg-blue-500/80 text-white'
+                    : 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200'"
+                >{{ ms.names.length }}</span>
+              </button>
+            </div>
             <div class="flex items-center gap-1.5 flex-wrap">
               <button
                 v-for="name in ms.names"
