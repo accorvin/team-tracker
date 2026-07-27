@@ -478,18 +478,27 @@ onBeforeUnmount(() => {
             class="px-3 py-2.5 border-t border-gray-100 dark:border-gray-700/80"
             :class="{ 'bg-blue-50/40 dark:bg-blue-900/15': isMilestoneSelected(ms.key) }"
           >
-            <button
-              type="button"
-              class="text-[11px] font-medium mb-1.5 inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 -ml-1.5 transition-colors"
-              :class="isMilestoneSelected(ms.key)
-                ? 'text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40'
-                : 'text-gray-600 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-gray-100 dark:hover:bg-gray-800'"
-              :title="'View all products for ' + ms.label"
-              @click="selectMilestoneGroup(ms)"
-            >
-              {{ ms.label }}
-              <span class="text-[10px] font-normal opacity-70">all products</span>
-            </button>
+            <div class="mb-1.5 flex items-center gap-2 flex-wrap">
+              <span class="text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                {{ ms.label }}
+              </span>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
+                :class="isMilestoneSelected(ms.key)
+                  ? 'bg-blue-600 text-white border-blue-600 dark:border-blue-500 shadow-sm'
+                  : 'bg-white dark:bg-gray-900 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30'"
+                :aria-pressed="isMilestoneSelected(ms.key) ? 'true' : 'false'"
+                :title="'View all products for ' + ms.label"
+                @click="selectMilestoneGroup(ms)"
+              >
+                All products
+                <span
+                  class="text-[10px] font-normal"
+                  :class="isMilestoneSelected(ms.key) ? 'text-blue-100' : 'text-blue-500/80 dark:text-blue-400/80'"
+                >({{ ms.names.length }})</span>
+              </button>
+            </div>
             <div class="flex items-center gap-1.5 flex-wrap">
               <button
                 v-for="name in ms.names"

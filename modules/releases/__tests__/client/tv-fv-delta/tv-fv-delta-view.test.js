@@ -297,12 +297,13 @@ describe('TvFvDeltaView milestone vs product selection', function () {
     })
 
     var msBtn = wrapper.findAll('button').find(function (b) {
-      return b.text().includes('3.6 GA Release') && b.text().includes('all products')
+      return b.text().includes('All products') && b.attributes('title') === 'View all products for 3.6 GA Release'
     })
     expect(msBtn).toBeTruthy()
     await msBtn.trigger('click')
     await flushPromises()
 
+    expect(msBtn.attributes('aria-pressed')).toBe('true')
     expect(wrapper.text()).toContain('Showing features for')
     expect(wrapper.text()).toContain('3.6 GA Release')
     expect(wrapper.text()).toMatch(/all products \(2\)/)
@@ -329,7 +330,7 @@ describe('TvFvDeltaView milestone vs product selection', function () {
     })
 
     var msBtn = wrapper.findAll('button').find(function (b) {
-      return b.text().includes('3.6 GA Release') && b.text().includes('all products')
+      return b.text().includes('All products') && b.attributes('title') === 'View all products for 3.6 GA Release'
     })
     await msBtn.trigger('click')
     await flushPromises()
@@ -341,6 +342,7 @@ describe('TvFvDeltaView milestone vs product selection', function () {
     await rhoai.trigger('click')
     await flushPromises()
 
+    expect(msBtn.attributes('aria-pressed')).toBe('false')
     expect(wrapper.text()).toContain('Showing features for')
     expect(wrapper.text()).toContain('3.6 GA RHOAI RELEASE')
     expect(wrapper.text()).not.toMatch(/all products \(2\)/)

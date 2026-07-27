@@ -714,9 +714,10 @@ test.describe('TV/FV Delta — Release Tabs @tv-fv-delta', () => {
     await expect(cycleHeaders.nth(1)).toHaveText(/3\.5 Release Cycle/i);
 
     const cycle36 = selector.locator('div.rounded-lg.border').filter({ hasText: '3.6 Release Cycle' }).first();
-    // Milestone headers are buttons: "3.6 EA1 Release all products"
-    const milestoneLabels = (await cycle36.getByRole('button', { name: /all products/ }).allTextContents())
-      .map(t => t.replace(/\s+/g, ' ').trim().replace(/\s+all products$/i, ''));
+    // Milestone "All products" buttons: title encodes the event label
+    const milestoneLabels = (await cycle36.getByRole('button', { name: /All products/ }).evaluateAll(
+      (btns) => btns.map((b) => (b.getAttribute('title') || '').replace(/^View all products for\s+/i, '')),
+    ));
     expect(milestoneLabels).toEqual([
       '3.6 EA1 Release',
       '3.6 EA2 Release',
@@ -805,9 +806,11 @@ test.describe('TV/FV Delta — Release Tabs @tv-fv-delta', () => {
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
     const selector = page.locator('div.mb-6.space-y-4');
-    await selector.getByRole('button', { name: /3\.5 EA1 Release\s+all products/ }).click();
+    const allProductsBtn = selector.locator('button[title="View all products for 3.5 EA1 Release"]');
+    await allProductsBtn.click();
     await page.waitForTimeout(300);
 
+    await expect(allProductsBtn).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByText(/Showing features for\s+3\.5 EA1 Release/)).toBeVisible();
     await expect(page.getByText(/all products \(2\)/)).toBeVisible();
 
@@ -834,12 +837,14 @@ test.describe('TV/FV Delta — Release Tabs @tv-fv-delta', () => {
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
     const selector = page.locator('div.mb-6.space-y-4');
-    await selector.getByRole('button', { name: /3\.5 EA1 Release\s+all products/ }).click();
+    const allProductsBtn = selector.locator('button[title="View all products for 3.5 EA1 Release"]');
+    await allProductsBtn.click();
     await page.waitForTimeout(200);
 
     await versionChip(page, '3.5 EA1 RHOAI RELEASE').click();
     await page.waitForTimeout(300);
 
+    await expect(allProductsBtn).toHaveAttribute('aria-pressed', 'false');
     await expect(page.getByText('Showing features for')).toContainText('3.5 EA1 RHOAI RELEASE');
     await expect(page.getByText(/all products \(2\)/)).toHaveCount(0);
 
