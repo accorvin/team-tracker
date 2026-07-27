@@ -13,6 +13,7 @@ const releases = ref([])
 const loading = ref(true)
 const error = ref(null)
 const selectedProduct = ref('')
+const selectedStream = ref('')
 
 async function fetchRegistry() {
   loading.value = true
@@ -93,9 +94,24 @@ const products = computed(() => {
   return Object.keys(set).sort()
 })
 
+const streams = computed(() => {
+  const set = {}
+  for (const r of releases.value) {
+    const v = r.productPagesVersion
+    if (v) set[v] = true
+  }
+  return Object.keys(set).sort()
+})
+
 const filteredReleases = computed(() => {
-  if (!selectedProduct.value) return releases.value
-  return releases.value.filter(r => getProduct(r) === selectedProduct.value)
+  let list = releases.value
+  if (selectedProduct.value) {
+    list = list.filter(r => getProduct(r) === selectedProduct.value)
+  }
+  if (selectedStream.value) {
+    list = list.filter(r => r.productPagesVersion === selectedStream.value)
+  }
+  return list
 })
 
 const milestoneTypes = [
@@ -153,14 +169,23 @@ const remainingMilestones = computed(() => upcomingMilestones.value.slice(1))
       >View all</button>
     </div>
 
-    <!-- Product filter -->
-    <div v-if="!loading && !error && products.length > 1" class="mb-3">
+    <!-- Release filter -->
+    <div v-if="!loading && !error && (streams.length > 1 || products.length > 1)" class="flex gap-2 mb-3">
       <select
+        v-if="products.length > 1"
         v-model="selectedProduct"
-        class="w-full text-xs rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        class="flex-1 text-xs rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
       >
         <option value="">All products</option>
         <option v-for="p in products" :key="p" :value="p">{{ p }}</option>
+      </select>
+      <select
+        v-if="streams.length > 1"
+        v-model="selectedStream"
+        class="flex-1 text-xs rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
+      >
+        <option value="">All releases</option>
+        <option v-for="s in streams" :key="s" :value="s">RHAI {{ s }}</option>
       </select>
     </div>
 
