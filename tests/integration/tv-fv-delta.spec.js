@@ -928,10 +928,21 @@ test.describe('TV/FV Delta — Category Sections @tv-fv-delta', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
+    // Default GA fixture only has aligned_on_time; pick EA1 (aligned + TV-only + misaligned)
+    await selectVersion(page, '3.5 EA1 RHOAI RELEASE');
+
     const jiraLinks = page.locator('summary a:has-text("View in Jira")');
     const count = await jiraLinks.count();
-    // Should have "View in Jira" on each visible category section
+    // Should have "View in Jira" on each non-empty category section
     expect(count).toBeGreaterThanOrEqual(3);
+    // Links use exact key-in JQL for the rows shown in the section
+    await expect(jiraLinks.first()).toHaveAttribute('href', /key\+in|key%20in|key in/);
+
+    // Also available in all-products (milestone) scope
+    const selector = page.locator('div.mb-6.space-y-4');
+    await selector.getByRole('button', { name: /3\.5 EA1 Release\s+all products/ }).click();
+    await page.waitForTimeout(300);
+    expect(await page.locator('summary a:has-text("View in Jira")').count()).toBeGreaterThanOrEqual(3);
 
     expect(relevantErrors(page)).toHaveLength(0);
   });
@@ -1094,7 +1105,8 @@ test.describe('TV/FV Delta — Feature Tables @tv-fv-delta', () => {
     await page.waitForTimeout(300);
 
     const tvOnlyDetails = page.locator('details:has(summary:has-text("TV-Only"))');
-    const keyLink = tvOnlyDetails.locator('a[href*="RHAISTRAT-200"]');
+    // Prefer /browse/ so the section "View in Jira" key-in link does not also match
+    const keyLink = tvOnlyDetails.locator('a[href*="/browse/RHAISTRAT-200"]');
     await expect(keyLink).toBeVisible();
     const href = await keyLink.getAttribute('href');
     expect(href).toContain('redhat.atlassian.net/browse/RHAISTRAT-200');

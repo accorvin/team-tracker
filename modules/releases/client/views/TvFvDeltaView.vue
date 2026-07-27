@@ -8,6 +8,7 @@ import { useComponentLeads } from '../composables/useComponentLeads'
 import { useTvFvData } from '../composables/useTvFvData'
 import { useReleaseFamily, getAlignmentTarget, buildNameRollup } from '../composables/useReleaseFamily'
 import { mergeReleaseDetails } from '../composables/mergeReleaseDetails'
+import { buildKeysJqlUrl } from '../composables/jiraKeysJql'
 import { DEFAULT_SELECTED_VERSIONS } from '../composables/tvFvDeltaDefaults'
 
 const FEATURE_COLS = [
@@ -18,7 +19,7 @@ const FEATURE_COLS = [
 /** Plain-English explanations for executive summary / component table headers */
 const COLUMN_HELP = {
   release: 'Jira Target Version / Fix Version name for this product release.',
-  total: 'All features that have this release on Target Version (TV) or Fix Version (FV).',
+  total: 'All features that have this release on Target Version (TV) or Fix Version (FV). Cycle/milestone rollups count each issue once across products.',
   aligned_on_time: 'Aligned on time: Fix Version matches Target Version, or ships earlier than planned.',
   aligned_late: 'Aligned late: Fix Version is later than Target Version, but planning freeze for that Target Version has already passed — accepted slip.',
   tv_only: 'TV-only: Target Version is set for this release, but Fix Version is empty.',
@@ -128,10 +129,17 @@ const releaseData = computed(() => {
   return mergeReleaseDetails(data.value.releases, activeReleaseNames.value)
 })
 
-/** Per-product Jira deep-links only apply in single-product mode */
-const releaseSummary = computed(() => {
-  if (!data.value || selectedMilestoneKey.value || !selectedRelease.value) return null
-  return data.value.executive_summary.find(s => s.release === selectedRelease.value)
+/** Section "View in Jira" links — exact keys shown in the table (works for all-products + late/misaligned) */
+const sectionJiraLinks = computed(() => {
+  const rd = releaseData.value
+  if (!rd) return {}
+  return {
+    tv_only: buildKeysJqlUrl(rd.tv_only),
+    fv_only: buildKeysJqlUrl(rd.fv_only),
+    aligned_on_time: buildKeysJqlUrl(rd.aligned_on_time),
+    aligned_late: buildKeysJqlUrl(rd.aligned_late),
+    misaligned: buildKeysJqlUrl(rd.misaligned),
+  }
 })
 
 const filteredSummary = computed(() => {
@@ -672,8 +680,8 @@ onBeforeUnmount(() => {
               </span>
             </span>
             <a
-              v-if="releaseSummary"
-              :href="releaseSummary.tv_only_jql"
+              v-if="sectionJiraLinks.tv_only"
+              :href="sectionJiraLinks.tv_only"
               target="_blank"
               rel="noopener noreferrer"
               class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
@@ -699,8 +707,8 @@ onBeforeUnmount(() => {
               </span>
             </span>
             <a
-              v-if="releaseSummary"
-              :href="releaseSummary.fv_only_jql"
+              v-if="sectionJiraLinks.fv_only"
+              :href="sectionJiraLinks.fv_only"
               target="_blank"
               rel="noopener noreferrer"
               class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
@@ -726,8 +734,8 @@ onBeforeUnmount(() => {
               </span>
             </span>
             <a
-              v-if="releaseSummary && releaseSummary.aligned_on_time_jql"
-              :href="releaseSummary.aligned_on_time_jql"
+              v-if="sectionJiraLinks.aligned_on_time"
+              :href="sectionJiraLinks.aligned_on_time"
               target="_blank"
               rel="noopener noreferrer"
               class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
@@ -752,6 +760,16 @@ onBeforeUnmount(() => {
                 Aligned Late — slipped after planning freeze ({{ releaseData.aligned_late.length }})
               </span>
             </span>
+            <a
+              v-if="sectionJiraLinks.aligned_late"
+              :href="sectionJiraLinks.aligned_late"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              @click.stop
+            >
+              View in Jira &rarr;
+            </a>
           </summary>
           <FeatureTable
             :features="releaseData.aligned_late"
@@ -768,6 +786,16 @@ onBeforeUnmount(() => {
                 Misaligned — slip before freeze, or different products ({{ releaseData.misaligned.length }})
               </span>
             </span>
+            <a
+              v-if="sectionJiraLinks.misaligned"
+              :href="sectionJiraLinks.misaligned"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              @click.stop
+            >
+              View in Jira &rarr;
+            </a>
           </summary>
           <FeatureTable
             :features="releaseData.misaligned"

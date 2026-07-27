@@ -2,7 +2,7 @@
  * Unit tests for merging multi-product release detail buckets.
  */
 import { describe, it, expect } from 'vitest'
-import { mergeReleaseDetails } from '../../../client/composables/mergeReleaseDetails'
+import { mergeReleaseDetails, countUniqueCategoryTotals } from '../../../client/composables/mergeReleaseDetails'
 
 describe('mergeReleaseDetails', function () {
   it('returns null when no names or missing map', function () {
@@ -72,5 +72,46 @@ describe('mergeReleaseDetails', function () {
     expect(merged.aligned_on_time.map(function (f) { return f.key })).toEqual(['LEGACY-A'])
     expect(merged.misaligned.map(function (f) { return f.key })).toEqual(['LEGACY-M'])
     expect(merged.aligned_late).toEqual([])
+  })
+})
+
+describe('countUniqueCategoryTotals', function () {
+  it('dedupes the same key across products in every category', function () {
+    var releases = {
+      '3.6 EA1 RHOAI RELEASE': {
+        aligned_on_time: [{ key: 'A-SHARED' }, { key: 'A-RHOAI' }],
+        aligned_late: [{ key: 'L-SHARED' }],
+        tv_only: [{ key: 'T-SHARED' }, { key: 'T-RHOAI' }],
+        fv_only: [{ key: 'F-RHOAI' }],
+        misaligned: [{ key: 'M-SHARED' }, { key: 'M-RHOAI' }],
+      },
+      '3.6 EA1 RHAII RELEASE': {
+        aligned_on_time: [{ key: 'A-SHARED' }, { key: 'A-RHAII' }],
+        aligned_late: [{ key: 'L-SHARED' }],
+        tv_only: [{ key: 'T-SHARED' }, { key: 'T-RHAII' }],
+        fv_only: [],
+        misaligned: [{ key: 'M-SHARED' }],
+      },
+    }
+
+    // Naive sum would be on_time 4, late 2, tv 4, fv 1, mis 3, total 14
+    var totals = countUniqueCategoryTotals(releases, [
+      '3.6 EA1 RHOAI RELEASE',
+      '3.6 EA1 RHAII RELEASE',
+    ])
+    expect(totals.aligned_on_time).toBe(3) // A-SHARED, A-RHOAI, A-RHAII
+    expect(totals.aligned_late).toBe(1) // L-SHARED
+    expect(totals.tv_only).toBe(3) // T-SHARED, T-RHOAI, T-RHAII
+    expect(totals.fv_only).toBe(1)
+    expect(totals.misaligned).toBe(2) // M-SHARED, M-RHOAI
+    expect(totals.total).toBe(10)
+    expect(totals.alignment_pct).toBe(40) // (3+1)/10
+  })
+
+  it('returns null when any product is missing detail data', function () {
+    expect(countUniqueCategoryTotals(
+      { '3.6 EA1 RHOAI RELEASE': { aligned_on_time: [], aligned_late: [], tv_only: [], fv_only: [], misaligned: [] } },
+      ['3.6 EA1 RHOAI RELEASE', '3.6 EA1 RHAII RELEASE'],
+    )).toBeNull()
   })
 })

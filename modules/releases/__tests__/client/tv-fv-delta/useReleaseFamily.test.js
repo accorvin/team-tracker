@@ -342,6 +342,42 @@ describe('useReleaseFamily composable', function () {
       // 10+5+1 + 4 + 7 = 27
       expect(cycle36.totals.total).toBe(27)
     })
+
+    it('dedupes multi-product keys in milestone rollups for every category', function () {
+      var rows = [
+        { release: '3.6 EA1 RHOAI RELEASE', total: 5, aligned_on_time: 2, aligned_late: 1, tv_only: 1, fv_only: 0, misaligned: 1, alignment_pct: 60 },
+        { release: '3.6 EA1 RHAII RELEASE', total: 5, aligned_on_time: 2, aligned_late: 1, tv_only: 1, fv_only: 0, misaligned: 1, alignment_pct: 60 },
+      ]
+      var dataRef = ref({
+        executive_summary: rows,
+        releases: {
+          '3.6 EA1 RHOAI RELEASE': {
+            aligned_on_time: [{ key: 'A-SHARED' }, { key: 'A-RHOAI' }],
+            aligned_late: [{ key: 'L-SHARED' }],
+            tv_only: [{ key: 'T-SHARED' }],
+            fv_only: [],
+            misaligned: [{ key: 'M-SHARED' }],
+          },
+          '3.6 EA1 RHAII RELEASE': {
+            aligned_on_time: [{ key: 'A-SHARED' }, { key: 'A-RHAII' }],
+            aligned_late: [{ key: 'L-SHARED' }],
+            tv_only: [{ key: 'T-SHARED' }],
+            fv_only: [],
+            misaligned: [{ key: 'M-SHARED' }],
+          },
+        },
+      })
+      var rf = useReleaseFamily(ref(rows), dataRef)
+      var ea1 = rf.summaryRollup.value[0].milestones.find(function (m) { return m.key === '3.6-EA1' })
+      // Naive sum would be 4/2/2/0/2 total 10 — unique is half the shared keys
+      expect(ea1.totals.aligned_on_time).toBe(3)
+      expect(ea1.totals.aligned_late).toBe(1)
+      expect(ea1.totals.tv_only).toBe(1)
+      expect(ea1.totals.fv_only).toBe(0)
+      expect(ea1.totals.misaligned).toBe(1)
+      expect(ea1.totals.total).toBe(6)
+      expect(ea1.totals.alignment_pct).toBe(66.7)
+    })
   })
 
   describe('sorting', function () {
