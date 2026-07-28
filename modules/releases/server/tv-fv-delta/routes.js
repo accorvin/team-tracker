@@ -1,6 +1,5 @@
 const { jiraRequest, JIRA_HOST, fetchAllJqlResults, fetchProjectVersions } = require('../../../../shared/server/jira')
 const { normalizeVersionName: sharedNormalize } = require('../version-utils')
-const { getRegistryReleasesFlat } = require('../registry')
 
 const JIRA_BROWSE = JIRA_HOST + '/browse'
 const JIRA_SEARCH = JIRA_HOST + '/issues/?jql='
