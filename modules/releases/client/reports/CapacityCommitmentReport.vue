@@ -106,8 +106,23 @@
         </template>
       </div>
 
-      <!-- Deadline cards -->
-      <div v-if="hasSelection" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <!-- Key Milestones -->
+      <div v-if="hasSelection">
+        <button
+          @click="milestonesOpen = !milestonesOpen"
+          class="flex items-center gap-2 mb-3 group"
+        >
+          <svg
+            class="w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-200"
+            :class="milestonesOpen ? 'rotate-90' : ''"
+            fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+          </svg>
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">Key Milestones</h3>
+        </button>
+      </div>
+      <div v-if="hasSelection && milestonesOpen" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         <div
           v-for="card in deadlineCards"
           :key="card.phase"
@@ -203,8 +218,23 @@
         </div>
       </div>
 
-      <!-- Tabbed analysis section -->
+      <!-- Feature Status Charts -->
       <div v-if="hasSelection" class="mt-6">
+        <button
+          @click="chartsOpen = !chartsOpen"
+          class="flex items-center gap-2 mb-3 group"
+        >
+          <svg
+            class="w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-200"
+            :class="chartsOpen ? 'rotate-90' : ''"
+            fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+          </svg>
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">Feature Status Charts</h3>
+        </button>
+
+        <template v-if="chartsOpen">
         <!-- Tab bar -->
         <div class="border-b border-gray-200 dark:border-gray-700 mb-4">
           <nav class="flex gap-6 -mb-px">
@@ -325,16 +355,27 @@
             </div>
           </template>
         </div>
+        </template>
       </div>
 
       <!-- Risk Assessment section -->
       <div v-if="hasSelection" class="mt-8">
-        <div class="flex items-start justify-between gap-4 mb-4">
-          <div>
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">Risk Assessment</h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Automated risk flags from the health pipeline — milestone progress, velocity, and dependency analysis.</p>
-          </div>
+        <div class="flex items-start justify-between gap-4 mb-3">
           <button
+            @click="riskOpen = !riskOpen"
+            class="flex items-center gap-2 group"
+          >
+            <svg
+              class="w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-200"
+              :class="riskOpen ? 'rotate-90' : ''"
+              fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+            </svg>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">Risk Assessment</h3>
+          </button>
+          <button
+            v-if="riskOpen"
             @click="riskInfoOpen = !riskInfoOpen"
             class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors"
             :class="riskInfoOpen
@@ -349,6 +390,7 @@
           </button>
         </div>
 
+        <template v-if="riskOpen">
         <!-- Risk interpretation guide -->
         <div v-if="riskInfoOpen" class="mb-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-500/20 rounded-lg px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
           <div class="flex items-start justify-between gap-3 mb-3">
@@ -667,6 +709,7 @@
               </div>
             </div>
           </div>
+        </template>
         </template>
       </div>
     </template>
@@ -1227,6 +1270,10 @@ const loading = ref(true)
 const error = ref(null)
 const modalOpen = ref(false)
 const activeAnalysisTab = ref('status-charts')
+
+const milestonesOpen = ref(true)
+const chartsOpen = ref(true)
+const riskOpen = ref(true)
 
 const selection = reactive({ version: '', families: new Set(), phases: new Set() })
 const draft = reactive({ version: '', families: new Set(), phases: new Set() })
