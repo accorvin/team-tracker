@@ -84,48 +84,49 @@
         </div>
       </div>
 
-      <!-- Product filter (multi-product) -->
-      <div v-if="products.length > 1" class="flex flex-wrap gap-2 mb-5">
-        <button
-          @click="selectedProduct = null"
-          class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
-          :class="!selectedProduct
-            ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
-            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
-        >All</button>
-        <button
-          v-for="p in products"
-          :key="p"
-          @click="selectedProduct = p"
-          class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
-          :class="selectedProduct === p
-            ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
-            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
-        >{{ p }}</button>
-      </div>
-
-      <!-- Stream filter + hide released toggle (single-product) -->
-      <div v-if="products.length <= 1" class="flex items-center justify-between mb-5">
-        <div v-if="streams.length > 1" class="flex flex-wrap gap-2">
-          <button
-            @click="selectedStream = null"
-            class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
-            :class="!selectedStream
-              ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
-              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
-          >All</button>
-          <button
-            v-for="s in streams"
-            :key="s"
-            @click="selectedStream = s"
-            class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
-            :class="selectedStream === s
-              ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
-              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
-          >{{ s }}</button>
+      <!-- Filters -->
+      <div class="flex items-center justify-between mb-5 gap-4">
+        <div class="flex flex-wrap gap-2">
+          <!-- Product filter pills -->
+          <template v-if="products.length > 1">
+            <button
+              @click="selectedProduct = null"
+              class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
+              :class="!selectedProduct
+                ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
+            >All</button>
+            <button
+              v-for="p in products"
+              :key="p"
+              @click="selectedProduct = p"
+              class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
+              :class="selectedProduct === p
+                ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
+            >{{ p }}</button>
+          </template>
+          <!-- Stream filter pills (single-product) -->
+          <template v-else-if="streams.length > 1">
+            <button
+              @click="selectedStream = null"
+              class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
+              :class="!selectedStream
+                ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
+            >All</button>
+            <button
+              v-for="s in streams"
+              :key="s"
+              @click="selectedStream = s"
+              class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
+              :class="selectedStream === s
+                ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
+            >{{ s }}</button>
+          </template>
         </div>
-        <div v-else></div>
-        <label class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+        <label class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none shrink-0">
           <input type="checkbox" v-model="hideReleased" class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500" />
           Hide released
         </label>
@@ -190,7 +191,7 @@ import { ref, computed, onMounted, h } from 'vue'
 import { apiRequest } from '@shared/client/services/api.js'
 import {
   parseDate, daysFromNow, formatShort as formatShortBase,
-  getProduct, releasePhase, milestoneProgress
+  getProduct, getStream, releasePhase, milestoneProgress
 } from '../composables/useScheduleHelpers.js'
 
 function formatShort(dateStr) {
@@ -204,7 +205,7 @@ const loading = ref(true)
 const error = ref(null)
 const selectedProduct = ref(null)
 const selectedStream = ref(null)
-const hideReleased = ref(false)
+const hideReleased = ref(true)
 
 async function fetchRegistry() {
   loading.value = true
@@ -258,7 +259,7 @@ const products = computed(() => {
 const streams = computed(() => {
   const set = {}
   for (let i = 0; i < releases.value.length; i++) {
-    const v = releases.value[i].productPagesVersion
+    const v = getStream(releases.value[i])
     if (v) set[v] = true
   }
   return Object.keys(set).sort()
@@ -270,7 +271,7 @@ const filteredReleases = computed(() => {
     list = list.filter(r => getProduct(r) === selectedProduct.value)
   }
   if (selectedStream.value) {
-    list = list.filter(r => r.productPagesVersion === selectedStream.value)
+    list = list.filter(r => getStream(r) === selectedStream.value)
   }
   if (hideReleased.value) {
     list = list.filter(r => !isReleased(r))
@@ -294,7 +295,7 @@ const groupedRows = computed(() => {
   let lastStream = null
   for (let i = 0; i < allSortedReleases.value.length; i++) {
     const r = allSortedReleases.value[i]
-    const stream = r.productPagesVersion || ''
+    const stream = getStream(r) || ''
     if (stream !== lastStream && !selectedStream.value) {
       rows.push({ type: 'header', stream, key: 'h-' + stream })
       lastStream = stream

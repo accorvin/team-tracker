@@ -1,6 +1,7 @@
 export function parseDate(val) {
   if (!val) return null
-  const d = new Date(val)
+  var str = (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) ? val + 'T00:00:00' : val
+  var d = new Date(str)
   return isNaN(d.getTime()) ? null : d
 }
 
@@ -50,6 +51,16 @@ export function releasePhase(release) {
     }
   }
   return { phaseIndex, phases }
+}
+
+export function getStream(release) {
+  var sources = [release.productPagesVersion, release.displayName, release.id]
+  for (var i = 0; i < sources.length; i++) {
+    if (!sources[i]) continue
+    var match = sources[i].match(/(\d+\.\d+)/)
+    if (match) return match[1]
+  }
+  return null
 }
 
 export function milestoneProgress(currentDate, prevDate) {
