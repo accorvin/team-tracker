@@ -339,6 +339,10 @@ test.describe('AI Impact Views @ai-impact', () => {
 test.describe('AI Impact Build & Release @ai-impact', () => {
   test.beforeEach(async ({ page }) => {
     setupErrorTracking(page);
+    // Prevent the auto-open AI Impact Guide modal from blocking filter clicks.
+    await page.addInitScript(() => {
+      localStorage.setItem('ai-impact-guide-dismissed', 'true');
+    });
     await page.goto('/#/ai-impact/build-release');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
