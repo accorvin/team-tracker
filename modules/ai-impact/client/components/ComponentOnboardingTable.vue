@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, inject, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, inject } from 'vue'
 import { useModuleLink } from '@shared/client/composables/useModuleLink'
+import MultiSelectDropdown from './MultiSelectDropdown.vue'
 
 const { linkTo } = useModuleLink()
 const moduleNav = inject('moduleNav')
@@ -40,11 +41,6 @@ const completionFilter = ref([])
 const productFilter = ref('all')
 const targetVersionFilter = ref([])
 
-const statusMenuOpen = ref(false)
-const versionMenuOpen = ref(false)
-const statusMenuRef = ref(null)
-const versionMenuRef = ref(null)
-
 const STATUS_OPTIONS = [
   { value: 'completed', label: 'Completed' },
   { value: 'in-progress', label: 'In Progress' },
@@ -59,20 +55,6 @@ const targetVersionOptions = computed(() => {
   return [...versions].sort()
 })
 
-const statusFilterLabel = computed(() => {
-  if (!completionFilter.value.length) return 'All statuses'
-  if (completionFilter.value.length === 1) {
-    return STATUS_OPTIONS.find(o => o.value === completionFilter.value[0])?.label || 'Status'
-  }
-  return `Status (${completionFilter.value.length})`
-})
-
-const versionFilterLabel = computed(() => {
-  if (!targetVersionFilter.value.length) return 'All versions'
-  if (targetVersionFilter.value.length === 1) return targetVersionFilter.value[0]
-  return `Versions (${targetVersionFilter.value.length})`
-})
-
 const selectedStatusChips = computed(() =>
   completionFilter.value.map(v => ({
     value: v,
@@ -80,15 +62,14 @@ const selectedStatusChips = computed(() =>
   }))
 )
 
-function toggleStatusMenu() {
-  versionMenuOpen.value = false
-  statusMenuOpen.value = !statusMenuOpen.value
-}
-
-function toggleVersionMenu() {
-  statusMenuOpen.value = false
-  versionMenuOpen.value = !versionMenuOpen.value
-}
+const hasActiveFilters = computed(() =>
+  Boolean(
+    search.value ||
+    completionFilter.value.length ||
+    productFilter.value !== 'all' ||
+    targetVersionFilter.value.length
+  )
+)
 
 function removeStatus(value) {
   completionFilter.value = completionFilter.value.filter(v => v !== value)
@@ -98,26 +79,12 @@ function removeVersion(value) {
   targetVersionFilter.value = targetVersionFilter.value.filter(v => v !== value)
 }
 
-function clearVersionFilter() {
-  targetVersionFilter.value = []
-}
-
 function clearAllFilters() {
+  search.value = ''
   completionFilter.value = []
+  productFilter.value = 'all'
   targetVersionFilter.value = []
 }
-
-function onDocClick(e) {
-  if (statusMenuOpen.value && statusMenuRef.value && !statusMenuRef.value.contains(e.target)) {
-    statusMenuOpen.value = false
-  }
-  if (versionMenuOpen.value && versionMenuRef.value && !versionMenuRef.value.contains(e.target)) {
-    versionMenuOpen.value = false
-  }
-}
-
-onMounted(() => document.addEventListener('click', onDocClick))
-onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
 // ── Derived list ──────────────────────────────────────────────────────────────
 const selectedKey = ref(null)
@@ -278,52 +245,13 @@ function completionStatusDotClass(status) {
           />
         </div>
 
-        <!-- Completion filter (multi-select) -->
-        <div ref="statusMenuRef" class="relative">
-          <button
-            type="button"
-            class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/40 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[8.5rem] inline-flex items-center justify-between gap-2"
-            :class="completionFilter.length ? 'border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-300' : ''"
-            @click.stop="toggleStatusMenu"
-          >
-            <span>{{ statusFilterLabel }}</span>
-            <svg class="h-3.5 w-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <div
-            v-if="statusMenuOpen"
-            class="absolute z-20 mt-1 w-48 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg p-2 space-y-1"
-            data-testid="status-filter-menu"
-            @click.stop
-          >
-            <label
-              v-for="opt in STATUS_OPTIONS"
-              :key="opt.value"
-              class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded cursor-pointer"
-            >
-              <input v-model="completionFilter" type="checkbox" :value="opt.value" class="rounded border-gray-300" />
-              {{ opt.label }}
-            </label>
-            <div class="flex items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-gray-700">
-              <button
-                v-if="completionFilter.length"
-                type="button"
-                class="px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                @click="completionFilter = []"
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                class="ml-auto px-2.5 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700"
-                @click="statusMenuOpen = false"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
+        <MultiSelectDropdown
+          v-model="completionFilter"
+          :options="STATUS_OPTIONS"
+          placeholder="All statuses"
+          test-id="status-filter-menu"
+          menu-class="w-48"
+        />
 
         <!-- Product filter -->
         <select
@@ -335,53 +263,13 @@ function completionStatusDotClass(status) {
           <option value="ODH">ODH</option>
         </select>
 
-        <!-- Target Version filter (multi-select) -->
-        <div ref="versionMenuRef" class="relative">
-          <button
-            type="button"
-            class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/40 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[8.5rem] inline-flex items-center justify-between gap-2"
-            :class="targetVersionFilter.length ? 'border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-300' : ''"
-            @click.stop="toggleVersionMenu"
-          >
-            <span class="truncate max-w-[10rem]">{{ versionFilterLabel }}</span>
-            <svg class="h-3.5 w-3.5 opacity-60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <div
-            v-if="versionMenuOpen"
-            class="absolute z-20 mt-1 max-h-56 overflow-auto w-56 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg p-2 space-y-1"
-            data-testid="version-filter-menu"
-            @click.stop
-          >
-            <p v-if="!targetVersionOptions.length" class="px-2 py-1 text-xs text-gray-400">No versions</p>
-            <label
-              v-for="v in targetVersionOptions"
-              :key="v"
-              class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded cursor-pointer"
-            >
-              <input v-model="targetVersionFilter" type="checkbox" :value="v" class="rounded border-gray-300" />
-              {{ v }}
-            </label>
-            <div class="sticky bottom-0 flex items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
-              <button
-                v-if="targetVersionFilter.length"
-                type="button"
-                class="px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                @click="clearVersionFilter"
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                class="ml-auto px-2.5 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700"
-                @click="versionMenuOpen = false"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
+        <MultiSelectDropdown
+          v-model="targetVersionFilter"
+          :options="targetVersionOptions"
+          placeholder="All versions"
+          test-id="version-filter-menu"
+          empty-text="No versions"
+        />
 
         <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">
           {{ componentList.length }} component{{ componentList.length !== 1 ? 's' : '' }}
@@ -390,9 +278,23 @@ function completionStatusDotClass(status) {
 
       <!-- Active filter chips -->
       <div
-        v-if="selectedStatusChips.length || targetVersionFilter.length"
+        v-if="hasActiveFilters"
         class="flex flex-wrap items-center gap-1.5"
       >
+        <span
+          v-if="search"
+          class="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 text-xs"
+        >
+          Search: {{ search }}
+          <button type="button" class="leading-none hover:opacity-70" aria-label="Clear search" @click="search = ''">×</button>
+        </span>
+        <span
+          v-if="productFilter !== 'all'"
+          class="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 text-xs"
+        >
+          {{ productFilter }}
+          <button type="button" class="leading-none hover:opacity-70" aria-label="Clear product" @click="productFilter = 'all'">×</button>
+        </span>
         <span
           v-for="chip in selectedStatusChips"
           :key="'s-' + chip.value"
