@@ -92,6 +92,7 @@ describe('ScheduleView', () => {
     const wrapper = mount(ScheduleView)
     await flushPromises()
 
+    await wrapper.find('input[type="checkbox"]').setValue(false)
     const rows = getReleaseRows(wrapper)
     expect(rows[0].text()).toContain('RHOAI-3.4')
     expect(rows[1].text()).toContain('RHOAI-3.5')
@@ -124,6 +125,7 @@ describe('ScheduleView', () => {
     const wrapper = mount(ScheduleView)
     await flushPromises()
 
+    await wrapper.find('input[type="checkbox"]').setValue(false)
     const rows = getReleaseRows(wrapper)
     const pastRow = rows[0]
     expect(pastRow.classes()).toContain('opacity-50')
@@ -227,7 +229,7 @@ describe('ScheduleView', () => {
 
     apiRequest.mockResolvedValue({
       releases: [
-        makeRelease('rhoai-3.5', { ga: dateStr })
+        makeRelease('rhoai-3.5', { planningFreeze: dateStr, ga: '2028-12-01' })
       ]
     })
     const wrapper = mount(ScheduleView)
