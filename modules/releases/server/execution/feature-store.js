@@ -12,7 +12,7 @@ let storeWriteInProgress = false;
 
 // Jira-owned fields — Jira always wins, preserve existing if jiraData is null
 const JIRA_FIELDS = [
-  'status', 'statusCategory', 'colorStatus', 'ownerStatusColor',
+  'issueType', 'status', 'statusCategory', 'colorStatus', 'ownerStatusColor',
   'statusSummary', 'assignee', 'pm', 'labels', 'fixVersions',
   'targetVersions', 'components', 'priority', 'team', 'releaseType',
   'docsRequired', 'targetEnd', 'riceScore', 'riceStatus', 'isBlocked',
@@ -184,6 +184,7 @@ async function rebuildIndex(storage) {
     const indexEntry = {
       key: feature.key,
       summary: feature.summary || '',
+      issueType: feature.issueType || null,
       status: feature.status || null,
       statusCategory: feature.statusCategory || null,
       priority: feature.priority || null,

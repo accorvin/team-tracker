@@ -405,8 +405,7 @@ function expandReleaseMilestones(r, productName) {
     const hasNoEa = !/\bEA\d?\b/i.test(name)
     const isGa = hasNoEa && (
       (/\bGA\s*$/i.test(name) && name.split(/\s+/).length <= 4) ||
-      /\bGA\s+Release\s*$/i.test(name) ||
-      /\bGA\s+[A-Z]+\s+RELEASE\s*$/i.test(name)
+      /\bGA\b.*\bRelease\s*$/i.test(name)
     )
     return isEaRelease || isGa
   })
@@ -524,6 +523,13 @@ async function fetchScheduleTasks(releaseId, baseUrl, headers) {
  * e.g. (rhelai-3.4, "rhelai-3.4 EA1 release") → "rhelai-3.4.EA1"
  *      (rhelai-3.4, "rhelai-3.4 GA") → "rhelai-3.4"
  *      (RHAIIS-3.4, "rhaiis-3.4 EA2 GA") → "RHAIIS-3.4.EA2"
+ *      (rhai-3.5, "3.5 GA RHOAI RELEASE") → "rhoai-3.5"
+ *      (rhai-3.5, "3.5 EA1 RHELAI Release") → "rhelai-3.5.EA1"
+ *
+ * When the milestone name contains a product family between the phase and
+ * "Release" (e.g. "3.5 GA RHOAI RELEASE"), the family replaces the parent
+ * shortname's product prefix. This handles umbrella products like "rhai"
+ * whose milestones reference sub-products (RHOAI, RHELAI, RHAII).
  *
  * For umbrella products (e.g. rhai), extracts the sub-product name from the
  * milestone name and uses it as the prefix instead of the parent shortname:
@@ -616,7 +622,7 @@ async function fetchProductsByShortname(shortnames, config) {
         const expanded = expandReleaseMilestones(r, productName)
         if (expanded) {
           // Enrich with schedule-tasks if any entry is missing freeze dates
-          const missingFreeze = expanded.some(e => e.dueDate && (!e.featureFreezeDate || !e.planningFreezeDate))
+          const missingFreeze = expanded.some(e => e.dueDate && (!e.codeFreezeDate || !e.featureFreezeDate || !e.planningFreezeDate))
           if (missingFreeze && r.id) {
             const tasks = await fetchScheduleTasks(r.id, baseUrl, {
               Accept: 'application/json',
@@ -624,6 +630,9 @@ async function fetchProductsByShortname(shortnames, config) {
             })
             if (tasks.length > 0) {
               for (const entry of expanded) {
+                if (!entry.codeFreezeDate) {
+                  entry.codeFreezeDate = matchScheduleFreezeDate(tasks, entry.releaseNumber, 'code')
+                }
                 if (!entry.featureFreezeDate) {
                   entry.featureFreezeDate = matchScheduleFreezeDate(tasks, entry.releaseNumber, 'feature')
                 }
@@ -649,16 +658,20 @@ async function fetchProductsByShortname(shortnames, config) {
         const releaseNumber = r.shortname || r.name || ''
         const eaMatch = releaseNumber.match(/\b(EA\d?)\b/i)
         const eaTag = eaMatch ? eaMatch[1] : null
+        let codeFreezeDate = extractCodeFreezeDate(r, eaTag) || null
         let featureFreezeDate = extractFeatureFreezeDate(r, eaTag) || null
         let planningFreezeDate = extractPlanningFreezeDate(r, eaTag) || null
 
         // Enrich from schedule-tasks if freeze dates are missing
-        if ((!featureFreezeDate || !planningFreezeDate) && r.id) {
+        if ((!codeFreezeDate || !featureFreezeDate || !planningFreezeDate) && r.id) {
           const tasks = await fetchScheduleTasks(r.id, baseUrl, {
             Accept: 'application/json',
             Authorization: `Bearer ${token}`
           })
           if (tasks.length > 0) {
+            if (!codeFreezeDate) {
+              codeFreezeDate = matchScheduleFreezeDate(tasks, releaseNumber, 'code')
+            }
             if (!featureFreezeDate) {
               featureFreezeDate = matchScheduleFreezeDate(tasks, releaseNumber, 'feature')
             }
@@ -672,7 +685,7 @@ async function fetchProductsByShortname(shortnames, config) {
           productName,
           releaseNumber,
           dueDate,
-          codeFreezeDate: extractCodeFreezeDate(r, eaTag) || null,
+          codeFreezeDate,
           featureFreezeDate,
           planningFreezeDate
         })

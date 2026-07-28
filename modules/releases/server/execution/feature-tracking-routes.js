@@ -11,12 +11,9 @@
  * previously had a fixVersion but no longer do (dropped features).
  */
 
-const { readRegistry } = require('../registry')
-const { fetchPlanningFreezeDatesFromSchedule } = require('../delivery/product-pages')
+const { readRegistry, getRegistryReleasesFlat } = require('../registry')
 const { CUSTOM_FIELDS, transformIssue } = require('../hygiene/jira-fetch')
 const versionUtils = require('../version-utils')
-
-const PP_CACHE_FILE = 'releases/delivery/product-pages-releases-cache.json'
 const PLANNING_CONFIG_FILE = 'releases/planning/config.json'
 const TRACKING_CONFIG_FILE = 'releases/execution/feature-tracking-config.json'
 const TRACKING_CACHE_PREFIX = 'releases/execution/tracking-data-'
@@ -413,20 +410,19 @@ function findFixVersionRemovedDate(changelog, fixVersionNames) {
 }
 
 /**
- * Get Feature Freeze dates from PP cache, keyed by product release number.
+ * Get Feature Freeze dates from the registry, keyed by product release number.
  * Returns a map: { "rhoai-3.5.EA1": "2026-05-15", "rhelai-3.5.EA1": "2026-04-17", ... }
  * Also returns the earliest date across products as a portfolio-level fallback.
  */
 async function getFeatureFreezeDatesFromCache(portfolioVersion, readFromStorage) {
-  const ppCache = await readFromStorage(PP_CACHE_FILE)
-  const ppReleases = Array.isArray(ppCache) ? ppCache : (ppCache && ppCache.releases) || []
+  const releases = await getRegistryReleasesFlat(readFromStorage)
 
   const normalizedPortfolio = normalizeVersionName(portfolioVersion)
   const byProduct = {}
   let earliest = null
 
-  for (let i = 0; i < ppReleases.length; i++) {
-    const rel = ppReleases[i]
+  for (let i = 0; i < releases.length; i++) {
+    const rel = releases[i]
     const relVersion = normalizeVersionName(rel.releaseNumber).replace(/^[a-z]+-/, '')
     var freezeDate = rel.planningFreezeDate || rel.featureFreezeDate
     if (relVersion === normalizedPortfolio && freezeDate) {
@@ -573,12 +569,6 @@ module.exports = async function registerFeatureTrackingRoutes(router, context) {
       addVersion(rel.displayName || rel.id || '')
     }
 
-    const ppCache = await storage.readFromStorage(PP_CACHE_FILE)
-    const ppReleases = Array.isArray(ppCache) ? ppCache : (ppCache && ppCache.releases) || []
-    for (let pi = 0; pi < ppReleases.length; pi++) {
-      if (ppReleases[pi].releaseNumber) addVersion(ppReleases[pi].releaseNumber)
-    }
-
     const planningConfig = await storage.readFromStorage(PLANNING_CONFIG_FILE)
     if (planningConfig && planningConfig.releases) {
       const configVersions = Object.keys(planningConfig.releases)
@@ -683,48 +673,16 @@ module.exports = async function registerFeatureTrackingRoutes(router, context) {
       const tConfig = await loadTrackingConfig(storage.readFromStorage)
       const productVersions = await resolveProductVersionsFromJira(version, jiraRequest, tConfig)
       const freezeDates = await getFeatureFreezeDatesFromCache(version, storage.readFromStorage)
-      const cacheDates = Object.assign({}, freezeDates.byProduct)
+      let freezeDateSource = 'registry'
 
-      // Always try the schedule API — it returns EA-specific freeze dates
-      // that the releases list endpoint and cache often lack.
-      // Schedule API dates unconditionally override cache dates (more granular).
-      let scheduleSource = 'none'
-      try {
-        const ppConfig = {
-          productPagesBaseUrl: process.env.PRODUCT_PAGES_BASE_URL || 'https://productpages.redhat.com'
-        }
-        const scheduleDates = await fetchPlanningFreezeDatesFromSchedule(version, DEFAULT_PRODUCTS, ppConfig)
-        const schedEntries = Object.entries(scheduleDates.byProduct)
-        if (schedEntries.length > 0) {
-          scheduleSource = 'schedule-api'
-          console.log('[feature-tracking] Schedule API returned planning freeze dates:', JSON.stringify(scheduleDates.byProduct))
-          for (const [key, date] of schedEntries) {
-            const normKey = normalizeVersionName(key)
-            freezeDates.byProduct[normKey] = date
-          }
-          // Recalculate earliest from final merged dates — unconditional
-          // overrides may have replaced the entry that was previously earliest
-          freezeDates.earliest = null
-          for (const d of Object.values(freezeDates.byProduct)) {
-            if (!freezeDates.earliest || d < freezeDates.earliest) freezeDates.earliest = d
-          }
-        } else {
-          scheduleSource = 'cache-only (schedule returned empty)'
-          console.warn('[feature-tracking] Schedule API returned no planning freeze dates for version:', version)
-        }
-      } catch (schedErr) {
-        scheduleSource = 'cache-only (' + schedErr.message + ')'
-        console.error('[feature-tracking] Schedule API failed for version:', version, schedErr.message)
-      }
-
-      // User-entered date takes priority over Product Pages for ALL products
+      // User-entered date takes priority over registry dates for ALL products
       var userFreezeOverride = null
       if (tConfig.releases && tConfig.releases[version]) {
         var overrideDate = tConfig.releases[version].planningFreezeOverride
         if (overrideDate) {
           userFreezeOverride = overrideDate
           freezeDates.earliest = overrideDate
-          scheduleSource = 'user-override' + (scheduleSource !== 'none' ? ' (PP: ' + scheduleSource + ')' : '')
+          freezeDateSource = 'user-override'
           console.log('[feature-tracking] Using user-entered freeze date for', version, ':', overrideDate)
         }
       }
@@ -802,9 +760,8 @@ module.exports = async function registerFeatureTrackingRoutes(router, context) {
         fetchedAt: new Date().toISOString(),
         totalUniqueFeatures: Object.keys(allKeys).length,
         groups: groups,
-        _freezeDateSource: scheduleSource,
-        _freezeDatesCache: cacheDates,
-        _freezeDatesFinal: Object.assign({}, freezeDates.byProduct)
+        _freezeDateSource: freezeDateSource,
+        _freezeDatesByProduct: Object.assign({}, freezeDates.byProduct)
       }
 
       await storage.writeToStorage(cacheKey(version), responseData)

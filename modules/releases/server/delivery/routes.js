@@ -2,7 +2,8 @@ const sharedJira = require('../../../../shared/server/jira')
 var { jiraRequest, JIRA_HOST, fetchAllJqlResults } = sharedJira
 const { getConfig, saveConfig, deleteConfig } = require('./config')
 const productPages = require('./product-pages')
-const { fetchProductsByShortname, fetchAllProducts, getProductPagesToken, getAuthStatus } = productPages
+const { fetchAllProducts, getAuthStatus } = productPages
+const { getRegistryReleasesFlat, readRegistry, writeRegistry, normalizeRelease } = require('../registry')
 const registerConformaRoutes = require('./conforma')
 const { registerConformaFetcher } = require('./conforma-fetcher')
 const registerBlockerRoutes = require('./blockers')
@@ -271,64 +272,15 @@ async function fetchOpenReleases(storage, config) {
     } catch (err) {
       console.error('[releases/delivery] Jira release discovery failed:', err.message)
     }
-    // Fall through to other methods on failure
+    // Fall through to registry on failure
   }
 
-  // Priority 2: product shortnames configured
-  if (config.productPagesProductShortnames?.length) {
-    try {
-      const releases = await fetchProductsByShortname(config.productPagesProductShortnames, config)
-      if (releases.length > 0) {
-        await storage.writeToStorage('releases/delivery/product-pages-releases-cache.json', {
-          source: 'api',
-          fetchedAt: new Date().toISOString(),
-          releases
-        })
-        return releases
-      }
-    } catch (err) {
-      console.error('[releases/delivery] Product Pages fetch by shortname failed:', err.message)
-    }
-    // Fall through to cache on failure or empty result
+  // Priority 2: Registry (single source of truth for release schedule data)
+  const registryReleases = await getRegistryReleasesFlat(storage.readFromStorage, { state: 'active' })
+  if (registryReleases.length > 0) {
+    return registryReleases
   }
 
-  // Legacy path: raw URL (preserved for backward compatibility)
-  if (config.productPagesReleasesUrl) {
-    const token = await getProductPagesToken(config)
-    const headers = { Accept: 'application/json' }
-    if (token) headers.Authorization = `Bearer ${token}`
-    const response = await fetch(config.productPagesReleasesUrl, {
-      headers,
-      signal: AbortSignal.timeout(30000)
-    })
-    if (!response.ok) {
-      throw new Error(`Product Pages API error (${response.status})`)
-    }
-    const payload = await response.json()
-    const rows = Array.isArray(payload) ? payload : (payload.releases || payload.items || [])
-    const releases = rows
-      .map(r => ({
-        productName: r.productName || r.product_name || r.product || r.product_shortname || '',
-        releaseNumber: r.releaseNumber || r.release_number || r.name || '',
-        dueDate: toIsoDate(r.dueDate || r.due_date || r.gaDate || r.ga_date || r.date_finish || r.date_start),
-        codeFreezeDate: toIsoDate(r.codeFreezeDate || r.code_freeze_date || r.codeFreeze || r.code_freeze) || null,
-        featureFreezeDate: toIsoDate(r.featureFreezeDate || r.feature_freeze_date || r.featureFreeze || r.feature_freeze) || null,
-        planningFreezeDate: toIsoDate(r.planningFreezeDate || r.planning_freeze_date || r.planningFreeze || r.planning_freeze) || null
-      }))
-      .filter(r => r.productName && r.releaseNumber && r.dueDate)
-    await storage.writeToStorage('releases/delivery/product-pages-releases-cache.json', {
-      source: 'api',
-      fetchedAt: new Date().toISOString(),
-      releases
-    })
-    return releases
-  }
-
-  // Fallback cache. This lets teams load MCP-fetched release snapshots into storage.
-  const cached = await storage.readFromStorage('releases/delivery/product-pages-releases-cache.json')
-  if (cached?.releases && Array.isArray(cached.releases)) {
-    return cached.releases
-  }
   return []
 }
 
@@ -1700,11 +1652,11 @@ module.exports = async function registerRoutes(router, context) {
    * @openapi
    * /api/modules/releases/delivery/admin/releases:
    *   post:
-   *     summary: Manually upload release data
+   *     summary: Manually upload release data into the registry
    *     tags: [Releases - Delivery]
    *     responses:
    *       200:
-   *         description: Releases uploaded and analysis triggered
+   *         description: Releases upserted into registry
    */
   router.post('/admin/releases', requireAdmin, requireScope('releases:write'), async function(req, res) {
     try {
@@ -1712,24 +1664,63 @@ module.exports = async function registerRoutes(router, context) {
       if (!releases || releases.length === 0) {
         return res.status(400).json({ error: 'Request must include non-empty releases array' })
       }
-      const normalized = releases.map(r => ({
-        productName: r.productName,
-        releaseNumber: r.releaseNumber,
-        dueDate: toIsoDate(r.dueDate),
-        codeFreezeDate: toIsoDate(r.codeFreezeDate) || null,
-        featureFreezeDate: toIsoDate(r.featureFreezeDate) || null
-      })).filter(r => r.productName && r.releaseNumber && r.dueDate)
-
-      if (normalized.length === 0) {
-        return res.status(400).json({ error: 'No valid releases after normalization' })
+      const valid = releases.filter(r => r.releaseNumber && r.dueDate)
+      if (valid.length === 0) {
+        return res.status(400).json({ error: 'No valid releases after validation' })
       }
 
-      await writeToStorage('releases/delivery/product-pages-releases-cache.json', {
-        source: 'manual',
-        fetchedAt: new Date().toISOString(),
-        releases: normalized
-      })
-      res.json({ success: true, count: normalized.length })
+      const registry = await readRegistry(readFromStorage)
+      const existingById = new Map()
+      for (const r of registry.releases) {
+        existingById.set(r.id, r)
+      }
+
+      let created = 0
+      let updated = 0
+      for (const r of valid) {
+        const id = sharedStripZStream(r.releaseNumber).toLowerCase().replace(/\s+/g, '-')
+        if (!/^[a-z0-9][a-z0-9._-]*$/.test(id)) continue
+
+        const milestones = {
+          ga: toIsoDate(r.dueDate) || null,
+          codeFreeze: toIsoDate(r.codeFreezeDate) || null,
+          featureFreeze: toIsoDate(r.featureFreezeDate) || null,
+          planningFreeze: toIsoDate(r.planningFreezeDate) || null
+        }
+
+        const existing = existingById.get(id)
+        if (existing) {
+          existing.milestones = Object.assign({}, existing.milestones, milestones)
+          existing.updatedAt = new Date().toISOString()
+          updated++
+        } else {
+          const release = normalizeRelease({
+            id,
+            displayName: sharedStripZStream(r.releaseNumber),
+            productPagesShortname: r.productName || r.releaseNumber.split('-')[0] || null,
+            productPagesVersion: r.releaseNumber,
+            milestones,
+            source: 'manual',
+            state: 'active'
+          })
+          registry.releases.push(release)
+          existingById.set(id, release)
+          created++
+        }
+      }
+
+      if (created > 0 || updated > 0) {
+        await writeRegistry(writeToStorage, registry)
+        await logAudit(readFromStorage, writeToStorage, {
+          domain: 'registry',
+          action: 'registry_manual_upload',
+          user: req.userEmail || 'unknown',
+          summary: `Manual upload: ${created} created, ${updated} updated`,
+          details: { created, updated }
+        })
+      }
+
+      res.json({ success: true, created, updated })
     } catch (error) {
       console.error('[releases/delivery] save releases error:', error)
       res.status(500).json({ error: error.message })
