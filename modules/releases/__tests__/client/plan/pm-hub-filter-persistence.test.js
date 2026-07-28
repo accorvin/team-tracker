@@ -24,6 +24,7 @@ function saveFilters(state) {
       releaseType: state.releaseType || [],
       status: state.status || [],
       blocked: state.blocked !== undefined ? state.blocked : null,
+      hideClosed: state.hideClosed || false,
       delOwner: state.delOwner || [],
       pmOwner: state.pmOwner || [],
       sort: state.sort || { column: null, direction: 'asc' }
@@ -47,6 +48,7 @@ function restoreFilters() {
     if (state.releaseType && Array.isArray(state.releaseType)) result.releaseType = state.releaseType
     if (state.status && Array.isArray(state.status)) result.status = state.status
     if (state.blocked !== undefined) result.blocked = state.blocked
+    if (state.hideClosed !== undefined) result.hideClosed = !!state.hideClosed
     if (state.delOwner && Array.isArray(state.delOwner)) result.delOwner = state.delOwner
     if (state.pmOwner && Array.isArray(state.pmOwner)) result.pmOwner = state.pmOwner
     if (state.sort && typeof state.sort === 'object') result.sort = state.sort
@@ -88,6 +90,7 @@ describe('saveFilters', function () {
       releaseType: ['Feature'],
       status: ['Green'],
       blocked: true,
+      hideClosed: true,
       delOwner: ['Alice'],
       pmOwner: ['Bob'],
       sort: { column: 'key', direction: 'asc' }
@@ -104,6 +107,7 @@ describe('saveFilters', function () {
     expect(parsed.releaseType).toEqual(['Feature'])
     expect(parsed.status).toEqual(['Green'])
     expect(parsed.blocked).toBe(true)
+    expect(parsed.hideClosed).toBe(true)
     expect(parsed.delOwner).toEqual(['Alice'])
     expect(parsed.pmOwner).toEqual(['Bob'])
     expect(parsed.sort).toEqual({ column: 'key', direction: 'asc' })
@@ -115,7 +119,20 @@ describe('saveFilters', function () {
     expect(parsed.pillars).toEqual([])
     expect(parsed.components).toEqual([])
     expect(parsed.blocked).toBeNull()
+    expect(parsed.hideClosed).toBe(false)
     expect(parsed.sort).toEqual({ column: null, direction: 'asc' })
+  })
+
+  it('saves hideClosed=true correctly', function () {
+    saveFilters({ hideClosed: true })
+    var parsed = JSON.parse(store[STORAGE_KEY])
+    expect(parsed.hideClosed).toBe(true)
+  })
+
+  it('saves hideClosed=false correctly', function () {
+    saveFilters({ hideClosed: false })
+    var parsed = JSON.parse(store[STORAGE_KEY])
+    expect(parsed.hideClosed).toBe(false)
   })
 
   it('saves blocked=false correctly', function () {
@@ -178,6 +195,7 @@ describe('restoreFilters', function () {
       releaseType: ['Feature'],
       status: ['Green'],
       blocked: true,
+      hideClosed: true,
       delOwner: ['Alice'],
       pmOwner: ['Bob'],
       sort: { column: 'priority', direction: 'desc' }
@@ -192,9 +210,22 @@ describe('restoreFilters', function () {
     expect(restored.releaseType).toEqual(['Feature'])
     expect(restored.status).toEqual(['Green'])
     expect(restored.blocked).toBe(true)
+    expect(restored.hideClosed).toBe(true)
     expect(restored.delOwner).toEqual(['Alice'])
     expect(restored.pmOwner).toEqual(['Bob'])
     expect(restored.sort).toEqual({ column: 'priority', direction: 'desc' })
+  })
+
+  it('restores hideClosed=true correctly', function () {
+    saveFilters({ hideClosed: true })
+    var restored = restoreFilters()
+    expect(restored.hideClosed).toBe(true)
+  })
+
+  it('restores hideClosed=false as false', function () {
+    saveFilters({ hideClosed: false })
+    var restored = restoreFilters()
+    expect(restored.hideClosed).toBe(false)
   })
 
   it('restores blocked=false correctly', function () {
@@ -284,6 +315,7 @@ describe('save/restore round-trip', function () {
       releaseType: ['Feature', 'Enhancement'],
       status: ['Green', 'Yellow', 'Red'],
       blocked: true,
+      hideClosed: true,
       delOwner: ['Alice', 'Bob'],
       pmOwner: ['Charlie', 'Diana'],
       sort: { column: 'priority', direction: 'desc' }
@@ -298,6 +330,7 @@ describe('save/restore round-trip', function () {
     expect(restored.releaseType).toEqual(original.releaseType)
     expect(restored.status).toEqual(original.status)
     expect(restored.blocked).toEqual(original.blocked)
+    expect(restored.hideClosed).toEqual(original.hideClosed)
     expect(restored.delOwner).toEqual(original.delOwner)
     expect(restored.pmOwner).toEqual(original.pmOwner)
     expect(restored.sort).toEqual(original.sort)
