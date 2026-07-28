@@ -110,16 +110,21 @@ describe('formatShort', () => {
 })
 
 describe('getProduct', () => {
-  it('returns productPagesShortname when present', () => {
+  it('returns productPagesShortname when valid', () => {
     expect(getProduct({ productPagesShortname: 'rhoai', id: 'rhoai-3.5' })).toBe('rhoai')
+  })
+
+  it('rejects shortname with digits and falls back to id', () => {
+    expect(getProduct({ productPagesShortname: '3.5rhoai', id: 'rhoai-3.5' })).toBe('rhoai')
+    expect(getProduct({ productPagesShortname: '3.6-rhoai', id: 'rhoai-3.6.EA1' })).toBe('rhoai')
   })
 
   it('falls back to regex extraction from id', () => {
     expect(getProduct({ id: 'rhoai-3.5' })).toBe('rhoai')
   })
 
-  it('regex is case-insensitive', () => {
-    expect(getProduct({ id: 'RHOAI-3.5' })).toBe('RHOAI')
+  it('normalizes to lowercase', () => {
+    expect(getProduct({ id: 'RHOAI-3.5' })).toBe('rhoai')
   })
 
   it('returns full id when regex does not match', () => {
