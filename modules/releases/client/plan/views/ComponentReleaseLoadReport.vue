@@ -224,6 +224,16 @@
           {{ filterBlocked === true ? 'Blocked' : filterBlocked === false ? 'Not Blocked' : 'Blocked' }}
         </button>
 
+        <!-- Hide Closed -->
+        <button
+          type="button"
+          @click="hideClosed = !hideClosed; saveFilters()"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors"
+          :class="hideClosed ? 'bg-gray-700 dark:bg-gray-200 border-gray-700 dark:border-gray-200 text-white dark:text-gray-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-500'"
+        >
+          Hide Closed
+        </button>
+
         <!-- Docs Required -->
         <div class="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 overflow-hidden">
           <button
@@ -439,6 +449,7 @@ var filterType = ref([])
 var filterReleaseType = ref([])
 var filterStatus = ref([])
 var filterBlocked = ref(null)
+var hideClosed = ref(false)
 var filterDelOwner = ref([])
 var filterPmOwner = ref([])
 var filterDocs = ref([])
@@ -471,6 +482,7 @@ function saveFilters() {
       releaseType: filterReleaseType.value,
       status: filterStatus.value,
       blocked: filterBlocked.value,
+      hideClosed: hideClosed.value,
       delOwner: filterDelOwner.value,
       pmOwner: filterPmOwner.value,
       docs: filterDocs.value,
@@ -493,6 +505,7 @@ function restoreFilters() {
     if (state.releaseType && Array.isArray(state.releaseType)) filterReleaseType.value = state.releaseType
     if (state.status && Array.isArray(state.status)) filterStatus.value = state.status
     if (state.blocked !== undefined) filterBlocked.value = state.blocked
+    if (state.hideClosed !== undefined) hideClosed.value = !!state.hideClosed
     if (state.delOwner && Array.isArray(state.delOwner)) filterDelOwner.value = state.delOwner
     if (state.pmOwner && Array.isArray(state.pmOwner)) filterPmOwner.value = state.pmOwner
     if (state.docs && Array.isArray(state.docs)) filterDocs.value = state.docs
@@ -542,6 +555,7 @@ var activeFilterCount = computed(function() {
   count += filterProduct.value.length + filterType.value.length + filterReleaseType.value.length
   count += filterStatus.value.length + filterDelOwner.value.length + filterPmOwner.value.length + filterDocs.value.length
   if (filterBlocked.value !== null) count++
+  if (hideClosed.value) count++
   return count
 })
 
@@ -557,6 +571,7 @@ function clearAllFilters() {
   filterReleaseType.value = []
   filterStatus.value = []
   filterBlocked.value = null
+  hideClosed.value = false
   filterDelOwner.value = []
   filterPmOwner.value = []
   filterDocs.value = []
@@ -641,7 +656,7 @@ var filteredPmOwners = computed(function() {
 })
 
 var hasClientFilters = computed(function() {
-  return filterProduct.value.length > 0 || filterType.value.length > 0 || filterReleaseType.value.length > 0 || filterStatus.value.length > 0 || filterBlocked.value !== null || filterDelOwner.value.length > 0 || filterPmOwner.value.length > 0 || filterDocs.value.length > 0
+  return filterProduct.value.length > 0 || filterType.value.length > 0 || filterReleaseType.value.length > 0 || filterStatus.value.length > 0 || filterBlocked.value !== null || hideClosed.value || filterDelOwner.value.length > 0 || filterPmOwner.value.length > 0 || filterDocs.value.length > 0
 })
 
 var clientFilteredGroups = computed(function() {
@@ -697,6 +712,7 @@ var clientFilteredGroups = computed(function() {
         }
         if (filterBlocked.value === true && !f.isBlocked) return false
         if (filterBlocked.value === false && f.isBlocked) return false
+        if (hideClosed.value && f.statusCategory === 'Done') return false
         if (filterDelOwner.value.length > 0 && filterDelOwner.value.indexOf(f.assignee || '') === -1) return false
         if (filterPmOwner.value.length > 0 && filterPmOwner.value.indexOf(f.pmOwner || '') === -1) return false
         if (filterDocs.value.length > 0) {
@@ -1096,7 +1112,7 @@ watch([selectedComponents, selectedVersions, selectedPillars], function() {
 
 // Save filters to localStorage on any filter change
 watch(
-  [selectedPillars, selectedComponents, selectedVersions, filterProduct, filterType, filterReleaseType, filterStatus, filterBlocked, filterDelOwner, filterPmOwner, filterDocs],
+  [selectedPillars, selectedComponents, selectedVersions, filterProduct, filterType, filterReleaseType, filterStatus, filterBlocked, hideClosed, filterDelOwner, filterPmOwner, filterDocs],
   saveFilters,
   { deep: true }
 )
