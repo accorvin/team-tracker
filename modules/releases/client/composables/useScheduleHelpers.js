@@ -33,7 +33,7 @@ export function getProduct(release) {
   var sources = [release.id, release.displayName]
   for (var i = 0; i < sources.length; i++) {
     if (!sources[i]) continue
-    var match = sources[i].match(/^([a-z]+)-/i)
+    var match = sources[i].match(/([a-z]{4,})/i)
     if (match) return match[1].toLowerCase()
   }
   return release.id

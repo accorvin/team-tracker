@@ -119,6 +119,11 @@ describe('getProduct', () => {
     expect(getProduct({ productPagesShortname: '3.6-rhoai', id: 'rhoai-3.6.EA1' })).toBe('rhoai')
   })
 
+  it('extracts product from reversed id format (version-product)', () => {
+    expect(getProduct({ productPagesShortname: '3.5', id: '3.5rhoai' })).toBe('rhoai')
+    expect(getProduct({ productPagesShortname: '3.6-rhoai', id: '3.6-rhoai' })).toBe('rhoai')
+  })
+
   it('falls back to regex extraction from id', () => {
     expect(getProduct({ id: 'rhoai-3.5' })).toBe('rhoai')
   })
@@ -127,8 +132,8 @@ describe('getProduct', () => {
     expect(getProduct({ id: 'RHOAI-3.5' })).toBe('rhoai')
   })
 
-  it('returns full id when regex does not match', () => {
-    expect(getProduct({ id: 'standalone' })).toBe('standalone')
+  it('returns full id when no 4+ letter sequence found', () => {
+    expect(getProduct({ id: 'ab-1' })).toBe('ab-1')
   })
 })
 
