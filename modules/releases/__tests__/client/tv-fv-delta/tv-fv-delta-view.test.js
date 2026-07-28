@@ -87,7 +87,7 @@ async function mountView(extraData) {
     global: {
       stubs: {
         ClickableCount: {
-          template: '<span class="clickable-count">{{ count }}</span>',
+          template: '<a v-if="jql" class="clickable-count" :href="jql">{{ count }}</a><span v-else class="clickable-count">{{ count }}</span>',
           props: ['count', 'jql', 'color', 'label'],
         },
       },
@@ -363,6 +363,49 @@ describe('TvFvDeltaView milestone vs product selection', function () {
   })
 })
 
+describe('TvFvDeltaView category section Jira links', function () {
+  beforeEach(function () {
+    mockApiRequest.mockReset()
+  })
+
+  it('shows View in Jira on Misaligned when the section has features', async function () {
+    var wrapper = await mountView({
+      releases: {
+        '3.6 GA RHOAI RELEASE': {
+          aligned_on_time: [],
+          aligned_late: [],
+          tv_only: [],
+          fv_only: [],
+          misaligned: [
+            {
+              key: 'RHAISTRAT-2196',
+              url: 'https://redhat.atlassian.net/browse/RHAISTRAT-2196',
+              summary: 'Misaligned A',
+            },
+            {
+              key: 'RHAISTRAT-2013',
+              url: 'https://redhat.atlassian.net/browse/RHAISTRAT-2013',
+              summary: 'Misaligned B',
+            },
+          ],
+        },
+      },
+    })
+
+    var misaligned = wrapper.findAll('details').find(function (d) {
+      return d.text().includes('Misaligned —')
+    })
+    expect(misaligned).toBeTruthy()
+    var jiraLink = misaligned.findAll('a').find(function (a) {
+      return a.text().includes('View in Jira')
+    })
+    expect(jiraLink).toBeTruthy()
+    expect(jiraLink.attributes('href')).toContain('key')
+    expect(jiraLink.attributes('href')).toContain('RHAISTRAT-2196')
+    expect(jiraLink.attributes('href')).toContain('RHAISTRAT-2013')
+  })
+})
+
 describe('TvFvDeltaView component breakdown PM/ENG columns', function () {
   beforeEach(function () {
     mockApiRequest.mockReset()
@@ -406,6 +449,13 @@ describe('TvFvDeltaView component breakdown PM/ENG columns', function () {
     })
     expect(servingRow.text()).toContain('PM Lead Serving')
     expect(servingRow.text()).toContain('Eng Lead Serving')
+
+    // Non-zero counts link to key-in Jira lists for that component
+    var totalLink = servingRow.findAll('a').find(function (a) {
+      return a.attributes('href') && a.attributes('href').includes('key') && a.text().trim() === '1'
+    })
+    expect(totalLink).toBeTruthy()
+    expect(totalLink.attributes('href')).toContain('RHAISTRAT-1')
 
     var unknownRow = table.findAll('tbody tr').find(function (r) {
       return r.text().includes('Unknown Comp')

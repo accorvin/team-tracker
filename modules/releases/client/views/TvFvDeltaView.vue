@@ -672,10 +672,10 @@ onBeforeUnmount(() => {
         </p>
         <!-- TV-Only -->
         <details class="group bg-white dark:bg-gray-800 rounded-lg border border-yellow-200 dark:border-yellow-800 overflow-hidden mb-4">
-          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-yellow-50 dark:hover:bg-yellow-900/10 flex items-center justify-between [&::-webkit-details-marker]:hidden">
-            <span class="flex items-center gap-2">
-              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform">&#9654;</span>
-              <span class="text-sm font-semibold text-yellow-700 dark:text-yellow-400">
+          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-yellow-50 dark:hover:bg-yellow-900/10 flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform shrink-0">&#9654;</span>
+              <span class="text-sm font-semibold text-yellow-700 dark:text-yellow-400 truncate">
                 TV-Only — Target Version set, no Fix Version ({{ releaseData.tv_only.length }})
               </span>
             </span>
@@ -684,7 +684,7 @@ onBeforeUnmount(() => {
               :href="sectionJiraLinks.tv_only"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              class="shrink-0 whitespace-nowrap text-xs text-blue-600 dark:text-blue-400 hover:underline"
               @click.stop
             >
               View in Jira &rarr;
@@ -699,10 +699,10 @@ onBeforeUnmount(() => {
 
         <!-- FV-Only -->
         <details class="group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-4">
-          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 flex items-center justify-between [&::-webkit-details-marker]:hidden">
-            <span class="flex items-center gap-2">
-              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform">&#9654;</span>
-              <span class="text-sm font-semibold text-gray-600 dark:text-gray-400" :title="COLUMN_HELP.fv_only">
+          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform shrink-0">&#9654;</span>
+              <span class="text-sm font-semibold text-gray-600 dark:text-gray-400 truncate" :title="COLUMN_HELP.fv_only">
                 FV-Only — Fix Version set, no Target Version ({{ releaseData.fv_only.length }})
               </span>
             </span>
@@ -711,7 +711,7 @@ onBeforeUnmount(() => {
               :href="sectionJiraLinks.fv_only"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              class="shrink-0 whitespace-nowrap text-xs text-blue-600 dark:text-blue-400 hover:underline"
               @click.stop
             >
               View in Jira &rarr;
@@ -726,10 +726,10 @@ onBeforeUnmount(() => {
 
         <!-- Aligned (on time) -->
         <details class="group bg-white dark:bg-gray-800 rounded-lg border border-green-200 dark:border-green-800 overflow-hidden mb-4">
-          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-green-50 dark:hover:bg-green-900/10 flex items-center justify-between [&::-webkit-details-marker]:hidden">
-            <span class="flex items-center gap-2">
-              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform">&#9654;</span>
-              <span class="text-sm font-semibold text-green-700 dark:text-green-400" :title="COLUMN_HELP.aligned_on_time">
+          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-green-50 dark:hover:bg-green-900/10 flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform shrink-0">&#9654;</span>
+              <span class="text-sm font-semibold text-green-700 dark:text-green-400 truncate" :title="COLUMN_HELP.aligned_on_time">
                 Aligned On Time — shipping on or ahead of plan ({{ releaseData.aligned_on_time.length }})
               </span>
             </span>
@@ -738,7 +738,7 @@ onBeforeUnmount(() => {
               :href="sectionJiraLinks.aligned_on_time"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              class="shrink-0 whitespace-nowrap text-xs text-blue-600 dark:text-blue-400 hover:underline"
               @click.stop
             >
               View in Jira &rarr;
@@ -753,10 +753,10 @@ onBeforeUnmount(() => {
 
         <!-- Aligned (late) -->
         <details v-if="releaseData.aligned_late.length" class="group bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-800 overflow-hidden mb-4">
-          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/10 flex items-center justify-between [&::-webkit-details-marker]:hidden">
-            <span class="flex items-center gap-2">
-              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform">&#9654;</span>
-              <span class="text-sm font-semibold text-amber-600 dark:text-amber-400" :title="COLUMN_HELP.aligned_late">
+          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/10 flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform shrink-0">&#9654;</span>
+              <span class="text-sm font-semibold text-amber-600 dark:text-amber-400 truncate" :title="COLUMN_HELP.aligned_late">
                 Aligned Late — slipped after planning freeze ({{ releaseData.aligned_late.length }})
               </span>
             </span>
@@ -765,7 +765,7 @@ onBeforeUnmount(() => {
               :href="sectionJiraLinks.aligned_late"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              class="shrink-0 whitespace-nowrap text-xs text-blue-600 dark:text-blue-400 hover:underline"
               @click.stop
             >
               View in Jira &rarr;
@@ -779,10 +779,10 @@ onBeforeUnmount(() => {
 
         <!-- Misaligned -->
         <details v-if="releaseData.misaligned.length" class="group bg-white dark:bg-gray-800 rounded-lg border border-red-200 dark:border-red-800 overflow-hidden mb-4">
-          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center justify-between [&::-webkit-details-marker]:hidden">
-            <span class="flex items-center gap-2">
-              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform">&#9654;</span>
-              <span class="text-sm font-semibold text-red-700 dark:text-red-400" :title="COLUMN_HELP.misaligned">
+          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform shrink-0">&#9654;</span>
+              <span class="text-sm font-semibold text-red-700 dark:text-red-400 truncate" :title="COLUMN_HELP.misaligned">
                 Misaligned — slip before freeze, or different products ({{ releaseData.misaligned.length }})
               </span>
             </span>
@@ -791,7 +791,7 @@ onBeforeUnmount(() => {
               :href="sectionJiraLinks.misaligned"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              class="shrink-0 whitespace-nowrap text-xs text-blue-600 dark:text-blue-400 hover:underline"
               @click.stop
             >
               View in Jira &rarr;
@@ -840,12 +840,24 @@ onBeforeUnmount(() => {
                 <td class="px-4 py-2 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
                   {{ leadsFor(comp.component)?.engLead || '—' }}
                 </td>
-                <td class="px-4 py-2 text-right text-gray-700 dark:text-gray-300">{{ comp.total }}</td>
-                <td class="px-4 py-2 text-right text-green-600 dark:text-green-400">{{ comp.aligned_on_time }}</td>
-                <td class="px-4 py-2 text-right text-amber-600 dark:text-amber-400">{{ comp.aligned_late }}</td>
-                <td class="px-4 py-2 text-right text-yellow-600 dark:text-yellow-400">{{ comp.tv_only }}</td>
-                <td class="px-4 py-2 text-right text-gray-500 dark:text-gray-400">{{ comp.fv_only }}</td>
-                <td class="px-4 py-2 text-right text-red-600 dark:text-red-400">{{ comp.misaligned }}</td>
+                <td class="px-4 py-2 text-right">
+                  <ClickableCount :count="comp.total" :jql="comp.total_jql" label="Total features" />
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <ClickableCount :count="comp.aligned_on_time" :jql="comp.aligned_on_time_jql" color="green" label="Aligned on time" />
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <ClickableCount :count="comp.aligned_late" :jql="comp.aligned_late_jql" color="amber" label="Aligned late" />
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <ClickableCount :count="comp.tv_only" :jql="comp.tv_only_jql" color="yellow" label="TV-only" />
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <ClickableCount :count="comp.fv_only" :jql="comp.fv_only_jql" color="muted" label="FV-only" />
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <ClickableCount :count="comp.misaligned" :jql="comp.misaligned_jql" color="red" label="Misaligned" />
+                </td>
                 <td class="px-4 py-2 text-right">
                   <span
                     class="font-semibold"

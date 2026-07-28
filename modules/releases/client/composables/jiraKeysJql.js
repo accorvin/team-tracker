@@ -13,13 +13,22 @@ var MAX_KEYS = 400
  * @param {Array<{ key?: string }>|null|undefined} features
  * @returns {string} Jira URL, or '' when there are no keys
  */
+function featureKey(feat) {
+  if (!feat) return ''
+  if (feat.key) return feat.key
+  // Fallback: /browse/RHAISTRAT-123
+  var url = feat.url || ''
+  var match = url.match(/\/browse\/([A-Z][A-Z0-9]+-\d+)/i)
+  return match ? match[1] : ''
+}
+
 export function buildKeysJqlUrl(features) {
   if (!features || !features.length) return ''
 
   var keys = []
   var seen = {}
   for (var i = 0; i < features.length; i++) {
-    var key = features[i] && features[i].key
+    var key = featureKey(features[i])
     if (!key || seen[key]) continue
     seen[key] = true
     keys.push(key)
