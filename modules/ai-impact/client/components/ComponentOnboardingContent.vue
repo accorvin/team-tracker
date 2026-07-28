@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import OnboardingMetricsRow from './OnboardingMetricsRow.vue'
 import OnboardingCharts from './OnboardingCharts.vue'
 import ComponentOnboardingTable from './ComponentOnboardingTable.vue'
@@ -14,7 +14,10 @@ const props = defineProps({
 const emit = defineEmits(['loadDetail', 'retry'])
 
 const chartsExpanded = ref(true)
-const versionFilter = ref('all')
+// Empty = all versions; otherwise match any selected version.
+const versionFilter = ref([])
+const versionMenuOpen = ref(false)
+const versionMenuRef = ref(null)
 
 const allComponents = computed(() => props.data?.components ?? {})
 
@@ -29,14 +32,34 @@ const availableVersions = computed(() => {
   return Array.from(versions).sort()
 })
 
+const versionFilterLabel = computed(() => {
+  if (!versionFilter.value.length) return 'All versions'
+  if (versionFilter.value.length === 1) return versionFilter.value[0]
+  return `Versions (${versionFilter.value.length})`
+})
+
 const filteredComponents = computed(() => {
-  if (versionFilter.value === 'all') return allComponents.value
+  if (!versionFilter.value.length) return allComponents.value
+  const selected = new Set(versionFilter.value)
   const filtered = {}
   for (const [key, comp] of Object.entries(allComponents.value)) {
-    if (comp.targetVersion === versionFilter.value) filtered[key] = comp
+    if (selected.has(comp.targetVersion)) filtered[key] = comp
   }
   return filtered
 })
+
+function removeVersion(value) {
+  versionFilter.value = versionFilter.value.filter(v => v !== value)
+}
+
+function onDocClick(e) {
+  if (versionMenuOpen.value && versionMenuRef.value && !versionMenuRef.value.contains(e.target)) {
+    versionMenuOpen.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', onDocClick))
+onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
 const featureTitles = computed(() => {
   const merged = {}
@@ -134,21 +157,69 @@ const metrics = computed(() => {
 
     <!-- Content -->
     <div v-else class="flex-1 flex flex-col overflow-hidden">
-      <!-- Version filter -->
+      <!-- Version filter (multi-select) -->
       <div
         v-if="availableVersions.length"
         class="px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-wrap items-center gap-3"
       >
         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Version Filter</span>
-        <select
-          v-model="versionFilter"
-          class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        <div ref="versionMenuRef" class="relative">
+          <button
+            type="button"
+            class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/40 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[8.5rem] inline-flex items-center justify-between gap-2"
+            :class="versionFilter.length ? 'border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-300' : ''"
+            @click.stop="versionMenuOpen = !versionMenuOpen"
+          >
+            <span class="truncate max-w-[10rem]">{{ versionFilterLabel }}</span>
+            <svg class="h-3.5 w-3.5 opacity-60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <div
+            v-if="versionMenuOpen"
+            class="absolute z-20 mt-1 max-h-56 overflow-auto w-56 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg p-2 space-y-1"
+            data-testid="page-version-filter-menu"
+            @click.stop
+          >
+            <label
+              v-for="version in availableVersions"
+              :key="version"
+              class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded cursor-pointer"
+            >
+              <input v-model="versionFilter" type="checkbox" :value="version" class="rounded border-gray-300" />
+              {{ version }}
+            </label>
+            <div class="sticky bottom-0 flex items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <button
+                v-if="versionFilter.length"
+                type="button"
+                class="px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                @click="versionFilter = []"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                class="ml-auto px-2.5 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700"
+                @click="versionMenuOpen = false"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+        <span
+          v-for="v in versionFilter"
+          :key="v"
+          class="inline-flex items-center gap-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 text-xs"
         >
-          <option value="all">All versions</option>
-          <option v-for="version in availableVersions" :key="version" :value="version">{{ version }}</option>
-        </select>
-        <span v-if="versionFilter !== 'all'" class="text-xs text-gray-400 dark:text-gray-500">
-          Showing components targeting {{ versionFilter }}
+          {{ v }}
+          <button
+            type="button"
+            class="hover:text-indigo-900 dark:hover:text-indigo-100 leading-none"
+            :aria-label="'Remove ' + v"
+            @click="removeVersion(v)"
+          >×</button>
         </span>
       </div>
 

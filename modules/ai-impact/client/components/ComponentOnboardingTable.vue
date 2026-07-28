@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import { useModuleLink } from '@shared/client/composables/useModuleLink'
 
 const { linkTo } = useModuleLink()
@@ -35,9 +35,21 @@ function sortIcon(key) {
 
 // ── Search / filter state (local to table) ───────────────────────────────────
 const search = ref('')
-const completionFilter = ref('all')
+// Empty arrays mean "all". Within a filter = OR; across filters = AND.
+const completionFilter = ref([])
 const productFilter = ref('all')
-const targetVersionFilter = ref('all')
+const targetVersionFilter = ref([])
+
+const statusMenuOpen = ref(false)
+const versionMenuOpen = ref(false)
+const statusMenuRef = ref(null)
+const versionMenuRef = ref(null)
+
+const STATUS_OPTIONS = [
+  { value: 'completed', label: 'Completed' },
+  { value: 'in-progress', label: 'In Progress' },
+  { value: 'in_queue', label: 'In Queue' }
+]
 
 const targetVersionOptions = computed(() => {
   const versions = new Set()
@@ -46,6 +58,66 @@ const targetVersionOptions = computed(() => {
   })
   return [...versions].sort()
 })
+
+const statusFilterLabel = computed(() => {
+  if (!completionFilter.value.length) return 'All statuses'
+  if (completionFilter.value.length === 1) {
+    return STATUS_OPTIONS.find(o => o.value === completionFilter.value[0])?.label || 'Status'
+  }
+  return `Status (${completionFilter.value.length})`
+})
+
+const versionFilterLabel = computed(() => {
+  if (!targetVersionFilter.value.length) return 'All versions'
+  if (targetVersionFilter.value.length === 1) return targetVersionFilter.value[0]
+  return `Versions (${targetVersionFilter.value.length})`
+})
+
+const selectedStatusChips = computed(() =>
+  completionFilter.value.map(v => ({
+    value: v,
+    label: STATUS_OPTIONS.find(o => o.value === v)?.label || v
+  }))
+)
+
+function toggleStatusMenu() {
+  versionMenuOpen.value = false
+  statusMenuOpen.value = !statusMenuOpen.value
+}
+
+function toggleVersionMenu() {
+  statusMenuOpen.value = false
+  versionMenuOpen.value = !versionMenuOpen.value
+}
+
+function removeStatus(value) {
+  completionFilter.value = completionFilter.value.filter(v => v !== value)
+}
+
+function removeVersion(value) {
+  targetVersionFilter.value = targetVersionFilter.value.filter(v => v !== value)
+}
+
+function clearVersionFilter() {
+  targetVersionFilter.value = []
+}
+
+function clearAllFilters() {
+  completionFilter.value = []
+  targetVersionFilter.value = []
+}
+
+function onDocClick(e) {
+  if (statusMenuOpen.value && statusMenuRef.value && !statusMenuRef.value.contains(e.target)) {
+    statusMenuOpen.value = false
+  }
+  if (versionMenuOpen.value && versionMenuRef.value && !versionMenuRef.value.contains(e.target)) {
+    versionMenuOpen.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', onDocClick))
+onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
 // ── Derived list ──────────────────────────────────────────────────────────────
 const selectedKey = ref(null)
@@ -69,11 +141,16 @@ const componentList = computed(() => {
   return Object.values(props.components)
     .filter(c => (c.onboardingMethod || 'automated') === 'automated')
     .filter(c => {
-      if (completionFilter.value !== 'all') {
-        if (c.completionStatus !== completionFilter.value) return false
+      if (completionFilter.value.length && !completionFilter.value.includes(c.completionStatus)) {
+        return false
       }
       if (productFilter.value !== 'all' && c.productContext !== productFilter.value) return false
-      if (targetVersionFilter.value !== 'all' && (c.targetVersion || '') !== targetVersionFilter.value) return false
+      if (
+        targetVersionFilter.value.length &&
+        !targetVersionFilter.value.includes(c.targetVersion || '')
+      ) {
+        return false
+      }
       if (!q) return true
       return (
         c.key.toLowerCase().includes(q) ||
@@ -186,53 +263,170 @@ function completionStatusDotClass(status) {
 <template>
   <div class="flex-1 overflow-auto">
     <!-- Table controls -->
-    <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-3 bg-white dark:bg-gray-900">
-      <!-- Search -->
-      <div class="relative">
-        <svg class="absolute left-2.5 top-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input
-          v-model="search"
-          type="text"
-          placeholder="Search key, component, feature…"
-          class="pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
-        />
+    <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-col gap-2 bg-white dark:bg-gray-900">
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Search -->
+        <div class="relative">
+          <svg class="absolute left-2.5 top-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            v-model="search"
+            type="text"
+            placeholder="Search key, component, feature…"
+            class="pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
+          />
+        </div>
+
+        <!-- Completion filter (multi-select) -->
+        <div ref="statusMenuRef" class="relative">
+          <button
+            type="button"
+            class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/40 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[8.5rem] inline-flex items-center justify-between gap-2"
+            :class="completionFilter.length ? 'border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-300' : ''"
+            @click.stop="toggleStatusMenu"
+          >
+            <span>{{ statusFilterLabel }}</span>
+            <svg class="h-3.5 w-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <div
+            v-if="statusMenuOpen"
+            class="absolute z-20 mt-1 w-48 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg p-2 space-y-1"
+            data-testid="status-filter-menu"
+            @click.stop
+          >
+            <label
+              v-for="opt in STATUS_OPTIONS"
+              :key="opt.value"
+              class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded cursor-pointer"
+            >
+              <input v-model="completionFilter" type="checkbox" :value="opt.value" class="rounded border-gray-300" />
+              {{ opt.label }}
+            </label>
+            <div class="flex items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-gray-700">
+              <button
+                v-if="completionFilter.length"
+                type="button"
+                class="px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                @click="completionFilter = []"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                class="ml-auto px-2.5 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700"
+                @click="statusMenuOpen = false"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Product filter -->
+        <select
+          v-model="productFilter"
+          class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">All products</option>
+          <option value="RHOAI">RHOAI</option>
+          <option value="ODH">ODH</option>
+        </select>
+
+        <!-- Target Version filter (multi-select) -->
+        <div ref="versionMenuRef" class="relative">
+          <button
+            type="button"
+            class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/40 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[8.5rem] inline-flex items-center justify-between gap-2"
+            :class="targetVersionFilter.length ? 'border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-300' : ''"
+            @click.stop="toggleVersionMenu"
+          >
+            <span class="truncate max-w-[10rem]">{{ versionFilterLabel }}</span>
+            <svg class="h-3.5 w-3.5 opacity-60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <div
+            v-if="versionMenuOpen"
+            class="absolute z-20 mt-1 max-h-56 overflow-auto w-56 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg p-2 space-y-1"
+            data-testid="version-filter-menu"
+            @click.stop
+          >
+            <p v-if="!targetVersionOptions.length" class="px-2 py-1 text-xs text-gray-400">No versions</p>
+            <label
+              v-for="v in targetVersionOptions"
+              :key="v"
+              class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded cursor-pointer"
+            >
+              <input v-model="targetVersionFilter" type="checkbox" :value="v" class="rounded border-gray-300" />
+              {{ v }}
+            </label>
+            <div class="sticky bottom-0 flex items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <button
+                v-if="targetVersionFilter.length"
+                type="button"
+                class="px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                @click="clearVersionFilter"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                class="ml-auto px-2.5 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700"
+                @click="versionMenuOpen = false"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">
+          {{ componentList.length }} component{{ componentList.length !== 1 ? 's' : '' }}
+        </span>
       </div>
 
-      <!-- Completion filter -->
-      <select
-        v-model="completionFilter"
-        class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      <!-- Active filter chips -->
+      <div
+        v-if="selectedStatusChips.length || targetVersionFilter.length"
+        class="flex flex-wrap items-center gap-1.5"
       >
-        <option value="all">All statuses</option>
-        <option value="completed">Completed</option>
-        <option value="in-progress">In Progress</option>
-        <option value="in_queue">In Queue</option>
-      </select>
-
-      <!-- Product filter -->
-      <select
-        v-model="productFilter"
-        class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        <option value="all">All products</option>
-        <option value="RHOAI">RHOAI</option>
-        <option value="ODH">ODH</option>
-      </select>
-
-      <!-- Target Version filter -->
-      <select
-        v-model="targetVersionFilter"
-        class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        <option value="all">All versions</option>
-        <option v-for="v in targetVersionOptions" :key="v" :value="v">{{ v }}</option>
-      </select>
-
-      <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">
-        {{ componentList.length }} component{{ componentList.length !== 1 ? 's' : '' }}
-      </span>
+        <span
+          v-for="chip in selectedStatusChips"
+          :key="'s-' + chip.value"
+          class="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 text-xs"
+        >
+          {{ chip.label }}
+          <button
+            type="button"
+            class="hover:text-blue-900 dark:hover:text-blue-100 leading-none"
+            :aria-label="'Remove ' + chip.label"
+            @click="removeStatus(chip.value)"
+          >×</button>
+        </span>
+        <span
+          v-for="v in targetVersionFilter"
+          :key="'v-' + v"
+          class="inline-flex items-center gap-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 text-xs"
+        >
+          {{ v }}
+          <button
+            type="button"
+            class="hover:text-indigo-900 dark:hover:text-indigo-100 leading-none"
+            :aria-label="'Remove ' + v"
+            @click="removeVersion(v)"
+          >×</button>
+        </span>
+        <button
+          type="button"
+          class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline ml-1"
+          @click="clearAllFilters"
+        >
+          Clear all
+        </button>
+      </div>
     </div>
 
     <!-- Table -->
