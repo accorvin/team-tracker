@@ -28,9 +28,15 @@ export function formatShort(dateStr, opts) {
 }
 
 export function getProduct(release) {
-  if (release.productPagesShortname) return release.productPagesShortname
-  const match = release.id.match(/^([a-z]+)-/i)
-  return match ? match[1] : release.id
+  var shortname = release.productPagesShortname
+  if (shortname && /^[a-z]+$/i.test(shortname)) return shortname
+  var sources = [release.id, release.displayName]
+  for (var i = 0; i < sources.length; i++) {
+    if (!sources[i]) continue
+    var match = sources[i].match(/^([a-z]+)-/i)
+    if (match) return match[1].toLowerCase()
+  }
+  return release.id
 }
 
 export function releasePhase(release) {
