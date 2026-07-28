@@ -17,7 +17,7 @@
     </div>
 
     <template v-else>
-      <!-- Selection summary bar -->
+      <!-- Selection & filter bar -->
       <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-6 px-5 py-4">
         <template v-if="hasSelection">
           <div class="flex items-start justify-between gap-4">
@@ -30,10 +30,67 @@
               {{ selection.phases.size === 1 ? 'phase' : 'phases' }}
               of the release lifecycle.
             </div>
-            <button
-              @click="openModal"
-              class="shrink-0 px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
-            >Change</button>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="openModal"
+                class="px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+              >Select Release</button>
+            </div>
+          </div>
+
+          <!-- Filter line -->
+          <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/50 flex items-start justify-between gap-4">
+            <div class="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+              <!-- No filters active -->
+              <template v-if="!hasActiveFilters">
+                Showing all features and initiatives.
+                <button @click="openFilterModal" class="text-primary-600 dark:text-primary-400 hover:underline font-medium">Manage filters</button>
+                or apply a
+                <button @click="openFilterModalToPresets" class="text-primary-600 dark:text-primary-400 hover:underline font-medium">saved preset</button>.
+              </template>
+
+              <!-- Preset applied -->
+              <template v-else-if="appliedPreset">
+                Showing features filtered by
+                <span class="font-semibold text-gray-900 dark:text-gray-100 inline-flex items-baseline gap-1">
+                  {{ appliedPreset.name }}
+                  <span v-if="appliedPreset.description" class="relative group inline-flex">
+                    <svg class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 cursor-help self-center" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+                    </svg>
+                    <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 text-xs font-normal text-white bg-gray-900 dark:bg-gray-700 rounded-md shadow-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10">{{ appliedPreset.description }}</span>
+                  </span>
+                </span>.
+              </template>
+
+              <!-- Ad-hoc filters -->
+              <template v-else>
+                Showing features filtered by
+                <template v-for="(part, idx) in filterNarrativeParts" :key="part.field">
+                  <template v-if="idx > 0 && idx === filterNarrativeParts.length - 1"> {{ crossFieldMode }} </template>
+                  <template v-else-if="idx > 0">, </template>
+                  <span class="font-semibold text-gray-900 dark:text-gray-100">{{ part.label }}: {{ part.values }}</span>
+                </template>.
+              </template>
+
+              <!-- Editing indicator (inline) -->
+              <span v-if="editingFilterId" class="ml-1 text-xs text-amber-600 dark:text-amber-400">
+                (editing preset · <button @click="cancelEditFilter" class="hover:underline">cancel</button>)
+              </span>
+            </div>
+
+            <!-- Filter action buttons -->
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="openFilterModal"
+                class="px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+              >{{ hasActiveFilters ? 'Edit' : 'Manage Filters' }}</button>
+              <button
+                v-if="hasActiveFilters"
+                @click="clearAllFilters"
+                class="px-3 py-1.5 text-sm font-medium rounded-md text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >Clear</button>
+            </div>
           </div>
         </template>
         <template v-else>
@@ -47,63 +104,6 @@
             >Select Release</button>
           </div>
         </template>
-      </div>
-
-      <!-- Filter bar -->
-      <div v-if="hasSelection" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-6 px-5 py-4">
-        <div class="flex items-start justify-between gap-4">
-          <div class="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-            <!-- No filters active -->
-            <template v-if="!hasActiveFilters">
-              Showing all features and initiatives.
-              <button @click="openFilterModal" class="text-primary-600 dark:text-primary-400 hover:underline font-medium">Manage filters</button>
-              or apply a
-              <button @click="openFilterModalToPresets" class="text-primary-600 dark:text-primary-400 hover:underline font-medium">saved preset</button>.
-            </template>
-
-            <!-- Preset applied -->
-            <template v-else-if="appliedPreset">
-              Showing features filtered by
-              <span class="font-semibold text-gray-900 dark:text-gray-100 inline-flex items-baseline gap-1">
-                {{ appliedPreset.name }}
-                <span v-if="appliedPreset.description" class="relative group inline-flex">
-                  <svg class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 cursor-help self-center" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-                  </svg>
-                  <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 text-xs font-normal text-white bg-gray-900 dark:bg-gray-700 rounded-md shadow-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10">{{ appliedPreset.description }}</span>
-                </span>
-              </span>.
-            </template>
-
-            <!-- Ad-hoc filters -->
-            <template v-else>
-              Showing features filtered by
-              <template v-for="(part, idx) in filterNarrativeParts" :key="part.field">
-                <template v-if="idx > 0 && idx === filterNarrativeParts.length - 1"> {{ crossFieldMode }} </template>
-                <template v-else-if="idx > 0">, </template>
-                <span class="font-semibold text-gray-900 dark:text-gray-100">{{ part.label }}: {{ part.values }}</span>
-              </template>.
-            </template>
-
-            <!-- Editing indicator (inline) -->
-            <span v-if="editingFilterId" class="ml-1 text-xs text-amber-600 dark:text-amber-400">
-              (editing preset · <button @click="cancelEditFilter" class="hover:underline">cancel</button>)
-            </span>
-          </div>
-
-          <!-- Action buttons -->
-          <div class="flex items-center gap-2 shrink-0">
-            <button
-              @click="openFilterModal"
-              class="px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
-            >{{ hasActiveFilters ? 'Edit' : 'Filters' }}</button>
-            <button
-              v-if="hasActiveFilters"
-              @click="clearAllFilters"
-              class="px-3 py-1.5 text-sm font-medium rounded-md text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-            >Clear</button>
-          </div>
-        </div>
       </div>
 
       <!-- Deadline cards -->
