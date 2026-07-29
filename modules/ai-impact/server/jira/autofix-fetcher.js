@@ -218,6 +218,10 @@ function getWindowBounds(timeWindow) {
       return { start: Date.now() - 30 * 24 * 60 * 60 * 1000, end: Date.now(), useTerminalDate: false };
     case 'last90':
       return { start: Date.now() - 90 * 24 * 60 * 60 * 1000, end: Date.now(), useTerminalDate: false };
+    case 'last180':
+      return { start: Date.now() - 180 * 24 * 60 * 60 * 1000, end: Date.now(), useTerminalDate: false };
+    case 'all':
+      return { start: 0, end: Date.now(), useTerminalDate: false };
     default:
       return { start: Date.now() - 30 * 24 * 60 * 60 * 1000, end: Date.now(), useTerminalDate: false };
   }
@@ -323,6 +327,8 @@ function computeAutofixMetrics(issues, timeWindow) {
 function getTrendWeekCount(timeWindow) {
   if (timeWindow === 'week' || timeWindow === 'lastWeek' || timeWindow === 'last7') return 4;
   if (timeWindow === 'month' || timeWindow === 'lastMonth' || timeWindow === 'last30') return 8;
+  if (timeWindow === 'last180') return 26;
+  if (timeWindow === 'all') return 52;
   return 13;
 }
 
