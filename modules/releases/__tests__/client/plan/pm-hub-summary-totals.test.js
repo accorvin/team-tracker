@@ -121,19 +121,45 @@ function applyClientFilters(groups, filters) {
 }
 
 /**
- * Compute summary totals from (filtered) groups — mirrors the fix where
- * totalRequested/totalCommitted/totalBlocked read from clientFilteredGroups.
+ * Compute summary totals from (filtered) groups — mirrors ComponentReleaseLoadReport
+ * unique-key counting for Requested / Committed / Blocked cards.
  */
 function computeTotals(groups) {
+  var reqSeen = {}
+  var comSeen = {}
+  var blockedSeen = {}
   var requested = 0
   var committed = 0
   var blocked = 0
   for (var i = 0; i < groups.length; i++) {
     var comps = groups[i].components || []
     for (var ci = 0; ci < comps.length; ci++) {
-      requested += comps[ci].requestedCount || 0
-      committed += comps[ci].committedCount || 0
-      blocked += comps[ci].blockedCount || 0
+      var reqList = comps[ci].requestedFeatures || []
+      var comList = comps[ci].committedFeatures || []
+      for (var ri = 0; ri < reqList.length; ri++) {
+        var rk = reqList[ri] && reqList[ri].key
+        if (rk && !reqSeen[rk]) {
+          reqSeen[rk] = true
+          requested++
+        }
+      }
+      for (var cmi = 0; cmi < comList.length; cmi++) {
+        var ck = comList[cmi] && comList[cmi].key
+        if (ck && !comSeen[ck]) {
+          comSeen[ck] = true
+          committed++
+        }
+      }
+      var lists = [reqList, comList]
+      for (var li = 0; li < lists.length; li++) {
+        for (var fi = 0; fi < lists[li].length; fi++) {
+          var f = lists[li][fi]
+          if (f && f.key && f.isBlocked && !blockedSeen[f.key]) {
+            blockedSeen[f.key] = true
+            blocked++
+          }
+        }
+      }
     }
   }
   return { requested: requested, committed: committed, blocked: blocked }
@@ -443,6 +469,39 @@ describe('edge cases', function () {
     var totals = computeTotals(filtered)
     // Only X-1 matches both blocked=true AND status=Red
     expect(totals.requested).toBe(1)
+    expect(totals.blocked).toBe(1)
+  })
+
+  it('dedupes the same feature key across multiple components', function () {
+    var shared = makeFeature({ key: 'X-SHARED', isBlocked: true })
+    var groups = [{
+      version: 'rhoai-3.5',
+      components: [
+        {
+          component: 'Dashboard',
+          requestedFeatures: [shared],
+          committedFeatures: [shared],
+          requestedCount: 1,
+          committedCount: 1,
+          blockedCount: 1
+        },
+        {
+          component: 'Inference',
+          requestedFeatures: [shared],
+          committedFeatures: [shared],
+          requestedCount: 1,
+          committedCount: 1,
+          blockedCount: 1
+        }
+      ],
+      requestedCount: 2,
+      committedCount: 2,
+      blockedCount: 2
+    }]
+
+    var totals = computeTotals(groups)
+    expect(totals.requested).toBe(1)
+    expect(totals.committed).toBe(1)
     expect(totals.blocked).toBe(1)
   })
 
