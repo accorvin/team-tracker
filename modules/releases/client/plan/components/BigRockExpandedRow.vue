@@ -125,7 +125,7 @@ var outcomeGroups = computed(function() {
 
     <!-- Empty / error state -->
     <div v-else-if="!features || features.length === 0" class="py-6 text-center text-gray-500 dark:text-gray-400 text-xs">
-      No feature health data available
+      No Features targeting this release under this Big Rock's Outcomes
     </div>
 
     <!-- Outcome-grouped view -->
@@ -206,6 +206,11 @@ var outcomeGroups = computed(function() {
                   </span>
                   <span v-if="f.override" class="ml-1 text-[9px] text-amber-600 dark:text-amber-400" title="Risk level manually overridden">M</span>
                   <span v-if="f.bigRock && f.bigRock.includes(', ')" class="ml-1 text-[9px] text-indigo-600 dark:text-indigo-400" :title="'Shared across: ' + f.bigRock">S</span>
+                  <span
+                    v-if="f.inIndex === false"
+                    class="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
+                    title="In Jira under this Outcome, but not yet in the execution feature index"
+                  >Not in index</span>
                 </td>
                 <td class="px-2 py-1.5 text-gray-700 dark:text-gray-300 max-w-[250px]">
                   <span :title="f.summary">{{ truncate(f.summary, 60) }}</span>
@@ -315,6 +320,11 @@ var outcomeGroups = computed(function() {
               </span>
               <span v-if="f.override" class="ml-1 text-[9px] text-amber-600 dark:text-amber-400" title="Risk level manually overridden">M</span>
               <span v-if="f.bigRock && f.bigRock.includes(', ')" class="ml-1 text-[9px] text-indigo-600 dark:text-indigo-400" :title="'Shared across: ' + f.bigRock">S</span>
+              <span
+                v-if="f.inIndex === false"
+                class="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
+                title="In Jira under this Outcome, but not yet in the execution feature index"
+              >Not in index</span>
             </td>
             <td class="px-2 py-1.5 text-gray-700 dark:text-gray-300 max-w-[250px]">
               <span :title="f.summary">{{ truncate(f.summary, 60) }}</span>

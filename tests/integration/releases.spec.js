@@ -949,3 +949,68 @@ test.describe('Releases Blockers @releases', () => {
     expect(body).toHaveProperty('error');
   });
 });
+
+/**
+ * Big Rocks hybrid hierarchy fields
+ *
+ * Candidates responses include hierarchySource + per-feature inIndex so the
+ * UI can show Jira-discovered children that are not yet in the execution index.
+ * Demo mode serves fixtures (hierarchySource=index); live refresh uses jira/index.
+ */
+test.describe('Releases Big Rocks hybrid candidates @releases', () => {
+  test.beforeEach(async ({ page }) => {
+    setupErrorTracking(page);
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    logCapturedErrors(page, testInfo);
+  });
+
+  test('candidates API exposes hierarchySource and inIndex on features', async ({ request }) => {
+    const releasesRes = await request.get('/api/modules/releases/planning/releases');
+    expect(releasesRes.ok()).toBe(true);
+    const releases = await releasesRes.json();
+    expect(Array.isArray(releases)).toBe(true);
+    expect(releases.length).toBeGreaterThan(0);
+
+    const version = releases[0].version;
+    const res = await request.get(`/api/modules/releases/planning/releases/${version}/candidates`);
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+
+    expect(body).toHaveProperty('features');
+    expect(Array.isArray(body.features)).toBe(true);
+    expect(body.features.length).toBeGreaterThan(0);
+    expect(body).toHaveProperty('hierarchySource');
+    expect(['jira', 'index']).toContain(body.hierarchySource);
+
+    const withIndexFlag = body.features.filter(function (f) {
+      return typeof f.inIndex === 'boolean';
+    });
+    expect(withIndexFlag.length).toBe(body.features.length);
+
+    // Demo fixture includes at least one Jira-only hybrid child
+    if (body.demoMode) {
+      expect(body.hierarchySource).toBe('index');
+      expect(body.features.some(function (f) { return f.inIndex === false; })).toBe(true);
+    }
+  });
+
+  test('Big Rocks plan view loads rock table from candidates', async ({ page }) => {
+    await page.goto('/#/releases/plan');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const bigRocksTab = page.getByRole('button', { name: /Big Rocks/i }).or(
+      page.locator('button, a, [role="tab"]', { hasText: /Big Rocks/i })
+    );
+    if (await bigRocksTab.first().isVisible().catch(function () { return false; })) {
+      await bigRocksTab.first().click();
+      await page.waitForTimeout(500);
+    }
+
+    // Rock names from demo candidates fixture should render
+    await expect(page.getByText('MaaS', { exact: false }).first()).toBeVisible({ timeout: 10000 });
+    expect(page.errors).toHaveLength(0);
+  });
+});

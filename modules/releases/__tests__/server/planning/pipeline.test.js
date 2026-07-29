@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 const { runPipeline, buildCandidateResponse } = require('../../../server/planning/pipeline')
 
 function makeFeatureIndex(key, opts) {
@@ -333,10 +333,11 @@ describe('runPipeline', () => {
 
     // Should have a diagnostic warning with filter breakdown
     expect(result.warnings).toEqual(
-      expect.arrayContaining([expect.stringContaining('candidate(s) with matching parentKey')])
+      expect.arrayContaining([expect.stringContaining('candidate(s) via matching parentKey in the index')])
     )
-    // Should mention specific filter reasons
-    const diagWarning = result.warnings.find(function(w) { return w.indexOf('candidate(s) with matching parentKey') !== -1 })
+    const diagWarning = result.warnings.find(function(w) {
+      return w.indexOf('candidate(s) via matching parentKey in the index') !== -1
+    })
     expect(diagWarning).toBeDefined()
     expect(diagWarning).toContain('excluded')
   })
@@ -358,7 +359,7 @@ describe('runPipeline', () => {
     const result = await runPipeline(config, bigRocks, '3.5', readFromStorage)
 
     expect(result.warnings).toEqual(
-      expect.arrayContaining([expect.stringContaining('no features with matching parentKey found in the index')])
+      expect.arrayContaining([expect.stringContaining('no features found via matching parentKey in the index')])
     )
   })
 
@@ -486,6 +487,105 @@ describe('runPipeline', () => {
     expect(result.features[0].tier).toBe(1)
     expect(result.features[1].tier).toBe(2)
     expect(result.features[2].tier).toBe(3)
+    expect(result.hierarchySource).toBe('index')
+  })
+
+  it('uses live Jira children for Tier 1 membership and flags not-in-index', async () => {
+    const index = {
+      features: [
+        makeFeatureIndex('RHAISTRAT-1513', { summary: 'Outcome', status: 'New' }),
+        // Stale/wrong parent in index — hybrid should still find via Jira
+        makeFeatureIndex('RHAISTRAT-100', {
+          parentKey: 'WRONG-PARENT',
+          targetVersions: ['rhoai-3.5'],
+          status: 'In Progress'
+        })
+      ],
+      rfes: []
+    }
+    const details = [
+      makeFeatureDetail('RHAISTRAT-100', {
+        parentKey: 'WRONG-PARENT',
+        targetVersions: ['rhoai-3.5']
+      })
+    ]
+    const readFromStorage = createMockStorage(index, details)
+
+    const fetchAllJqlResults = vi.fn().mockResolvedValue([
+      {
+        key: 'RHAISTRAT-100',
+        fields: {
+          summary: 'In index',
+          status: { name: 'In Progress' },
+          issuetype: { name: 'Feature' },
+          parent: { key: 'RHAISTRAT-1513' },
+          customfield_10855: [{ name: 'rhoai-3.5' }]
+        }
+      },
+      {
+        key: 'RHAISTRAT-900',
+        fields: {
+          summary: 'Jira only',
+          status: { name: 'New' },
+          issuetype: { name: 'Feature' },
+          parent: { key: 'RHAISTRAT-1513' },
+          customfield_10855: [{ name: 'rhoai-3.5' }]
+        }
+      }
+    ])
+
+    const result = await runPipeline(
+      makeConfig(),
+      [{ priority: 1, name: 'MaaS', outcomeKeys: ['RHAISTRAT-1513'], pillar: 'Inference' }],
+      '3.5',
+      readFromStorage,
+      { jiraClient: { fetchAllJqlResults: fetchAllJqlResults } }
+    )
+
+    expect(result.hierarchySource).toBe('jira')
+    expect(result.tier1Features).toBe(2)
+    const byKey = {}
+    for (let i = 0; i < result.features.length; i++) {
+      byKey[result.features[i].issueKey] = result.features[i]
+    }
+    expect(byKey['RHAISTRAT-100'].inIndex).toBe(true)
+    expect(byKey['RHAISTRAT-100'].parentKey).toBe('RHAISTRAT-1513')
+    expect(byKey['RHAISTRAT-900'].inIndex).toBe(false)
+    expect(byKey['RHAISTRAT-900'].summary).toBe('Jira only')
+  })
+
+  it('falls back to index parentKey when Jira fetch fails', async () => {
+    const index = {
+      features: [
+        makeFeatureIndex('RHAISTRAT-1513', { summary: 'Outcome', status: 'New' }),
+        makeFeatureIndex('RHAISTRAT-100', {
+          parentKey: 'RHAISTRAT-1513',
+          targetVersions: ['rhoai-3.5'],
+          status: 'In Progress'
+        })
+      ],
+      rfes: []
+    }
+    const details = [
+      makeFeatureDetail('RHAISTRAT-100', {
+        parentKey: 'RHAISTRAT-1513',
+        targetVersions: ['rhoai-3.5']
+      })
+    ]
+    const readFromStorage = createMockStorage(index, details)
+    const fetchAllJqlResults = vi.fn().mockRejectedValue(new Error('Jira down'))
+
+    const result = await runPipeline(
+      makeConfig(),
+      [{ priority: 1, name: 'MaaS', outcomeKeys: ['RHAISTRAT-1513'], pillar: 'Inference' }],
+      '3.5',
+      readFromStorage,
+      { jiraClient: { fetchAllJqlResults: fetchAllJqlResults } }
+    )
+
+    expect(result.hierarchySource).toBe('index')
+    expect(result.tier1Features).toBe(1)
+    expect(result.warnings.some(function (w) { return w.indexOf('Live Jira outcome-children fetch failed') !== -1 })).toBe(true)
   })
 })
 
@@ -540,6 +640,26 @@ describe('buildCandidateResponse', () => {
     expect(response.filterOptions.statuses).toContain('In Progress')
     expect(response.filterOptions.pillars).toContain('Inference')
     expect(response.pipelineWarnings).toEqual(['test warning'])
+    expect(response.hierarchySource).toBe('index')
+  })
+
+  it('passes through hierarchySource from pipeline', async () => {
+    const response = await buildCandidateResponse({
+      features: [],
+      rfes: [],
+      tier1Features: 0,
+      tier1Rfes: 0,
+      tier2Features: 0,
+      tier2Rfes: 0,
+      tier3Features: 0,
+      outcomeSummaries: {},
+      perRockStats: {},
+      release: '3.5',
+      warnings: [],
+      hierarchySource: 'jira'
+    }, '3.5', [], false)
+
+    expect(response.hierarchySource).toBe('jira')
   })
 
   it('omits pipelineWarnings when empty', async () => {

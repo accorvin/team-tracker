@@ -319,15 +319,35 @@ describe('useHealthAggregation', function() {
       expect(rf[1].planningChecks).toBe(null)
     })
 
-    it('defaults to green when feature has no health data', function() {
+    it('includes candidates without health data (hybrid Jira-only children)', function() {
       var hd = ref(makeHealthData([]))
       var features = ref([
-        makeFeature('FEAT-1', null, 'Rock A')
+        Object.assign(makeFeature('FEAT-1', null, 'Rock A', 1), {
+          summary: 'Live from Jira',
+          status: 'New',
+          inIndex: false,
+          jiraUrl: 'https://issues.redhat.com/browse/FEAT-1'
+        })
       ])
 
-      // healthByKey will be empty, so rockFeatures should also be empty
       var result = useHealthAggregation(hd, features, ref([]), ref([]))
-      expect(result.rockFeatures.value).toEqual({})
+      expect(result.rockFeatures.value['Rock A']).toHaveLength(1)
+      expect(result.rockFeatures.value['Rock A'][0].key).toBe('FEAT-1')
+      expect(result.rockFeatures.value['Rock A'][0].level).toBe('green')
+      expect(result.rockFeatures.value['Rock A'][0].summary).toBe('Live from Jira')
+      expect(result.rockFeatures.value['Rock A'][0].inIndex).toBe(false)
+    })
+
+    it('skips non-tier-1 features in rock expand list', function() {
+      var hd = ref(makeHealthData([]))
+      var features = ref([
+        makeFeature('FEAT-T1', null, 'Rock A', 1),
+        makeFeature('FEAT-T2', null, 'Rock A', 2)
+      ])
+
+      var result = useHealthAggregation(hd, features, ref([]), ref([]))
+      expect(result.rockFeatures.value['Rock A']).toHaveLength(1)
+      expect(result.rockFeatures.value['Rock A'][0].key).toBe('FEAT-T1')
     })
 
     it('uses overridden level in feature detail', function() {
