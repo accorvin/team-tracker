@@ -9,6 +9,7 @@
 const { CUSTOM_FIELDS, transformIssue } = require('../hygiene/jira-fetch')
 const { blockDuringImpersonation } = require('../../../../shared/server/auth')
 const { JIRA_HOST } = require('../../../../shared/server/jira')
+const { filterCommittedFixVersions } = require('./committed-definition')
 
 const JIRA_SEARCH = JIRA_HOST + '/issues/?jql='
 const PM_HUB_PROJECTS = ['RHAIENG', 'RHOAIENG', 'INFERENG', 'AIPCC', 'RHAISTRAT', 'RHAIRFE']
@@ -525,7 +526,9 @@ module.exports = async function registerPmHubRoutes(router, context) {
    *     description: >
    *       Queries Jira for Features/Initiatives grouped by version then component.
    *       F Requested = issues where Target Version (cf[10855]) matches a selected version.
-   *       F Committed = issues where fixVersion matches a selected version.
+   *       F Committed = issues where fixVersion matches a selected version AND a Target
+   *       Version either matches that fixVersion or is later in the same release cycle
+   *       (early delivery; same product + major.minor, EA1 < EA2 < GA).
    *     parameters:
    *       - in: query
    *         name: components
@@ -657,7 +660,8 @@ module.exports = async function registerPmHubRoutes(router, context) {
         requestedIssues = await jiraClient.fetchAllJqlResults(tvJql, fieldsWithTv, { expand: 'renderedFields' })
       }
 
-      // Query 2: F Committed — fixVersion matches selected versions
+      // Query 2: FV candidates — fixVersion matches selected versions.
+      // Committed bucketing applies a stricter TV/FV rule after fetch.
       var committedIssues = []
       if (versionNames.length > 0) {
         var fvJqlParts = baseParts.slice()
@@ -693,8 +697,8 @@ module.exports = async function registerPmHubRoutes(router, context) {
 
       // Process all issues with OR display logic:
       // Show issue if selected release matches fixVersion OR targetVersion.
-      // committedFeatures/Count = fixVersion matches only.
-      // requestedFeatures/Count = targetVersion matches only.
+      // committedFeatures/Count = FV in scope + TV match or early delivery (same cycle).
+      // requestedFeatures/Count = targetVersion matches selected scope only.
       var allIssues = {}
 
       for (var ri = 0; ri < requestedIssues.length; ri++) {
@@ -716,13 +720,14 @@ module.exports = async function registerPmHubRoutes(router, context) {
         var compList = f.components && f.components.length > 0 ? f.components : ['No Component']
 
         if (versionNames.length === 0) {
-          // Component-only mode: group by fixVersion, all go into committed
-          var groupFvList = fvList.length > 0 ? fvList : ['Unversioned']
-          for (var ufi = 0; ufi < groupFvList.length; ufi++) {
+          // Component-only mode: group by fixVersion; Committed still requires TV support
+          var committedFvOnly = filterCommittedFixVersions(fvList, tvNames)
+          if (committedFvOnly.length === 0) continue
+          for (var ufi = 0; ufi < committedFvOnly.length; ufi++) {
             for (var uci = 0; uci < compList.length; uci++) {
               var ucName = compList[uci]
               if (componentNames.length > 0 && componentNames.indexOf(ucName) === -1) continue
-              var uGroup = ensureGroup(groupFvList[ufi], ucName)
+              var uGroup = ensureGroup(committedFvOnly[ufi], ucName)
               if (!uGroup.committedFeatures.some(function(e) { return e.key === f.key })) {
                 uGroup.committedFeatures.push(buildFeatureObj(f, tvNames))
                 uGroup.committedCount++
@@ -746,13 +751,17 @@ module.exports = async function registerPmHubRoutes(router, context) {
         // OR logic: skip if neither field matches any selected version
         if (matchingFv.length === 0 && matchingTv.length === 0) continue
 
-        // Determine group version keys — use all unique matching versions from either field
+        // Committed = selected FV + TV match or early delivery in same cycle
+        var committedFv = filterCommittedFixVersions(matchingFv, tvNames)
+
+        // Group only under versions that will receive this feature (avoid empty groups
+        // when FV is in scope but fails the Committed TV rule).
         var groupVersions = {}
-        for (var mf = 0; mf < matchingFv.length; mf++) groupVersions[matchingFv[mf]] = true
+        for (var mf = 0; mf < committedFv.length; mf++) groupVersions[committedFv[mf]] = true
         for (var mt = 0; mt < matchingTv.length; mt++) groupVersions[matchingTv[mt]] = true
         var groupVersionKeys = Object.keys(groupVersions)
+        if (groupVersionKeys.length === 0) continue
 
-        var isCommitted = matchingFv.length > 0
         var isRequested = matchingTv.length > 0
         var featureObj = buildFeatureObj(f, tvNames)
 
@@ -763,7 +772,7 @@ module.exports = async function registerPmHubRoutes(router, context) {
             if (componentNames.length > 0 && componentNames.indexOf(cName) === -1) continue
             var group = ensureGroup(vKey, cName)
 
-            if (isCommitted && matchingFv.indexOf(vKey) !== -1) {
+            if (committedFv.indexOf(vKey) !== -1) {
               if (!group.committedFeatures.some(function(e) { return e.key === f.key })) {
                 group.committedFeatures.push(featureObj)
                 group.committedCount++
@@ -836,3 +845,4 @@ module.exports.backfillLeads = backfillLeads
 module.exports.computeVelocity = computeVelocity
 module.exports.buildFeatureObj = buildFeatureObj
 module.exports.extractTargetVersions = extractTargetVersions
+module.exports.filterCommittedFixVersions = filterCommittedFixVersions

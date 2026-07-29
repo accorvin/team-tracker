@@ -1,10 +1,8 @@
 /**
  * Tests for PM Hub summary card totals.
  *
- * Exercises the logic that computes totalRequested, totalCommitted, and
- * totalBlocked from client-filtered groups — verifying that the summary
- * cards update when client-side filters (product, type, status, blocked,
- * delivery owner, PM owner) are applied.
+ * Exercises totalRequested / totalCommitted / totalBlocked from summaryFilteredGroups
+ * (ignores REQ/COM type) vs clientFilteredGroups (table, applies type chips).
  *
  * Same inlined-function pattern as the other PM Hub test files.
  */
@@ -24,10 +22,11 @@ function extractProduct(versionName) {
 }
 
 /**
- * Client-side filtering logic from clientFilteredGroups computed property.
- * Applies client-side filters to server-returned groups and recomputes counts.
+ * Client-side filtering from filterGroups().
+ * @param {object} filters
+ * @param {boolean} [includeTypeFilter=false] - KPI path omits type; table path passes true
  */
-function applyClientFilters(groups, filters) {
+function applyClientFilters(groups, filters, includeTypeFilter) {
   var filterProduct = filters.product || []
   var filterType = filters.type || []
   var filterReleaseType = filters.releaseType || []
@@ -36,11 +35,12 @@ function applyClientFilters(groups, filters) {
   var filterDelOwner = filters.delOwner || []
   var filterPmOwner = filters.pmOwner || []
 
-  var hasFilters = filterProduct.length > 0 || filterType.length > 0 ||
-    filterReleaseType.length > 0 || filterStatus.length > 0 ||
-    filterBlocked !== null || filterDelOwner.length > 0 || filterPmOwner.length > 0
+  var applyType = !!includeTypeFilter && filterType.length > 0
+  var hasOther = filterProduct.length > 0 || filterReleaseType.length > 0 ||
+    filterStatus.length > 0 || filterBlocked !== null ||
+    filterDelOwner.length > 0 || filterPmOwner.length > 0
 
-  if (!hasFilters) return groups
+  if (!applyType && !hasOther) return groups
 
   return groups.map(function (g) {
     var version = g.version
@@ -75,7 +75,7 @@ function applyClientFilters(groups, filters) {
         var isReq = !!reqKeys[f.key]
         var isCom = !!comKeys[f.key]
 
-        if (filterType.length > 0) {
+        if (applyType) {
           var matches = false
           if (filterType.indexOf('requested') >= 0 && isReq) matches = true
           if (filterType.indexOf('committed') >= 0 && isCom) matches = true
@@ -356,75 +356,69 @@ describe('summary totals reflect client-side filters', function () {
 })
 
 // ---------------------------------------------------------------------------
-// Type filter (REQ / COM toggle)
+// Type filter (REQ / COM) — KPIs ignore type; table applies it
 // ---------------------------------------------------------------------------
 
-describe('type filter affects totals', function () {
+describe('type filter: KPI totals stay independent; table filters', function () {
   var feat1 = makeFeature({ key: 'X-1', isBlocked: true })
   var feat2 = makeFeature({ key: 'X-2', isBlocked: false })
 
-  it('type=requested shows only requested features', function () {
-    // feat1 is requested-only, feat2 is committed-only
-    var groups = [{
-      version: 'rhoai-3.5',
-      components: [{
-        component: 'Dashboard',
-        requestedFeatures: [feat1],
-        committedFeatures: [feat2],
-        requestedCount: 1,
-        committedCount: 1,
-        blockedCount: 0
-      }],
+  var splitGroups = [{
+    version: 'rhoai-3.5',
+    components: [{
+      component: 'Dashboard',
+      requestedFeatures: [feat1],
+      committedFeatures: [feat2],
       requestedCount: 1,
       committedCount: 1,
       blockedCount: 0
-    }]
-    var filtered = applyClientFilters(groups, { type: ['requested'] })
-    var totals = computeTotals(filtered)
+    }],
+    requestedCount: 1,
+    committedCount: 1,
+    blockedCount: 0
+  }]
+
+  it('with type=requested only, Committed KPI still includes committed-only features', function () {
+    var summary = applyClientFilters(splitGroups, { type: ['requested'] }, false)
+    var totals = computeTotals(summary)
+    expect(totals.requested).toBe(1)
+    expect(totals.committed).toBe(1)
+    expect(totals.blocked).toBe(1)
+  })
+
+  it('with type=requested only, Requested KPI is unchanged', function () {
+    var baseline = computeTotals(applyClientFilters(splitGroups, {}, false))
+    var withType = computeTotals(applyClientFilters(splitGroups, { type: ['requested'] }, false))
+    expect(withType.requested).toBe(baseline.requested)
+    expect(withType.committed).toBe(baseline.committed)
+  })
+
+  it('with type=committed only, Requested KPI still includes requested-only features', function () {
+    var summary = applyClientFilters(splitGroups, { type: ['committed'] }, false)
+    var totals = computeTotals(summary)
+    expect(totals.requested).toBe(1)
+    expect(totals.committed).toBe(1)
+  })
+
+  it('REQ chip still filters table data (includeTypeFilter=true)', function () {
+    var table = applyClientFilters(splitGroups, { type: ['requested'] }, true)
+    var totals = computeTotals(table)
     expect(totals.requested).toBe(1)
     expect(totals.committed).toBe(0)
     expect(totals.blocked).toBe(1)
   })
 
-  it('type=committed shows only committed features', function () {
-    var groups = [{
-      version: 'rhoai-3.5',
-      components: [{
-        component: 'Dashboard',
-        requestedFeatures: [feat1],
-        committedFeatures: [feat2],
-        requestedCount: 1,
-        committedCount: 1,
-        blockedCount: 0
-      }],
-      requestedCount: 1,
-      committedCount: 1,
-      blockedCount: 0
-    }]
-    var filtered = applyClientFilters(groups, { type: ['committed'] })
-    var totals = computeTotals(filtered)
+  it('COM chip still filters table data (includeTypeFilter=true)', function () {
+    var table = applyClientFilters(splitGroups, { type: ['committed'] }, true)
+    var totals = computeTotals(table)
     expect(totals.requested).toBe(0)
     expect(totals.committed).toBe(1)
     expect(totals.blocked).toBe(0)
   })
 
-  it('type=[requested,committed] shows features in either bucket', function () {
-    var groups = [{
-      version: 'rhoai-3.5',
-      components: [{
-        component: 'Dashboard',
-        requestedFeatures: [feat1],
-        committedFeatures: [feat2],
-        requestedCount: 1,
-        committedCount: 1,
-        blockedCount: 0
-      }],
-      requestedCount: 1,
-      committedCount: 1,
-      blockedCount: 0
-    }]
-    var filtered = applyClientFilters(groups, { type: ['requested', 'committed'] })
-    var totals = computeTotals(filtered)
+  it('type=[requested,committed] table shows features in either bucket', function () {
+    var table = applyClientFilters(splitGroups, { type: ['requested', 'committed'] }, true)
+    var totals = computeTotals(table)
     expect(totals.requested).toBe(1)
     expect(totals.committed).toBe(1)
     expect(totals.blocked).toBe(1)

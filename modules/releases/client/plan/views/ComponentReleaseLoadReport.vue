@@ -290,9 +290,15 @@
       </div>
     </div>
 
-    <!-- Summary cards -->
+    <!--
+      Summary cards are display-only KPIs. Click-to-filter was removed because
+      toggling Requested/Committed via tiles made independent Requested (TV in
+      scope) and Committed (FV in scope + TV match/early delivery) counts appear
+      correlated. Use REQ/COM (and other) filter chips in the bar above to filter
+      the table.
+    -->
     <div v-if="groups.length > 0 && !loadingData" class="grid grid-cols-2 sm:grid-cols-6 gap-3">
-      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5 cursor-pointer transition-all" :class="filterType.includes('requested') ? 'ring-2 ring-blue-300 dark:ring-blue-700' : 'hover:shadow-md'" @click="toggleFilter('filterType', 'requested')" title="Filter by Requested">
+      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
         <div class="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-xl" />
         <div class="flex items-center gap-2 mb-1.5">
           <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-blue-100 dark:bg-blue-900/40">
@@ -302,7 +308,7 @@
         </div>
         <div class="text-2xl font-bold text-blue-600 dark:text-blue-400 ml-7">{{ totalRequested }}</div>
       </div>
-      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5 cursor-pointer transition-all" :class="filterType.includes('committed') ? 'ring-2 ring-emerald-300 dark:ring-emerald-700' : 'hover:shadow-md'" @click="toggleFilter('filterType', 'committed')" title="Filter by Committed">
+      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
         <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500 rounded-l-xl" />
         <div class="flex items-center gap-2 mb-1.5">
           <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-emerald-100 dark:bg-emerald-900/40">
@@ -312,7 +318,7 @@
         </div>
         <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 ml-7">{{ totalCommitted }}</div>
       </div>
-      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5 cursor-pointer transition-all" :class="filterBlocked === true ? 'ring-2 ring-red-300 dark:ring-red-700' : 'hover:shadow-md'" @click="filterBlocked = filterBlocked === true ? null : true" title="Filter by Blocked">
+      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
         <div class="absolute top-0 left-0 w-1 h-full bg-red-500 rounded-l-xl" />
         <div class="flex items-center gap-2 mb-1.5">
           <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-red-100 dark:bg-red-900/40">
@@ -655,12 +661,20 @@ var filteredPmOwners = computed(function() {
   return availablePmOwners.value.filter(function(o) { return o.toLowerCase().includes(q) })
 })
 
-var hasClientFilters = computed(function() {
-  return filterProduct.value.length > 0 || filterType.value.length > 0 || filterReleaseType.value.length > 0 || filterStatus.value.length > 0 || filterBlocked.value !== null || hideClosed.value || filterDelOwner.value.length > 0 || filterPmOwner.value.length > 0 || filterDocs.value.length > 0
-})
+/**
+ * Apply client-side filters to groups.
+ * @param {boolean} includeTypeFilter - when true, apply REQ/COM (filterType) for the table.
+ *   KPI summary tiles intentionally omit type filter so Requested (TV in scope)
+ *   and Committed (FV in scope + TV match/early delivery) remain independent
+ *   headline counts.
+ */
+function filterGroups(includeTypeFilter) {
+  var applyType = includeTypeFilter && filterType.value.length > 0
+  var hasOther = filterProduct.value.length > 0 || filterReleaseType.value.length > 0 ||
+    filterStatus.value.length > 0 || filterBlocked.value !== null || hideClosed.value ||
+    filterDelOwner.value.length > 0 || filterPmOwner.value.length > 0 || filterDocs.value.length > 0
 
-var clientFilteredGroups = computed(function() {
-  if (!hasClientFilters.value) return groups.value
+  if (!applyType && !hasOther) return groups.value
 
   return groups.value.map(function(g) {
     var version = g.version
@@ -695,7 +709,7 @@ var clientFilteredGroups = computed(function() {
         var isReq = !!reqKeys[f.key]
         var isCom = !!comKeys[f.key]
 
-        if (filterType.value.length > 0) {
+        if (applyType) {
           var matches = false
           if (filterType.value.indexOf('requested') >= 0 && isReq) matches = true
           if (filterType.value.indexOf('committed') >= 0 && isCom) matches = true
@@ -750,6 +764,16 @@ var clientFilteredGroups = computed(function() {
 
     return Object.assign({}, g, { components: filteredComps })
   }).filter(function(g) { return g.components.length > 0 })
+}
+
+/** Table/groups view — includes REQ/COM type chips. */
+var clientFilteredGroups = computed(function() {
+  return filterGroups(true)
+})
+
+/** KPI tiles — ignore filterType so Requested and Committed stay independent. */
+var summaryFilteredGroups = computed(function() {
+  return filterGroups(false)
 })
 
 var HIDDEN_COMPONENTS = ['lllm-d']
@@ -875,16 +899,16 @@ function countUniqueFeatureKeys(groups, listName) {
 }
 
 var totalRequested = computed(function() {
-  return countUniqueFeatureKeys(clientFilteredGroups.value, 'requestedFeatures')
+  return countUniqueFeatureKeys(summaryFilteredGroups.value, 'requestedFeatures')
 })
 
 var totalCommitted = computed(function() {
-  return countUniqueFeatureKeys(clientFilteredGroups.value, 'committedFeatures')
+  return countUniqueFeatureKeys(summaryFilteredGroups.value, 'committedFeatures')
 })
 
 var totalBlocked = computed(function() {
   // Unique blocked keys across either bucket (same feature under multiple components counts once)
-  var source = clientFilteredGroups.value
+  var source = summaryFilteredGroups.value
   var seen = {}
   var count = 0
   for (var gi = 0; gi < source.length; gi++) {
@@ -905,7 +929,7 @@ var totalBlocked = computed(function() {
 })
 
 var totalFeatures = computed(function() {
-  var source = clientFilteredGroups.value
+  var source = summaryFilteredGroups.value
   var seen = {}
   var count = 0
   for (var gi = 0; gi < source.length; gi++) {
@@ -933,7 +957,7 @@ var blockedPercent = computed(function() {
 })
 
 var totalAtRisk = computed(function() {
-  var source = clientFilteredGroups.value
+  var source = summaryFilteredGroups.value
   var seen = {}
   var count = 0
   for (var gi = 0; gi < source.length; gi++) {
