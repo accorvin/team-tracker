@@ -1658,7 +1658,7 @@ async function fetchFieldOptions() {
   try {
     const [components, teams] = await Promise.all([
       apiRequest('/modules/team-tracker/field-options/component'), // eslint-disable-line org-pulse/no-cross-module-imports
-      apiRequest('/modules/team-tracker/field-options/jira_team') // eslint-disable-line org-pulse/no-cross-module-imports
+      apiRequest('/modules/team-tracker/field-options/jiraTeam') // eslint-disable-line org-pulse/no-cross-module-imports
     ])
     knownComponents.value = components.values || []
     knownTeams.value = teams.values || []
