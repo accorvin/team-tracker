@@ -376,7 +376,7 @@ test.describe('AI Impact Build & Release @ai-impact', () => {
 
   test('target version dropdown appears and filters correctly', async ({ page }) => {
     // Page header version multi-select (button + checkbox menu).
-    const versionButton = page.getByRole('button', { name: /All versions|Versions \(/ }).first();
+    const versionButton = page.getByRole('button', { name: /All versions/ }).first();
     await expect(versionButton).toBeVisible();
     await versionButton.click();
 
@@ -396,7 +396,7 @@ test.describe('AI Impact Build & Release @ai-impact', () => {
   });
 
   test('status filter includes "In Queue" option and filters correctly', async ({ page }) => {
-    const statusButton = page.getByRole('button', { name: /All statuses|Statuses \(/ });
+    const statusButton = page.getByRole('button', { name: /All statuses/ });
     await expect(statusButton).toBeVisible();
     await statusButton.click();
 
