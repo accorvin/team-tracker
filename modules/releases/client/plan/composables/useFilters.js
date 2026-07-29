@@ -1,5 +1,13 @@
 import { ref, computed } from 'vue'
 
+function rockChildCount(rock) {
+  return (rock.featureCount || 0) + (rock.rfeCount || 0)
+}
+
+function isEmptyRock(rock) {
+  return rockChildCount(rock) === 0
+}
+
 export function useFilters(features, rfes, bigRocks) {
   const selectedPillar = ref('')
   const selectedRock = ref('')
@@ -7,6 +15,8 @@ export function useFilters(features, rfes, bigRocks) {
   const selectedPriority = ref('')
   const selectedTeams = ref([])
   const searchQuery = ref('')
+  /** When false (default), rocks with 0 Features and 0 RFEs for this release are hidden. */
+  const showEmptyRocks = ref(false)
 
   function matchesFilters(item) {
     if (searchQuery.value) {
@@ -63,10 +73,15 @@ export function useFilters(features, rfes, bigRocks) {
     return rfes.value.filter(matchesFilters)
   })
 
+  const emptyRockCount = computed(() => {
+    if (!bigRocks.value) return 0
+    return bigRocks.value.filter(isEmptyRock).length
+  })
+
   const filteredBigRocks = computed(() => {
     if (!bigRocks.value) return []
-    if (!selectedPillar.value && !searchQuery.value) return bigRocks.value
     return bigRocks.value.filter(function(rock) {
+      if (!showEmptyRocks.value && isEmptyRock(rock)) return false
       if (selectedPillar.value && rock.pillar !== selectedPillar.value) return false
       if (searchQuery.value) {
         const q = searchQuery.value.toLowerCase()
@@ -104,6 +119,8 @@ export function useFilters(features, rfes, bigRocks) {
     selectedPriority,
     selectedTeams,
     searchQuery,
+    showEmptyRocks,
+    emptyRockCount,
     filteredFeatures,
     filteredRfes,
     filteredBigRocks,
