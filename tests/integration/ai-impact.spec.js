@@ -396,7 +396,7 @@ test.describe('AI Impact Build & Release @ai-impact', () => {
   });
 
   test('status filter includes "In Queue" option and filters correctly', async ({ page }) => {
-    const statusButton = page.getByRole('button', { name: /All statuses|Status \(/ });
+    const statusButton = page.getByRole('button', { name: /All statuses|Statuses \(/ });
     await expect(statusButton).toBeVisible();
     await statusButton.click();
 

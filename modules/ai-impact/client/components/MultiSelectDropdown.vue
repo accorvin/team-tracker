@@ -7,7 +7,6 @@ const props = defineProps({
   placeholder: { type: String, default: 'All' },
   /** Optional test id on the open menu panel */
   testId: { type: String, default: null },
-  menuClass: { type: String, default: 'w-56 max-h-56' },
   emptyText: { type: String, default: 'No options available' }
 })
 
@@ -28,7 +27,9 @@ const label = computed(() => {
     const opt = normalizedOptions.value.find(o => o.value === props.modelValue[0])
     return opt ? opt.label : props.modelValue[0]
   }
-  return `${props.placeholder.replace(/^All\s+/i, '')} (${props.modelValue.length})`
+  const base = props.placeholder.replace(/^All\s+/i, '')
+  const titled = base ? base.charAt(0).toUpperCase() + base.slice(1) : base
+  return `${titled} (${props.modelValue.length})`
 })
 
 function toggle(value) {
@@ -55,54 +56,56 @@ onUnmounted(() => document.removeEventListener('mousedown', handleClickOutside))
 
 <template>
   <div ref="dropdownRef" class="relative">
+    <!-- Same classes as the Product <select> for a uniform filter bar -->
     <button
       type="button"
-      class="text-sm border rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 inline-flex items-center justify-between gap-2 min-w-[8.5rem] focus:outline-none focus:ring-2 focus:ring-blue-500"
-      :class="modelValue.length
-        ? 'border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-300'
-        : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/40'"
+      class="inline-flex items-center justify-between gap-2 min-w-[8.5rem] text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      :class="modelValue.length ? 'border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-300' : ''"
+      :aria-expanded="open"
+      aria-haspopup="listbox"
       @click.stop="open = !open"
     >
-      <span class="truncate max-w-[10rem]">{{ label }}</span>
-      <svg class="h-3.5 w-3.5 opacity-60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <span class="max-w-[10rem] truncate">{{ label }}</span>
+      <svg class="h-3.5 w-3.5 flex-shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
       </svg>
     </button>
 
     <div
       v-if="open"
-      class="absolute z-20 mt-1 overflow-auto rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg p-2 space-y-1"
-      :class="menuClass"
+      class="absolute z-20 mt-1 w-56 max-h-56 overflow-auto p-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg"
       :data-testid="testId || undefined"
       @click.stop
     >
-      <p v-if="!normalizedOptions.length" class="px-2 py-1 text-xs text-gray-400">{{ emptyText }}</p>
+      <p v-if="!normalizedOptions.length" class="px-2 py-1 text-xs text-gray-400 dark:text-gray-500">
+        {{ emptyText }}
+      </p>
       <label
         v-for="opt in normalizedOptions"
         :key="opt.value"
-        class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded cursor-pointer"
+        class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
       >
         <input
           type="checkbox"
+          class="rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500"
           :value="opt.value"
           :checked="modelValue.includes(opt.value)"
-          class="rounded border-gray-300"
           @change="toggle(opt.value)"
         />
         {{ opt.label }}
       </label>
-      <div class="sticky bottom-0 flex items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+      <div class="sticky bottom-0 flex items-center justify-between gap-2 pt-1 mt-1 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
         <button
           v-if="modelValue.length"
           type="button"
-          class="px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          class="px-2 py-1 text-xs text-blue-600 dark:text-blue-400 underline bg-transparent border-0 cursor-pointer"
           @click="clearAll"
         >
           Clear
         </button>
         <button
           type="button"
-          class="ml-auto px-2.5 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700"
+          class="ml-auto px-2.5 py-1 text-xs font-medium rounded bg-blue-600 hover:bg-blue-700 text-white border-0 cursor-pointer"
           @click="open = false"
         >
           Done

@@ -4,6 +4,8 @@ import OnboardingMetricsRow from './OnboardingMetricsRow.vue'
 import OnboardingCharts from './OnboardingCharts.vue'
 import ComponentOnboardingTable from './ComponentOnboardingTable.vue'
 import MultiSelectDropdown from './MultiSelectDropdown.vue'
+import { collectVersionGroups, matchesVersionGroups, formatVersionGroupLabel } from '../utils/version-group.js'
+import '../styles/onboarding-filter-chips.css'
 
 const props = defineProps({
   loading: { type: Boolean, default: true },
@@ -21,22 +23,32 @@ const versionFilter = ref([])
 const allComponents = computed(() => props.data?.components ?? {})
 
 const availableVersions = computed(() => {
+  const raw = []
   if (Array.isArray(props.data?.availableVersions) && props.data.availableVersions.length) {
-    return props.data.availableVersions
+    raw.push(...props.data.availableVersions)
+  } else {
+    for (const comp of Object.values(allComponents.value)) {
+      if (comp.targetVersion) raw.push(comp.targetVersion)
+    }
   }
-  const versions = new Set()
-  for (const comp of Object.values(allComponents.value)) {
-    if (comp.targetVersion) versions.add(comp.targetVersion)
-  }
-  return Array.from(versions).sort()
+  // One option per logical release (version + phase); merge naming formats only.
+  return collectVersionGroups(raw).map(g => ({
+    value: g,
+    label: formatVersionGroupLabel(g)
+  }))
 })
 
+const selectedVersionChips = computed(() =>
+  versionFilter.value.map(v => ({
+    value: v,
+    label: formatVersionGroupLabel(v)
+  }))
+)
 const filteredComponents = computed(() => {
   if (!versionFilter.value.length) return allComponents.value
-  const selected = new Set(versionFilter.value)
   const filtered = {}
   for (const [key, comp] of Object.entries(allComponents.value)) {
-    if (selected.has(comp.targetVersion)) filtered[key] = comp
+    if (matchesVersionGroups(comp.targetVersion, versionFilter.value)) filtered[key] = comp
   }
   return filtered
 })
@@ -154,16 +166,16 @@ const metrics = computed(() => {
           test-id="page-version-filter-menu"
         />
         <span
-          v-for="v in versionFilter"
-          :key="v"
-          class="inline-flex items-center gap-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 text-xs"
+          v-for="chip in selectedVersionChips"
+          :key="chip.value"
+          class="onboarding-filter-chip onboarding-filter-chip--version"
         >
-          {{ v }}
+          {{ chip.label }}
           <button
             type="button"
-            class="hover:text-indigo-900 dark:hover:text-indigo-100 leading-none"
-            :aria-label="'Remove ' + v"
-            @click="removeVersion(v)"
+            class="onboarding-filter-chip__remove"
+            :aria-label="'Remove ' + chip.label"
+            @click="removeVersion(chip.value)"
           >×</button>
         </span>
       </div>

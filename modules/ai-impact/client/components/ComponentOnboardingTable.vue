@@ -2,6 +2,8 @@
 import { ref, computed, inject } from 'vue'
 import { useModuleLink } from '@shared/client/composables/useModuleLink'
 import MultiSelectDropdown from './MultiSelectDropdown.vue'
+import { collectVersionGroups, matchesVersionGroups, formatVersionGroupLabel } from '../utils/version-group.js'
+import '../styles/onboarding-filter-chips.css'
 
 const { linkTo } = useModuleLink()
 const moduleNav = inject('moduleNav')
@@ -48,17 +50,28 @@ const STATUS_OPTIONS = [
 ]
 
 const targetVersionOptions = computed(() => {
-  const versions = new Set()
+  const versions = []
   Object.values(props.components).forEach(c => {
-    if (c.targetVersion) versions.add(c.targetVersion)
+    if (c.targetVersion) versions.push(c.targetVersion)
   })
-  return [...versions].sort()
+  // One option per logical release (version + phase); merge naming formats only.
+  return collectVersionGroups(versions).map(g => ({
+    value: g,
+    label: formatVersionGroupLabel(g)
+  }))
 })
 
 const selectedStatusChips = computed(() =>
   completionFilter.value.map(v => ({
     value: v,
     label: STATUS_OPTIONS.find(o => o.value === v)?.label || v
+  }))
+)
+
+const selectedVersionChips = computed(() =>
+  targetVersionFilter.value.map(v => ({
+    value: v,
+    label: formatVersionGroupLabel(v)
   }))
 )
 
@@ -112,12 +125,7 @@ const componentList = computed(() => {
         return false
       }
       if (productFilter.value !== 'all' && c.productContext !== productFilter.value) return false
-      if (
-        targetVersionFilter.value.length &&
-        !targetVersionFilter.value.includes(c.targetVersion || '')
-      ) {
-        return false
-      }
+      if (!matchesVersionGroups(c.targetVersion, targetVersionFilter.value)) return false
       if (!q) return true
       return (
         c.key.toLowerCase().includes(q) ||
@@ -250,7 +258,6 @@ function completionStatusDotClass(status) {
           :options="STATUS_OPTIONS"
           placeholder="All statuses"
           test-id="status-filter-menu"
-          menu-class="w-48"
         />
 
         <!-- Product filter -->
@@ -279,51 +286,51 @@ function completionStatusDotClass(status) {
       <!-- Active filter chips -->
       <div
         v-if="hasActiveFilters"
-        class="flex flex-wrap items-center gap-1.5"
+        class="onboarding-filter-chips"
       >
         <span
           v-if="search"
-          class="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 text-xs"
+          class="onboarding-filter-chip onboarding-filter-chip--neutral"
         >
           Search: {{ search }}
-          <button type="button" class="leading-none hover:opacity-70" aria-label="Clear search" @click="search = ''">×</button>
+          <button type="button" class="onboarding-filter-chip__remove" aria-label="Clear search" @click="search = ''">×</button>
         </span>
         <span
           v-if="productFilter !== 'all'"
-          class="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 text-xs"
+          class="onboarding-filter-chip onboarding-filter-chip--neutral"
         >
           {{ productFilter }}
-          <button type="button" class="leading-none hover:opacity-70" aria-label="Clear product" @click="productFilter = 'all'">×</button>
+          <button type="button" class="onboarding-filter-chip__remove" aria-label="Clear product" @click="productFilter = 'all'">×</button>
         </span>
         <span
           v-for="chip in selectedStatusChips"
           :key="'s-' + chip.value"
-          class="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 text-xs"
+          class="onboarding-filter-chip onboarding-filter-chip--status"
         >
           {{ chip.label }}
           <button
             type="button"
-            class="hover:text-blue-900 dark:hover:text-blue-100 leading-none"
+            class="onboarding-filter-chip__remove"
             :aria-label="'Remove ' + chip.label"
             @click="removeStatus(chip.value)"
           >×</button>
         </span>
         <span
-          v-for="v in targetVersionFilter"
-          :key="'v-' + v"
-          class="inline-flex items-center gap-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 text-xs"
+          v-for="chip in selectedVersionChips"
+          :key="'v-' + chip.value"
+          class="onboarding-filter-chip onboarding-filter-chip--version"
         >
-          {{ v }}
+          {{ chip.label }}
           <button
             type="button"
-            class="hover:text-indigo-900 dark:hover:text-indigo-100 leading-none"
-            :aria-label="'Remove ' + v"
-            @click="removeVersion(v)"
+            class="onboarding-filter-chip__remove"
+            :aria-label="'Remove ' + chip.label"
+            @click="removeVersion(chip.value)"
           >×</button>
         </span>
         <button
           type="button"
-          class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline ml-1"
+          class="onboarding-filter-chips__clear-all"
           @click="clearAllFilters"
         >
           Clear all
