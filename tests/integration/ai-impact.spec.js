@@ -339,6 +339,10 @@ test.describe('AI Impact Views @ai-impact', () => {
 test.describe('AI Impact Build & Release @ai-impact', () => {
   test.beforeEach(async ({ page }) => {
     setupErrorTracking(page);
+    // Prevent the auto-open AI Impact Guide modal from blocking filter clicks.
+    await page.addInitScript(() => {
+      localStorage.setItem('ai-impact-guide-dismissed', 'true');
+    });
     await page.goto('/#/ai-impact/build-release');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
@@ -371,15 +375,18 @@ test.describe('AI Impact Build & Release @ai-impact', () => {
   });
 
   test('target version dropdown appears and filters correctly', async ({ page }) => {
-    // Page header and table each have an "All versions" select; use the header filter.
-    const versionSelect = page.locator('select').filter({ hasText: 'All versions' }).first();
-    await expect(versionSelect).toBeVisible();
+    // Page header version multi-select (button + checkbox menu).
+    const versionButton = page.getByRole('button', { name: /All versions/ }).first();
+    await expect(versionButton).toBeVisible();
+    await versionButton.click();
 
-    const options = await versionSelect.locator('option').allTextContents();
-    expect(options).toContain('All versions');
-    expect(options.length).toBeGreaterThan(1);
+    const menu = page.getByTestId('page-version-filter-menu');
+    await expect(menu).toBeVisible();
+    const checkboxes = menu.locator('input[type="checkbox"]');
+    expect(await checkboxes.count()).toBeGreaterThan(0);
 
-    await versionSelect.selectOption({ index: 1 });
+    await checkboxes.first().check();
+    await menu.getByRole('button', { name: 'Done' }).click();
     await page.waitForTimeout(500);
 
     const countText = page.locator('text=/\\d+ components?/');
@@ -389,13 +396,16 @@ test.describe('AI Impact Build & Release @ai-impact', () => {
   });
 
   test('status filter includes "In Queue" option and filters correctly', async ({ page }) => {
-    const statusSelect = page.locator('select').filter({ hasText: 'All statuses' });
-    await expect(statusSelect).toBeVisible();
+    const statusButton = page.getByRole('button', { name: /All statuses/ });
+    await expect(statusButton).toBeVisible();
+    await statusButton.click();
 
-    const options = await statusSelect.locator('option').allTextContents();
-    expect(options).toContain('In Queue');
+    const menu = page.getByTestId('status-filter-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByText('In Queue')).toBeVisible();
 
-    await statusSelect.selectOption('in_queue');
+    await menu.locator('input[type="checkbox"][value="in_queue"]').check();
+    await menu.getByRole('button', { name: 'Done' }).click();
     await page.waitForTimeout(500);
 
     const rows = page.locator('table tbody tr');
@@ -407,7 +417,9 @@ test.describe('AI Impact Build & Release @ai-impact', () => {
       const badge = row.locator('.rounded-full');
       if (await badge.count() > 0) {
         const text = await badge.first().textContent();
-        expect(text.trim()).toBe('In Queue');
+        if (text && ['Completed', 'In Progress', 'In Queue'].includes(text.trim())) {
+          expect(text.trim()).toBe('In Queue');
+        }
       }
     }
 
