@@ -855,32 +855,51 @@ var filteredVersions = computed(function() {
   return portfolioVersionLabels.filter(function(name) { return name.toLowerCase().includes(q) })
 })
 
-var totalRequested = computed(function() {
-  var source = clientFilteredGroups.value
+/** Count unique feature keys across component groups (multi-component features must not inflate summary cards). */
+function countUniqueFeatureKeys(groups, listName) {
+  var seen = {}
   var count = 0
-  for (var i = 0; i < source.length; i++) {
-    var comps = source[i].components || []
-    for (var ci = 0; ci < comps.length; ci++) count += comps[ci].requestedCount || 0
+  for (var gi = 0; gi < groups.length; gi++) {
+    var comps = groups[gi].components || []
+    for (var ci = 0; ci < comps.length; ci++) {
+      var list = comps[ci][listName] || []
+      for (var fi = 0; fi < list.length; fi++) {
+        var f = list[fi]
+        if (!f || !f.key || seen[f.key]) continue
+        seen[f.key] = true
+        count++
+      }
+    }
   }
   return count
+}
+
+var totalRequested = computed(function() {
+  return countUniqueFeatureKeys(clientFilteredGroups.value, 'requestedFeatures')
 })
 
 var totalCommitted = computed(function() {
-  var source = clientFilteredGroups.value
-  var count = 0
-  for (var i = 0; i < source.length; i++) {
-    var comps = source[i].components || []
-    for (var ci = 0; ci < comps.length; ci++) count += comps[ci].committedCount || 0
-  }
-  return count
+  return countUniqueFeatureKeys(clientFilteredGroups.value, 'committedFeatures')
 })
 
 var totalBlocked = computed(function() {
+  // Unique blocked keys across either bucket (same feature under multiple components counts once)
   var source = clientFilteredGroups.value
+  var seen = {}
   var count = 0
-  for (var i = 0; i < source.length; i++) {
-    var comps = source[i].components || []
-    for (var ci = 0; ci < comps.length; ci++) count += comps[ci].blockedCount || 0
+  for (var gi = 0; gi < source.length; gi++) {
+    var comps = source[gi].components || []
+    for (var ci = 0; ci < comps.length; ci++) {
+      var lists = [comps[ci].requestedFeatures || [], comps[ci].committedFeatures || []]
+      for (var li = 0; li < lists.length; li++) {
+        for (var fi = 0; fi < lists[li].length; fi++) {
+          var f = lists[li][fi]
+          if (!f || !f.key || seen[f.key] || !f.isBlocked) continue
+          seen[f.key] = true
+          count++
+        }
+      }
+    }
   }
   return count
 })
