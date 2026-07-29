@@ -5,7 +5,10 @@ import OnboardingCharts from './OnboardingCharts.vue'
 import ComponentOnboardingTable from './ComponentOnboardingTable.vue'
 import MultiSelectDropdown from './MultiSelectDropdown.vue'
 import { collectVersionGroups, matchesVersionGroups, formatVersionGroupLabel } from '../utils/version-group.js'
-import '../styles/onboarding-filter-chips.css'
+import {
+  filterChipVersionClass,
+  filterChipRemoveClass
+} from '../utils/filter-chip-classes.js'
 
 const props = defineProps({
   loading: { type: Boolean, default: true },
@@ -168,12 +171,12 @@ const metrics = computed(() => {
         <span
           v-for="chip in selectedVersionChips"
           :key="chip.value"
-          class="onboarding-filter-chip onboarding-filter-chip--version"
+          :class="filterChipVersionClass"
         >
           {{ chip.label }}
           <button
             type="button"
-            class="onboarding-filter-chip__remove"
+            :class="filterChipRemoveClass"
             :aria-label="'Remove ' + chip.label"
             @click="removeVersion(chip.value)"
           >×</button>

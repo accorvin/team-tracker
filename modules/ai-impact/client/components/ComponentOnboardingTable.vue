@@ -3,7 +3,14 @@ import { ref, computed, inject } from 'vue'
 import { useModuleLink } from '@shared/client/composables/useModuleLink'
 import MultiSelectDropdown from './MultiSelectDropdown.vue'
 import { collectVersionGroups, matchesVersionGroups, formatVersionGroupLabel } from '../utils/version-group.js'
-import '../styles/onboarding-filter-chips.css'
+import {
+  filterChipsRowClass,
+  filterChipNeutralClass,
+  filterChipStatusClass,
+  filterChipVersionClass,
+  filterChipRemoveClass,
+  filterChipsClearAllClass
+} from '../utils/filter-chip-classes.js'
 
 const { linkTo } = useModuleLink()
 const moduleNav = inject('moduleNav')
@@ -286,31 +293,31 @@ function completionStatusDotClass(status) {
       <!-- Active filter chips -->
       <div
         v-if="hasActiveFilters"
-        class="onboarding-filter-chips"
+        :class="filterChipsRowClass"
       >
         <span
           v-if="search"
-          class="onboarding-filter-chip onboarding-filter-chip--neutral"
+          :class="filterChipNeutralClass"
         >
           Search: {{ search }}
-          <button type="button" class="onboarding-filter-chip__remove" aria-label="Clear search" @click="search = ''">×</button>
+          <button type="button" :class="filterChipRemoveClass" aria-label="Clear search" @click="search = ''">×</button>
         </span>
         <span
           v-if="productFilter !== 'all'"
-          class="onboarding-filter-chip onboarding-filter-chip--neutral"
+          :class="filterChipNeutralClass"
         >
           {{ productFilter }}
-          <button type="button" class="onboarding-filter-chip__remove" aria-label="Clear product" @click="productFilter = 'all'">×</button>
+          <button type="button" :class="filterChipRemoveClass" aria-label="Clear product" @click="productFilter = 'all'">×</button>
         </span>
         <span
           v-for="chip in selectedStatusChips"
           :key="'s-' + chip.value"
-          class="onboarding-filter-chip onboarding-filter-chip--status"
+          :class="filterChipStatusClass"
         >
           {{ chip.label }}
           <button
             type="button"
-            class="onboarding-filter-chip__remove"
+            :class="filterChipRemoveClass"
             :aria-label="'Remove ' + chip.label"
             @click="removeStatus(chip.value)"
           >×</button>
@@ -318,19 +325,19 @@ function completionStatusDotClass(status) {
         <span
           v-for="chip in selectedVersionChips"
           :key="'v-' + chip.value"
-          class="onboarding-filter-chip onboarding-filter-chip--version"
+          :class="filterChipVersionClass"
         >
           {{ chip.label }}
           <button
             type="button"
-            class="onboarding-filter-chip__remove"
+            :class="filterChipRemoveClass"
             :aria-label="'Remove ' + chip.label"
             @click="removeVersion(chip.value)"
           >×</button>
         </span>
         <button
           type="button"
-          class="onboarding-filter-chips__clear-all"
+          :class="filterChipsClearAllClass"
           @click="clearAllFilters"
         >
           Clear all

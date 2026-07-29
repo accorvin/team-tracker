@@ -27,9 +27,9 @@ const label = computed(() => {
     const opt = normalizedOptions.value.find(o => o.value === props.modelValue[0])
     return opt ? opt.label : props.modelValue[0]
   }
-  const base = props.placeholder.replace(/^All\s+/i, '')
-  const titled = base ? base.charAt(0).toUpperCase() + base.slice(1) : base
-  return `${titled} (${props.modelValue.length})`
+  const base = props.placeholder.replace(/^All\s*/i, '').trim()
+  if (!base) return `Selected (${props.modelValue.length})`
+  return `${base.charAt(0).toUpperCase()}${base.slice(1)} (${props.modelValue.length})`
 })
 
 function toggle(value) {
