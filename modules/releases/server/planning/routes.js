@@ -157,7 +157,9 @@ module.exports = async function registerPlanningRoutes(router, context) {
     var refreshStartTime = Date.now()
 
     async function doRefresh(attempt) {
-      const pipeline = runPipeline(config, bigRocks, version, readFromStorage)
+      const pipeline = runPipeline(config, bigRocks, version, readFromStorage, {
+        jiraClient: jiraClient
+      })
       const timeout = new Promise(function(_, reject) {
         setTimeout(function() { reject(new Error('Refresh timed out after 5 minutes')) }, REFRESH_TIMEOUT_MS)
       })

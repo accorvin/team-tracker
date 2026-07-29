@@ -449,7 +449,7 @@ describe('BigRockExpandedRow', function() {
 
   it('shows empty state when features array is empty', function() {
     var wrapper = mountExpanded({ features: [] })
-    expect(wrapper.text()).toContain('No feature health data available')
+    expect(wrapper.text()).toContain('No Features targeting this release under this Big Rock\'s Outcomes')
   })
 
   it('shows loading state when loading is true', function() {
