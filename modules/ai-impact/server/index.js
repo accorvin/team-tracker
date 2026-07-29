@@ -117,7 +117,7 @@ module.exports = function registerRoutes(router, context) {
 
   // ─── Autofix data ───
 
-  const VALID_AUTOFIX_TIME_WINDOWS = ['week', 'lastWeek', 'last7', 'month', 'lastMonth', 'last30', 'last90'];
+  const VALID_AUTOFIX_TIME_WINDOWS = ['week', 'lastWeek', 'last7', 'month', 'lastMonth', 'last30', 'last90', 'last180', 'all'];
 
   let autofixDataCache = null;
 
