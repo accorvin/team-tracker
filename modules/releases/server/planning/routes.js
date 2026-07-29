@@ -169,7 +169,7 @@ module.exports = async function registerPlanningRoutes(router, context) {
           // Jira fallback: fetch missing outcome summaries asynchronously
           var fallback
           if (result.missingOutcomes && result.missingOutcomes.length > 0) {
-            fallback = await getOutcomeSummaries(jiraClient ? jiraClient.jiraRequest : null, result.missingOutcomes, version, readFromStorage, writeToStorage)
+            fallback = getOutcomeSummaries(jiraClient ? jiraClient.jiraRequest : null, result.missingOutcomes, version, readFromStorage, writeToStorage)
               .then(function(fetched) {
                 // Merge fetched summaries into the pipeline result
                 for (var key in fetched) {
