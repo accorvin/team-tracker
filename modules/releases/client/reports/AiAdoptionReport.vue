@@ -1,11 +1,10 @@
 <script setup>
 import { ref, shallowRef, computed, onMounted, watch } from 'vue'
-import { Bar, Line } from 'vue-chartjs'
+import { Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  BarElement,
   LineElement,
   PointElement,
   Filler,
@@ -15,7 +14,7 @@ import {
 import { useAiAdoption } from '../composables/useAiAdoption.js'
 import { apiRequest } from '@shared/client'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Filler, Tooltip, Legend)
+ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Filler, Tooltip, Legend)
 
 const PIPELINE_META = {
   stratCreator: { name: 'Strategy Creator', short: 'Strat', description: 'AI auto-generates and refines feature strategy definitions, validated against a quality rubric with optional human sign-off.', labels: ['strat-creator-auto-created', 'strat-creator-auto-refined', 'strat-creator-rubric-pass', 'strat-creator-human-sign-off'] },
@@ -42,6 +41,9 @@ const selectedComponent = ref('all')
 const expandedPipelines = ref({})
 const scorecardView = ref('table')
 const selectedChartMetric = ref('features')
+const selectedBaseline = ref(BASELINE_NAME)
+const componentSortKey = ref('aiTouched')
+const componentSortAsc = ref(false)
 
 async function loadData() {
   const comp = selectedComponent.value === 'all' ? null : selectedComponent.value
@@ -74,8 +76,9 @@ const allComponents = computed(() => {
   return [...set].sort()
 })
 
-const baseline = computed(() => scorecardGroups.value.find(r => r.releaseGroup === BASELINE_NAME) || null)
-const postBaselineGroups = computed(() => scorecardGroups.value.filter(r => r.releaseGroup !== BASELINE_NAME))
+const baseline = computed(() => scorecardGroups.value.find(r => r.releaseGroup === selectedBaseline.value) || null)
+const postBaselineGroups = computed(() => scorecardGroups.value.filter(r => r.releaseGroup !== selectedBaseline.value))
+const baselineOptions = computed(() => scorecardGroups.value.map(g => g.releaseGroup))
 
 const summaryStats = computed(() => {
   const groups = releaseGroups.value
@@ -147,7 +150,7 @@ const scorecardColumns = computed(() => {
 })
 
 function scorecardDelta(metric, group) {
-  if (!baseline.value || group.releaseGroup === BASELINE_NAME) return null
+  if (!baseline.value || group.releaseGroup === selectedBaseline.value) return null
   const current = metric.getValue(group)
   const base = metric.getValue(baseline.value)
   if (metric.isPct) return deltaPp(current, base)
@@ -155,7 +158,7 @@ function scorecardDelta(metric, group) {
 }
 
 function scorecardDeltaClass(metric, group) {
-  if (!baseline.value || group.releaseGroup === BASELINE_NAME) return ''
+  if (!baseline.value || group.releaseGroup === selectedBaseline.value) return ''
   const diff = metric.getValue(group) - metric.getValue(baseline.value)
   if (diff > 0) return 'text-green-600 dark:text-green-400'
   if (diff < 0) return 'text-red-500 dark:text-red-400'
@@ -163,7 +166,7 @@ function scorecardDeltaClass(metric, group) {
 }
 
 function scorecardColHeaderClass(releaseGroup) {
-  const isBase = releaseGroup === BASELINE_NAME
+  const isBase = releaseGroup === selectedBaseline.value
   const isSelected = selectedRelease.value !== 'all' && releaseGroup === selectedRelease.value
   if (isSelected) return 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border-b-2 border-primary-500'
   if (isBase) return 'bg-amber-50/60 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400'
@@ -171,7 +174,7 @@ function scorecardColHeaderClass(releaseGroup) {
 }
 
 function scorecardColCellClass(releaseGroup) {
-  const isBase = releaseGroup === BASELINE_NAME
+  const isBase = releaseGroup === selectedBaseline.value
   const isSelected = selectedRelease.value !== 'all' && releaseGroup === selectedRelease.value
   if (isSelected) return 'bg-primary-50/50 dark:bg-primary-900/10'
   if (isBase) return 'bg-amber-50/30 dark:bg-amber-900/5'
@@ -191,8 +194,8 @@ const scorecardChartData = computed(() => {
   const metric = SCORECARD_METRICS.find(m => m.key === selectedChartMetric.value) || SCORECARD_METRICS[0]
   const labels = cols.map(c => c.releaseGroup)
   const values = cols.map(c => metric.getValue(c))
-  const pointBg = cols.map(c => c.releaseGroup === BASELINE_NAME ? '#f59e0b' : '#3b82f6')
-  const pointBorder = cols.map(c => c.releaseGroup === BASELINE_NAME ? '#d97706' : '#2563eb')
+  const pointBg = cols.map(c => c.releaseGroup === selectedBaseline.value ? '#f59e0b' : '#3b82f6')
+  const pointBorder = cols.map(c => c.releaseGroup === selectedBaseline.value ? '#d97706' : '#2563eb')
   return {
     labels,
     datasets: [{
@@ -240,7 +243,7 @@ const scorecardChartOptions = computed(() => {
           label: ctx => {
             const val = ctx.parsed.y
             const formatted = metric.isPct ? val + '%' : (metric.suffix ? val + metric.suffix : val)
-            const label = ctx.label === BASELINE_NAME ? `${formatted} (baseline)` : formatted
+            const label = ctx.label === selectedBaseline.value ? `${formatted} (baseline)` : formatted
             return `${metric.label}: ${label}`
           }
         }
@@ -249,67 +252,16 @@ const scorecardChartOptions = computed(() => {
   }
 })
 
-const stackedBarData = computed(() => {
-  const groups = releaseGroups.value
-  return {
-    labels: groups.map(g => g.releaseGroup),
-    datasets: [
-      {
-        label: 'AI-Touched',
-        data: groups.map(g => g.aiTouchedFeatures),
-        backgroundColor: '#3b82f6',
-        borderRadius: 4
-      },
-      {
-        label: 'No AI Evidence',
-        data: groups.map(g => g.totalFeatures - g.aiTouchedFeatures),
-        backgroundColor: '#d1d5db',
-        borderRadius: 4
-      }
-    ]
-  }
-})
-
-const stackedBarOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  scales: {
-    x: { stacked: true, grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 11 } } },
-    y: { stacked: true, grid: { color: 'rgba(156,163,175,0.15)' }, ticks: { color: '#9ca3af', font: { size: 11 } } }
-  },
-  plugins: {
-    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, color: '#6b7280', font: { size: 11 } } },
-    tooltip: { backgroundColor: '#111827', bodyFont: { size: 11 }, padding: 10, cornerRadius: 8 }
-  }
+function componentPct(row) {
+  return row.total > 0 ? Math.round((row.aiTouched / row.total) * 100) : 0
 }
 
-const coverageLineData = computed(() => {
-  const groups = releaseGroups.value
-  return {
-    labels: groups.map(g => g.releaseGroup),
-    datasets: [{
-      label: 'AI Coverage %',
-      data: groups.map(g => aiPct(g)),
-      borderColor: '#22c55e',
-      backgroundColor: 'rgba(34,197,94,0.1)',
-      fill: true,
-      tension: 0.3,
-      pointRadius: 5,
-      pointBackgroundColor: '#22c55e'
-    }]
-  }
-})
-
-const coverageLineOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  scales: {
-    x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 11 } } },
-    y: { min: 0, max: 100, grid: { color: 'rgba(156,163,175,0.15)' }, ticks: { color: '#9ca3af', font: { size: 11 }, callback: v => v + '%' } }
-  },
-  plugins: {
-    legend: { display: false },
-    tooltip: { backgroundColor: '#111827', bodyFont: { size: 11 }, padding: 10, cornerRadius: 8, callbacks: { label: ctx => ctx.parsed.y + '%' } }
+function toggleComponentSort(key) {
+  if (componentSortKey.value === key) {
+    componentSortAsc.value = !componentSortAsc.value
+  } else {
+    componentSortKey.value = key
+    componentSortAsc.value = false
   }
 }
 
@@ -326,20 +278,82 @@ const perComponentRows = computed(() => {
       for (const k of PIPELINE_KEYS) map[c.name].pipelines[k] += c.pipelines[k] || 0
     }
   }
-  return Object.values(map).sort((a, b) => b.aiTouched - a.aiTouched)
+  const rows = Object.values(map)
+  const key = componentSortKey.value
+  const dir = componentSortAsc.value ? 1 : -1
+  rows.sort((a, b) => {
+    let va, vb
+    if (key === 'total') { va = a.total; vb = b.total }
+    else if (key === 'aiTouched') { va = a.aiTouched; vb = b.aiTouched }
+    else { va = componentPct(a); vb = componentPct(b) }
+    return (va - vb) * dir
+  })
+  return rows
 })
 
 function togglePipeline(key) {
   expandedPipelines.value[key] = !expandedPipelines.value[key]
 }
 
-const insightText = computed(() => {
+const executiveSummary = computed(() => {
+  const groups = scorecardGroups.value
+  if (groups.length < 2) return null
+
   const bl = baseline.value
-  const ga = releaseGroups.value.find(r => r.releaseGroup === '3.5 GA')
-  if (!bl || !ga) return null
+  const latest = groups[groups.length - 1]
+  if (!bl || bl.releaseGroup === latest.releaseGroup) return null
+
   const blPct = aiPct(bl)
-  const gaPct = aiPct(ga)
-  return `AI adoption grew from ${blPct}% (3.4 GA baseline) to ${gaPct}% (3.5 GA), a ${gaPct - blPct}pp increase. Feature volume went from ${bl.totalFeatures} to ${ga.totalFeatures} features between these releases.`
+  const latestPct = aiPct(latest)
+  const pctDelta = latestPct - blPct
+
+  const blPipelines = activePipelineCount(bl)
+  const latestPipelines = activePipelineCount(latest)
+
+  const strengths = []
+  const concerns = []
+
+  if (pctDelta > 0) {
+    strengths.push(`AI adoption rate grew ${pctDelta}pp — from ${blPct}% (${bl.releaseGroup}) to ${latestPct}% (${latest.releaseGroup}).`)
+  } else if (pctDelta < 0) {
+    concerns.push(`AI adoption rate dropped ${Math.abs(pctDelta)}pp — from ${blPct}% (${bl.releaseGroup}) to ${latestPct}% (${latest.releaseGroup}).`)
+  }
+
+  if (latestPipelines > blPipelines) {
+    strengths.push(`Pipeline breadth expanded from ${blPipelines}/6 to ${latestPipelines}/6 active pipelines.`)
+  } else if (latestPipelines < blPipelines) {
+    concerns.push(`Pipeline breadth narrowed from ${blPipelines}/6 to ${latestPipelines}/6 active pipelines.`)
+  }
+
+  if (latest.totalFeatures > bl.totalFeatures * 1.5) {
+    strengths.push(`Feature volume grew ${Math.round(((latest.totalFeatures / bl.totalFeatures) - 1) * 100)}% (${bl.totalFeatures} → ${latest.totalFeatures}), showing increased throughput alongside AI adoption.`)
+  }
+
+  const blTotals = groupPipelineTotals(bl)
+  const latestTotals = groupPipelineTotals(latest)
+  const zeroPipelines = PIPELINE_KEYS.filter(k => latestTotals[k] === 0)
+  const surgedPipelines = PIPELINE_KEYS.filter(k => blTotals[k] === 0 && latestTotals[k] > 10)
+
+  if (surgedPipelines.length > 0) {
+    strengths.push(`${surgedPipelines.map(k => PIPELINE_META[k].name).join(', ')} ${surgedPipelines.length === 1 ? 'was' : 'were'} newly adopted since baseline.`)
+  }
+
+  if (zeroPipelines.length > 0 && zeroPipelines.length < PIPELINE_KEYS.length) {
+    concerns.push(`${zeroPipelines.map(k => PIPELINE_META[k].name).join(', ')} ${zeroPipelines.length === 1 ? 'has' : 'have'} zero usage in ${latest.releaseGroup} — potential for expansion.`)
+  }
+
+  const compRows = perComponentRows.value
+  const lowAdoption = compRows.filter(r => r.total >= 5 && componentPct(r) < 30)
+  if (lowAdoption.length > 0) {
+    concerns.push(`${lowAdoption.map(r => r.name).join(', ')} ${lowAdoption.length === 1 ? 'has' : 'have'} <30% AI adoption despite having 5+ features.`)
+  }
+
+  const highAdoption = compRows.filter(r => r.total >= 5 && componentPct(r) >= 80)
+  if (highAdoption.length > 0) {
+    strengths.push(`${highAdoption.map(r => r.name).join(', ')} ${highAdoption.length === 1 ? 'leads' : 'lead'} with 80%+ AI adoption.`)
+  }
+
+  return { strengths, concerns, headline: `AI adoption grew from ${blPct}% to ${latestPct}% between ${bl.releaseGroup} and ${latest.releaseGroup}.` }
 })
 </script>
 
@@ -398,33 +412,103 @@ const insightText = computed(() => {
 
       <!-- Summary stats -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
+        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center relative">
+          <span class="absolute top-2 right-2 group/s1">
+            <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
+            <span class="invisible opacity-0 group-hover/s1:visible group-hover/s1:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 z-50 w-56 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:right-3 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">Total Jira Feature issues across all selected releases, projects, and components.</span>
+          </span>
           <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ summaryStats.totalFeatures }}</p>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Total Features</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-blue-200 dark:border-blue-800 p-4 text-center">
+        <div class="bg-white dark:bg-gray-800 rounded-lg border border-blue-200 dark:border-blue-800 p-4 text-center relative">
+          <span class="absolute top-2 right-2 group/s2">
+            <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
+            <span class="invisible opacity-0 group-hover/s2:visible group-hover/s2:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 z-50 w-56 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:right-3 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">Features where at least one AI pipeline assisted in strategy, planning, testing, or documentation.</span>
+          </span>
           <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ summaryStats.aiTouched }}</p>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">AI-Touched Features</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-green-200 dark:border-green-800 p-4 text-center">
+        <div class="bg-white dark:bg-gray-800 rounded-lg border border-green-200 dark:border-green-800 p-4 text-center relative">
+          <span class="absolute top-2 right-2 group/s3">
+            <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
+            <span class="invisible opacity-0 group-hover/s3:visible group-hover/s3:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 z-50 w-56 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:right-3 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">Percentage of all features that used AI pipelines. Calculated as AI-Touched / Total Features × 100.</span>
+          </span>
           <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ summaryStats.pct }}%</p>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Overall AI Adoption</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
+        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center relative">
+          <span class="absolute top-2 right-2 group/s4">
+            <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
+            <span class="invisible opacity-0 group-hover/s4:visible group-hover/s4:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 z-50 w-56 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:right-3 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">How many of the 6 available AI pipelines (Strat, RFE, Test Plan, QG1, AI Doc, UXD) were used across all selected releases.</span>
+          </span>
           <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ summaryStats.activePipelines }}</p>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Active Pipelines</p>
         </div>
       </div>
 
+      <!-- Executive Summary -->
+      <div v-if="executiveSummary" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-transparent dark:from-gray-700/30 dark:to-transparent">
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-800/40 flex items-center justify-center shrink-0">
+              <svg class="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            </span>
+            <div>
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Executive Summary</h3>
+              <p class="text-xs text-gray-600 dark:text-gray-400 mt-0.5">{{ executiveSummary.headline }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-200 dark:divide-gray-700">
+          <div class="px-5 py-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="w-5 h-5 rounded-full bg-green-100 dark:bg-green-800/40 flex items-center justify-center shrink-0">
+                <svg class="w-3 h-3 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+              </span>
+              <span class="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-wider">Strengths</span>
+            </div>
+            <ul v-if="executiveSummary.strengths.length" class="space-y-2">
+              <li v-for="(item, i) in executiveSummary.strengths" :key="i" class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                <span class="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
+                {{ item }}
+              </li>
+            </ul>
+            <p v-else class="text-sm text-gray-400 dark:text-gray-500 italic">No notable strengths identified.</p>
+          </div>
+          <div class="px-5 py-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center shrink-0">
+                <svg class="w-3 h-3 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </span>
+              <span class="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Areas for Growth</span>
+            </div>
+            <ul v-if="executiveSummary.concerns.length" class="space-y-2">
+              <li v-for="(item, i) in executiveSummary.concerns" :key="i" class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                <span class="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
+                {{ item }}
+              </li>
+            </ul>
+            <p v-else class="text-sm text-gray-400 dark:text-gray-500 italic">No concerns identified — strong adoption across the board.</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Scorecard: table / chart toggle -->
       <div v-if="scorecardColumns.length" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 shadow-sm">
-        <!-- Header with toggle -->
+        <!-- Header with baseline selector and toggle -->
         <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-4">
           <div>
-            <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Release Scorecard</h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">All metrics compared against the 3.4 GA baseline. Deltas show change from baseline.</p>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">AI Adoption Scorecard</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">All metrics compared against the selected baseline. Deltas show change from baseline.</p>
           </div>
-          <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5 shrink-0">
+          <div class="flex items-center gap-3 shrink-0">
+            <div class="flex flex-col gap-0.5">
+              <label class="text-[9px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Baseline</label>
+              <select v-model="selectedBaseline" class="text-xs font-medium rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 pl-2 pr-6 py-1 cursor-pointer">
+                <option v-for="opt in baselineOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+          <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5">
             <button @click="scorecardView = 'table'" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all" :class="scorecardView === 'table' ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'">
               <span class="flex items-center gap-1.5">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M3 6h18M3 18h18" /></svg>
@@ -438,6 +522,7 @@ const insightText = computed(() => {
               </span>
             </button>
           </div>
+          </div>
         </div>
 
         <!-- TABLE VIEW -->
@@ -449,14 +534,19 @@ const insightText = computed(() => {
                 <th v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap" :class="scorecardColHeaderClass(col.releaseGroup)">
                   <div class="flex items-center justify-center gap-1.5">
                     {{ col.releaseGroup }}
-                    <span v-if="col.releaseGroup === BASELINE_NAME" class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300 uppercase tracking-wide">Base</span>
+                    <span v-if="col.releaseGroup === selectedBaseline" class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300 uppercase tracking-wide">Base</span>
                   </div>
                 </th>
               </tr>
             </thead>
             <tbody>
-              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/20">
-                <td :colspan="scorecardColumns.length + 1" class="px-5 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Overview</td>
+              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/15 dark:to-transparent">
+                <td :colspan="scorecardColumns.length + 1" class="px-5 py-2">
+                  <div class="flex items-center gap-2">
+                    <span class="w-1 h-4 rounded-full bg-blue-500"></span>
+                    <span class="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Overview</span>
+                  </div>
+                </td>
               </tr>
               <template v-for="metric in SCORECARD_METRICS.filter(m => m.group === 'summary')" :key="metric.key">
                 <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="metric.highlight ? 'bg-blue-50/40 dark:bg-blue-900/10' : ''">
@@ -476,8 +566,13 @@ const insightText = computed(() => {
                 </tr>
               </template>
 
-              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/20">
-                <td :colspan="scorecardColumns.length + 1" class="px-5 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Pipeline Breakdown</td>
+              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-purple-50 to-transparent dark:from-purple-900/15 dark:to-transparent">
+                <td :colspan="scorecardColumns.length + 1" class="px-5 py-2">
+                  <div class="flex items-center gap-2">
+                    <span class="w-1 h-4 rounded-full bg-purple-500"></span>
+                    <span class="text-[11px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest">Pipeline Breakdown</span>
+                  </div>
+                </td>
               </tr>
               <template v-for="(metric, idx) in SCORECARD_METRICS.filter(m => m.group === 'pipeline')" :key="metric.key">
                 <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="idx % 2 === 0 ? 'bg-gray-50/30 dark:bg-gray-800/30' : ''">
@@ -523,41 +618,29 @@ const insightText = computed(() => {
         </div>
       </div>
 
-      <!-- Charts (only when all releases visible) -->
-      <template v-if="selectedRelease === 'all' && releaseGroups.length > 1">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <!-- Stacked bar: AI adoption over releases -->
-          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">AI Adoption Over Releases</h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Features with at least one AI pipeline label per release</p>
-            <div class="h-64">
-              <Bar :data="stackedBarData" :options="stackedBarOptions" />
-            </div>
-          </div>
-
-          <!-- Line chart: AI coverage rate -->
-          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">AI Coverage Rate Trend</h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Adoption percentage per release, starting from 3.4 GA baseline</p>
-            <div class="h-64">
-              <Line :data="coverageLineData" :options="coverageLineOptions" />
-            </div>
-          </div>
-        </div>
-      </template>
 
       <!-- Per-component breakdown (when All Components) -->
-      <div v-if="selectedComponent === 'all' && perComponentRows.length > 1" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-6 overflow-x-auto">
-        <div class="px-5 py-3 border-b border-gray-200 dark:border-gray-700">
-          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Per-Component Breakdown</h3>
+      <div v-if="selectedComponent === 'all' && perComponentRows.length > 1" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 overflow-x-auto shadow-sm">
+        <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div class="flex items-center gap-2">
+            <span class="w-1 h-4 rounded-full bg-teal-500"></span>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Per-Component Breakdown</h3>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 ml-3">AI adoption metrics aggregated by component across all selected releases</p>
         </div>
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-gray-200 dark:border-gray-700">
               <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Component</th>
-              <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Features</th>
-              <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">AI-Touched</th>
-              <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">AI %</th>
+              <th v-for="col in [{key:'total',label:'Features'},{key:'aiTouched',label:'AI-Touched'},{key:'pct',label:'AI %'}]" :key="col.key" class="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider cursor-pointer select-none transition-colors" :class="componentSortKey === col.key ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'" @click="toggleComponentSort(col.key)">
+                <span class="inline-flex items-center gap-1 justify-end">
+                  {{ col.label }}
+                  <span class="inline-flex flex-col -space-y-1">
+                    <svg class="w-2.5 h-2.5 transition-colors" :class="componentSortKey === col.key && componentSortAsc ? 'text-primary-600 dark:text-primary-400' : 'text-gray-300 dark:text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg>
+                    <svg class="w-2.5 h-2.5 transition-colors" :class="componentSortKey === col.key && !componentSortAsc ? 'text-primary-600 dark:text-primary-400' : 'text-gray-300 dark:text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </span>
+                </span>
+              </th>
               <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dominant Pipelines</th>
             </tr>
           </thead>
@@ -576,10 +659,13 @@ const insightText = computed(() => {
       </div>
 
       <!-- Pipeline taxonomy (collapsible) -->
-      <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-6">
-        <div class="px-5 py-3 border-b border-gray-200 dark:border-gray-700">
-          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Pipelines Identified</h3>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Six distinct AI automation pipelines detected via Jira labels</p>
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 shadow-sm">
+        <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div class="flex items-center gap-2">
+            <span class="w-1 h-4 rounded-full bg-indigo-500"></span>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Pipelines Identified</h3>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 ml-3">Six distinct AI automation pipelines detected via Jira labels. Click to expand details.</p>
         </div>
         <div class="divide-y divide-gray-100 dark:divide-gray-700/50">
           <div v-for="(meta, key) in PIPELINE_META" :key="key">
@@ -598,11 +684,6 @@ const insightText = computed(() => {
         </div>
       </div>
 
-      <!-- Key insight callout -->
-      <div v-if="insightText" class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-5 py-4 mb-6">
-        <h4 class="text-sm font-semibold text-green-800 dark:text-green-300 mb-1">Key Finding</h4>
-        <p class="text-sm text-green-700 dark:text-green-400">{{ insightText }}</p>
-      </div>
     </template>
   </div>
 </template>
