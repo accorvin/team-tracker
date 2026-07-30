@@ -19,6 +19,7 @@ const registerPmHubRoutes = require('./pm-hub/routes');
 const registerDraftPlanRoutes = require('./draft-plans/routes');
 const registerReleaseReadinessRoutes = require('./release-readiness/routes');
 const registerCveSustainingRoutes = require('./cve-sustaining/routes');
+const registerAiAdoptionRoutes = require('./ai-adoption/routes');
 const { getAuditLog } = require('./planning/audit-log');
 
 /**
@@ -318,6 +319,16 @@ module.exports = async function registerRoutes(router, context) {
     jira
   });
   router.use('/cve-sustaining', cveSustainingRouter);
+
+  // AI Adoption sub-router (mounted at /api/modules/releases/ai-adoption/)
+  const aiAdoptionRouter = express.Router();
+  registerAiAdoptionRoutes(aiAdoptionRouter, {
+    storage,
+    requireAuth,
+    requireScope,
+    jira
+  });
+  router.use('/ai-adoption', aiAdoptionRouter);
 
   // ─── Unified Audit Routes ───
 
