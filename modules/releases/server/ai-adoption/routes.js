@@ -27,7 +27,11 @@ function applyFilters(cached, { releaseGroup, component }) {
       const filtered = (g.components || []).filter(c => c.name === component);
       const total = filtered.reduce((s, c) => s + c.total, 0);
       const aiTouched = filtered.reduce((s, c) => s + c.aiTouched, 0);
-      return { ...g, totalFeatures: total, aiTouchedFeatures: aiTouched, components: filtered };
+      const pipelines = {};
+      for (const k of Object.keys(g.pipelines || {})) {
+        pipelines[k] = filtered.reduce((s, c) => s + ((c.pipelines && c.pipelines[k]) || 0), 0);
+      }
+      return { ...g, totalFeatures: total, aiTouchedFeatures: aiTouched, pipelines, components: filtered };
     });
   }
 

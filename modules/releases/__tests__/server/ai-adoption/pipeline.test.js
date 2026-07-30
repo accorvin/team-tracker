@@ -64,6 +64,12 @@ describe('scanLabels', () => {
     expect(result.pipelines.uxdAgentic).toBe(1);
   });
 
+  it('detects epicCreator labels', () => {
+    const result = scanLabels(['epic-creator-auto-decomposed']);
+    expect(result.touched).toBe(true);
+    expect(result.pipelines.epicCreator).toBe(1);
+  });
+
   it('detects multiple pipelines simultaneously', () => {
     const result = scanLabels([
       'strat-creator-auto-created',
@@ -71,7 +77,8 @@ describe('scanLabels', () => {
       'test-plan-rubric-pass',
       'rp-qg1-pass',
       'ai1st-doc-invoked',
-      'uxd-agentic'
+      'uxd-agentic',
+      'epic-creator-auto-decomposed'
     ]);
     expect(result.touched).toBe(true);
     for (const k of PIPELINE_KEYS) {
@@ -94,9 +101,9 @@ describe('scanLabels', () => {
 describe('constants', () => {
   it('exports expected pipeline keys', () => {
     expect(PIPELINE_KEYS).toEqual(
-      expect.arrayContaining(['stratCreator', 'rfeCreator', 'testPlan', 'qg1', 'aiDoc', 'uxdAgentic'])
+      expect.arrayContaining(['stratCreator', 'rfeCreator', 'testPlan', 'qg1', 'aiDoc', 'uxdAgentic', 'epicCreator'])
     );
-    expect(PIPELINE_KEYS).toHaveLength(6);
+    expect(PIPELINE_KEYS).toHaveLength(7);
   });
 
   it('exports expected release groups', () => {

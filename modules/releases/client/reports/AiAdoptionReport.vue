@@ -540,7 +540,7 @@ const executiveSummary = computed(() => {
 
     const activePipes = PIPELINE_KEYS.filter(k => latestPTotals[k] > 0)
     if (activePipes.length > 0 && activePipes.length <= 2) {
-      concerns.push(`Only ${activePipes.length} of 6 pipelines active — adoption is concentrated in ${activePipes.map(k => PIPELINE_META[k].name).join(' and ')}.`)
+      concerns.push(`Only ${activePipes.length} of ${PIPELINE_KEYS.length} pipelines active — adoption is concentrated in ${activePipes.map(k => PIPELINE_META[k].name).join(' and ')}.`)
     }
   }
 
