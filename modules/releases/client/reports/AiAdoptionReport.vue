@@ -40,6 +40,8 @@ const scorecardData = shallowRef(null)
 const selectedRelease = ref('all')
 const selectedComponent = ref('all')
 const expandedPipelines = ref({})
+const scorecardView = ref('table')
+const selectedChartMetric = ref('features')
 
 async function loadData() {
   const comp = selectedComponent.value === 'all' ? null : selectedComponent.value
@@ -182,6 +184,70 @@ function formatCellValue(metric, group) {
   if (metric.suffix) return val + metric.suffix
   return val
 }
+
+const scorecardChartData = computed(() => {
+  const cols = scorecardColumns.value
+  if (!cols.length) return null
+  const metric = SCORECARD_METRICS.find(m => m.key === selectedChartMetric.value) || SCORECARD_METRICS[0]
+  const labels = cols.map(c => c.releaseGroup)
+  const values = cols.map(c => metric.getValue(c))
+  const pointBg = cols.map(c => c.releaseGroup === BASELINE_NAME ? '#f59e0b' : '#3b82f6')
+  const pointBorder = cols.map(c => c.releaseGroup === BASELINE_NAME ? '#d97706' : '#2563eb')
+  return {
+    labels,
+    datasets: [{
+      label: metric.label,
+      data: values,
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,0.08)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 7,
+      pointHoverRadius: 9,
+      pointBackgroundColor: pointBg,
+      pointBorderColor: pointBorder,
+      pointBorderWidth: 2,
+      borderWidth: 2.5
+    }]
+  }
+})
+
+const scorecardChartOptions = computed(() => {
+  const metric = SCORECARD_METRICS.find(m => m.key === selectedChartMetric.value) || SCORECARD_METRICS[0]
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 12, weight: '500' } } },
+      y: {
+        beginAtZero: true,
+        grid: { color: 'rgba(156,163,175,0.15)' },
+        ticks: {
+          color: '#9ca3af',
+          font: { size: 11 },
+          callback: v => metric.isPct ? v + '%' : (metric.suffix ? v + metric.suffix : v)
+        }
+      }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#111827',
+        bodyFont: { size: 12 },
+        padding: 12,
+        cornerRadius: 8,
+        callbacks: {
+          label: ctx => {
+            const val = ctx.parsed.y
+            const formatted = metric.isPct ? val + '%' : (metric.suffix ? val + metric.suffix : val)
+            const label = ctx.label === BASELINE_NAME ? `${formatted} (baseline)` : formatted
+            return `${metric.label}: ${label}`
+          }
+        }
+      }
+    }
+  }
+})
 
 const stackedBarData = computed(() => {
   const groups = releaseGroups.value
@@ -350,70 +416,111 @@ const insightText = computed(() => {
         </div>
       </div>
 
-      <!-- Scorecard table — transposed: metrics as rows, releases as columns -->
-      <div v-if="scorecardColumns.length" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 overflow-x-auto shadow-sm">
-        <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Release Scorecard</h3>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">All metrics compared against the 3.4 GA baseline. Deltas show change from baseline.</p>
+      <!-- Scorecard: table / chart toggle -->
+      <div v-if="scorecardColumns.length" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 shadow-sm">
+        <!-- Header with toggle -->
+        <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-4">
+          <div>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Release Scorecard</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">All metrics compared against the 3.4 GA baseline. Deltas show change from baseline.</p>
+          </div>
+          <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5 shrink-0">
+            <button @click="scorecardView = 'table'" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all" :class="scorecardView === 'table' ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'">
+              <span class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M3 6h18M3 18h18" /></svg>
+                Table
+              </span>
+            </button>
+            <button @click="scorecardView = 'chart'" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all" :class="scorecardView === 'chart' ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'">
+              <span class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6m6 0h6m-6 0V9a2 2 0 012-2h2a2 2 0 012 2v10m6 0v-4a2 2 0 00-2-2h-2a2 2 0 00-2 2v4" /></svg>
+                Chart
+              </span>
+            </button>
+          </div>
         </div>
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b-2 border-gray-200 dark:border-gray-600">
-              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-52">Metric</th>
-              <th v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap" :class="scorecardColHeaderClass(col.releaseGroup)">
-                <div class="flex items-center justify-center gap-1.5">
-                  {{ col.releaseGroup }}
-                  <span v-if="col.releaseGroup === BASELINE_NAME" class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300 uppercase tracking-wide">Base</span>
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- Summary metrics group -->
-            <tr class="border-b border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/20">
-              <td :colspan="scorecardColumns.length + 1" class="px-5 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Overview</td>
-            </tr>
-            <template v-for="metric in SCORECARD_METRICS.filter(m => m.group === 'summary')" :key="metric.key">
-              <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="metric.highlight ? 'bg-blue-50/40 dark:bg-blue-900/10' : ''">
-                <td class="px-5 py-3 whitespace-nowrap">
-                  <div class="flex items-center gap-1.5 relative">
-                    <span class="font-medium text-gray-900 dark:text-gray-100 text-[13px]">{{ metric.label }}</span>
-                    <span class="relative group/tip inline-flex">
-                      <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
-                      <span class="invisible opacity-0 group-hover/tip:visible group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full left-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:left-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ metric.tooltip }}</span>
-                    </span>
-                  </div>
-                </td>
-                <td v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center" :class="scorecardColCellClass(col.releaseGroup)">
-                  <span class="font-semibold text-[15px]" :class="metric.highlight ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'">{{ formatCellValue(metric, col) }}</span>
-                  <div v-if="scorecardDelta(metric, col)" class="text-[11px] mt-0.5 font-medium" :class="scorecardDeltaClass(metric, col)">{{ scorecardDelta(metric, col) }}</div>
-                </td>
-              </tr>
-            </template>
 
-            <!-- Pipeline metrics group -->
-            <tr class="border-b border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/20">
-              <td :colspan="scorecardColumns.length + 1" class="px-5 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Pipeline Breakdown</td>
-            </tr>
-            <template v-for="(metric, idx) in SCORECARD_METRICS.filter(m => m.group === 'pipeline')" :key="metric.key">
-              <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="idx % 2 === 0 ? 'bg-gray-50/30 dark:bg-gray-800/30' : ''">
-                <td class="px-5 py-3 whitespace-nowrap">
-                  <div class="flex items-center gap-1.5 relative">
-                    <span class="font-medium text-gray-900 dark:text-gray-100 text-[13px]">{{ metric.label }}</span>
-                    <span class="relative group/tip inline-flex">
-                      <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
-                      <span class="invisible opacity-0 group-hover/tip:visible group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full left-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:left-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ metric.tooltip }}</span>
-                    </span>
+        <!-- TABLE VIEW -->
+        <div v-if="scorecardView === 'table'" class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b-2 border-gray-200 dark:border-gray-600">
+                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-52">Metric</th>
+                <th v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap" :class="scorecardColHeaderClass(col.releaseGroup)">
+                  <div class="flex items-center justify-center gap-1.5">
+                    {{ col.releaseGroup }}
+                    <span v-if="col.releaseGroup === BASELINE_NAME" class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300 uppercase tracking-wide">Base</span>
                   </div>
-                </td>
-                <td v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center" :class="scorecardColCellClass(col.releaseGroup)">
-                  <span class="font-semibold text-[15px] text-gray-900 dark:text-gray-100">{{ formatCellValue(metric, col) }}</span>
-                  <div v-if="scorecardDelta(metric, col)" class="text-[11px] mt-0.5 font-medium" :class="scorecardDeltaClass(metric, col)">{{ scorecardDelta(metric, col) }}</div>
-                </td>
+                </th>
               </tr>
-            </template>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/20">
+                <td :colspan="scorecardColumns.length + 1" class="px-5 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Overview</td>
+              </tr>
+              <template v-for="metric in SCORECARD_METRICS.filter(m => m.group === 'summary')" :key="metric.key">
+                <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="metric.highlight ? 'bg-blue-50/40 dark:bg-blue-900/10' : ''">
+                  <td class="px-5 py-3 whitespace-nowrap">
+                    <div class="flex items-center gap-1.5 relative">
+                      <span class="font-medium text-gray-900 dark:text-gray-100 text-[13px]">{{ metric.label }}</span>
+                      <span class="relative group/tip inline-flex">
+                        <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
+                        <span class="invisible opacity-0 group-hover/tip:visible group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full left-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:left-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ metric.tooltip }}</span>
+                      </span>
+                    </div>
+                  </td>
+                  <td v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center" :class="scorecardColCellClass(col.releaseGroup)">
+                    <span class="font-semibold text-[15px]" :class="metric.highlight ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'">{{ formatCellValue(metric, col) }}</span>
+                    <div v-if="scorecardDelta(metric, col)" class="text-[11px] mt-0.5 font-medium" :class="scorecardDeltaClass(metric, col)">{{ scorecardDelta(metric, col) }}</div>
+                  </td>
+                </tr>
+              </template>
+
+              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/20">
+                <td :colspan="scorecardColumns.length + 1" class="px-5 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Pipeline Breakdown</td>
+              </tr>
+              <template v-for="(metric, idx) in SCORECARD_METRICS.filter(m => m.group === 'pipeline')" :key="metric.key">
+                <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="idx % 2 === 0 ? 'bg-gray-50/30 dark:bg-gray-800/30' : ''">
+                  <td class="px-5 py-3 whitespace-nowrap">
+                    <div class="flex items-center gap-1.5 relative">
+                      <span class="font-medium text-gray-900 dark:text-gray-100 text-[13px]">{{ metric.label }}</span>
+                      <span class="relative group/tip inline-flex">
+                        <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
+                        <span class="invisible opacity-0 group-hover/tip:visible group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full left-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:left-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ metric.tooltip }}</span>
+                      </span>
+                    </div>
+                  </td>
+                  <td v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center" :class="scorecardColCellClass(col.releaseGroup)">
+                    <span class="font-semibold text-[15px] text-gray-900 dark:text-gray-100">{{ formatCellValue(metric, col) }}</span>
+                    <div v-if="scorecardDelta(metric, col)" class="text-[11px] mt-0.5 font-medium" :class="scorecardDeltaClass(metric, col)">{{ scorecardDelta(metric, col) }}</div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- CHART VIEW -->
+        <div v-else class="p-5">
+          <div class="flex items-center gap-3 mb-4">
+            <label class="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Metric</label>
+            <select v-model="selectedChartMetric" class="text-sm font-medium rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 pl-3 pr-8 py-1.5 cursor-pointer">
+              <optgroup label="Overview">
+                <option v-for="m in SCORECARD_METRICS.filter(x => x.group === 'summary')" :key="m.key" :value="m.key">{{ m.label }}</option>
+              </optgroup>
+              <optgroup label="Pipeline Breakdown">
+                <option v-for="m in SCORECARD_METRICS.filter(x => x.group === 'pipeline')" :key="m.key" :value="m.key">{{ m.label }}</option>
+              </optgroup>
+            </select>
+            <div class="flex items-center gap-3 ml-auto text-[11px] text-gray-400 dark:text-gray-500">
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-amber-500 inline-block"></span> Baseline</span>
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-blue-500 inline-block"></span> Release</span>
+            </div>
+          </div>
+          <div class="h-80">
+            <Line v-if="scorecardChartData" :data="scorecardChartData" :options="scorecardChartOptions" />
+          </div>
+        </div>
       </div>
 
       <!-- Charts (only when all releases visible) -->
