@@ -68,6 +68,10 @@ const AI_PIPELINE_TAXONOMY = {
   uxdAgentic: {
     name: 'UXD Agentic',
     prefixes: ['uxd-agentic']
+  },
+  epicCreator: {
+    name: 'Epic Creator / Decomposer',
+    prefixes: ['epic-creator-auto-decomposed', 'epic-creator-auto-created', 'epic-creator-split-result']
   }
 };
 
@@ -131,6 +135,8 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
     let aiTouchedFeatures = 0;
     let filteredTotal = 0;
     let filteredAiTouched = 0;
+    const groupPipelines = {};
+    for (const key of PIPELINE_KEYS) groupPipelines[key] = 0;
 
     for (const issue of issues) {
       const f = issue.fields || {};
@@ -140,6 +146,7 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
 
       totalFeatures++;
       if (touched) aiTouchedFeatures++;
+      for (const key of PIPELINE_KEYS) groupPipelines[key] += pipelines[key];
 
       if (options.component && !components.includes(options.component)) continue;
 
@@ -164,10 +171,18 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
 
     const componentList = Object.values(componentMap).sort((a, b) => b.aiTouched - a.aiTouched);
 
+    const filteredPipelines = {};
+    if (options.component) {
+      for (const key of PIPELINE_KEYS) {
+        filteredPipelines[key] = componentList.reduce((s, c) => s + (c.pipelines[key] || 0), 0);
+      }
+    }
+
     results.push({
       releaseGroup: group.name,
       totalFeatures: options.component ? filteredTotal : totalFeatures,
       aiTouchedFeatures: options.component ? filteredAiTouched : aiTouchedFeatures,
+      pipelines: options.component ? filteredPipelines : groupPipelines,
       components: componentList
     });
   }

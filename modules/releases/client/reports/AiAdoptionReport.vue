@@ -22,7 +22,8 @@ const PIPELINE_META = {
   testPlan: { name: 'Test Plan Generator', short: 'Test Plan', description: 'AI auto-generates and revises test plans for features, validated against a quality rubric.', labels: ['test-plan-auto-created', 'test-plan-auto-revised', 'test-plan-rubric-pass'] },
   qg1: { name: 'Priority Scoring (QG1)', short: 'QG1', description: 'Automated RICE priority scoring and quality gate evaluation for feature prioritization.', labels: ['rp-qg1-auto-rice', 'rp-qg1-pass', 'rp-qg1-fail'] },
   aiDoc: { name: 'AI-First Documentation', short: 'AI Doc', description: 'AI contributes documentation drafts, Jira content, and technical writing.', labels: ['ai1st-doc-contributed', 'ai1st-doc-invoked', 'ai1st-jira-contributed'] },
-  uxdAgentic: { name: 'UXD Agentic', short: 'UXD', description: 'AI-assisted UX design process for generating or validating design specifications.', labels: ['uxd-agentic'] }
+  uxdAgentic: { name: 'UXD Agentic', short: 'UXD', description: 'AI-assisted UX design process for generating or validating design specifications.', labels: ['uxd-agentic'] },
+  epicCreator: { name: 'Epic Creator / Decomposer', short: 'Epic Creator', description: 'AI decomposes signed-off STRATs into implementation epics with visible dependencies, producing structured work breakdown for component teams.', labels: ['epic-creator-auto-decomposed', 'epic-creator-auto-created', 'epic-creator-split-result'] }
 }
 const PIPELINE_KEYS = Object.keys(PIPELINE_META)
 const RELEASE_OPTIONS = [
@@ -44,6 +45,7 @@ const selectedChartMetric = ref('features')
 const selectedBaseline = ref(BASELINE_NAME)
 const componentSortKey = ref('aiTouched')
 const componentSortAsc = ref(false)
+const expandedSections = ref({ summary: true, pipeline: false, planning: false, execution: false, delivery: false })
 
 async function loadData() {
   const comp = selectedComponent.value === 'all' ? null : selectedComponent.value
@@ -97,6 +99,7 @@ const summaryStats = computed(() => {
 })
 
 function groupPipelineTotals(group) {
+  if (group.pipelines) return group.pipelines
   const totals = {}
   for (const k of PIPELINE_KEYS) totals[k] = 0
   for (const c of group.components || []) {
@@ -128,16 +131,72 @@ function activePipelineCount(group) {
   return PIPELINE_KEYS.filter(k => totals[k] > 0).length
 }
 
+const DOMAIN_DEFINITIONS = {
+  planning: {
+    label: 'Planning Domain',
+    color: 'emerald',
+    description: 'Pipelines that shape what gets built — strategy, RFE creation, and epic decomposition.',
+    pipelines: ['stratCreator', 'rfeCreator', 'epicCreator']
+  },
+  execution: {
+    label: 'Execution Domain',
+    color: 'orange',
+    description: 'Pipelines that drive how work gets done — prioritization, test planning, and UX design.',
+    pipelines: ['qg1', 'testPlan', 'uxdAgentic']
+  },
+  delivery: {
+    label: 'Delivery Domain',
+    color: 'sky',
+    description: 'Pipelines that support shipping — documentation and release-readiness artifacts.',
+    pipelines: ['aiDoc']
+  }
+}
+
+function domainTotal(group, domainKey) {
+  const totals = groupPipelineTotals(group)
+  return DOMAIN_DEFINITIONS[domainKey].pipelines.reduce((s, k) => s + (totals[k] || 0), 0)
+}
+
+function domainActivePipelines(group, domainKey) {
+  const totals = groupPipelineTotals(group)
+  const keys = DOMAIN_DEFINITIONS[domainKey].pipelines
+  return keys.filter(k => totals[k] > 0).length
+}
+
 const SCORECARD_METRICS = [
   { key: 'features', label: 'Total Features Delivered', tooltip: 'Total number of Jira Feature issues shipped in this release across selected projects and components.', getValue: g => g.totalFeatures, group: 'summary' },
   { key: 'aiTouched', label: 'Features Using AI', tooltip: 'Features where at least one AI pipeline assisted in strategy, planning, testing, or documentation.', getValue: g => g.aiTouchedFeatures, group: 'summary' },
   { key: 'aiPct', label: 'AI Adoption Rate', tooltip: 'Percentage of delivered features that used AI pipelines. Calculated as Features Using AI / Total Features × 100.', getValue: g => aiPct(g), isPct: true, group: 'summary', highlight: true },
-  { key: 'activePipelines', label: 'Active AI Pipelines', tooltip: 'How many of the 6 available AI pipelines were used by at least one feature in this release.', getValue: g => activePipelineCount(g), suffix: '/6', group: 'summary' },
+  { key: 'activePipelines', label: 'Active AI Pipelines', tooltip: 'How many of the 7 available AI pipelines were used by at least one feature in this release.', getValue: g => activePipelineCount(g), suffix: '/7', group: 'summary' },
   ...PIPELINE_KEYS.map(k => ({
     key: k, label: PIPELINE_META[k].name,
     tooltip: PIPELINE_META[k].description,
     getValue: g => groupPipelineTotals(g)[k],
     group: 'pipeline'
+  })),
+  { key: 'planningTotal', label: 'Features Touched', tooltip: 'Total features touched by any planning pipeline (Strategy Creator, RFE Creator, Epic Creator).', getValue: g => domainTotal(g, 'planning'), group: 'planning' },
+  { key: 'planningActive', label: 'Active Pipelines', tooltip: 'How many of the 3 planning pipelines were used in this release.', getValue: g => domainActivePipelines(g, 'planning'), suffix: '/3', group: 'planning' },
+  ...DOMAIN_DEFINITIONS.planning.pipelines.map(k => ({
+    key: 'planning_' + k, label: PIPELINE_META[k].name,
+    tooltip: PIPELINE_META[k].description,
+    getValue: g => groupPipelineTotals(g)[k],
+    group: 'planning'
+  })),
+  { key: 'executionTotal', label: 'Features Touched', tooltip: 'Total features touched by any execution pipeline (Priority Scoring, Test Plan Generator, UXD Agentic).', getValue: g => domainTotal(g, 'execution'), group: 'execution' },
+  { key: 'executionActive', label: 'Active Pipelines', tooltip: 'How many of the 3 execution pipelines were used in this release.', getValue: g => domainActivePipelines(g, 'execution'), suffix: '/3', group: 'execution' },
+  ...DOMAIN_DEFINITIONS.execution.pipelines.map(k => ({
+    key: 'execution_' + k, label: PIPELINE_META[k].name,
+    tooltip: PIPELINE_META[k].description,
+    getValue: g => groupPipelineTotals(g)[k],
+    group: 'execution'
+  })),
+  { key: 'deliveryTotal', label: 'Features Touched', tooltip: 'Total features touched by delivery pipelines (AI-First Documentation).', getValue: g => domainTotal(g, 'delivery'), group: 'delivery' },
+  { key: 'deliveryActive', label: 'Active Pipelines', tooltip: 'How many of the 1 delivery pipeline(s) were used in this release.', getValue: g => domainActivePipelines(g, 'delivery'), suffix: '/1', group: 'delivery' },
+  ...DOMAIN_DEFINITIONS.delivery.pipelines.map(k => ({
+    key: 'delivery_' + k, label: PIPELINE_META[k].name,
+    tooltip: PIPELINE_META[k].description,
+    getValue: g => groupPipelineTotals(g)[k],
+    group: 'delivery'
   }))
 ]
 
@@ -187,6 +246,33 @@ function formatCellValue(metric, group) {
   if (metric.suffix) return val + metric.suffix
   return val
 }
+
+function showCoverageBar(metric) {
+  return !metric.isPct && !metric.suffix && metric.key !== 'features'
+}
+
+function coverageDenominator(metric, group) {
+  if (metric.group === 'summary') return group.totalFeatures
+  return group.aiTouchedFeatures
+}
+
+function coveragePct(metric, group) {
+  const denom = coverageDenominator(metric, group)
+  if (!denom) return 0
+  return Math.min(Math.round((metric.getValue(group) / denom) * 100), 100)
+}
+
+function coverageTipLine1(metric, group) {
+  const val = metric.getValue(group)
+  const denom = coverageDenominator(metric, group)
+  const pct = coveragePct(metric, group)
+  if (metric.group === 'summary') {
+    return `${val} of ${denom} total features used AI (${pct}%)`
+  }
+  return `${val} of ${denom} AI-touched features used ${metric.label} (${pct}%)`
+}
+
+
 
 const scorecardChartData = computed(() => {
   const cols = scorecardColumns.value
@@ -295,6 +381,35 @@ function togglePipeline(key) {
   expandedPipelines.value[key] = !expandedPipelines.value[key]
 }
 
+function componentPipelineTotals(group, compName) {
+  const comp = (group.components || []).find(c => c.name === compName)
+  if (!comp) return PIPELINE_KEYS.reduce((o, k) => { o[k] = 0; return o }, {})
+  const totals = {}
+  for (const k of PIPELINE_KEYS) totals[k] = comp.pipelines[k] || 0
+  return totals
+}
+
+function componentActivePipelines(group, compName) {
+  const totals = componentPipelineTotals(group, compName)
+  return PIPELINE_KEYS.filter(k => totals[k] > 0).length
+}
+
+function componentAiPct(group, compName) {
+  const comp = (group.components || []).find(c => c.name === compName)
+  if (!comp || comp.total === 0) return 0
+  return Math.round((comp.aiTouched / comp.total) * 100)
+}
+
+function componentTotal(group, compName) {
+  const comp = (group.components || []).find(c => c.name === compName)
+  return comp ? comp.total : 0
+}
+
+function componentAiTouched(group, compName) {
+  const comp = (group.components || []).find(c => c.name === compName)
+  return comp ? comp.aiTouched : 0
+}
+
 const executiveSummary = computed(() => {
   const groups = scorecardGroups.value
   if (groups.length < 2) return null
@@ -303,57 +418,144 @@ const executiveSummary = computed(() => {
   const latest = groups[groups.length - 1]
   if (!bl || bl.releaseGroup === latest.releaseGroup) return null
 
-  const blPct = aiPct(bl)
-  const latestPct = aiPct(latest)
-  const pctDelta = latestPct - blPct
-
-  const blPipelines = activePipelineCount(bl)
-  const latestPipelines = activePipelineCount(latest)
-
+  const isFiltered = selectedComponent.value !== 'all'
+  const compName = selectedComponent.value
   const strengths = []
   const concerns = []
 
+  const blPct = isFiltered ? componentAiPct(bl, compName) : aiPct(bl)
+  const latestPct = isFiltered ? componentAiPct(latest, compName) : aiPct(latest)
+  const pctDelta = latestPct - blPct
+
+  const blTotal = isFiltered ? componentTotal(bl, compName) : bl.totalFeatures
+  const latestTotal = isFiltered ? componentTotal(latest, compName) : latest.totalFeatures
+  const blAi = isFiltered ? componentAiTouched(bl, compName) : bl.aiTouchedFeatures
+  const latestAi = isFiltered ? componentAiTouched(latest, compName) : latest.aiTouchedFeatures
+
+  const blPipelines = isFiltered ? componentActivePipelines(bl, compName) : activePipelineCount(bl)
+  const latestPipelines = isFiltered ? componentActivePipelines(latest, compName) : activePipelineCount(latest)
+
+  const blPTotals = isFiltered ? componentPipelineTotals(bl, compName) : groupPipelineTotals(bl)
+  const latestPTotals = isFiltered ? componentPipelineTotals(latest, compName) : groupPipelineTotals(latest)
+
+  const label = isFiltered ? compName : 'overall'
+  let headline
+
   if (pctDelta > 0) {
-    strengths.push(`AI adoption rate grew ${pctDelta}pp — from ${blPct}% (${bl.releaseGroup}) to ${latestPct}% (${latest.releaseGroup}).`)
+    headline = `${isFiltered ? compName + ' ' : ''}AI adoption grew from ${blPct}% to ${latestPct}% between ${bl.releaseGroup} and ${latest.releaseGroup}.`
+    strengths.push(`Adoption rate increased ${pctDelta}pp — from ${blPct}% (${bl.releaseGroup}) to ${latestPct}% (${latest.releaseGroup}).`)
   } else if (pctDelta < 0) {
-    concerns.push(`AI adoption rate dropped ${Math.abs(pctDelta)}pp — from ${blPct}% (${bl.releaseGroup}) to ${latestPct}% (${latest.releaseGroup}).`)
+    headline = `${isFiltered ? compName + ' ' : ''}AI adoption dropped from ${blPct}% to ${latestPct}% between ${bl.releaseGroup} and ${latest.releaseGroup}.`
+    concerns.push(`Adoption rate decreased ${Math.abs(pctDelta)}pp — from ${blPct}% (${bl.releaseGroup}) to ${latestPct}% (${latest.releaseGroup}).`)
+  } else {
+    headline = `${isFiltered ? compName + ' ' : ''}AI adoption held steady at ${latestPct}% between ${bl.releaseGroup} and ${latest.releaseGroup}.`
+  }
+
+  if (latestPct >= 80) {
+    strengths.push(`Strong ${label} adoption at ${latestPct}% in ${latest.releaseGroup}.`)
+  } else if (latestPct > 0 && latestPct < 30) {
+    concerns.push(`Low ${label} adoption at only ${latestPct}% in ${latest.releaseGroup} — significant room for improvement.`)
   }
 
   if (latestPipelines > blPipelines) {
-    strengths.push(`Pipeline breadth expanded from ${blPipelines}/6 to ${latestPipelines}/6 active pipelines.`)
+    strengths.push(`Pipeline breadth expanded from ${blPipelines}/7 to ${latestPipelines}/7 active pipelines.`)
   } else if (latestPipelines < blPipelines) {
-    concerns.push(`Pipeline breadth narrowed from ${blPipelines}/6 to ${latestPipelines}/6 active pipelines.`)
+    concerns.push(`Pipeline breadth narrowed from ${blPipelines}/7 to ${latestPipelines}/7 active pipelines.`)
   }
 
-  if (latest.totalFeatures > bl.totalFeatures * 1.5) {
-    strengths.push(`Feature volume grew ${Math.round(((latest.totalFeatures / bl.totalFeatures) - 1) * 100)}% (${bl.totalFeatures} → ${latest.totalFeatures}), showing increased throughput alongside AI adoption.`)
+  if (blTotal > 0 && latestTotal > blTotal * 1.5) {
+    strengths.push(`Feature volume grew ${Math.round(((latestTotal / blTotal) - 1) * 100)}% (${blTotal} → ${latestTotal}), showing increased throughput.`)
+  } else if (blTotal > 0 && latestTotal < blTotal * 0.5) {
+    concerns.push(`Feature volume dropped ${Math.round((1 - latestTotal / blTotal) * 100)}% (${blTotal} → ${latestTotal}).`)
   }
 
-  const blTotals = groupPipelineTotals(bl)
-  const latestTotals = groupPipelineTotals(latest)
-  const zeroPipelines = PIPELINE_KEYS.filter(k => latestTotals[k] === 0)
-  const surgedPipelines = PIPELINE_KEYS.filter(k => blTotals[k] === 0 && latestTotals[k] > 10)
+  if (latestAi > blAi && blAi > 0) {
+    strengths.push(`AI-touched features grew from ${blAi} to ${latestAi} (${Math.round(((latestAi / blAi) - 1) * 100)}% increase).`)
+  }
+
+  const surgedPipelines = PIPELINE_KEYS.filter(k => blPTotals[k] === 0 && latestPTotals[k] > 0)
+  const droppedPipelines = PIPELINE_KEYS.filter(k => blPTotals[k] > 0 && latestPTotals[k] === 0)
+  const zeroPipelines = PIPELINE_KEYS.filter(k => latestPTotals[k] === 0)
 
   if (surgedPipelines.length > 0) {
     strengths.push(`${surgedPipelines.map(k => PIPELINE_META[k].name).join(', ')} ${surgedPipelines.length === 1 ? 'was' : 'were'} newly adopted since baseline.`)
+  }
+
+  if (droppedPipelines.length > 0) {
+    concerns.push(`${droppedPipelines.map(k => PIPELINE_META[k].name).join(', ')} ${droppedPipelines.length === 1 ? 'was' : 'were'} active at baseline but dropped to zero.`)
   }
 
   if (zeroPipelines.length > 0 && zeroPipelines.length < PIPELINE_KEYS.length) {
     concerns.push(`${zeroPipelines.map(k => PIPELINE_META[k].name).join(', ')} ${zeroPipelines.length === 1 ? 'has' : 'have'} zero usage in ${latest.releaseGroup} — potential for expansion.`)
   }
 
-  const compRows = perComponentRows.value
-  const lowAdoption = compRows.filter(r => r.total >= 5 && componentPct(r) < 30)
-  if (lowAdoption.length > 0) {
-    concerns.push(`${lowAdoption.map(r => r.name).join(', ')} ${lowAdoption.length === 1 ? 'has' : 'have'} <30% AI adoption despite having 5+ features.`)
+  if (!isFiltered) {
+    const compRows = perComponentRows.value
+    const lowAdoption = compRows.filter(r => r.total >= 5 && componentPct(r) < 30)
+    if (lowAdoption.length > 0) {
+      concerns.push(`${lowAdoption.length} component${lowAdoption.length === 1 ? '' : 's'} (${lowAdoption.map(r => r.name).join(', ')}) ${lowAdoption.length === 1 ? 'has' : 'have'} <30% AI adoption despite having 5+ features — these are high-impact targets for AI onboarding.`)
+    }
+    const highAdoption = compRows.filter(r => r.total >= 5 && componentPct(r) >= 80)
+    if (highAdoption.length > 0) {
+      strengths.push(`${highAdoption.map(r => r.name).join(', ')} ${highAdoption.length === 1 ? 'leads' : 'lead'} with 80%+ AI adoption.`)
+    }
+
+    const midTier = compRows.filter(r => r.total >= 5 && componentPct(r) >= 30 && componentPct(r) < 60)
+    if (midTier.length > 0) {
+      concerns.push(`${midTier.length} component${midTier.length === 1 ? '' : 's'} (${midTier.map(r => `${r.name} at ${componentPct(r)}%`).join(', ')}) sit in the 30–60% range — close to tipping point for full adoption.`)
+    }
+
+    if (compRows.length >= 3) {
+      const pcts = compRows.filter(r => r.total >= 3).map(r => componentPct(r))
+      const maxPct = Math.max(...pcts)
+      const minPct = Math.min(...pcts)
+      if (maxPct - minPct > 40) {
+        concerns.push(`${maxPct - minPct}pp gap between highest (${maxPct}%) and lowest (${minPct}%) adopting components — adoption is uneven across the product.`)
+      }
+    }
+
+    const untouched = latestTotal - latestAi
+    if (untouched > 10) {
+      concerns.push(`${untouched} features in ${latest.releaseGroup} had no AI pipeline involvement — ${Math.round((untouched / latestTotal) * 100)}% of the release went through fully manual workflows.`)
+    }
+  } else {
+    const topPipeline = PIPELINE_KEYS.reduce((best, k) => latestPTotals[k] > (latestPTotals[best] || 0) ? k : best, PIPELINE_KEYS[0])
+    if (latestPTotals[topPipeline] > 0) {
+      strengths.push(`Most-used pipeline: ${PIPELINE_META[topPipeline].name} with ${latestPTotals[topPipeline]} labeled features in ${latest.releaseGroup}.`)
+    }
+
+    const lowestPipeline = PIPELINE_KEYS.filter(k => latestPTotals[k] > 0).reduce((low, k) => latestPTotals[k] < latestPTotals[low] ? k : low, topPipeline)
+    if (lowestPipeline !== topPipeline && latestPTotals[lowestPipeline] > 0) {
+      concerns.push(`${PIPELINE_META[lowestPipeline].name} has the lowest usage at ${latestPTotals[lowestPipeline]} features — consider increasing adoption for this pipeline.`)
+    }
+
+    const untouched = latestTotal - latestAi
+    if (untouched > 0) {
+      concerns.push(`${untouched} of ${latestTotal} features (${Math.round((untouched / latestTotal) * 100)}%) in ${latest.releaseGroup} had no AI pipeline involvement.`)
+    }
+
+    if (latestPct > 0 && latestPct < 50) {
+      concerns.push(`${compName} is below 50% adoption — less than half of features are using AI pipelines.`)
+    }
+
+    const activePipes = PIPELINE_KEYS.filter(k => latestPTotals[k] > 0)
+    if (activePipes.length > 0 && activePipes.length <= 2) {
+      concerns.push(`Only ${activePipes.length} of 6 pipelines active — adoption is concentrated in ${activePipes.map(k => PIPELINE_META[k].name).join(' and ')}.`)
+    }
   }
 
-  const highAdoption = compRows.filter(r => r.total >= 5 && componentPct(r) >= 80)
-  if (highAdoption.length > 0) {
-    strengths.push(`${highAdoption.map(r => r.name).join(', ')} ${highAdoption.length === 1 ? 'leads' : 'lead'} with 80%+ AI adoption.`)
+  // Release-over-release dip detection
+  for (let i = 1; i < groups.length; i++) {
+    const prev = groups[i - 1]
+    const curr = groups[i]
+    const prevPct = isFiltered ? componentAiPct(prev, compName) : aiPct(prev)
+    const currPct = isFiltered ? componentAiPct(curr, compName) : aiPct(curr)
+    if (prevPct > currPct && prevPct - currPct >= 5) {
+      concerns.push(`Adoption dipped ${prevPct - currPct}pp between ${prev.releaseGroup} (${prevPct}%) and ${curr.releaseGroup} (${currPct}%).`)
+    }
   }
 
-  return { strengths, concerns, headline: `AI adoption grew from ${blPct}% to ${latestPct}% between ${bl.releaseGroup} and ${latest.releaseGroup}.` }
+  return { strengths, concerns, headline }
 })
 </script>
 
@@ -439,7 +641,7 @@ const executiveSummary = computed(() => {
         <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center relative">
           <span class="absolute top-2 right-2 group/s4">
             <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
-            <span class="invisible opacity-0 group-hover/s4:visible group-hover/s4:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 z-50 w-56 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:right-3 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">How many of the 6 available AI pipelines (Strat, RFE, Test Plan, QG1, AI Doc, UXD) were used across all selected releases.</span>
+            <span class="invisible opacity-0 group-hover/s4:visible group-hover/s4:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 z-50 w-56 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:right-3 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">How many of the 7 available AI pipelines (Strat, RFE, Test Plan, QG1, AI Doc, UXD, Epic Creator) were used across all selected releases.</span>
           </span>
           <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ summaryStats.activePipelines }}</p>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Active Pipelines</p>
@@ -526,7 +728,7 @@ const executiveSummary = computed(() => {
         </div>
 
         <!-- TABLE VIEW -->
-        <div v-if="scorecardView === 'table'" class="overflow-x-auto">
+        <div v-if="scorecardView === 'table'" class="overflow-x-auto overflow-y-visible">
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b-2 border-gray-200 dark:border-gray-600">
@@ -540,56 +742,206 @@ const executiveSummary = computed(() => {
               </tr>
             </thead>
             <tbody>
-              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/15 dark:to-transparent">
-                <td :colspan="scorecardColumns.length + 1" class="px-5 py-2">
-                  <div class="flex items-center gap-2">
-                    <span class="w-1 h-4 rounded-full bg-blue-500"></span>
-                    <span class="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Overview</span>
+              <!-- Overview section header -->
+              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/15 dark:to-transparent cursor-pointer select-none" @click="expandedSections.summary = !expandedSections.summary">
+                <td :colspan="scorecardColumns.length + 1" class="px-5 py-2.5">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="w-1 h-4 rounded-full bg-blue-500"></span>
+                      <span class="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Overview</span>
+                      <span class="text-[10px] text-gray-400 dark:text-gray-500">{{ SCORECARD_METRICS.filter(m => m.group === 'summary').length }} metrics</span>
+                    </div>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="expandedSections.summary ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
                   </div>
                 </td>
               </tr>
-              <template v-for="metric in SCORECARD_METRICS.filter(m => m.group === 'summary')" :key="metric.key">
-                <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="metric.highlight ? 'bg-blue-50/40 dark:bg-blue-900/10' : ''">
-                  <td class="px-5 py-3 whitespace-nowrap">
-                    <div class="flex items-center gap-1.5 relative">
-                      <span class="font-medium text-gray-900 dark:text-gray-100 text-[13px]">{{ metric.label }}</span>
-                      <span class="relative group/tip inline-flex">
-                        <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
-                        <span class="invisible opacity-0 group-hover/tip:visible group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full left-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:left-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ metric.tooltip }}</span>
-                      </span>
-                    </div>
-                  </td>
-                  <td v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center" :class="scorecardColCellClass(col.releaseGroup)">
-                    <span class="font-semibold text-[15px]" :class="metric.highlight ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'">{{ formatCellValue(metric, col) }}</span>
-                    <div v-if="scorecardDelta(metric, col)" class="text-[11px] mt-0.5 font-medium" :class="scorecardDeltaClass(metric, col)">{{ scorecardDelta(metric, col) }}</div>
-                  </td>
-                </tr>
+              <!-- Overview rows -->
+              <template v-if="expandedSections.summary">
+                <template v-for="metric in SCORECARD_METRICS.filter(m => m.group === 'summary')" :key="metric.key">
+                  <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="metric.highlight ? 'bg-blue-50/40 dark:bg-blue-900/10' : ''">
+                    <td class="px-5 py-3 whitespace-nowrap">
+                      <div class="flex items-center gap-1.5 relative">
+                        <span class="font-medium text-gray-900 dark:text-gray-100 text-[13px]">{{ metric.label }}</span>
+                        <span class="relative group/tip inline-flex">
+                          <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
+                          <span class="invisible opacity-0 group-hover/tip:visible group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full left-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:left-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ metric.tooltip }}</span>
+                        </span>
+                      </div>
+                    </td>
+                    <td v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center" :class="scorecardColCellClass(col.releaseGroup)">
+                      <span class="font-semibold text-[15px]" :class="metric.highlight ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'">{{ formatCellValue(metric, col) }}</span>
+                      <div v-if="scorecardDelta(metric, col)" class="text-[11px] mt-0.5 font-medium" :class="scorecardDeltaClass(metric, col)">{{ scorecardDelta(metric, col) }}</div>
+                      <div v-if="showCoverageBar(metric)" class="relative group/bar mt-1.5 flex items-center gap-1.5 justify-center cursor-help">
+                        <div class="w-16 h-1 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+                          <div class="h-full rounded-full transition-all" :class="coveragePct(metric, col) >= 50 ? 'bg-blue-500' : 'bg-blue-300 dark:bg-blue-600'" :style="{ width: coveragePct(metric, col) + '%' }"></div>
+                        </div>
+                        <span class="text-[9px] text-gray-400 dark:text-gray-500 tabular-nums">{{ coveragePct(metric, col) }}%</span>
+                        <span class="invisible opacity-0 group-hover/bar:visible group-hover/bar:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:right-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ coverageTipLine1(metric, col) }}<br/>{{ col.releaseGroup }}: {{ col.totalFeatures }} total, {{ col.aiTouchedFeatures }} AI-touched</span>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
               </template>
 
-              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-purple-50 to-transparent dark:from-purple-900/15 dark:to-transparent">
-                <td :colspan="scorecardColumns.length + 1" class="px-5 py-2">
-                  <div class="flex items-center gap-2">
-                    <span class="w-1 h-4 rounded-full bg-purple-500"></span>
-                    <span class="text-[11px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest">Pipeline Breakdown</span>
+              <!-- Pipeline Breakdown section header -->
+              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-purple-50 to-transparent dark:from-purple-900/15 dark:to-transparent cursor-pointer select-none" @click="expandedSections.pipeline = !expandedSections.pipeline">
+                <td :colspan="scorecardColumns.length + 1" class="px-5 py-2.5">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="w-1 h-4 rounded-full bg-purple-500"></span>
+                      <span class="text-[11px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest">Pipeline Breakdown</span>
+                      <span class="text-[10px] text-gray-400 dark:text-gray-500">{{ SCORECARD_METRICS.filter(m => m.group === 'pipeline').length }} pipelines</span>
+                    </div>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="expandedSections.pipeline ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
                   </div>
                 </td>
               </tr>
-              <template v-for="(metric, idx) in SCORECARD_METRICS.filter(m => m.group === 'pipeline')" :key="metric.key">
-                <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="idx % 2 === 0 ? 'bg-gray-50/30 dark:bg-gray-800/30' : ''">
-                  <td class="px-5 py-3 whitespace-nowrap">
-                    <div class="flex items-center gap-1.5 relative">
-                      <span class="font-medium text-gray-900 dark:text-gray-100 text-[13px]">{{ metric.label }}</span>
-                      <span class="relative group/tip inline-flex">
-                        <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
-                        <span class="invisible opacity-0 group-hover/tip:visible group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full left-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:left-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ metric.tooltip }}</span>
-                      </span>
+              <!-- Pipeline rows -->
+              <template v-if="expandedSections.pipeline">
+                <template v-for="(metric, idx) in SCORECARD_METRICS.filter(m => m.group === 'pipeline')" :key="metric.key">
+                  <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="idx % 2 === 0 ? 'bg-gray-50/30 dark:bg-gray-800/30' : ''">
+                    <td class="px-5 py-3 whitespace-nowrap">
+                      <div class="flex items-center gap-1.5 relative">
+                        <span class="font-medium text-gray-900 dark:text-gray-100 text-[13px]">{{ metric.label }}</span>
+                        <span class="relative group/tip inline-flex">
+                          <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
+                          <span class="invisible opacity-0 group-hover/tip:visible group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full left-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:left-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ metric.tooltip }}</span>
+                        </span>
+                      </div>
+                    </td>
+                    <td v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center" :class="scorecardColCellClass(col.releaseGroup)">
+                      <span class="font-semibold text-[15px] text-gray-900 dark:text-gray-100">{{ formatCellValue(metric, col) }}</span>
+                      <div v-if="scorecardDelta(metric, col)" class="text-[11px] mt-0.5 font-medium" :class="scorecardDeltaClass(metric, col)">{{ scorecardDelta(metric, col) }}</div>
+                      <div v-if="showCoverageBar(metric)" class="relative group/bar mt-1.5 flex items-center gap-1.5 justify-center cursor-help">
+                        <div class="w-16 h-1 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+                          <div class="h-full rounded-full transition-all" :class="coveragePct(metric, col) >= 50 ? 'bg-purple-500' : 'bg-purple-300 dark:bg-purple-600'" :style="{ width: coveragePct(metric, col) + '%' }"></div>
+                        </div>
+                        <span class="text-[9px] text-gray-400 dark:text-gray-500 tabular-nums">{{ coveragePct(metric, col) }}%</span>
+                        <span class="invisible opacity-0 group-hover/bar:visible group-hover/bar:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:right-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ coverageTipLine1(metric, col) }}<br/>{{ col.releaseGroup }}: {{ col.totalFeatures }} total, {{ col.aiTouchedFeatures }} AI-touched</span>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </template>
+
+              <!-- Planning Domain section header -->
+              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-emerald-50 to-transparent dark:from-emerald-900/15 dark:to-transparent cursor-pointer select-none" @click="expandedSections.planning = !expandedSections.planning">
+                <td :colspan="scorecardColumns.length + 1" class="px-5 py-2.5">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="w-1 h-4 rounded-full bg-emerald-500"></span>
+                      <span class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Planning Domain</span>
+                      <span class="text-[10px] text-gray-400 dark:text-gray-500">Strategy, RFE & Epic creation</span>
                     </div>
-                  </td>
-                  <td v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center" :class="scorecardColCellClass(col.releaseGroup)">
-                    <span class="font-semibold text-[15px] text-gray-900 dark:text-gray-100">{{ formatCellValue(metric, col) }}</span>
-                    <div v-if="scorecardDelta(metric, col)" class="text-[11px] mt-0.5 font-medium" :class="scorecardDeltaClass(metric, col)">{{ scorecardDelta(metric, col) }}</div>
-                  </td>
-                </tr>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="expandedSections.planning ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </div>
+                </td>
+              </tr>
+              <template v-if="expandedSections.planning">
+                <template v-for="(metric, idx) in SCORECARD_METRICS.filter(m => m.group === 'planning')" :key="metric.key">
+                  <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="idx % 2 === 0 ? 'bg-gray-50/30 dark:bg-gray-800/30' : ''">
+                    <td class="px-5 py-3 whitespace-nowrap">
+                      <div class="flex items-center gap-1.5 relative">
+                        <span class="font-medium text-gray-900 dark:text-gray-100 text-[13px]">{{ metric.label }}</span>
+                        <span class="relative group/tip inline-flex">
+                          <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
+                          <span class="invisible opacity-0 group-hover/tip:visible group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full left-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:left-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ metric.tooltip }}</span>
+                        </span>
+                      </div>
+                    </td>
+                    <td v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center" :class="scorecardColCellClass(col.releaseGroup)">
+                      <span class="font-semibold text-[15px] text-gray-900 dark:text-gray-100">{{ formatCellValue(metric, col) }}</span>
+                      <div v-if="scorecardDelta(metric, col)" class="text-[11px] mt-0.5 font-medium" :class="scorecardDeltaClass(metric, col)">{{ scorecardDelta(metric, col) }}</div>
+                      <div v-if="showCoverageBar(metric)" class="relative group/bar mt-1.5 flex items-center gap-1.5 justify-center cursor-help">
+                        <div class="w-16 h-1 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+                          <div class="h-full rounded-full transition-all" :class="coveragePct(metric, col) >= 50 ? 'bg-emerald-500' : 'bg-emerald-300 dark:bg-emerald-600'" :style="{ width: coveragePct(metric, col) + '%' }"></div>
+                        </div>
+                        <span class="text-[9px] text-gray-400 dark:text-gray-500 tabular-nums">{{ coveragePct(metric, col) }}%</span>
+                        <span class="invisible opacity-0 group-hover/bar:visible group-hover/bar:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:right-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ coverageTipLine1(metric, col) }}<br/>{{ col.releaseGroup }}: {{ col.totalFeatures }} total, {{ col.aiTouchedFeatures }} AI-touched</span>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </template>
+
+              <!-- Execution Domain section header -->
+              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-orange-50 to-transparent dark:from-orange-900/15 dark:to-transparent cursor-pointer select-none" @click="expandedSections.execution = !expandedSections.execution">
+                <td :colspan="scorecardColumns.length + 1" class="px-5 py-2.5">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="w-1 h-4 rounded-full bg-orange-500"></span>
+                      <span class="text-[11px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-widest">Execution Domain</span>
+                      <span class="text-[10px] text-gray-400 dark:text-gray-500">Prioritization, testing & UX design</span>
+                    </div>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="expandedSections.execution ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </div>
+                </td>
+              </tr>
+              <template v-if="expandedSections.execution">
+                <template v-for="(metric, idx) in SCORECARD_METRICS.filter(m => m.group === 'execution')" :key="metric.key">
+                  <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="idx % 2 === 0 ? 'bg-gray-50/30 dark:bg-gray-800/30' : ''">
+                    <td class="px-5 py-3 whitespace-nowrap">
+                      <div class="flex items-center gap-1.5 relative">
+                        <span class="font-medium text-gray-900 dark:text-gray-100 text-[13px]">{{ metric.label }}</span>
+                        <span class="relative group/tip inline-flex">
+                          <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
+                          <span class="invisible opacity-0 group-hover/tip:visible group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full left-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:left-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ metric.tooltip }}</span>
+                        </span>
+                      </div>
+                    </td>
+                    <td v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center" :class="scorecardColCellClass(col.releaseGroup)">
+                      <span class="font-semibold text-[15px] text-gray-900 dark:text-gray-100">{{ formatCellValue(metric, col) }}</span>
+                      <div v-if="scorecardDelta(metric, col)" class="text-[11px] mt-0.5 font-medium" :class="scorecardDeltaClass(metric, col)">{{ scorecardDelta(metric, col) }}</div>
+                      <div v-if="showCoverageBar(metric)" class="relative group/bar mt-1.5 flex items-center gap-1.5 justify-center cursor-help">
+                        <div class="w-16 h-1 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+                          <div class="h-full rounded-full transition-all" :class="coveragePct(metric, col) >= 50 ? 'bg-orange-500' : 'bg-orange-300 dark:bg-orange-600'" :style="{ width: coveragePct(metric, col) + '%' }"></div>
+                        </div>
+                        <span class="text-[9px] text-gray-400 dark:text-gray-500 tabular-nums">{{ coveragePct(metric, col) }}%</span>
+                        <span class="invisible opacity-0 group-hover/bar:visible group-hover/bar:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:right-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ coverageTipLine1(metric, col) }}<br/>{{ col.releaseGroup }}: {{ col.totalFeatures }} total, {{ col.aiTouchedFeatures }} AI-touched</span>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </template>
+
+              <!-- Delivery Domain section header -->
+              <tr class="border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-sky-50 to-transparent dark:from-sky-900/15 dark:to-transparent cursor-pointer select-none" @click="expandedSections.delivery = !expandedSections.delivery">
+                <td :colspan="scorecardColumns.length + 1" class="px-5 py-2.5">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="w-1 h-4 rounded-full bg-sky-500"></span>
+                      <span class="text-[11px] font-bold text-sky-600 dark:text-sky-400 uppercase tracking-widest">Delivery Domain</span>
+                      <span class="text-[10px] text-gray-400 dark:text-gray-500">Documentation & release readiness</span>
+                    </div>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="expandedSections.delivery ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </div>
+                </td>
+              </tr>
+              <template v-if="expandedSections.delivery">
+                <template v-for="(metric, idx) in SCORECARD_METRICS.filter(m => m.group === 'delivery')" :key="metric.key">
+                  <tr class="border-b border-gray-100 dark:border-gray-700/40 transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20" :class="idx % 2 === 0 ? 'bg-gray-50/30 dark:bg-gray-800/30' : ''">
+                    <td class="px-5 py-3 whitespace-nowrap">
+                      <div class="flex items-center gap-1.5 relative">
+                        <span class="font-medium text-gray-900 dark:text-gray-100 text-[13px]">{{ metric.label }}</span>
+                        <span class="relative group/tip inline-flex">
+                          <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 cursor-help hover:text-gray-500 dark:hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke-linecap="round" /></svg>
+                          <span class="invisible opacity-0 group-hover/tip:visible group-hover/tip:opacity-100 transition-opacity duration-150 absolute bottom-full left-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:left-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ metric.tooltip }}</span>
+                        </span>
+                      </div>
+                    </td>
+                    <td v-for="col in scorecardColumns" :key="col.releaseGroup" class="px-4 py-3 text-center" :class="scorecardColCellClass(col.releaseGroup)">
+                      <span class="font-semibold text-[15px] text-gray-900 dark:text-gray-100">{{ formatCellValue(metric, col) }}</span>
+                      <div v-if="scorecardDelta(metric, col)" class="text-[11px] mt-0.5 font-medium" :class="scorecardDeltaClass(metric, col)">{{ scorecardDelta(metric, col) }}</div>
+                      <div v-if="showCoverageBar(metric)" class="relative group/bar mt-1.5 flex items-center gap-1.5 justify-center cursor-help">
+                        <div class="w-16 h-1 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+                          <div class="h-full rounded-full transition-all" :class="coveragePct(metric, col) >= 50 ? 'bg-sky-500' : 'bg-sky-300 dark:bg-sky-600'" :style="{ width: coveragePct(metric, col) + '%' }"></div>
+                        </div>
+                        <span class="text-[9px] text-gray-400 dark:text-gray-500 tabular-nums">{{ coveragePct(metric, col) }}%</span>
+                        <span class="invisible opacity-0 group-hover/bar:visible group-hover/bar:opacity-100 transition-opacity duration-150 absolute bottom-full right-0 mb-2 z-50 w-64 whitespace-normal break-words px-3 py-2 text-[11px] leading-relaxed text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg pointer-events-none after:content-[''] after:absolute after:top-full after:right-4 after:border-4 after:border-transparent after:border-t-gray-900 dark:after:border-t-gray-700">{{ coverageTipLine1(metric, col) }}<br/>{{ col.releaseGroup }}: {{ col.totalFeatures }} total, {{ col.aiTouchedFeatures }} AI-touched</span>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
               </template>
             </tbody>
           </table>
@@ -605,6 +957,15 @@ const executiveSummary = computed(() => {
               </optgroup>
               <optgroup label="Pipeline Breakdown">
                 <option v-for="m in SCORECARD_METRICS.filter(x => x.group === 'pipeline')" :key="m.key" :value="m.key">{{ m.label }}</option>
+              </optgroup>
+              <optgroup label="Planning Domain">
+                <option v-for="m in SCORECARD_METRICS.filter(x => x.group === 'planning')" :key="m.key" :value="m.key">{{ m.label }}</option>
+              </optgroup>
+              <optgroup label="Execution Domain">
+                <option v-for="m in SCORECARD_METRICS.filter(x => x.group === 'execution')" :key="m.key" :value="m.key">{{ m.label }}</option>
+              </optgroup>
+              <optgroup label="Delivery Domain">
+                <option v-for="m in SCORECARD_METRICS.filter(x => x.group === 'delivery')" :key="m.key" :value="m.key">{{ m.label }}</option>
               </optgroup>
             </select>
             <div class="flex items-center gap-3 ml-auto text-[11px] text-gray-400 dark:text-gray-500">
@@ -665,7 +1026,7 @@ const executiveSummary = computed(() => {
             <span class="w-1 h-4 rounded-full bg-indigo-500"></span>
             <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Pipelines Identified</h3>
           </div>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 ml-3">Six distinct AI automation pipelines detected via Jira labels. Click to expand details.</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 ml-3">Seven distinct AI automation pipelines detected via Jira labels. Click to expand details.</p>
         </div>
         <div class="divide-y divide-gray-100 dark:divide-gray-700/50">
           <div v-for="(meta, key) in PIPELINE_META" :key="key">
