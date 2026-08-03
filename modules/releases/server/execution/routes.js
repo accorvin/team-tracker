@@ -343,7 +343,6 @@ module.exports = async function registerExecutionRoutes(router, context) {
       jiraSyncStatus.warning = 'Jira client not configured — sync cannot run';
     }
     result.jiraSync = jiraSyncStatus;
-    result.jiraEnrichment = jiraSyncStatus; // backward-compat alias
 
     res.json(result);
   });
