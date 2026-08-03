@@ -2,7 +2,7 @@
   <div>
     <!-- Header -->
     <div class="mb-6">
-      <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Release Capacity &amp; Commitment</h2>
+      <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Program Level Release Report</h2>
       <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Key deadlines and capacity overview for a selected release</p>
     </div>
 
@@ -39,58 +39,12 @@
           </div>
 
           <!-- Filter line -->
-          <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/50 flex items-start justify-between gap-4">
-            <div class="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-              <!-- No filters active -->
-              <template v-if="!hasActiveFilters">
-                Showing all features and initiatives.
-                <button @click="openFilterModal" class="text-primary-600 dark:text-primary-400 hover:underline font-medium">Manage filters</button>
-                or apply a
-                <button @click="openFilterModalToPresets" class="text-primary-600 dark:text-primary-400 hover:underline font-medium">saved preset</button>.
-              </template>
-
-              <!-- Preset applied -->
-              <template v-else-if="appliedPreset">
-                Showing features filtered by
-                <span class="font-semibold text-gray-900 dark:text-gray-100 inline-flex items-baseline gap-1">
-                  {{ appliedPreset.name }}
-                  <span v-if="appliedPreset.description" class="relative group inline-flex">
-                    <svg class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 cursor-help self-center" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-                    </svg>
-                    <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 text-xs font-normal text-white bg-gray-900 dark:bg-gray-700 rounded-md shadow-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10">{{ appliedPreset.description }}</span>
-                  </span>
-                </span>.
-              </template>
-
-              <!-- Ad-hoc filters -->
-              <template v-else>
-                Showing features filtered by
-                <template v-for="(part, idx) in filterNarrativeParts" :key="part.field">
-                  <template v-if="idx > 0 && idx === filterNarrativeParts.length - 1"> {{ crossFieldMode }} </template>
-                  <template v-else-if="idx > 0">, </template>
-                  <span class="font-semibold text-gray-900 dark:text-gray-100">{{ part.label }}: {{ part.values }}</span>
-                </template>.
-              </template>
-
-              <!-- Editing indicator (inline) -->
-              <span v-if="editingFilterId" class="ml-1 text-xs text-amber-600 dark:text-amber-400">
-                (editing preset · <button @click="cancelEditFilter" class="hover:underline">cancel</button>)
-              </span>
-            </div>
-
-            <!-- Filter action buttons -->
-            <div class="flex items-center gap-2 shrink-0">
-              <button
-                @click="openFilterModal"
-                class="px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
-              >{{ hasActiveFilters ? 'Edit' : 'Manage Filters' }}</button>
-              <button
-                v-if="hasActiveFilters"
-                @click="clearAllFilters"
-                class="px-3 py-1.5 text-sm font-medium rounded-md text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              >Clear</button>
-            </div>
+          <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/50">
+            <ReportFilterNarrative
+              :filters="filters"
+              no-filter-text="Showing all features and initiatives."
+              filter-prefix="Showing features filtered by"
+            />
           </div>
         </template>
         <template v-else>
@@ -809,262 +763,7 @@
     </Teleport>
 
     <!-- Filter modal -->
-    <Teleport to="body">
-      <div v-if="filterModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/40 dark:bg-black/60" @click="closeFilterModal"></div>
-        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-xl max-h-[80vh] flex flex-col">
-          <!-- Header with tabs -->
-          <div class="shrink-0">
-            <div class="flex items-center justify-between px-6 pt-4 pb-0">
-              <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Filters</h3>
-              <button @click="closeFilterModal" class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div class="flex gap-6 px-6 mt-3 border-b border-gray-200 dark:border-gray-700">
-              <button
-                @click="filterModalTab = 'fields'"
-                class="pb-2.5 text-sm font-medium transition-colors whitespace-nowrap border-b-2"
-                :class="filterModalTab === 'fields'
-                  ? 'border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'"
-              >Filter Fields</button>
-              <button
-                @click="filterModalTab = 'presets'"
-                class="pb-2.5 text-sm font-medium transition-colors whitespace-nowrap border-b-2 inline-flex items-center gap-1.5"
-                :class="filterModalTab === 'presets'
-                  ? 'border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'"
-              >
-                Saved Presets
-                <span
-                  v-if="savedFilters.length > 0"
-                  class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                  :class="filterModalTab === 'presets'
-                    ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'"
-                >{{ savedFilters.length }}</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Tab: Filter Fields -->
-          <div v-if="filterModalTab === 'fields'" class="flex flex-1 min-h-0" style="min-height: 320px">
-            <!-- Field list (left) -->
-            <div class="w-44 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50/50 dark:bg-gray-900/20">
-              <div class="flex-1 overflow-y-auto">
-                <button
-                  v-for="f in FILTER_FIELDS"
-                  :key="f.key"
-                  @click="selectFilterField(f.key)"
-                  class="w-full px-4 py-2.5 text-sm text-left transition-colors"
-                  :class="filterModalField === f.key
-                    ? 'bg-white dark:bg-gray-800 text-primary-700 dark:text-primary-300 font-medium border-r-2 border-primary-600 dark:border-primary-400'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'"
-                >
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="truncate">{{ f.label }}</span>
-                    <span
-                      v-if="activeFilters[f.key]?.length"
-                      class="text-[10px] font-semibold text-primary-600 dark:text-primary-400 bg-primary-100 dark:bg-primary-900/40 px-1.5 py-0.5 rounded-full shrink-0"
-                    >{{ activeFilters[f.key].length }}</span>
-                  </div>
-                </button>
-              </div>
-              <!-- Cross-field mode -->
-              <div v-if="activeFieldCount > 1" class="border-t border-gray-200 dark:border-gray-700 px-3 py-2.5">
-                <div class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Across fields</div>
-                <button
-                  @click="crossFieldMode = crossFieldMode === 'and' ? 'or' : 'and'; persistActiveFilters()"
-                  class="w-full px-2 py-1 rounded text-[11px] font-medium text-center transition-colors"
-                  :class="crossFieldMode === 'and'
-                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'"
-                >{{ crossFieldMode === 'and' ? 'ALL fields (AND)' : 'ANY field (OR)' }}</button>
-              </div>
-            </div>
-
-            <!-- Value list (right) -->
-            <div class="flex-1 flex flex-col min-w-0">
-              <div v-if="!filterModalField" class="flex-1 flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
-                Select a field to filter by
-              </div>
-              <template v-else>
-                <!-- Search + match mode -->
-                <div class="px-4 pt-3 pb-2 shrink-0 space-y-2">
-                  <input
-                    v-model="filterModalSearch"
-                    type="text"
-                    :placeholder="'Search ' + filterFieldLabel(filterModalField).toLowerCase() + 's...'"
-                    class="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                  />
-                  <div v-if="activeFilters[filterModalField]?.length > 1" class="flex items-center gap-2">
-                    <span class="text-[11px] text-gray-500 dark:text-gray-400">Match:</span>
-                    <button
-                      @click="toggleFilterMode(filterModalField)"
-                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
-                      :class="(filterModes[filterModalField] || 'or') === 'and'
-                        ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-                        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'"
-                    >
-                      {{ (filterModes[filterModalField] || 'or') === 'and' ? 'ALL (AND)' : 'ANY (OR)' }}
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Values -->
-                <div class="flex-1 overflow-y-auto px-4 pb-3">
-                  <div v-if="filterModalValues.selected.length === 0 && filterModalValues.unselected.length === 0" class="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
-                    {{ filterModalSearch ? 'No matching values' : 'No values available' }}
-                  </div>
-                  <template v-else>
-                    <!-- Selected values -->
-                    <div v-if="filterModalValues.selected.length > 0" class="space-y-0.5">
-                      <label
-                        v-for="val in filterModalValues.selected"
-                        :key="val"
-                        class="flex items-center gap-2.5 px-3 py-1.5 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked
-                          @change="toggleFilterValue(filterModalField, val)"
-                          class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-                        />
-                        <span class="text-gray-700 dark:text-gray-300 truncate">{{ val }}</span>
-                      </label>
-                    </div>
-                    <!-- Separator -->
-                    <div v-if="filterModalValues.selected.length > 0 && filterModalValues.unselected.length > 0" class="my-2 border-t border-gray-200 dark:border-gray-700"></div>
-                    <!-- Unselected values -->
-                    <div v-if="filterModalValues.unselected.length > 0" class="space-y-0.5">
-                      <label
-                        v-for="val in filterModalValues.unselected"
-                        :key="val"
-                        class="flex items-center gap-2.5 px-3 py-1.5 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          @change="toggleFilterValue(filterModalField, val)"
-                          class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-                        />
-                        <span class="text-gray-700 dark:text-gray-300 truncate">{{ val }}</span>
-                      </label>
-                    </div>
-                  </template>
-                </div>
-              </template>
-            </div>
-          </div>
-
-          <!-- Tab: Saved Presets -->
-          <div v-if="filterModalTab === 'presets'" class="flex-1 flex flex-col min-h-0" style="min-height: 320px">
-            <!-- Saved filter list -->
-            <div class="flex-1 overflow-y-auto">
-              <div v-if="savedFilters.length === 0" class="px-6 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
-                No saved presets yet.
-              </div>
-              <div v-else class="divide-y divide-gray-200 dark:divide-gray-700">
-                <div
-                  v-for="preset in savedFilters"
-                  :key="preset.id"
-                  class="px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                >
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="flex-1 min-w-0">
-                      <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ preset.name }}</div>
-                      <div v-if="preset.description" class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ preset.description }}</div>
-                      <div class="flex flex-wrap gap-1 mt-1.5">
-                        <span
-                          v-for="(values, field) in preset.filters"
-                          :key="field"
-                          class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
-                        >{{ filterFieldLabel(field) }}: {{ formatFilterValues(values) }}</span>
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-1 shrink-0">
-                      <button @click="applySavedFilter(preset)" class="p-1 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors" title="Apply">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                      </button>
-                      <button @click="editSavedFilter(preset)" class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors" title="Edit">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-                        </svg>
-                      </button>
-                      <button @click="deleteSavedFilter(preset.id)" class="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" title="Delete">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Footer -->
-          <div class="border-t border-gray-200 dark:border-gray-700 shrink-0">
-            <!-- Save form (expandable) -->
-            <div v-if="showSaveForm && hasActiveFilters" class="px-6 py-3 bg-gray-50/50 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-700">
-              <div class="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                {{ editingFilterId ? 'Update Preset' : 'Save as Preset' }}
-              </div>
-              <div class="space-y-2">
-                <input
-                  v-model="savedFilterName"
-                  type="text"
-                  placeholder="Name (required)"
-                  class="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                />
-                <input
-                  v-model="savedFilterDescription"
-                  type="text"
-                  placeholder="Description (optional)"
-                  class="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                />
-                <div class="flex items-center gap-2">
-                  <button
-                    @click="saveCurrentFilters"
-                    :disabled="!savedFilterName.trim()"
-                    class="px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >{{ editingFilterId ? 'Update' : 'Save' }}</button>
-                  <button
-                    @click="cancelSaveForm"
-                    class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  >Cancel</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Button bar -->
-            <div class="flex items-center justify-between px-6 py-3">
-              <button
-                v-if="hasActiveFilters"
-                @click="clearAllFilters"
-                class="text-sm text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-              >Clear All Filters</button>
-              <span v-else></span>
-              <div class="flex items-center gap-2">
-                <button
-                  v-if="hasActiveFilters && !showSaveForm"
-                  @click="showSaveForm = true"
-                  class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >Save as Preset</button>
-                <button
-                  @click="closeFilterModal"
-                  class="px-4 py-2 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
-                >Done</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <ReportFilterModal :filters="filters" :available-filter-values="availableFilterValues" />
 
     <!-- Feature list modal -->
     <Teleport to="body">
@@ -1216,6 +915,9 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted, inject } from '
 import { apiRequest } from '@shared/client/services/api.js'
 import { Doughnut } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Tooltip } from 'chart.js'
+import { useReportFilters } from './composables/useReportFilters.js'
+import ReportFilterModal from './components/ReportFilterModal.vue'
+import ReportFilterNarrative from './components/ReportFilterNarrative.vue'
 
 ChartJS.register(ArcElement, Tooltip)
 
@@ -1246,8 +948,11 @@ const FILTER_FIELDS = [
   { key: 'issueType', label: 'Type' },
   { key: 'priority', label: 'Priority' }
 ]
-const FILTERS_STORAGE_KEY = 'tt_cache:capacity-report-active-filters'
-const SAVED_FILTERS_STORAGE_KEY = 'tt_cache:capacity-report-saved-filters'
+
+const filters = useReportFilters({
+  storageKeyPrefix: 'capacity-report',
+  filterFields: FILTER_FIELDS
+})
 
 const RISK_COLORS = {
   'Green': '#22c55e',
@@ -1277,21 +982,6 @@ const riskOpen = ref(true)
 
 const selection = reactive({ version: '', families: new Set(), phases: new Set() })
 const draft = reactive({ version: '', families: new Set(), phases: new Set() })
-
-// ── Filter state ──
-const activeFilters = reactive({})
-const filterModes = reactive({}) // per-field: 'or' (default) or 'and'
-const crossFieldMode = ref('and') // across fields: 'and' (default) or 'or'
-const filterModalOpen = ref(false)
-const filterModalField = ref(null)
-const filterModalSearch = ref('')
-const filterModalTab = ref('fields')
-const showSaveForm = ref(false)
-const savedFilters = ref([])
-const savedFilterName = ref('')
-const savedFilterDescription = ref('')
-const editingFilterId = ref(null)
-const appliedPresetId = ref(null)
 
 // ── Registry parsing ──
 
@@ -1535,7 +1225,7 @@ function reconcileDraftPhases() {
 // Close modal on Escape
 function handleEscape(e) {
   if (e.key !== 'Escape') return
-  if (filterModalOpen.value) { closeFilterModal(); return }
+  if (filters.filterModalOpen.value) { filters.closeFilterModal(); return }
   if (columnSettingsOpen.value) { columnSettingsOpen.value = false; return }
   if (riskColumnSettingsOpen.value) { riskColumnSettingsOpen.value = false; return }
   if (featureListStatus.value) { closeFeatureList(); return }
@@ -1672,60 +1362,7 @@ onMounted(fetchFieldOptions)
 
 // ── Feature filtering ──
 
-function matchesFieldFilter(feature, field, values) {
-  const valSet = new Set(values)
-  const mode = filterModes[field] || 'or'
-  const val = feature[field]
-  if (mode === 'and') {
-    if (Array.isArray(val)) return [...valSet].every(v => val.includes(v))
-    return valSet.size === 1 && valSet.has(val || '')
-  }
-  if (Array.isArray(val)) return val.some(v => valSet.has(v))
-  return valSet.has(val || '')
-}
-
-const filteredAllFeatures = computed(() => {
-  const activeEntries = Object.entries(activeFilters).filter(([, v]) => v && v.length > 0)
-  if (activeEntries.length === 0) return allFeatures.value
-
-  if (crossFieldMode.value === 'or') {
-    return allFeatures.value.filter(f =>
-      activeEntries.some(([field, values]) => matchesFieldFilter(f, field, values))
-    )
-  }
-  return allFeatures.value.filter(f =>
-    activeEntries.every(([field, values]) => matchesFieldFilter(f, field, values))
-  )
-})
-
-const hasActiveFilters = computed(() => {
-  return Object.values(activeFilters).some(v => v && v.length > 0)
-})
-
-const activeFieldCount = computed(() => {
-  return Object.values(activeFilters).filter(v => v && v.length > 0).length
-})
-
-const activeFilterDisplay = computed(() => {
-  const result = {}
-  for (const [field, values] of Object.entries(activeFilters)) {
-    if (values && values.length > 0) result[field] = values
-  }
-  return result
-})
-
-const appliedPreset = computed(() => {
-  if (!appliedPresetId.value) return null
-  return savedFilters.value.find(f => f.id === appliedPresetId.value) || null
-})
-
-const filterNarrativeParts = computed(() => {
-  return Object.entries(activeFilterDisplay.value).map(([field, values]) => ({
-    field,
-    label: filterFieldLabel(field),
-    values: formatFilterValues(values)
-  }))
-})
+const filteredAllFeatures = computed(() => filters.filterItems(allFeatures.value))
 
 const availableFilterValues = computed(() => {
   if (!hasSelection.value) return {}
@@ -1753,219 +1390,6 @@ const availableFilterValues = computed(() => {
   }
   return result
 })
-
-const filterModalValues = computed(() => {
-  if (!filterModalField.value) return { selected: [], unselected: [] }
-  const all = availableFilterValues.value[filterModalField.value] || []
-  const q = filterModalSearch.value.toLowerCase().trim()
-  const filtered = q ? all.filter(v => v.toLowerCase().includes(q)) : all
-  const active = activeFilters[filterModalField.value] || []
-  const activeSet = new Set(active)
-  const selected = filtered.filter(v => activeSet.has(v))
-  const unselected = filtered.filter(v => !activeSet.has(v))
-  return { selected, unselected }
-})
-
-function filterFieldLabel(key) {
-  const field = FILTER_FIELDS.find(f => f.key === key)
-  return field ? field.label : key
-}
-
-function formatFilterValues(values) {
-  if (values.length <= 2) return values.join(', ')
-  return values.slice(0, 2).join(', ') + ' +' + (values.length - 2)
-}
-
-function toggleFilterValue(field, value) {
-  if (!activeFilters[field]) activeFilters[field] = []
-  const idx = activeFilters[field].indexOf(value)
-  if (idx >= 0) {
-    activeFilters[field].splice(idx, 1)
-    if (activeFilters[field].length === 0) delete activeFilters[field]
-  } else {
-    activeFilters[field].push(value)
-  }
-  appliedPresetId.value = null
-  persistActiveFilters()
-}
-
-function toggleFilterMode(field) {
-  filterModes[field] = (filterModes[field] || 'or') === 'or' ? 'and' : 'or'
-  persistActiveFilters()
-}
-
-function clearAllFilters() {
-  for (const key of Object.keys(activeFilters)) delete activeFilters[key]
-  for (const key of Object.keys(filterModes)) delete filterModes[key]
-  crossFieldMode.value = 'and'
-  appliedPresetId.value = null
-  editingFilterId.value = null
-  persistActiveFilters()
-}
-
-function openFilterModal() {
-  filterModalField.value = FILTER_FIELDS[0]?.key || null
-  filterModalSearch.value = ''
-  filterModalTab.value = 'fields'
-  filterModalOpen.value = true
-}
-
-function openFilterModalToPresets() {
-  filterModalTab.value = 'presets'
-  filterModalOpen.value = true
-}
-
-function closeFilterModal() {
-  filterModalOpen.value = false
-  filterModalSearch.value = ''
-  showSaveForm.value = false
-}
-
-function selectFilterField(key) {
-  filterModalField.value = key
-  filterModalSearch.value = ''
-}
-
-function persistActiveFilters() {
-  const data = {}
-  for (const [k, v] of Object.entries(activeFilters)) {
-    if (v && v.length > 0) data[k] = v
-  }
-  const modes = {}
-  for (const [k, v] of Object.entries(filterModes)) {
-    if (v === 'and') modes[k] = v
-  }
-  const cross = crossFieldMode.value !== 'and' ? crossFieldMode.value : undefined
-  if (Object.keys(data).length > 0 || Object.keys(modes).length > 0) {
-    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({ filters: data, modes, crossFieldMode: cross }))
-  } else {
-    localStorage.removeItem(FILTERS_STORAGE_KEY)
-  }
-}
-
-function loadActiveFilters() {
-  try {
-    const stored = localStorage.getItem(FILTERS_STORAGE_KEY)
-    if (!stored) return
-    const parsed = JSON.parse(stored)
-    // Support both old format (flat object) and new format ({ filters, modes })
-    const filters = parsed.filters || (Array.isArray(parsed) ? {} : (!parsed.modes ? parsed : {}))
-    const modes = parsed.modes || {}
-    for (const [k, v] of Object.entries(filters)) {
-      if (Array.isArray(v) && v.length > 0) activeFilters[k] = v
-    }
-    for (const [k, v] of Object.entries(modes)) {
-      if (v === 'and') filterModes[k] = v
-    }
-    if (parsed.crossFieldMode) crossFieldMode.value = parsed.crossFieldMode
-  } catch { /* ignore */ }
-}
-
-function loadSavedFilters() {
-  try {
-    const stored = localStorage.getItem(SAVED_FILTERS_STORAGE_KEY)
-    if (stored) savedFilters.value = JSON.parse(stored)
-  } catch { /* ignore */ }
-}
-
-function persistSavedFilters() {
-  localStorage.setItem(SAVED_FILTERS_STORAGE_KEY, JSON.stringify(savedFilters.value))
-}
-
-function saveCurrentFilters() {
-  const name = savedFilterName.value.trim()
-  if (!name) return
-
-  const filterData = {}
-  for (const [k, v] of Object.entries(activeFilters)) {
-    if (v && v.length > 0) filterData[k] = [...v]
-  }
-  const modesData = {}
-  for (const [k, v] of Object.entries(filterModes)) {
-    if (v === 'and') modesData[k] = v
-  }
-
-  if (editingFilterId.value) {
-    const idx = savedFilters.value.findIndex(f => f.id === editingFilterId.value)
-    if (idx >= 0) {
-      savedFilters.value[idx] = {
-        ...savedFilters.value[idx],
-        name,
-        description: savedFilterDescription.value.trim(),
-        filters: filterData,
-        modes: modesData,
-        crossFieldMode: crossFieldMode.value
-      }
-    }
-    editingFilterId.value = null
-  } else {
-    savedFilters.value.push({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      name,
-      description: savedFilterDescription.value.trim(),
-      filters: filterData,
-      modes: modesData,
-      crossFieldMode: crossFieldMode.value
-    })
-  }
-
-  persistSavedFilters()
-  savedFilterName.value = ''
-  savedFilterDescription.value = ''
-  showSaveForm.value = false
-}
-
-function cancelSaveForm() {
-  showSaveForm.value = false
-  editingFilterId.value = null
-  savedFilterName.value = ''
-  savedFilterDescription.value = ''
-}
-
-function restorePresetState(preset) {
-  for (const key of Object.keys(activeFilters)) delete activeFilters[key]
-  for (const key of Object.keys(filterModes)) delete filterModes[key]
-  for (const [k, v] of Object.entries(preset.filters)) {
-    if (Array.isArray(v) && v.length > 0) activeFilters[k] = [...v]
-  }
-  if (preset.modes) {
-    for (const [k, v] of Object.entries(preset.modes)) filterModes[k] = v
-  }
-  crossFieldMode.value = preset.crossFieldMode || 'and'
-}
-
-function applySavedFilter(preset) {
-  restorePresetState(preset)
-  appliedPresetId.value = preset.id
-  persistActiveFilters()
-  editingFilterId.value = null
-  closeFilterModal()
-}
-
-function editSavedFilter(preset) {
-  restorePresetState(preset)
-  persistActiveFilters()
-  editingFilterId.value = preset.id
-  savedFilterName.value = preset.name
-  savedFilterDescription.value = preset.description || ''
-  showSaveForm.value = true
-  filterModalTab.value = 'fields'
-}
-
-function cancelEditFilter() {
-  editingFilterId.value = null
-  savedFilterName.value = ''
-  savedFilterDescription.value = ''
-}
-
-function deleteSavedFilter(id) {
-  savedFilters.value = savedFilters.value.filter(f => f.id !== id)
-  persistSavedFilters()
-  if (editingFilterId.value === id) cancelEditFilter()
-}
-
-loadActiveFilters()
-loadSavedFilters()
 
 // Restore modal state when returning from feature detail
 watch(featuresLoading, (loading) => {
