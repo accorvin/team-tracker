@@ -65,7 +65,7 @@ async function forwardDeleteToReleases() {
 }
 
 /**
- * Trigger a one-time Jira enrichment on the releases module.
+ * Trigger a one-time Jira sync on the releases module.
  * Fire-and-forget — errors are logged but not surfaced.
  */
 function triggerJiraSync() {
