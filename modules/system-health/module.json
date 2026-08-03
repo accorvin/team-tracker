@@ -20,11 +20,12 @@
     "entry": "./server/index.js"
   },
   "secrets": {
-    "platform": ["github"]
+    "platform": ["github", "gitlab"]
   },
   "export": {
     "files": [
-      { "path": "system-health/disconnected/reports.json", "notes": "Disconnected readiness reports with history for all tracked repos" }
+      { "path": "system-health/disconnected/reports.json", "notes": "Disconnected readiness reports with history for all tracked repos" },
+      { "path": "system-health/quality/reports.json", "notes": "Quality analysis reports with history for tracked repos" }
     ]
   }
 }
