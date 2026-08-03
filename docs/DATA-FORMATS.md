@@ -1354,7 +1354,7 @@ Heuristic narrative signals for the Feature detail **Traffic Signals** panel (bl
 
 ## Releases — Execution Config (`data/releases/execution/config.json`)
 
-Admin-configurable settings for GitLab CI artifact fetching and Jira enrichment.
+Admin-configurable settings for GitLab CI artifact fetching and Jira sync.
 
 ```json
 {
@@ -1366,10 +1366,7 @@ Admin-configurable settings for GitLab CI artifact fetching and Jira enrichment.
   "refreshIntervalHours": 12,
   "enabled": false,
   "jiraEnrichment": {
-    "enabled": false,
-    "syncIntervalHours": 6,
-    "discoveryEnabled": false,
-    "discoveryJql": "project = RHAISTRAT AND issuetype IN (Feature, Initiative) AND created >= -365d"
+    "enabled": false
   }
 }
 ```
@@ -1377,28 +1374,26 @@ Admin-configurable settings for GitLab CI artifact fetching and Jira enrichment.
 **Notes:**
 - `enabled` defaults to `false`. Module does nothing until an admin enables it in Settings.
 - `artifactPath` is the directory prefix stripped from zip entry paths (e.g., `output/index.json` becomes `index.json`).
-- `jiraEnrichment.enabled` enables periodic Jira sync of feature data (6h default cadence).
-- `jiraEnrichment.discoveryEnabled` enables Jira JQL discovery of features not yet in the store.
-- `jiraEnrichment.discoveryJql` is bounded by `created >= -365d` by default to prevent unbounded results.
+- `jiraEnrichment.enabled` enables periodic Jira sync of feature data (12h default cadence). The sync fetches all RHAISTRAT features from Jira as the authoritative source.
 
 ## Releases — Execution Last Enrichment (`data/releases/execution/last-enrichment.json`)
 
-Metadata from the most recent Jira enrichment sync.
+Metadata from the most recent Jira sync.
 
 ```json
 {
   "status": "success",
   "timestamp": "2026-06-05T08:30:00Z",
-  "featureCount": 632,
-  "enrichedCount": 630,
-  "duration": 24500,
-  "lastKey": "RHAISTRAT-1500"
+  "featureCount": 2400,
+  "newCount": 15,
+  "updatedCount": 2385,
+  "duration": 124500
 }
 ```
 
 **Notes:**
-- `enrichedCount` may be less than `featureCount` if some Jira lookups failed (partial failure handling).
-- `lastKey` is for diagnostics only.
+- `featureCount` is the total number of features returned by Jira.
+- `newCount` / `updatedCount` track how many features were created vs updated in the store.
 
 ## Releases — Execution Last Fetch (`data/releases/execution/last-fetch.json`)
 

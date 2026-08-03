@@ -68,14 +68,14 @@ async function forwardDeleteToReleases() {
  * Trigger a one-time Jira enrichment on the releases module.
  * Fire-and-forget — errors are logged but not surfaced.
  */
-function triggerJiraEnrichment() {
+function triggerJiraSync() {
   const url = 'http://localhost:' + API_PORT + '/api/admin/refresh-all';
   fetch(url, {
     method: 'POST',
     headers: internalHeaders('application/json'),
-    body: JSON.stringify({ handlers: ['jira-enrichment'] })
+    body: JSON.stringify({ handlers: ['jira-sync'] })
   }).catch(function(err) {
-    console.warn('[ai-impact] Post-bulk Jira enrichment trigger failed:', err.message);
+    console.warn('[ai-impact] Post-bulk Jira sync trigger failed:', err.message);
   });
 }
 
@@ -137,14 +137,14 @@ module.exports = function registerFeatureRoutes(router, context) {
     });
   });
 
-  // POST /features/sync (Admin) — Jira sync is now handled by releases jira-enrichment
+  // POST /features/sync (Admin) — Jira sync is now handled by releases jira-sync
   router.post('/features/sync', requireAdmin, requireScope('ai-impact:write'), function(req, res) {
     if (DEMO_MODE) {
       return res.json({ status: 'skipped', message: 'Sync disabled in demo mode' });
     }
     res.json({
       status: 'unified',
-      message: 'Feature Jira sync is now handled by the releases jira-enrichment handler. Use POST /api/admin/refresh-all to trigger.'
+      message: 'Feature Jira sync is now handled by the releases jira-sync handler. Use POST /api/admin/refresh-all to trigger.'
     });
   });
 
@@ -191,7 +191,7 @@ module.exports = function registerFeatureRoutes(router, context) {
 
         // Trigger Jira enrichment for newly created features
         if (counts.created > 0) {
-          triggerJiraEnrichment();
+          triggerJiraSync();
         }
       } catch (err) {
         console.error('[ai-impact] Forward to releases failed:', err.message);
