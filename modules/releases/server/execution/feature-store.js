@@ -180,6 +180,9 @@ async function rebuildIndex(storage) {
     const feature = await storage.readFromStorage(DATA_PREFIX + '/features/' + fileName);
     if (!feature || !feature.key) continue;
 
+    // Skip stale features (no longer in Jira) from the index
+    if (feature._stale) continue;
+
     // Map detail fields to index summary fields
     const indexEntry = {
       key: feature.key,
