@@ -97,7 +97,7 @@
 </template>
 
 <script setup>
-defineProps({
+const props = defineProps({
   visible: { type: Boolean, default: false },
   title: { type: String, default: '' },
   issues: { type: Array, default: () => [] },
@@ -109,7 +109,8 @@ defineProps({
 defineEmits(['close'])
 
 function jiraIssueUrl(key) {
-  return `https://issues.redhat.com/browse/${key}`
+  const host = props.jiraHost || 'https://issues.redhat.com'
+  return `${host}/browse/${key}`
 }
 
 function statusBadgeClass(status) {

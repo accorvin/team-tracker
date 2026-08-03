@@ -425,7 +425,9 @@ function drillDownByAssignee(assignee, jql) {
 }
 
 function handleEscape(e) {
-  if (e.key === 'Escape' && drillDown.value.visible) closeDrillDown()
+  if (e.key !== 'Escape') return
+  if (filters.filterModalOpen.value) { filters.closeFilterModal(); return }
+  if (drillDown.value.visible) closeDrillDown()
 }
 
 onMounted(() => document.addEventListener('keydown', handleEscape))
