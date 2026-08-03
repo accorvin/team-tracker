@@ -317,31 +317,33 @@ module.exports = async function registerExecutionRoutes(router, context) {
       result.nextScheduledFetch = nextFetch.toISOString();
     }
 
-    // Jira enrichment status
+    // Jira sync status
     const jiraEnrichConfig = config.jiraEnrichment || {};
     const lastEnrichment = await readDataFile('last-enrichment.json');
-    result.jiraEnrichment = {
+    const jiraSyncStatus = {
       enabled: jiraEnrichConfig.enabled !== false,
       jiraConfigured: !!jira,
       lastSync: lastEnrichment || null
     };
-    // Warn if Jira enrichment hasn't run in >24h (2x the default 6h cadence)
-    if (result.jiraEnrichment.enabled && jira) {
+    // Warn if Jira sync hasn't run in >24h
+    if (jiraSyncStatus.enabled && jira) {
       const enrichTs = lastEnrichment?.timestamp ? new Date(lastEnrichment.timestamp).getTime() : 0;
       const enrichAgeMs = enrichTs ? Date.now() - enrichTs : Infinity;
       const enrichAgeHours = enrichAgeMs / (1000 * 60 * 60);
       if (enrichAgeHours > 24) {
-        result.jiraEnrichment.stale = true;
+        jiraSyncStatus.stale = true;
         if (enrichTs === 0) {
-          result.jiraEnrichment.warning = 'Jira enrichment has never run';
+          jiraSyncStatus.warning = 'Jira sync has never run';
         } else {
           const ageDays = Math.floor(enrichAgeHours / 24);
-          result.jiraEnrichment.warning = 'Last Jira sync was ' + (ageDays === 1 ? '1 day' : ageDays + ' days') + ' ago';
+          jiraSyncStatus.warning = 'Last Jira sync was ' + (ageDays === 1 ? '1 day' : ageDays + ' days') + ' ago';
         }
       }
     } else if (!jira) {
-      result.jiraEnrichment.warning = 'Jira client not configured — enrichment cannot run';
+      jiraSyncStatus.warning = 'Jira client not configured — sync cannot run';
     }
+    result.jiraSync = jiraSyncStatus;
+    result.jiraEnrichment = jiraSyncStatus; // backward-compat alias
 
     res.json(result);
   });
@@ -552,12 +554,14 @@ module.exports = async function registerExecutionRoutes(router, context) {
         schemaVersion: index?.schemaVersion || null,
         lastFetchStatus: lastFetch?.status || null,
         configured: config.enabled && !!getToken(),
-        jiraEnrichment: {
+        jiraSync: {
           enabled: jiraEnrichConfig.enabled !== false,
           jiraConfigured: !!jira,
           lastSyncStatus: lastEnrichment?.status || null,
           lastSyncTimestamp: lastEnrichment?.timestamp || null,
-          enrichedCount: lastEnrichment?.enrichedCount || 0
+          featureCount: lastEnrichment?.featureCount || 0,
+          newCount: lastEnrichment?.newCount || 0,
+          updatedCount: lastEnrichment?.updatedCount || 0
         }
       };
     });
@@ -593,52 +597,39 @@ module.exports = async function registerExecutionRoutes(router, context) {
       });
     });
 
-    // Register Jira enrichment periodic sync (Phase 3)
+    // Register Jira sync handler — full Jira fetch as authoritative source
     if (jira) {
-      const { syncAllFeatures, discoverFromJira, reconcileTrackingData } = require('./jira-sync');
+      const { fullJiraSync, detectStaleFeatures } = require('./jira-sync');
 
-      const enrichmentConfig = initialConfig.jiraEnrichment || {};
-      const syncIntervalHours = enrichmentConfig.syncIntervalHours || 6;
-
-      const enrichmentHandler = async function() {
+      const jiraSyncHandler = async function() {
         const config = await loadConfig(storage);
         const jiraEnrichConfig = config.jiraEnrichment || {};
-        // Default to enabled — Jira enrichment should run unless explicitly disabled
+        // Default to enabled — Jira sync should run unless explicitly disabled
         if (jiraEnrichConfig.enabled === false) {
-          return { status: 'skipped', message: 'Jira enrichment disabled in config (jiraEnrichment.enabled = false)' };
+          return { status: 'skipped', message: 'Jira sync disabled in config (jiraEnrichment.enabled = false)' };
         }
 
-        const result = await syncAllFeatures(storage, jira.jiraRequest, jira.fetchAllJqlResults);
+        const result = await fullJiraSync(storage, jira.jiraRequest, jira.fetchAllJqlResults);
 
-        // Feature discovery (Phase 4)
-        if (jiraEnrichConfig.discoveryEnabled) {
+        // Detect stale features (in store but no longer in Jira)
+        if (result.jiraKeys) {
           try {
-            const discovery = await discoverFromJira(
-              storage, jira.jiraRequest, jira.fetchAllJqlResults, jiraEnrichConfig
-            );
-            result.discovery = discovery;
+            const staleResult = await detectStaleFeatures(storage, result.jiraKeys);
+            result.stale = staleResult;
           } catch (err) {
-            console.warn('[execution] Feature discovery failed:', err.message);
+            console.warn('[execution] Stale feature detection failed:', err.message);
           }
-        }
-
-        // Tracking data reconciliation
-        try {
-          const reconciliation = await reconcileTrackingData(storage);
-          result.reconciliation = reconciliation;
-        } catch (err) {
-          console.warn('[execution] Tracking reconciliation failed:', err.message);
         }
 
         return result;
       };
 
-      context.registerRefresh('jira-enrichment', {
+      context.registerRefresh('jira-sync', {
         order: 75,
-        cadence: syncIntervalHours + 'h',
-        timeout: 120000,
-        description: 'Enriches execution data with Jira issue details, status transitions, and tracking reconciliation.',
-        handler: enrichmentHandler
+        cadence: '12h',
+        timeout: 600000,
+        description: 'Full Jira sync — fetches all RHAISTRAT features, creates/updates store entries, detects stale features.',
+        handler: jiraSyncHandler
       });
     }
   }
