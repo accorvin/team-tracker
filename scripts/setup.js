@@ -52,3 +52,18 @@ for (const sub of ['server', 'client']) {
   fs.symlinkSync(target, link, 'dir');
   console.log(`[ai-eng] Symlinked shared/${sub}`);
 }
+
+// Apply patches to core package
+const patchDir = path.join(process.cwd(), 'patches');
+if (fs.existsSync(patchDir)) {
+  for (const file of fs.readdirSync(patchDir).filter(f => f.startsWith('core-') && f.endsWith('.js'))) {
+    try {
+      const patch = require(path.join(patchDir, file));
+      if (patch.apply(coreDir)) {
+        console.log(`[ai-eng] Applied patch: ${file}`);
+      }
+    } catch (err) {
+      console.warn(`[ai-eng] Patch ${file} failed: ${err.message}`);
+    }
+  }
+}

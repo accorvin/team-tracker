@@ -45,6 +45,7 @@ export default defineConfig({
           include: [
             'modules/*/server/**/*.{test,spec}.js',
             'modules/*/__tests__/server/**/*.{test,spec}.js',
+            'patches/__tests__/**/*.{test,spec}.js',
           ],
         },
       },
