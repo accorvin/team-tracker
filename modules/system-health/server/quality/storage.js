@@ -26,7 +26,12 @@ function repoKeyFromSlug(repository) {
   return repository.replace('/', '--');
 }
 
+const POISONED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 function upsertReport(data, repoKey, report) {
+  if (POISONED_KEYS.has(repoKey)) {
+    return 'unchanged';
+  }
   const existing = data.reports[repoKey];
 
   if (!existing) {
@@ -109,10 +114,12 @@ function countHistoryEntries(data) {
 }
 
 async function readHtmlReport(readFromStorage, repoKey) {
+  if (POISONED_KEYS.has(repoKey)) return null;
   return readFromStorage(HTML_PREFIX + repoKey + '.html');
 }
 
 async function writeHtmlReport(writeToStorage, repoKey, html) {
+  if (POISONED_KEYS.has(repoKey)) return;
   await writeToStorage(HTML_PREFIX + repoKey + '.html', html);
 }
 

@@ -103,7 +103,7 @@ module.exports = function registerQualityRoutes(router, context) {
           await writeHtmlReport(writeToStorage, repoKey, entry.reportHtml);
           reportData.hasHtmlReport = true;
         } catch (err) {
-          console.error('[system-health/quality] Failed to write HTML for ' + repoKey + ':', err.message);
+          console.error('[system-health/quality] Failed to write HTML for %s: %s', repoKey, err.message);
         }
       }
 
@@ -247,7 +247,7 @@ module.exports = function registerQualityRoutes(router, context) {
   router.get('/reports/:key/html', requireAuth, requireScope('system-health:read'), async function(req, res) {
     const key = req.params.key;
 
-    if (!/^[a-zA-Z0-9._-]+--[a-zA-Z0-9._-]+$/.test(key)) {
+    if (key.length > 200 || !/^[a-zA-Z0-9._-]+--[a-zA-Z0-9._-]+$/.test(key)) {
       return res.status(400).json({ error: 'Invalid repo key format. Expected owner--repo.' });
     }
 
@@ -256,6 +256,7 @@ module.exports = function registerQualityRoutes(router, context) {
       return res.status(404).json({ error: 'HTML report not found for ' + key });
     }
 
+    res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:;");
     res.type('html').send(html);
   });
 
@@ -280,7 +281,7 @@ module.exports = function registerQualityRoutes(router, context) {
   router.get('/reports/:key', requireAuth, requireScope('system-health:read'), async function(req, res) {
     const key = req.params.key;
 
-    if (!/^[a-zA-Z0-9._-]+--[a-zA-Z0-9._-]+$/.test(key)) {
+    if (key.length > 200 || !/^[a-zA-Z0-9._-]+--[a-zA-Z0-9._-]+$/.test(key)) {
       return res.status(400).json({ error: 'Invalid repo key format. Expected owner--repo.' });
     }
 
