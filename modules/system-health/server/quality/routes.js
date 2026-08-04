@@ -23,7 +23,7 @@ const BULK_CAP = 5000;
  * @param {object} context
  */
 module.exports = function registerQualityRoutes(router, context) {
-  const { storage, requireAdmin, requireScope } = context;
+  const { storage, requireAuth, requireAdmin, requireScope } = context;
   const { readFromStorage, writeToStorage } = storage;
 
   // ─── Static routes FIRST ───
@@ -219,7 +219,7 @@ module.exports = function registerQualityRoutes(router, context) {
    *       200:
    *         description: Quality report list with scores and metadata
    */
-  router.get('/reports', requireScope('system-health:read'), async function(req, res) {
+  router.get('/reports', requireAuth, requireScope('system-health:read'), async function(req, res) {
     const data = await readReports(readFromStorage);
     res.json(getListProjection(data));
   });
@@ -244,7 +244,7 @@ module.exports = function registerQualityRoutes(router, context) {
    *       404:
    *         description: Report not found
    */
-  router.get('/reports/:key/html', requireScope('system-health:read'), async function(req, res) {
+  router.get('/reports/:key/html', requireAuth, requireScope('system-health:read'), async function(req, res) {
     const key = req.params.key;
 
     if (!/^[a-zA-Z0-9._-]+--[a-zA-Z0-9._-]+$/.test(key)) {
@@ -277,7 +277,7 @@ module.exports = function registerQualityRoutes(router, context) {
    *       404:
    *         description: Report not found
    */
-  router.get('/reports/:key', requireScope('system-health:read'), async function(req, res) {
+  router.get('/reports/:key', requireAuth, requireScope('system-health:read'), async function(req, res) {
     const key = req.params.key;
 
     if (!/^[a-zA-Z0-9._-]+--[a-zA-Z0-9._-]+$/.test(key)) {

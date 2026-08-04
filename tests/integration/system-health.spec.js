@@ -185,9 +185,9 @@ test.describe('System Health Views @system-health', () => {
       return;
     }
 
-    // The same row should also show "Awaiting scan" in the gaps column
+    // The same row should also show "None" in the gaps column
     const pendingRow = pendingLabels.first().locator('xpath=ancestor::tr');
-    await expect(pendingRow.locator('text=Awaiting scan')).toBeVisible();
+    await expect(pendingRow.locator('text=None')).toBeVisible();
 
     // Click the repo name button in that row to open the detail view
     await pendingRow.locator('button').first().click();
