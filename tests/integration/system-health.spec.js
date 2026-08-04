@@ -67,11 +67,10 @@ test.describe('System Health Module @system-health', () => {
     expect(page.errors).toHaveLength(0);
   });
 
-  test('should use static data (no API calls required)', async ({ page }) => {
-    // Monitor network requests
+  test('should fetch quality reports from API', async ({ page }) => {
     const apiRequests = [];
     page.on('request', request => {
-      if (request.url().includes('/api/modules/system-health')) {
+      if (request.url().includes('/api/modules/system-health/quality')) {
         apiRequests.push({
           url: request.url(),
           method: request.method()
@@ -79,17 +78,15 @@ test.describe('System Health Module @system-health', () => {
       }
     });
 
-    // Navigate to Quality Analysis view
     await page.goto('/#/system-health/quality-analysis');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // System Health uses static data (imported from qualityReports.data.js)
-    // so there should be NO API requests to system-health endpoints
-    expect(apiRequests.length).toBe(0);
-    console.log(`System Health API requests: ${apiRequests.length} (expected 0 - uses static data)`);
+    const reportsRequests = apiRequests.filter(r => r.url.includes('/quality/reports'));
+    expect(reportsRequests.length).toBeGreaterThan(0);
+    console.log(`Quality API requests: ${reportsRequests.length}`);
+    reportsRequests.forEach(r => console.log(`  ${r.method} ${r.url}`));
 
-    // Verify the page still loaded successfully with content
     const hasContent = await pageHasContent(page);
     expect(hasContent).toBe(true);
 
@@ -188,9 +185,9 @@ test.describe('System Health Views @system-health', () => {
       return;
     }
 
-    // The same row should also show "Awaiting scan" in the gaps column
+    // The same row should also show "None" in the gaps column
     const pendingRow = pendingLabels.first().locator('xpath=ancestor::tr');
-    await expect(pendingRow.locator('text=Awaiting scan')).toBeVisible();
+    await expect(pendingRow.locator('text=None')).toBeVisible();
 
     // Click the repo name button in that row to open the detail view
     await pendingRow.locator('button').first().click();
@@ -221,7 +218,7 @@ test.describe('System Health Views @system-health', () => {
     await expect(table).toBeVisible();
 
     // Check that all expected columns are present
-    const expectedColumns = ['REPOSITORY', 'TIER', 'COMPONENT', 'SCORE', 'TOP GAPS'];
+    const expectedColumns = ['Repository', 'Tier', 'Component', 'Score', 'Gaps'];
     for (const columnName of expectedColumns) {
       // Look for the column header in table headers (th) or column cells
       const columnHeader = table.locator('th, thead td, [role="columnheader"]').filter({ hasText: columnName });
@@ -233,6 +230,71 @@ test.describe('System Health Views @system-health', () => {
     // Verify column order
     const allHeaders = await table.locator('th, thead td, [role="columnheader"]').allTextContents();
     console.log('All table headers:', allHeaders);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should display quality scores from API data', async ({ page }) => {
+    await page.goto('/#/system-health/quality-analysis');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const rows = page.locator('table tbody tr');
+    const rowCount = await rows.count();
+    expect(rowCount).toBe(5);
+    console.log(`Quality analysis table rows: ${rowCount}`);
+
+    const scoreCell = page.locator('table td span').filter({ hasText: /\d\.\d\/10/ });
+    const scoreCount = await scoreCell.count();
+    expect(scoreCount).toBeGreaterThan(0);
+    console.log(`Score cells found: ${scoreCount}`);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should filter reports by tier', async ({ page }) => {
+    await page.goto('/#/system-health/quality-analysis');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const allRows = await page.locator('table tbody tr').count();
+    expect(allRows).toBe(5);
+
+    // Select "downstream" tier — only 1 repo in fixture
+    const tierSelect = page.locator('select').first();
+    await tierSelect.selectOption({ label: 'downstream' });
+    await page.waitForTimeout(500);
+
+    const filteredRows = await page.locator('table tbody tr').count();
+    expect(filteredRows).toBe(1);
+
+    const summaryText = page.locator('text=/Showing 1 of 5/');
+    await expect(summaryText).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should show report detail empty state when clicked', async ({ page }) => {
+    await page.goto('/#/system-health/quality-analysis');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const repoButton = page.locator('table tbody button').first();
+    await repoButton.click();
+    await page.waitForTimeout(1000);
+
+    const heading = page.locator('h2').filter({ hasText: 'No quality report available' });
+    await expect(heading).toBeVisible();
+
+    const backButton = page.locator('button').filter({ hasText: 'Back to list' });
+    await expect(backButton).toBeVisible();
+
+    expect(await page.locator('iframe').count()).toBe(0);
+
+    await backButton.click();
+    await page.waitForTimeout(500);
+
+    await expect(page.locator('table')).toBeVisible();
 
     expect(page.errors).toHaveLength(0);
   });
