@@ -219,6 +219,7 @@ watch(
         v-if="selected.reportUrl"
         :src="selected.reportUrl"
         :title="`Quality report: ${selected.label}`"
+        sandbox="allow-same-origin"
         class="w-full border-0 bg-white block"
         style="min-height: calc(100vh - 11rem)"
       />

@@ -158,7 +158,7 @@ async function fetchReports(storage, token) {
     const htmlContent = htmlFiles.get(repoKey) || report.reportHtml;
     if (htmlContent) {
       await writeHtmlReport(writeToStorage, repoKey, htmlContent);
-      if (data.reports[repoKey]) {
+      if (Object.hasOwn(data.reports, repoKey)) {
         data.reports[repoKey].latest.hasHtmlReport = true;
       }
       htmlCount++;

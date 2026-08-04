@@ -1768,7 +1768,7 @@ Quality analysis reports tracking repository testing, CI/CD, and code quality pr
 
 **Per-repository structure:**
 - `latest`: Most recent quality assessment with full scorecard
-- `history`: Array of prior assessments (summary only, sorted newest-first, capped at 20)
+- `history`: Array of prior assessments (summary only, sorted newest-first, capped at 52)
 
 **Latest assessment fields:**
 - `repository`: Repository identifier in `owner/repo` format
