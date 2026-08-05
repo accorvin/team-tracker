@@ -1,7 +1,7 @@
 name: Dependabot Lockfile Fix
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [main]
     types: [opened, synchronize]
 
@@ -33,7 +33,7 @@ jobs:
           node-version: '22'
 
       - name: Regenerate lockfile
-        run: npm install --package-lock-only
+        run: npm install --package-lock-only --ignore-scripts
 
       - name: Commit updated lockfile
         run: |
