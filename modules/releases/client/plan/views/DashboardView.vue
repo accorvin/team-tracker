@@ -90,6 +90,8 @@ const {
   selectedPriority,
   selectedTeams,
   searchQuery,
+  showEmptyRocks,
+  emptyRockCount,
   filteredFeatures,
   filteredRfes,
   filteredBigRocks,
@@ -379,6 +381,8 @@ onMounted(async function() {
         v-model:selectedPriority="selectedPriority"
         v-model:selectedTeams="selectedTeams"
         v-model:searchQuery="searchQuery"
+        v-model:showEmptyRocks="showEmptyRocks"
+        :emptyRockCount="emptyRockCount"
         :hasActiveFilters="hasActiveFilters"
         @clearFilters="clearFilters"
       />

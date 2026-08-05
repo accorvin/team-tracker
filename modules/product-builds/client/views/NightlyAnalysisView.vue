@@ -117,7 +117,7 @@ const chartLayout = computed(() => {
   const pts = timelinePipelines.value
   if (!pts.length) return null
   const pad = { left: 44, right: 16, top: 16, bottom: 32 }
-  const w = Math.max(pts.length * 56, 300)
+  const w = Math.max(pts.length * 56, 600)
   const h = 100
   const yPass = pad.top + 14
   const yFail = h - pad.bottom - 14

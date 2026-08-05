@@ -9,6 +9,7 @@
 const { CUSTOM_FIELDS, transformIssue } = require('../hygiene/jira-fetch')
 const { blockDuringImpersonation } = require('../../../../shared/server/auth')
 const { JIRA_HOST } = require('../../../../shared/server/jira')
+const { filterCommittedFixVersions } = require('./committed-definition')
 
 const JIRA_SEARCH = JIRA_HOST + '/issues/?jql='
 const PM_HUB_PROJECTS = ['RHAIENG', 'RHOAIENG', 'INFERENG', 'AIPCC', 'RHAISTRAT', 'RHAIRFE']
@@ -525,7 +526,9 @@ module.exports = async function registerPmHubRoutes(router, context) {
    *     description: >
    *       Queries Jira for Features/Initiatives grouped by version then component.
    *       F Requested = issues where Target Version (cf[10855]) matches a selected version.
-   *       F Committed = issues where fixVersion matches a selected version.
+   *       F Committed = issues where fixVersion matches a selected version AND a Target
+   *       Version either matches that fixVersion or is later in the same release cycle
+   *       (early delivery; same product + major.minor, EA1 < EA2 < GA).
    *     parameters:
    *       - in: query
    *         name: components
@@ -657,7 +660,8 @@ module.exports = async function registerPmHubRoutes(router, context) {
         requestedIssues = await jiraClient.fetchAllJqlResults(tvJql, fieldsWithTv, { expand: 'renderedFields' })
       }
 
-      // Query 2: F Committed — fixVersion matches selected versions
+      // Query 2: FV candidates — fixVersion matches selected versions.
+      // Committed bucketing applies a stricter TV/FV rule after fetch.
       var committedIssues = []
       if (versionNames.length > 0) {
         var fvJqlParts = baseParts.slice()
@@ -691,49 +695,95 @@ module.exports = async function registerPmHubRoutes(router, context) {
         return versionGroups[vName].components[cName]
       }
 
-      // Process requested issues (Target Version matches)
+      // Process all issues with OR display logic:
+      // Show issue if selected release matches fixVersion OR targetVersion.
+      // committedFeatures/Count = FV in scope + TV match or early delivery (same cycle).
+      // requestedFeatures/Count = targetVersion matches selected scope only.
+      var allIssues = {}
+
       for (var ri = 0; ri < requestedIssues.length; ri++) {
         var raw = requestedIssues[ri]
-        var f = transformIssue(raw, {})
-        var tvNames = extractTargetVersions(raw)
+        if (!allIssues[raw.key]) allIssues[raw.key] = { raw: raw }
+      }
+      for (var cii = 0; cii < committedIssues.length; cii++) {
+        var rawC = committedIssues[cii]
+        if (!allIssues[rawC.key]) allIssues[rawC.key] = { raw: rawC }
+      }
+
+      var issueKeys = Object.keys(allIssues)
+      for (var ik = 0; ik < issueKeys.length; ik++) {
+        var entry = allIssues[issueKeys[ik]]
+        var rawIssue = entry.raw
+        var f = transformIssue(rawIssue, {})
+        var tvNames = extractTargetVersions(rawIssue)
+        var fvList = f.fixVersions && f.fixVersions.length > 0 ? f.fixVersions : []
         var compList = f.components && f.components.length > 0 ? f.components : ['No Component']
 
-        for (var tvi = 0; tvi < tvNames.length; tvi++) {
-          var tvName = tvNames[tvi]
-          if (versionNames.indexOf(tvName) === -1) continue
+        if (versionNames.length === 0) {
+          // Component-only mode: group by fixVersion; Committed still requires TV support
+          var committedFvOnly = filterCommittedFixVersions(fvList, tvNames)
+          if (committedFvOnly.length === 0) continue
+          for (var ufi = 0; ufi < committedFvOnly.length; ufi++) {
+            for (var uci = 0; uci < compList.length; uci++) {
+              var ucName = compList[uci]
+              if (componentNames.length > 0 && componentNames.indexOf(ucName) === -1) continue
+              var uGroup = ensureGroup(committedFvOnly[ufi], ucName)
+              if (!uGroup.committedFeatures.some(function(e) { return e.key === f.key })) {
+                uGroup.committedFeatures.push(buildFeatureObj(f, tvNames))
+                uGroup.committedCount++
+                if (f.isBlocked) uGroup.blockedCount++
+              }
+            }
+          }
+          continue
+        }
 
+        // Determine which selected versions match each field
+        var matchingFv = []
+        var matchingTv = []
+        for (var fvi = 0; fvi < fvList.length; fvi++) {
+          if (versionNames.indexOf(fvList[fvi]) !== -1) matchingFv.push(fvList[fvi])
+        }
+        for (var tvi = 0; tvi < tvNames.length; tvi++) {
+          if (versionNames.indexOf(tvNames[tvi]) !== -1) matchingTv.push(tvNames[tvi])
+        }
+
+        // OR logic: skip if neither field matches any selected version
+        if (matchingFv.length === 0 && matchingTv.length === 0) continue
+
+        // Committed = selected FV + TV match or early delivery in same cycle
+        var committedFv = filterCommittedFixVersions(matchingFv, tvNames)
+
+        // Group only under versions that will receive this feature (avoid empty groups
+        // when FV is in scope but fails the Committed TV rule).
+        var groupVersions = {}
+        for (var mf = 0; mf < committedFv.length; mf++) groupVersions[committedFv[mf]] = true
+        for (var mt = 0; mt < matchingTv.length; mt++) groupVersions[matchingTv[mt]] = true
+        var groupVersionKeys = Object.keys(groupVersions)
+        if (groupVersionKeys.length === 0) continue
+
+        var isRequested = matchingTv.length > 0
+        var featureObj = buildFeatureObj(f, tvNames)
+
+        for (var gvi = 0; gvi < groupVersionKeys.length; gvi++) {
+          var vKey = groupVersionKeys[gvi]
           for (var ci = 0; ci < compList.length; ci++) {
             var cName = compList[ci]
             if (componentNames.length > 0 && componentNames.indexOf(cName) === -1) continue
-            var group = ensureGroup(tvName, cName)
-            if (!group.requestedFeatures.some(function(e) { return e.key === f.key })) {
-              group.requestedFeatures.push(buildFeatureObj(f, tvNames))
-              group.requestedCount++
+            var group = ensureGroup(vKey, cName)
+
+            if (committedFv.indexOf(vKey) !== -1) {
+              if (!group.committedFeatures.some(function(e) { return e.key === f.key })) {
+                group.committedFeatures.push(featureObj)
+                group.committedCount++
+                if (f.isBlocked) group.blockedCount++
+              }
             }
-          }
-        }
-      }
-
-      // Process committed issues (Fix Version matches)
-      for (var cii = 0; cii < committedIssues.length; cii++) {
-        var rawC = committedIssues[cii]
-        var fc = transformIssue(rawC, {})
-        var tvNamesC = extractTargetVersions(rawC)
-        var fvList = fc.fixVersions && fc.fixVersions.length > 0 ? fc.fixVersions : ['Unversioned']
-        var compListC = fc.components && fc.components.length > 0 ? fc.components : ['No Component']
-
-        for (var fvi = 0; fvi < fvList.length; fvi++) {
-          var fvName = fvList[fvi]
-          if (versionNames.length > 0 && versionNames.indexOf(fvName) === -1) continue
-
-          for (var cci = 0; cci < compListC.length; cci++) {
-            var cNameC = compListC[cci]
-            if (componentNames.length > 0 && componentNames.indexOf(cNameC) === -1) continue
-            var groupC = ensureGroup(fvName, cNameC)
-            if (!groupC.committedFeatures.some(function(e) { return e.key === fc.key })) {
-              groupC.committedFeatures.push(buildFeatureObj(fc, tvNamesC))
-              groupC.committedCount++
-              if (fc.isBlocked) groupC.blockedCount++
+            if (isRequested && matchingTv.indexOf(vKey) !== -1) {
+              if (!group.requestedFeatures.some(function(e) { return e.key === f.key })) {
+                group.requestedFeatures.push(featureObj)
+                group.requestedCount++
+              }
             }
           }
         }
@@ -795,3 +845,4 @@ module.exports.backfillLeads = backfillLeads
 module.exports.computeVelocity = computeVelocity
 module.exports.buildFeatureObj = buildFeatureObj
 module.exports.extractTargetVersions = extractTargetVersions
+module.exports.filterCommittedFixVersions = filterCommittedFixVersions

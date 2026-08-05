@@ -1,16 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('../../../server/planning/pipeline', () => ({
-  runPipeline: vi.fn().mockReturnValue({
-    features: [], rfes: [], tier1Features: 0, tier1Rfes: 0,
-    tier2Features: 0, tier2Rfes: 0, tier3Features: 0,
-    perRockStats: {}, outcomeSummaries: {}, release: '3.5',
-    skippedCount: 0, terminalFilteredCount: 0, rocksWithoutOutcomes: []
-  }),
-  buildCandidateResponse: vi.fn().mockReturnValue({
-    version: '3.5', features: [], rfes: [], bigRocks: [], summary: null
-  })
-}))
+const { runPipelineMock, buildCandidateResponseMock } = vi.hoisted(function() {
+  return {
+    runPipelineMock: vi.fn().mockResolvedValue({
+      features: [], rfes: [], tier1Features: 0, tier1Rfes: 0,
+      tier2Features: 0, tier2Rfes: 0, tier3Features: 0,
+      perRockStats: {}, outcomeSummaries: {}, release: '3.5',
+      skippedCount: 0, terminalFilteredCount: 0, rocksWithoutOutcomes: [],
+      hierarchySource: 'jira', warnings: []
+    }),
+    buildCandidateResponseMock: vi.fn().mockReturnValue({
+      version: '3.5', features: [], rfes: [], bigRocks: [], summary: null,
+      hierarchySource: 'jira'
+    })
+  }
+})
+
+vi.mock('../../../server/planning/pipeline', function() {
+  return {
+    runPipeline: runPipelineMock,
+    buildCandidateResponse: buildCandidateResponseMock
+  }
+})
 
 vi.mock('../../../server/planning/config-lock', () => ({
   withConfigLock: vi.fn(function(fn) { return fn() })
@@ -310,6 +321,46 @@ describe('release-planning routes', function() {
       const req = makeReq({ params: { version: '3.5' } })
       const res = await callRoute(router._routes, 'POST', '/releases/:version/refresh', req)
       expect(res._status).toBe(200)
+    })
+  })
+
+  describe('POST /releases/:version/refresh hybrid jira wiring', function() {
+    it('passes context.jira into the pipeline for live outcome-children fetch', async function() {
+      const jira = { fetchAllJqlResults: vi.fn().mockResolvedValue([]) }
+      setupVersion(storage._store, '3.5', [{
+        priority: 1,
+        name: 'MaaS',
+        fullName: 'MaaS',
+        pillar: 'Inference',
+        state: '',
+        owner: 'Owner',
+        architect: '',
+        outcomeKeys: ['RHAISTRAT-1513'],
+        notes: ''
+      }])
+      storage._store['releases/execution/index.json'] = { features: [], rfes: [] }
+
+      const hybridRouter = makeRouter()
+      await registerRoutes(hybridRouter, Object.assign({}, context, {
+        storage: storage,
+        jira: jira
+      }))
+
+      jira.fetchAllJqlResults.mockClear()
+      const req = makeReq({ params: { version: '3.5' } })
+      const res = await callRoute(hybridRouter._routes, 'POST', '/releases/:version/refresh', req)
+      expect(res._status).toBe(200)
+      expect(res._json.status).toBe('started')
+
+      // Background refresh uses live Jira hierarchy via context.jira
+      await vi.waitFor(function() {
+        expect(jira.fetchAllJqlResults).toHaveBeenCalled()
+      }, { timeout: 3000 })
+
+      const jql = jira.fetchAllJqlResults.mock.calls[0][0]
+      expect(jql).toContain('RHAISTRAT-1513')
+      expect(jql).toContain('parent in')
+      expect(jql).toContain('"Epic Link" in')
     })
   })
 

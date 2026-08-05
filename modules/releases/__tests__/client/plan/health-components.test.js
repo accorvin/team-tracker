@@ -449,7 +449,26 @@ describe('BigRockExpandedRow', function() {
 
   it('shows empty state when features array is empty', function() {
     var wrapper = mountExpanded({ features: [] })
-    expect(wrapper.text()).toContain('No feature health data available')
+    expect(wrapper.text()).toContain('No Features targeting this release under this Big Rock\'s Outcomes')
+  })
+
+  it('shows Not in index badge for hybrid Jira-only children', function() {
+    var wrapper = mountExpanded({
+      features: [{
+        key: 'RHAISTRAT-900',
+        level: 'green',
+        flagCount: 0,
+        flagCategories: [],
+        summary: 'Jira-only child',
+        deliveryOwner: '',
+        jiraUrl: 'https://issues.redhat.com/browse/RHAISTRAT-900',
+        override: null,
+        status: 'New',
+        inIndex: false
+      }]
+    })
+    expect(wrapper.text()).toContain('Not in index')
+    expect(wrapper.text()).toContain('RHAISTRAT-900')
   })
 
   it('shows loading state when loading is true', function() {

@@ -123,7 +123,9 @@ function mapToCandidate(item, bigRockName, sourcePass) {
     source: item.key.startsWith('RHAIRFE-') ? 'rfe' : 'jira',
     sourcePass: sourcePass,
     jiraUrl: JIRA_BROWSE_URL + '/' + item.key,
-    parentKey: item.parentKey || (item._indexEntry && item._indexEntry.parentKey) || ''
+    parentKey: item.parentKey || (item._indexEntry && item._indexEntry.parentKey) || '',
+    // false when discovered via live Jira hierarchy but not yet in execution index
+    inIndex: item.inIndex !== false
   }
 }
 
@@ -192,8 +194,100 @@ async function findTier1Features(readFromStorage, index, outcomeKeys, stats) {
     const detail = await loadFeatureDetail(readFromStorage, f.key)
     if (detail) {
       detail._indexEntry = f
+      detail.inIndex = true
+    } else {
+      f.inIndex = true
     }
     results.push(detail || f)
+  }
+
+  return results
+}
+
+/**
+ * Tier 1 features from live Jira children, enriched from the execution index.
+ * Jira hierarchy is authoritative for membership; index supplies metrics/links.
+ *
+ * @param {Function} readFromStorage
+ * @param {object} index
+ * @param {string[]} outcomeKeys
+ * @param {Record<string, object[]>} jiraChildrenByOutcome
+ * @param {object} [stats]
+ */
+async function findTier1FeaturesFromJira(readFromStorage, index, outcomeKeys, jiraChildrenByOutcome, stats) {
+  const results = []
+  const indexByKey = {}
+  const features = index.features || []
+  for (var ii = 0; ii < features.length; ii++) {
+    if (features[ii] && features[ii].key) indexByKey[features[ii].key] = features[ii]
+  }
+
+  if (stats) {
+    stats.totalMatches = 0
+    stats.closedFiltered = 0
+    stats.noTargetVersion = 0
+    stats.jiraOnly = 0
+  }
+
+  for (var oi = 0; oi < outcomeKeys.length; oi++) {
+    var outcomeKey = outcomeKeys[oi]
+    var children = (jiraChildrenByOutcome && jiraChildrenByOutcome[outcomeKey]) || []
+    for (var ci = 0; ci < children.length; ci++) {
+      var jiraChild = children[ci]
+      if (!jiraChild || !jiraChild.key) continue
+      if (stats) stats.totalMatches++
+
+      var indexEntry = indexByKey[jiraChild.key]
+      var detail = indexEntry ? await loadFeatureDetail(readFromStorage, jiraChild.key) : null
+      var merged
+      if (detail) {
+        merged = Object.assign({}, detail)
+        merged.inIndex = true
+        // Prefer fresher Jira status/TV/parent when present
+        if (jiraChild.status) merged.status = jiraChild.status
+        if (jiraChild.priority) merged.priority = jiraChild.priority
+        if (jiraChild.summary) merged.summary = jiraChild.summary
+        if (jiraChild.targetVersions && jiraChild.targetVersions.length) {
+          merged.targetVersions = jiraChild.targetVersions
+        }
+        if (jiraChild.fixVersions && jiraChild.fixVersions.length) {
+          merged.fixVersions = jiraChild.fixVersions
+        }
+        merged.parentKey = jiraChild.parentKey || outcomeKey
+        merged._indexEntry = indexEntry
+      } else if (indexEntry) {
+        merged = Object.assign({}, indexEntry, {
+          inIndex: true,
+          status: jiraChild.status || indexEntry.status,
+          priority: jiraChild.priority || indexEntry.priority,
+          summary: jiraChild.summary || indexEntry.summary,
+          targetVersions: (jiraChild.targetVersions && jiraChild.targetVersions.length)
+            ? jiraChild.targetVersions
+            : indexEntry.targetVersions,
+          parentKey: jiraChild.parentKey || outcomeKey
+        })
+      } else {
+        merged = Object.assign({}, jiraChild, {
+          inIndex: false,
+          parentKey: jiraChild.parentKey || outcomeKey
+        })
+      }
+
+      var versions = getTargetVersions(merged)
+      if (versions.length === 0) {
+        if (stats) stats.noTargetVersion++
+        continue
+      }
+
+      var status = merged.status || ''
+      if (CLOSED_STATUSES.indexOf(status) !== -1) {
+        if (stats) stats.closedFiltered++
+        continue
+      }
+
+      if (stats && merged.inIndex === false) stats.jiraOnly++
+      results.push(merged)
+    }
   }
 
   return results
@@ -374,6 +468,7 @@ module.exports = {
   mapToCandidate: mapToCandidate,
   findRfeFromLinks: findRfeFromLinks,
   findTier1Features: findTier1Features,
+  findTier1FeaturesFromJira: findTier1FeaturesFromJira,
   findTier1Rfes: findTier1Rfes,
   findOutcomeSummaries: findOutcomeSummaries,
   findTier2Features: findTier2Features,

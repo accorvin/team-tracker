@@ -1,6 +1,16 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
 import { useModuleLink } from '@shared/client/composables/useModuleLink'
+import MultiSelectDropdown from './MultiSelectDropdown.vue'
+import { collectVersionGroups, matchesVersionGroups, formatVersionGroupLabel } from '../utils/version-group.js'
+import {
+  filterChipsRowClass,
+  filterChipNeutralClass,
+  filterChipStatusClass,
+  filterChipVersionClass,
+  filterChipRemoveClass,
+  filterChipsClearAllClass
+} from '../utils/filter-chip-classes.js'
 
 const { linkTo } = useModuleLink()
 const moduleNav = inject('moduleNav')
@@ -35,17 +45,66 @@ function sortIcon(key) {
 
 // ── Search / filter state (local to table) ───────────────────────────────────
 const search = ref('')
-const completionFilter = ref('all')
+// Empty arrays mean "all". Within a filter = OR; across filters = AND.
+const completionFilter = ref([])
 const productFilter = ref('all')
-const targetVersionFilter = ref('all')
+const targetVersionFilter = ref([])
+
+const STATUS_OPTIONS = [
+  { value: 'completed', label: 'Completed' },
+  { value: 'in-progress', label: 'In Progress' },
+  { value: 'in_queue', label: 'In Queue' }
+]
 
 const targetVersionOptions = computed(() => {
-  const versions = new Set()
+  const versions = []
   Object.values(props.components).forEach(c => {
-    if (c.targetVersion) versions.add(c.targetVersion)
+    if (c.targetVersion) versions.push(c.targetVersion)
   })
-  return [...versions].sort()
+  // One option per logical release (version + phase); merge naming formats only.
+  return collectVersionGroups(versions).map(g => ({
+    value: g,
+    label: formatVersionGroupLabel(g)
+  }))
 })
+
+const selectedStatusChips = computed(() =>
+  completionFilter.value.map(v => ({
+    value: v,
+    label: STATUS_OPTIONS.find(o => o.value === v)?.label || v
+  }))
+)
+
+const selectedVersionChips = computed(() =>
+  targetVersionFilter.value.map(v => ({
+    value: v,
+    label: formatVersionGroupLabel(v)
+  }))
+)
+
+const hasActiveFilters = computed(() =>
+  Boolean(
+    search.value ||
+    completionFilter.value.length ||
+    productFilter.value !== 'all' ||
+    targetVersionFilter.value.length
+  )
+)
+
+function removeStatus(value) {
+  completionFilter.value = completionFilter.value.filter(v => v !== value)
+}
+
+function removeVersion(value) {
+  targetVersionFilter.value = targetVersionFilter.value.filter(v => v !== value)
+}
+
+function clearAllFilters() {
+  search.value = ''
+  completionFilter.value = []
+  productFilter.value = 'all'
+  targetVersionFilter.value = []
+}
 
 // ── Derived list ──────────────────────────────────────────────────────────────
 const selectedKey = ref(null)
@@ -69,11 +128,11 @@ const componentList = computed(() => {
   return Object.values(props.components)
     .filter(c => (c.onboardingMethod || 'automated') === 'automated')
     .filter(c => {
-      if (completionFilter.value !== 'all') {
-        if (c.completionStatus !== completionFilter.value) return false
+      if (completionFilter.value.length && !completionFilter.value.includes(c.completionStatus)) {
+        return false
       }
       if (productFilter.value !== 'all' && c.productContext !== productFilter.value) return false
-      if (targetVersionFilter.value !== 'all' && (c.targetVersion || '') !== targetVersionFilter.value) return false
+      if (!matchesVersionGroups(c.targetVersion, targetVersionFilter.value)) return false
       if (!q) return true
       return (
         c.key.toLowerCase().includes(q) ||
@@ -186,53 +245,104 @@ function completionStatusDotClass(status) {
 <template>
   <div class="flex-1 overflow-auto">
     <!-- Table controls -->
-    <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-3 bg-white dark:bg-gray-900">
-      <!-- Search -->
-      <div class="relative">
-        <svg class="absolute left-2.5 top-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input
-          v-model="search"
-          type="text"
-          placeholder="Search key, component, feature…"
-          class="pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
+    <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-col gap-2 bg-white dark:bg-gray-900">
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Search -->
+        <div class="relative">
+          <svg class="absolute left-2.5 top-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            v-model="search"
+            type="text"
+            placeholder="Search key, component, feature…"
+            class="pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
+          />
+        </div>
+
+        <MultiSelectDropdown
+          v-model="completionFilter"
+          :options="STATUS_OPTIONS"
+          placeholder="All statuses"
+          test-id="status-filter-menu"
         />
+
+        <!-- Product filter -->
+        <select
+          v-model="productFilter"
+          class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">All products</option>
+          <option value="RHOAI">RHOAI</option>
+          <option value="ODH">ODH</option>
+        </select>
+
+        <MultiSelectDropdown
+          v-model="targetVersionFilter"
+          :options="targetVersionOptions"
+          placeholder="All versions"
+          test-id="version-filter-menu"
+          empty-text="No versions"
+        />
+
+        <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">
+          {{ componentList.length }} component{{ componentList.length !== 1 ? 's' : '' }}
+        </span>
       </div>
 
-      <!-- Completion filter -->
-      <select
-        v-model="completionFilter"
-        class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      <!-- Active filter chips -->
+      <div
+        v-if="hasActiveFilters"
+        :class="filterChipsRowClass"
       >
-        <option value="all">All statuses</option>
-        <option value="completed">Completed</option>
-        <option value="in-progress">In Progress</option>
-        <option value="in_queue">In Queue</option>
-      </select>
-
-      <!-- Product filter -->
-      <select
-        v-model="productFilter"
-        class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        <option value="all">All products</option>
-        <option value="RHOAI">RHOAI</option>
-        <option value="ODH">ODH</option>
-      </select>
-
-      <!-- Target Version filter -->
-      <select
-        v-model="targetVersionFilter"
-        class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        <option value="all">All versions</option>
-        <option v-for="v in targetVersionOptions" :key="v" :value="v">{{ v }}</option>
-      </select>
-
-      <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">
-        {{ componentList.length }} component{{ componentList.length !== 1 ? 's' : '' }}
-      </span>
+        <span
+          v-if="search"
+          :class="filterChipNeutralClass"
+        >
+          Search: {{ search }}
+          <button type="button" :class="filterChipRemoveClass" aria-label="Clear search" @click="search = ''">×</button>
+        </span>
+        <span
+          v-if="productFilter !== 'all'"
+          :class="filterChipNeutralClass"
+        >
+          {{ productFilter }}
+          <button type="button" :class="filterChipRemoveClass" aria-label="Clear product" @click="productFilter = 'all'">×</button>
+        </span>
+        <span
+          v-for="chip in selectedStatusChips"
+          :key="'s-' + chip.value"
+          :class="filterChipStatusClass"
+        >
+          {{ chip.label }}
+          <button
+            type="button"
+            :class="filterChipRemoveClass"
+            :aria-label="'Remove ' + chip.label"
+            @click="removeStatus(chip.value)"
+          >×</button>
+        </span>
+        <span
+          v-for="chip in selectedVersionChips"
+          :key="'v-' + chip.value"
+          :class="filterChipVersionClass"
+        >
+          {{ chip.label }}
+          <button
+            type="button"
+            :class="filterChipRemoveClass"
+            :aria-label="'Remove ' + chip.label"
+            @click="removeVersion(chip.value)"
+          >×</button>
+        </span>
+        <button
+          type="button"
+          :class="filterChipsClearAllClass"
+          @click="clearAllFilters"
+        >
+          Clear all
+        </button>
+      </div>
     </div>
 
     <!-- Table -->

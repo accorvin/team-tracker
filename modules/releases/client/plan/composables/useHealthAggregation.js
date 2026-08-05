@@ -172,13 +172,16 @@ export function useHealthAggregation(healthData, features, _rfes, _bigRocks) {
 
   /**
    * Per-big-rock feature detail: key, effective level, flag count, flag categories.
-   * Respects risk overrides.
+   * Built from candidates (so Jira-only hybrid children appear even without health),
+   * enriched with health when available. Respects risk overrides.
    */
   var rockFeatures = computed(function() {
-    if (Object.keys(healthByKey.value).length === 0) return {}
+    if (!features.value || features.value.length === 0) return {}
     var result = {}
     for (var i = 0; i < features.value.length; i++) {
       var f = features.value[i]
+      // Tier 1 Big Rock children only in the expanded Outcome view
+      if (f.tier != null && f.tier !== 1) continue
       var rockNames = f.bigRock ? f.bigRock.split(', ') : []
       if (rockNames.length === 0) continue
       var h = healthByKey.value[f.issueKey]
@@ -194,19 +197,20 @@ export function useHealthAggregation(healthData, features, _rfes, _bigRocks) {
           level: level,
           flagCount: flags.length,
           flagCategories: flags.map(function(fl) { return fl.category }),
-          summary: h ? (h.summary || '') : '',
+          summary: (h && h.summary) || f.summary || '',
           planningStatus: h ? (h.planningStatus || '') : '',
-          deliveryOwner: h ? (h.deliveryOwner || '') : '',
-          jiraUrl: h ? (h.jiraUrl || '') : '',
+          deliveryOwner: (h && h.deliveryOwner) || f.deliveryOwner || '',
+          jiraUrl: (h && h.jiraUrl) || f.jiraUrl || '',
           override: h && h.risk ? (h.risk.override || null) : null,
-          status: h ? (h.status || '') : '',
-          fixVersions: h ? (h.fixVersions || '') : '',
-          targetRelease: h ? (h.targetRelease || '') : '',
+          status: (h && h.status) || f.status || '',
+          fixVersions: (h && h.fixVersions) || f.fixVersion || '',
+          targetRelease: (h && h.targetRelease) || f.targetRelease || '',
           versionStatus: h ? (h.versionStatus || 'none') : 'none',
           completionPct: h ? (h.completionPct || 0) : 0,
           planningChecks: h && h.planningChecks ? h.planningChecks : null,
           fpdor: h && h.fpdor ? h.fpdor : null,
-          parentKey: f.parentKey || ''
+          parentKey: f.parentKey || '',
+          inIndex: f.inIndex !== false
         })
       }
     }

@@ -16,23 +16,9 @@ vi.mock('../../../server/planning/health/health-pipeline', () => ({
     milestones: null,
     enrichmentStatus: { jiraQueriesRun: 0, featuresEnriched: 0, warnings: [] }
   }),
-  loadMilestones: vi.fn().mockReturnValue({
-    ea1Freeze: null, ea1Target: '2026-06-18', ea2Freeze: null, ea2Target: '2026-07-16',
-    gaFreeze: null, gaTarget: '2026-08-20', _matched: { ea1: 'rhelai-3.5 EA1 release', ea2: 'rhelai-3.5 EA2 release', ga: 'rhelai-3.5 GA' }
-  }),
-  backfillFreezeDatesFromSmartsheet: vi.fn().mockResolvedValue({
-    milestones: {
-      ea1Freeze: '2026-05-15', ea1Target: '2026-06-18', ea2Freeze: '2026-06-19', ea2Target: '2026-07-16',
-      gaFreeze: '2026-07-24', gaTarget: '2026-08-20'
-    },
-    warnings: []
-  }),
-  deriveFreezeDates: vi.fn().mockReturnValue({
-    milestones: {
-      ea1Freeze: '2026-05-15', ea1Target: '2026-06-18', ea2Freeze: '2026-06-19', ea2Target: '2026-07-16',
-      gaFreeze: '2026-07-24', gaTarget: '2026-08-20'
-    },
-    warnings: []
+  loadMilestones: vi.fn().mockResolvedValue({
+    ea1Freeze: '2026-05-15', ea1Target: '2026-06-18', ea2Freeze: '2026-06-19', ea2Target: '2026-07-16',
+    gaFreeze: '2026-07-24', gaTarget: '2026-08-20', _matched: { ea1: 'rhelai-3.5 EA1 release', ea2: 'rhelai-3.5 EA2 release', ga: 'rhelai-3.5 GA' }
   })
 }))
 
@@ -43,11 +29,6 @@ vi.mock('../../../../../shared/server/auth', () => ({
 vi.mock('../../../../../shared/server/jira', () => ({
   jiraRequest: vi.fn().mockResolvedValue([]),
   fetchAllJqlResults: vi.fn()
-}))
-
-vi.mock('../../../../../shared/server/smartsheet', () => ({
-  isConfigured: vi.fn().mockReturnValue(false),
-  discoverReleasesPartial: vi.fn().mockResolvedValue([])
 }))
 
 const healthRoutes = require('../../../server/planning/health/health-routes')
@@ -904,53 +885,17 @@ describe('health routes', function() {
       expect(res._status).toBe(400)
     })
 
-    it('returns full derivation chain', async function() {
-      storage._store['releases/delivery/product-pages-releases-cache.json'] = {
-        releases: [
-          { releaseNumber: 'rhelai-3.5 EA1 release', targetDate: '2026-06-18' },
-          { releaseNumber: 'rhelai-3.5 GA', targetDate: '2026-08-20' }
-        ]
-      }
+    it('returns registry entries and milestones', async function() {
       var res = await callRoute(router._routes, 'GET', '/releases/:version/health/milestones/debug',
         makeReq({ params: { version: '3.5' } }))
       expect(res._status).toBe(200)
       expect(res._json.version).toBe('3.5')
-      expect(res._json.productPages).toHaveLength(2)
-      expect(res._json.afterLoadMilestones).toBeDefined()
-      expect(res._json.afterBackfill).toBeDefined()
-      expect(res._json.afterBackfill.milestones).toBeDefined()
-      expect(res._json.afterDerive).toBeDefined()
-      expect(res._json.afterDerive.milestones).toBeDefined()
-    })
-
-    it('filters product pages entries by version', async function() {
-      storage._store['releases/delivery/product-pages-releases-cache.json'] = {
-        releases: [
-          { releaseNumber: 'rhelai-3.5 EA1 release' },
-          { releaseNumber: 'rhelai-3.4 GA' },
-          { releaseNumber: 'rhelai-3.5 GA' }
-        ]
-      }
-      var res = await callRoute(router._routes, 'GET', '/releases/:version/health/milestones/debug',
-        makeReq({ params: { version: '3.5' } }))
-      expect(res._json.productPages).toHaveLength(2)
-    })
-
-    it('includes smartsheet field in response', async function() {
-      var res = await callRoute(router._routes, 'GET', '/releases/:version/health/milestones/debug',
-        makeReq({ params: { version: '3.5' } }))
-      expect(res._status).toBe(200)
-      expect('smartsheet' in res._json).toBe(true)
-    })
-
-    it('returns smartsheet as null when not configured', async function() {
-      var res = await callRoute(router._routes, 'GET', '/releases/:version/health/milestones/debug',
-        makeReq({ params: { version: '3.5' } }))
-      expect(res._json.smartsheet).toBeNull()
+      expect(res._json.registry).toBeDefined()
+      expect(res._json.milestones).toBeDefined()
     })
 
     it('returns 500 on internal error', async function() {
-      Object.defineProperty(storage._store, 'releases/delivery/product-pages-releases-cache.json', {
+      Object.defineProperty(storage._store, 'releases/registry.json', {
         get: function() { throw new Error('Storage read error') },
         configurable: true
       })

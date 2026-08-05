@@ -1,5 +1,6 @@
 <script setup>
 import { reactive, computed } from 'vue'
+import { getComponentLeads } from '../../composables/componentLeads'
 
 const props = defineProps({
   groups: { type: Array, default: () => [] },
@@ -134,28 +135,16 @@ function collapseAll() {
 }
 
 function getLeads(componentName) {
-  var lower = (componentName || '').toLowerCase()
-  var leads = props.componentLeads
-  if (leads[lower]) return leads[lower]
-  var keys = Object.keys(leads)
-  for (var i = 0; i < keys.length; i++) {
-    if (lower.includes(keys[i]) || keys[i].includes(lower)) return leads[keys[i]]
-  }
-  return null
+  return getComponentLeads(props.componentLeads, componentName)
 }
 
 function extractProduct(versionName) {
   if (!versionName) return versionName
   var lower = versionName.toLowerCase()
-  if (lower.startsWith('rhoai')) return 'RHOAI'
-  if (lower.startsWith('rhelai')) return 'RHELAI'
-  if (lower.startsWith('rhaii')) return 'RHAII'
-  return versionName.split('-')[0] || versionName
-}
-
-function normalizeVersion(v) {
-  if (!v || typeof v !== 'string') return v
-  return v.replace(/^rhoai-/i, '')
+  if (lower.indexOf('rhoai') !== -1) return 'RHOAI'
+  if (lower.indexOf('rhelai') !== -1) return 'RHELAI'
+  if (lower.indexOf('rhaii') !== -1) return 'RHAII'
+  return null
 }
 
 var componentGroups = computed(function() {
@@ -300,8 +289,8 @@ defineExpose({ expandAll, collapseAll })
 </script>
 
 <template>
-  <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-    <table class="w-full text-sm border-collapse">
+  <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+    <table class="w-full text-sm border-collapse min-w-[1400px]">
       <tbody>
         <template v-for="comp in componentGroups" :key="comp.component">
           <!-- Component group header -->
@@ -474,7 +463,7 @@ defineExpose({ expandAll, collapseAll })
                     v-for="fv in feature.fixVersions"
                     :key="fv"
                     class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
-                  >{{ normalizeVersion(fv) }}</span>
+                  >{{ fv }}</span>
                 </div>
                 <span v-else class="text-gray-300 dark:text-gray-600 text-xs">--</span>
               </td>
@@ -484,7 +473,7 @@ defineExpose({ expandAll, collapseAll })
                     v-for="tv in feature.targetVersions"
                     :key="tv"
                     class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
-                  >{{ normalizeVersion(tv) }}</span>
+                  >{{ tv }}</span>
                 </div>
                 <span v-else class="text-gray-300 dark:text-gray-600 text-xs">--</span>
               </td>

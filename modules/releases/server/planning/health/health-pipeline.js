@@ -20,7 +20,7 @@ const { enrichFeatures } = require('./jira-enrichment')
 const { computeFeatureRisk } = require('./risk-engine')
 var { computeFPDoRReadiness, extractRubricData } = require('../fpdor')
 const { computePriorityScores } = require('./priority-scorer')
-const smartsheetClient = require('../../../../../shared/server/smartsheet')
+const { getRegistryReleasesFlat } = require('../../registry')
 
 var DATA_PREFIX = 'releases/planning'
 
@@ -257,16 +257,16 @@ function getFeaturePhase(feature) {
 }
 
 /**
- * Load milestone data from the Product Pages cache (written by release-analysis module).
- * Maps Product Pages release entries to the milestones shape the health pipeline expects.
+ * Load milestone data from the release registry.
+ * Maps registry release entries to the milestones shape the health pipeline expects.
  *
  * @param {Function} readFromStorage
  * @param {string} version - Release version (e.g., '3.5')
  * @returns {object|null} Milestone dates or null
  */
 async function loadMilestones(readFromStorage, version) {
-  var cached = await readFromStorage('releases/delivery/product-pages-releases-cache.json')
-  if (!cached || !cached.releases || !Array.isArray(cached.releases)) {
+  var releases = await getRegistryReleasesFlat(readFromStorage)
+  if (!releases || releases.length === 0) {
     return null
   }
 
@@ -280,8 +280,8 @@ async function loadMilestones(readFromStorage, version) {
   var ea2Entry = null
   var gaEntry = null
 
-  for (var i = 0; i < cached.releases.length; i++) {
-    var r = cached.releases[i]
+  for (var i = 0; i < releases.length; i++) {
+    var r = releases[i]
     var rn = r.releaseNumber || ''
     if (ea1Pattern.test(rn)) {
       if (!ea1Entry || preferredProduct.test(rn)) ea1Entry = r
@@ -312,7 +312,7 @@ async function loadMilestones(readFromStorage, version) {
 }
 
 /**
- * Look up the previous version's GA code freeze date from Product Pages cache.
+ * Look up the previous version's GA code freeze date from the release registry.
  * Used to compute EA1's planning freeze (1 week before previous GA code freeze).
  *
  * @param {Function} readFromStorage
@@ -326,122 +326,17 @@ async function loadPreviousGaFreeze(readFromStorage, version) {
   if (prevMinor < 0) return null
   var prevVersion = parts[0] + '.' + prevMinor
 
-  // Try Product Pages cache first
-  var cached = await readFromStorage('releases/delivery/product-pages-releases-cache.json')
-  if (cached && cached.releases && Array.isArray(cached.releases)) {
-    for (var i = 0; i < cached.releases.length; i++) {
-      var r = cached.releases[i]
-      var rn = r.releaseNumber || ''
-      if (rn.indexOf(prevVersion) !== -1 && !/\bEA\d?\b/i.test(rn)) {
-        if (r.codeFreezeDate) return r.codeFreezeDate
-      }
-    }
-  }
-
-  // Fallback to Smartsheet
-  if (smartsheetClient.isConfigured()) {
-    try {
-      var releases = await smartsheetClient.discoverReleasesPartial()
-      for (var j = 0; j < releases.length; j++) {
-        if (releases[j].version === prevVersion && releases[j].gaFreeze) {
-          return releases[j].gaFreeze
-        }
-      }
-    } catch {
-      // fall through
+  var releases = await getRegistryReleasesFlat(readFromStorage)
+  for (var i = 0; i < releases.length; i++) {
+    var r = releases[i]
+    var rn = r.releaseNumber || ''
+    if (rn.indexOf(prevVersion) !== -1 && !/\bEA\d?\b/i.test(rn)) {
+      if (r.codeFreezeDate) return r.codeFreezeDate
     }
   }
 
   return null
 }
-
-/**
- * Fill missing freeze dates from Smartsheet.
- *
- * If milestones is null (no Product Pages data), attempts to load everything
- * from Smartsheet. If milestones exist but freeze dates are null, merges
- * Smartsheet freeze dates into the existing object.
- *
- * @param {object|null} milestones - Milestones from Product Pages (may have null freeze fields)
- * @param {string} version - Release version (e.g., '3.5')
- * @returns {Promise<{ milestones: object|null, warnings: string[] }>}
- */
-async function backfillFreezeDatesFromSmartsheet(milestones, version) {
-  var warnings = []
-
-  if (!smartsheetClient.isConfigured()) {
-    if (!milestones) {
-      warnings.push('Neither Product Pages nor Smartsheet is configured -- milestone risk checks will be skipped')
-    } else if (!milestones.ea1Freeze && !milestones.ea2Freeze && !milestones.gaFreeze) {
-      warnings.push('Product Pages freeze dates are missing and Smartsheet is not configured')
-    }
-    return { milestones: milestones, warnings: warnings }
-  }
-
-  var needsFullLoad = !milestones
-  var needsFreezeFill = milestones &&
-    !milestones.ea1Freeze && !milestones.ea2Freeze && !milestones.gaFreeze
-
-  if (!needsFullLoad && !needsFreezeFill) {
-    return { milestones: milestones, warnings: warnings }
-  }
-
-  try {
-    var releases = await smartsheetClient.discoverReleasesPartial()
-    var match = null
-    for (var i = 0; i < releases.length; i++) {
-      if (releases[i].version === version) {
-        match = releases[i]
-        break
-      }
-    }
-
-    if (!match) {
-      if (needsFullLoad) {
-        warnings.push('No milestone data found in Smartsheet for version ' + version)
-      }
-      return { milestones: milestones, warnings: warnings }
-    }
-
-    if (needsFullLoad) {
-      warnings.push('Using Smartsheet as milestone source (Product Pages unavailable)')
-      return {
-        milestones: {
-          ea1Freeze: match.ea1Freeze,
-          ea1Target: match.ea1Target,
-          ea2Freeze: match.ea2Freeze,
-          ea2Target: match.ea2Target,
-          gaFreeze: match.gaFreeze,
-          gaTarget: match.gaTarget
-        },
-        warnings: warnings
-      }
-    }
-
-    // Merge freeze dates from Smartsheet into existing Product Pages milestones
-    var merged = {
-      ea1Freeze: milestones.ea1Freeze || match.ea1Freeze || null,
-      ea1Target: milestones.ea1Target,
-      ea2Freeze: milestones.ea2Freeze || match.ea2Freeze || null,
-      ea2Target: milestones.ea2Target,
-      gaFreeze: milestones.gaFreeze || match.gaFreeze || null,
-      gaTarget: milestones.gaTarget
-    }
-    var filled = []
-    if (!milestones.ea1Freeze && merged.ea1Freeze) filled.push('ea1Freeze')
-    if (!milestones.ea2Freeze && merged.ea2Freeze) filled.push('ea2Freeze')
-    if (!milestones.gaFreeze && merged.gaFreeze) filled.push('gaFreeze')
-    if (filled.length > 0) {
-      warnings.push('Backfilled freeze dates from Smartsheet: ' + filled.join(', '))
-    }
-    return { milestones: merged, warnings: warnings }
-  } catch (err) {
-    warnings.push('Smartsheet fallback failed: ' + err.message)
-    return { milestones: milestones, warnings: warnings }
-  }
-}
-
-var FREEZE_OFFSET_DAYS = 30
 
 /**
  * Offset a date string by a given number of days.
@@ -453,38 +348,6 @@ function offsetDate(dateStr, days) {
   var d = new Date(dateStr + 'T00:00:00Z')
   d.setUTCDate(d.getUTCDate() + days)
   return d.toISOString().split('T')[0]
-}
-
-/**
- * Derive missing freeze dates by subtracting FREEZE_OFFSET_DAYS from target dates.
- *
- * @param {object|null} milestones
- * @returns {{ milestones: object|null, warnings: string[] }}
- */
-function deriveFreezeDates(milestones) {
-  var warnings = []
-  if (!milestones) return { milestones: null, warnings: warnings }
-
-  var derived = []
-
-  if (!milestones.ea1Freeze && milestones.ea1Target) {
-    milestones.ea1Freeze = offsetDate(milestones.ea1Target, -FREEZE_OFFSET_DAYS)
-    derived.push('ea1Freeze')
-  }
-  if (!milestones.ea2Freeze && milestones.ea2Target) {
-    milestones.ea2Freeze = offsetDate(milestones.ea2Target, -FREEZE_OFFSET_DAYS)
-    derived.push('ea2Freeze')
-  }
-  if (!milestones.gaFreeze && milestones.gaTarget) {
-    milestones.gaFreeze = offsetDate(milestones.gaTarget, -FREEZE_OFFSET_DAYS)
-    derived.push('gaFreeze')
-  }
-
-  if (derived.length > 0) {
-    warnings.push('Derived freeze dates (target minus ' + FREEZE_OFFSET_DAYS + ' days): ' + derived.join(', '))
-  }
-
-  return { milestones: milestones, warnings: warnings }
 }
 
 /**
@@ -691,14 +554,8 @@ async function runHealthPipeline(version, readFromStorage, writeToStorage, jiraR
     }
   }
 
-  // Step 2: Load milestone dates (Product Pages → Smartsheet fallback → derived from targets)
+  // Step 2: Load milestone dates from registry (freeze dates already backfilled by registry-sync)
   var milestones = await loadMilestones(readFromStorage, version)
-  var fallbackResult = await backfillFreezeDatesFromSmartsheet(milestones, version)
-  milestones = fallbackResult.milestones
-  warnings = warnings.concat(fallbackResult.warnings)
-  var deriveResult = deriveFreezeDates(milestones)
-  milestones = deriveResult.milestones
-  warnings = warnings.concat(deriveResult.warnings)
   var prevGaFreeze = await loadPreviousGaFreeze(readFromStorage, version)
 
   // Step 3: Run Jira enrichment
@@ -1026,8 +883,6 @@ module.exports = {
   loadFeaturesForRelease: loadFeaturesForRelease,
   loadFeaturesFromCandidates: loadFeaturesFromCandidates,
   loadMilestones: loadMilestones,
-  backfillFreezeDatesFromSmartsheet: backfillFreezeDatesFromSmartsheet,
-  deriveFreezeDates: deriveFreezeDates,
   computeMilestoneInfo: computeMilestoneInfo,
   computePlanningDeadline: computePlanningDeadline,
   deriveReleasePhaseMode: deriveReleasePhaseMode,

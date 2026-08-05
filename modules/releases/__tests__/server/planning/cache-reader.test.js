@@ -3,6 +3,7 @@ const {
   mapToCandidate,
   findRfeFromLinks,
   findTier1Features,
+  findTier1FeaturesFromJira,
   findTier1Rfes,
   findOutcomeSummaries,
   findTier2Features,
@@ -125,6 +126,15 @@ describe('mapToCandidate', () => {
     expect(candidate.deliveryOwner).toBe('John Smith')
     expect(candidate.source).toBe('jira')
     expect(candidate.sourcePass).toBe('outcome')
+    expect(candidate.inIndex).toBe(true)
+  })
+
+  it('preserves inIndex: false for Jira-only hybrid children', () => {
+    const feature = makeFeatureIndex('RHAISTRAT-100', {
+      targetVersions: ['rhoai-3.6'],
+      inIndex: false
+    })
+    expect(mapToCandidate(feature, 'MaaS', 'outcome').inIndex).toBe(false)
   })
 
   it('maps a detail-level feature (object fields)', () => {
@@ -269,6 +279,71 @@ describe('findTier1Features', () => {
     const results = await findTier1Features(readFromStorage, index, ['KEY-1'])
     expect(results).toHaveLength(1)
     expect(results[0].key).toBe('RHAISTRAT-100')
+  })
+})
+
+describe('findTier1FeaturesFromJira', () => {
+  it('enriches index features and flags jira-only children', async () => {
+    const index = {
+      features: [
+        makeFeatureIndex('RHAISTRAT-100', {
+          parentKey: 'RHAISTRAT-2000',
+          targetVersions: ['rhoai-3.6'],
+          status: 'In Progress'
+        })
+      ],
+      rfes: []
+    }
+    const details = [
+      makeFeatureDetail('RHAISTRAT-100', {
+        parentKey: 'RHAISTRAT-2000',
+        targetVersions: ['rhoai-3.6'],
+        components: ['Serving']
+      })
+    ]
+    const readFromStorage = createMockStorage(details)
+    const jiraChildren = {
+      'RHAISTRAT-2000': [
+        {
+          key: 'RHAISTRAT-100',
+          summary: 'Updated summary',
+          status: 'In Progress',
+          targetVersions: ['rhoai-3.6'],
+          parentKey: 'RHAISTRAT-2000'
+        },
+        {
+          key: 'RHAISTRAT-999',
+          summary: 'Not in index yet',
+          status: 'New',
+          targetVersions: ['rhoai-3.6'],
+          parentKey: 'RHAISTRAT-2000',
+          components: [],
+          fixVersions: [],
+          labels: []
+        },
+        {
+          key: 'RHAISTRAT-998',
+          summary: 'No TV',
+          status: 'New',
+          targetVersions: [],
+          parentKey: 'RHAISTRAT-2000'
+        }
+      ]
+    }
+    const stats = {}
+    const results = await findTier1FeaturesFromJira(
+      readFromStorage, index, ['RHAISTRAT-2000'], jiraChildren, stats
+    )
+
+    expect(results).toHaveLength(2)
+    expect(results[0].key).toBe('RHAISTRAT-100')
+    expect(results[0].inIndex).toBe(true)
+    expect(results[0].summary).toBe('Updated summary')
+    expect(results[1].key).toBe('RHAISTRAT-999')
+    expect(results[1].inIndex).toBe(false)
+    expect(stats.jiraOnly).toBe(1)
+    expect(stats.noTargetVersion).toBe(1)
+    expect(stats.totalMatches).toBe(3)
   })
 })
 

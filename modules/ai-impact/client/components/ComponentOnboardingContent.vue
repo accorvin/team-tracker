@@ -3,6 +3,12 @@ import { ref, computed } from 'vue'
 import OnboardingMetricsRow from './OnboardingMetricsRow.vue'
 import OnboardingCharts from './OnboardingCharts.vue'
 import ComponentOnboardingTable from './ComponentOnboardingTable.vue'
+import MultiSelectDropdown from './MultiSelectDropdown.vue'
+import { collectVersionGroups, matchesVersionGroups, formatVersionGroupLabel } from '../utils/version-group.js'
+import {
+  filterChipVersionClass,
+  filterChipRemoveClass
+} from '../utils/filter-chip-classes.js'
 
 const props = defineProps({
   loading: { type: Boolean, default: true },
@@ -14,29 +20,45 @@ const props = defineProps({
 const emit = defineEmits(['loadDetail', 'retry'])
 
 const chartsExpanded = ref(true)
-const versionFilter = ref('all')
+// Empty = all versions; otherwise match any selected version.
+const versionFilter = ref([])
 
 const allComponents = computed(() => props.data?.components ?? {})
 
 const availableVersions = computed(() => {
+  const raw = []
   if (Array.isArray(props.data?.availableVersions) && props.data.availableVersions.length) {
-    return props.data.availableVersions
+    raw.push(...props.data.availableVersions)
+  } else {
+    for (const comp of Object.values(allComponents.value)) {
+      if (comp.targetVersion) raw.push(comp.targetVersion)
+    }
   }
-  const versions = new Set()
-  for (const comp of Object.values(allComponents.value)) {
-    if (comp.targetVersion) versions.add(comp.targetVersion)
-  }
-  return Array.from(versions).sort()
+  // One option per logical release (version + phase); merge naming formats only.
+  return collectVersionGroups(raw).map(g => ({
+    value: g,
+    label: formatVersionGroupLabel(g)
+  }))
 })
 
+const selectedVersionChips = computed(() =>
+  versionFilter.value.map(v => ({
+    value: v,
+    label: formatVersionGroupLabel(v)
+  }))
+)
 const filteredComponents = computed(() => {
-  if (versionFilter.value === 'all') return allComponents.value
+  if (!versionFilter.value.length) return allComponents.value
   const filtered = {}
   for (const [key, comp] of Object.entries(allComponents.value)) {
-    if (comp.targetVersion === versionFilter.value) filtered[key] = comp
+    if (matchesVersionGroups(comp.targetVersion, versionFilter.value)) filtered[key] = comp
   }
   return filtered
 })
+
+function removeVersion(value) {
+  versionFilter.value = versionFilter.value.filter(v => v !== value)
+}
 
 const featureTitles = computed(() => {
   const merged = {}
@@ -134,21 +156,30 @@ const metrics = computed(() => {
 
     <!-- Content -->
     <div v-else class="flex-1 flex flex-col overflow-hidden">
-      <!-- Version filter -->
+      <!-- Version filter (multi-select) — analysis scope -->
       <div
         v-if="availableVersions.length"
         class="px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-wrap items-center gap-3"
       >
         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Version Filter</span>
-        <select
+        <MultiSelectDropdown
           v-model="versionFilter"
-          class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          :options="availableVersions"
+          placeholder="All versions"
+          test-id="page-version-filter-menu"
+        />
+        <span
+          v-for="chip in selectedVersionChips"
+          :key="chip.value"
+          :class="filterChipVersionClass"
         >
-          <option value="all">All versions</option>
-          <option v-for="version in availableVersions" :key="version" :value="version">{{ version }}</option>
-        </select>
-        <span v-if="versionFilter !== 'all'" class="text-xs text-gray-400 dark:text-gray-500">
-          Showing components targeting {{ versionFilter }}
+          {{ chip.label }}
+          <button
+            type="button"
+            :class="filterChipRemoveClass"
+            :aria-label="'Remove ' + chip.label"
+            @click="removeVersion(chip.value)"
+          >×</button>
         </span>
       </div>
 

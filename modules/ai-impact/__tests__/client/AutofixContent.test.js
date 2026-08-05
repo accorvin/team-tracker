@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import AutofixContent from '../../client/components/AutofixContent.vue'
 
-// Use relative dates so time-window filtering never ages out of the 30-day window
+// Use relative dates so time-window filtering never ages out of the 30-day window.
+// Tests use 'last30' (rolling 30-day window) instead of 'month' (calendar month)
+// to avoid failures near month boundaries when daysAgo() crosses into the prior month.
 const daysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString()
 
 const MOCK_DATA = {
@@ -81,7 +83,7 @@ const MOCK_DATA = {
 describe('AutofixContent', () => {
   it('renders summary stat cards with metric values', () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'month' }
+      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'last30' }
     })
     expect(wrapper.text()).toContain('10')
     expect(wrapper.text()).toContain('100%')
@@ -89,7 +91,7 @@ describe('AutofixContent', () => {
 
   it('renders triage outcomes panel', () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'month' }
+      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'last30' }
     })
     expect(wrapper.text()).toContain('Triage Outcomes')
     expect(wrapper.text()).toContain('Ready for AI')
@@ -99,7 +101,7 @@ describe('AutofixContent', () => {
 
   it('renders autofix progress panel', () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'month' }
+      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'last30' }
     })
     expect(wrapper.text()).toContain('Autofix Progress')
     expect(wrapper.text()).toContain('AI Fix Merged')
@@ -108,7 +110,7 @@ describe('AutofixContent', () => {
 
   it('renders issue table with Jira links', () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'month' }
+      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'last30' }
     })
     expect(wrapper.text()).toContain('AIPCC-100')
     expect(wrapper.text()).toContain('Fix null pointer')
@@ -119,14 +121,14 @@ describe('AutofixContent', () => {
 
   it('shows empty state when no data', () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: null, loading: false, timeWindow: 'month' }
+      props: { autofixData: null, loading: false, timeWindow: 'last30' }
     })
     expect(wrapper.text()).toContain('No autofix data yet')
   })
 
   it('shows error state', () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: null, loading: false, error: 'Connection failed', timeWindow: 'month' }
+      props: { autofixData: null, loading: false, error: 'Connection failed', timeWindow: 'last30' }
     })
     expect(wrapper.text()).toContain('Failed to load data')
     expect(wrapper.text()).toContain('Connection failed')
@@ -143,7 +145,7 @@ describe('AutofixContent', () => {
 
   it('filters issues by search query', async () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'month' }
+      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'last30' }
     })
     const input = wrapper.find('input[placeholder="Search issues..."]')
     await input.setValue('null pointer')
@@ -154,7 +156,7 @@ describe('AutofixContent', () => {
 
   it('renders new triage states in state filter dropdown', async () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'month' }
+      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'last30' }
     })
     const stateBtn = wrapper.findAll('button').find(b => b.text().includes('All States'))
     await stateBtn.trigger('click')
@@ -166,7 +168,7 @@ describe('AutofixContent', () => {
 
   it('renders priority distribution section', () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'month' }
+      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'last30' }
     })
     expect(wrapper.text()).toContain('Priority Distribution')
     expect(wrapper.text()).toContain('Major')
@@ -175,7 +177,7 @@ describe('AutofixContent', () => {
 
   it('renders effort breakdown section', () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'month' }
+      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'last30' }
     })
     expect(wrapper.text()).toContain('Effort Breakdown')
     expect(wrapper.text()).toContain('Quick Win')
@@ -184,7 +186,7 @@ describe('AutofixContent', () => {
 
   it('renders median time to fix', () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'month' }
+      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'last30' }
     })
     expect(wrapper.text()).toContain('Time to Fix')
     expect(wrapper.text()).toContain('2.5 days')
@@ -193,7 +195,7 @@ describe('AutofixContent', () => {
 
   it('renders effort tier badge in issue table', () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'month' }
+      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'last30' }
     })
     expect(wrapper.text()).toContain('Quick Win')
     expect(wrapper.text()).toContain('Standard Fix')
@@ -201,7 +203,7 @@ describe('AutofixContent', () => {
 
   it('filters issues by state', async () => {
     const wrapper = mount(AutofixContent, {
-      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'month' }
+      props: { autofixData: MOCK_DATA, loading: false, timeWindow: 'last30' }
     })
     const stateBtn = wrapper.findAll('button').find(b => b.text().includes('All States'))
     await stateBtn.trigger('click')

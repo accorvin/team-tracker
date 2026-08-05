@@ -224,6 +224,16 @@
           {{ filterBlocked === true ? 'Blocked' : filterBlocked === false ? 'Not Blocked' : 'Blocked' }}
         </button>
 
+        <!-- Hide Closed -->
+        <button
+          type="button"
+          @click="hideClosed = !hideClosed; saveFilters()"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors"
+          :class="hideClosed ? 'bg-gray-700 dark:bg-gray-200 border-gray-700 dark:border-gray-200 text-white dark:text-gray-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-500'"
+        >
+          Hide Closed
+        </button>
+
         <!-- Docs Required -->
         <div class="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 overflow-hidden">
           <button
@@ -280,9 +290,15 @@
       </div>
     </div>
 
-    <!-- Summary cards -->
+    <!--
+      Summary cards are display-only KPIs. Click-to-filter was removed because
+      toggling Requested/Committed via tiles made independent Requested (TV in
+      scope) and Committed (FV in scope + TV match/early delivery) counts appear
+      correlated. Use REQ/COM (and other) filter chips in the bar above to filter
+      the table.
+    -->
     <div v-if="groups.length > 0 && !loadingData" class="grid grid-cols-2 sm:grid-cols-6 gap-3">
-      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5 cursor-pointer transition-all" :class="filterType.includes('requested') ? 'ring-2 ring-blue-300 dark:ring-blue-700' : 'hover:shadow-md'" @click="toggleFilter('filterType', 'requested')" title="Filter by Requested">
+      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
         <div class="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-xl" />
         <div class="flex items-center gap-2 mb-1.5">
           <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-blue-100 dark:bg-blue-900/40">
@@ -292,7 +308,7 @@
         </div>
         <div class="text-2xl font-bold text-blue-600 dark:text-blue-400 ml-7">{{ totalRequested }}</div>
       </div>
-      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5 cursor-pointer transition-all" :class="filterType.includes('committed') ? 'ring-2 ring-emerald-300 dark:ring-emerald-700' : 'hover:shadow-md'" @click="toggleFilter('filterType', 'committed')" title="Filter by Committed">
+      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
         <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500 rounded-l-xl" />
         <div class="flex items-center gap-2 mb-1.5">
           <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-emerald-100 dark:bg-emerald-900/40">
@@ -302,7 +318,7 @@
         </div>
         <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 ml-7">{{ totalCommitted }}</div>
       </div>
-      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5 cursor-pointer transition-all" :class="filterBlocked === true ? 'ring-2 ring-red-300 dark:ring-red-700' : 'hover:shadow-md'" @click="filterBlocked = filterBlocked === true ? null : true" title="Filter by Blocked">
+      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
         <div class="absolute top-0 left-0 w-1 h-full bg-red-500 rounded-l-xl" />
         <div class="flex items-center gap-2 mb-1.5">
           <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-red-100 dark:bg-red-900/40">
@@ -392,6 +408,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { getApiBase } from '@shared/client/services/api'
+import { buildComponentLeadsMap } from '../../composables/componentLeads'
 import ComponentReleaseLoadTable from '../components/ComponentReleaseLoadTable.vue'
 import PillarConfigPanel from '../components/PillarConfigPanel.vue'
 
@@ -438,6 +455,7 @@ var filterType = ref([])
 var filterReleaseType = ref([])
 var filterStatus = ref([])
 var filterBlocked = ref(null)
+var hideClosed = ref(false)
 var filterDelOwner = ref([])
 var filterPmOwner = ref([])
 var filterDocs = ref([])
@@ -470,6 +488,7 @@ function saveFilters() {
       releaseType: filterReleaseType.value,
       status: filterStatus.value,
       blocked: filterBlocked.value,
+      hideClosed: hideClosed.value,
       delOwner: filterDelOwner.value,
       pmOwner: filterPmOwner.value,
       docs: filterDocs.value,
@@ -492,6 +511,7 @@ function restoreFilters() {
     if (state.releaseType && Array.isArray(state.releaseType)) filterReleaseType.value = state.releaseType
     if (state.status && Array.isArray(state.status)) filterStatus.value = state.status
     if (state.blocked !== undefined) filterBlocked.value = state.blocked
+    if (state.hideClosed !== undefined) hideClosed.value = !!state.hideClosed
     if (state.delOwner && Array.isArray(state.delOwner)) filterDelOwner.value = state.delOwner
     if (state.pmOwner && Array.isArray(state.pmOwner)) filterPmOwner.value = state.pmOwner
     if (state.docs && Array.isArray(state.docs)) filterDocs.value = state.docs
@@ -541,6 +561,7 @@ var activeFilterCount = computed(function() {
   count += filterProduct.value.length + filterType.value.length + filterReleaseType.value.length
   count += filterStatus.value.length + filterDelOwner.value.length + filterPmOwner.value.length + filterDocs.value.length
   if (filterBlocked.value !== null) count++
+  if (hideClosed.value) count++
   return count
 })
 
@@ -556,6 +577,7 @@ function clearAllFilters() {
   filterReleaseType.value = []
   filterStatus.value = []
   filterBlocked.value = null
+  hideClosed.value = false
   filterDelOwner.value = []
   filterPmOwner.value = []
   filterDocs.value = []
@@ -566,10 +588,10 @@ function clearAllFilters() {
 function extractProduct(versionName) {
   if (!versionName) return versionName
   var lower = versionName.toLowerCase()
-  if (lower.startsWith('rhoai')) return 'RHOAI'
-  if (lower.startsWith('rhelai')) return 'RHELAI'
-  if (lower.startsWith('rhaii')) return 'RHAII'
-  return versionName.split('-')[0] || versionName
+  if (lower.indexOf('rhoai') !== -1) return 'RHOAI'
+  if (lower.indexOf('rhelai') !== -1) return 'RHELAI'
+  if (lower.indexOf('rhaii') !== -1) return 'RHAII'
+  return null
 }
 
 function flattenFeatures() {
@@ -639,12 +661,20 @@ var filteredPmOwners = computed(function() {
   return availablePmOwners.value.filter(function(o) { return o.toLowerCase().includes(q) })
 })
 
-var hasClientFilters = computed(function() {
-  return filterProduct.value.length > 0 || filterType.value.length > 0 || filterReleaseType.value.length > 0 || filterStatus.value.length > 0 || filterBlocked.value !== null || filterDelOwner.value.length > 0 || filterPmOwner.value.length > 0 || filterDocs.value.length > 0
-})
+/**
+ * Apply client-side filters to groups.
+ * @param {boolean} includeTypeFilter - when true, apply REQ/COM (filterType) for the table.
+ *   KPI summary tiles intentionally omit type filter so Requested (TV in scope)
+ *   and Committed (FV in scope + TV match/early delivery) remain independent
+ *   headline counts.
+ */
+function filterGroups(includeTypeFilter) {
+  var applyType = includeTypeFilter && filterType.value.length > 0
+  var hasOther = filterProduct.value.length > 0 || filterReleaseType.value.length > 0 ||
+    filterStatus.value.length > 0 || filterBlocked.value !== null || hideClosed.value ||
+    filterDelOwner.value.length > 0 || filterPmOwner.value.length > 0 || filterDocs.value.length > 0
 
-var clientFilteredGroups = computed(function() {
-  if (!hasClientFilters.value) return groups.value
+  if (!applyType && !hasOther) return groups.value
 
   return groups.value.map(function(g) {
     var version = g.version
@@ -679,7 +709,7 @@ var clientFilteredGroups = computed(function() {
         var isReq = !!reqKeys[f.key]
         var isCom = !!comKeys[f.key]
 
-        if (filterType.value.length > 0) {
+        if (applyType) {
           var matches = false
           if (filterType.value.indexOf('requested') >= 0 && isReq) matches = true
           if (filterType.value.indexOf('committed') >= 0 && isCom) matches = true
@@ -696,6 +726,7 @@ var clientFilteredGroups = computed(function() {
         }
         if (filterBlocked.value === true && !f.isBlocked) return false
         if (filterBlocked.value === false && f.isBlocked) return false
+        if (hideClosed.value && f.statusCategory === 'Done') return false
         if (filterDelOwner.value.length > 0 && filterDelOwner.value.indexOf(f.assignee || '') === -1) return false
         if (filterPmOwner.value.length > 0 && filterPmOwner.value.indexOf(f.pmOwner || '') === -1) return false
         if (filterDocs.value.length > 0) {
@@ -733,6 +764,16 @@ var clientFilteredGroups = computed(function() {
 
     return Object.assign({}, g, { components: filteredComps })
   }).filter(function(g) { return g.components.length > 0 })
+}
+
+/** Table/groups view — includes REQ/COM type chips. */
+var clientFilteredGroups = computed(function() {
+  return filterGroups(true)
+})
+
+/** KPI tiles — ignore filterType so Requested and Committed stay independent. */
+var summaryFilteredGroups = computed(function() {
+  return filterGroups(false)
 })
 
 var HIDDEN_COMPONENTS = ['lllm-d']
@@ -751,12 +792,12 @@ var uniqueComponents = computed(function() {
 })
 
 var PORTFOLIO_VERSIONS = [
-  { label: '3.5 EA1', jiraVersions: ['rhoai-3.5.EA1', 'rhelai-3.5 EA1 release', 'RHAII-3.5 EA1'] },
-  { label: '3.5 EA2', jiraVersions: ['rhoai-3.5.EA2', 'rhelai-3.5 EA2 release', 'RHAII-3.5 EA2'] },
-  { label: '3.5', jiraVersions: ['rhoai-3.5', 'rhelai-3.5', 'RHAII-3.5'] },
-  { label: '3.6 EA1', jiraVersions: ['rhoai-3.6.EA1', 'rhelai-3.6 EA1 release', 'RHAII-3.6 EA1'] },
-  { label: '3.6 EA2', jiraVersions: ['rhoai-3.6.EA2', 'rhelai-3.6 EA2 release', 'RHAII-3.6 EA2'] },
-  { label: '3.6', jiraVersions: ['rhoai-3.6', 'rhelai-3.6', 'RHAII-3.6'] }
+  { label: '3.5 EA1', jiraVersions: ['3.5 EA1 RHOAI RELEASE', '3.5 EA1 RHELAI RELEASE', '3.5 EA1 RHAII RELEASE'] },
+  { label: '3.5 EA2', jiraVersions: ['3.5 EA2 RHOAI RELEASE', '3.5 EA2 RHELAI RELEASE', '3.5 EA2 RHAII RELEASE'] },
+  { label: '3.5', jiraVersions: ['3.5 GA RHOAI RELEASE', '3.5 GA RHELAI RELEASE', '3.5 GA RHAII RELEASE'] },
+  { label: '3.6 EA1', jiraVersions: ['3.6 EA1 RHOAI RELEASE', '3.6 EA1 RHELAI RELEASE', '3.6 EA1 RHAII RELEASE'] },
+  { label: '3.6 EA2', jiraVersions: ['3.6 EA2 RHOAI RELEASE', '3.6 EA2 RHELAI RELEASE', '3.6 EA2 RHAII RELEASE'] },
+  { label: '3.6', jiraVersions: ['3.6 GA RHOAI RELEASE', '3.6 GA RHELAI RELEASE', '3.6 GA RHAII RELEASE'] }
 ]
 
 var portfolioVersionLabels = PORTFOLIO_VERSIONS.map(function(v) { return v.label })
@@ -779,18 +820,7 @@ var pillarNames = computed(function() {
 })
 
 var componentLeads = computed(function() {
-  var map = {}
-  var pillars = pillarConfig.value.pillars || []
-  for (var pi = 0; pi < pillars.length; pi++) {
-    var comps = pillars[pi].components || []
-    for (var ci = 0; ci < comps.length; ci++) {
-      var c = comps[ci]
-      if (typeof c === 'object' && c !== null && c.name) {
-        map[c.name.toLowerCase()] = { pmLead: c.pmLead || '', engLead: c.engLead || '' }
-      }
-    }
-  }
-  return map
+  return buildComponentLeadsMap(pillarConfig.value)
 })
 
 var filteredPillarNames = computed(function() {
@@ -849,38 +879,57 @@ var filteredVersions = computed(function() {
   return portfolioVersionLabels.filter(function(name) { return name.toLowerCase().includes(q) })
 })
 
-var totalRequested = computed(function() {
-  var source = clientFilteredGroups.value
+/** Count unique feature keys across component groups (multi-component features must not inflate summary cards). */
+function countUniqueFeatureKeys(groups, listName) {
+  var seen = {}
   var count = 0
-  for (var i = 0; i < source.length; i++) {
-    var comps = source[i].components || []
-    for (var ci = 0; ci < comps.length; ci++) count += comps[ci].requestedCount || 0
+  for (var gi = 0; gi < groups.length; gi++) {
+    var comps = groups[gi].components || []
+    for (var ci = 0; ci < comps.length; ci++) {
+      var list = comps[ci][listName] || []
+      for (var fi = 0; fi < list.length; fi++) {
+        var f = list[fi]
+        if (!f || !f.key || seen[f.key]) continue
+        seen[f.key] = true
+        count++
+      }
+    }
   }
   return count
+}
+
+var totalRequested = computed(function() {
+  return countUniqueFeatureKeys(summaryFilteredGroups.value, 'requestedFeatures')
 })
 
 var totalCommitted = computed(function() {
-  var source = clientFilteredGroups.value
-  var count = 0
-  for (var i = 0; i < source.length; i++) {
-    var comps = source[i].components || []
-    for (var ci = 0; ci < comps.length; ci++) count += comps[ci].committedCount || 0
-  }
-  return count
+  return countUniqueFeatureKeys(summaryFilteredGroups.value, 'committedFeatures')
 })
 
 var totalBlocked = computed(function() {
-  var source = clientFilteredGroups.value
+  // Unique blocked keys across either bucket (same feature under multiple components counts once)
+  var source = summaryFilteredGroups.value
+  var seen = {}
   var count = 0
-  for (var i = 0; i < source.length; i++) {
-    var comps = source[i].components || []
-    for (var ci = 0; ci < comps.length; ci++) count += comps[ci].blockedCount || 0
+  for (var gi = 0; gi < source.length; gi++) {
+    var comps = source[gi].components || []
+    for (var ci = 0; ci < comps.length; ci++) {
+      var lists = [comps[ci].requestedFeatures || [], comps[ci].committedFeatures || []]
+      for (var li = 0; li < lists.length; li++) {
+        for (var fi = 0; fi < lists[li].length; fi++) {
+          var f = lists[li][fi]
+          if (!f || !f.key || seen[f.key] || !f.isBlocked) continue
+          seen[f.key] = true
+          count++
+        }
+      }
+    }
   }
   return count
 })
 
 var totalFeatures = computed(function() {
-  var source = clientFilteredGroups.value
+  var source = summaryFilteredGroups.value
   var seen = {}
   var count = 0
   for (var gi = 0; gi < source.length; gi++) {
@@ -908,7 +957,7 @@ var blockedPercent = computed(function() {
 })
 
 var totalAtRisk = computed(function() {
-  var source = clientFilteredGroups.value
+  var source = summaryFilteredGroups.value
   var seen = {}
   var count = 0
   for (var gi = 0; gi < source.length; gi++) {
@@ -1106,7 +1155,7 @@ watch([selectedComponents, selectedVersions, selectedPillars], function() {
 
 // Save filters to localStorage on any filter change
 watch(
-  [selectedPillars, selectedComponents, selectedVersions, filterProduct, filterType, filterReleaseType, filterStatus, filterBlocked, filterDelOwner, filterPmOwner, filterDocs],
+  [selectedPillars, selectedComponents, selectedVersions, filterProduct, filterType, filterReleaseType, filterStatus, filterBlocked, hideClosed, filterDelOwner, filterPmOwner, filterDocs],
   saveFilters,
   { deep: true }
 )

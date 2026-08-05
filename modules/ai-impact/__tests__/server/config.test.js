@@ -20,9 +20,37 @@ describe('saveConfig', () => {
     const writeToStorage = vi.fn().mockResolvedValue(undefined);
     await saveConfig(writeToStorage, { jiraProject: 'MYPROJECT' });
     expect(writeToStorage).toHaveBeenCalledWith('ai-impact/config.json', expect.objectContaining({
-      jiraProject: 'MYPROJECT',
-      linkedProject: 'RHAISTRAT'
+      jiraProject: 'MYPROJECT'
     }));
+  });
+
+  it('only persists fields that differ from defaults', async () => {
+    const writeToStorage = vi.fn().mockResolvedValue(undefined);
+    await saveConfig(writeToStorage, { jiraProject: 'CUSTOM' });
+    const saved = writeToStorage.mock.calls[0][1];
+    expect(saved.jiraProject).toBe('CUSTOM');
+    expect(saved).not.toHaveProperty('linkedProject');
+    expect(saved).not.toHaveProperty('autofixProjects');
+  });
+
+  it('writes empty object when all values match defaults', async () => {
+    const writeToStorage = vi.fn().mockResolvedValue(undefined);
+    await saveConfig(writeToStorage, { ...DEFAULT_CONFIG });
+    expect(writeToStorage.mock.calls[0][1]).toEqual({});
+  });
+
+  it('round-trips correctly: delta save then getConfig returns full config', async () => {
+    let stored = null;
+    const writeFn = vi.fn((_key, data) => { stored = data; });
+    const readFn = vi.fn(() => stored);
+
+    await saveConfig(writeFn, { jiraProject: 'CUSTOM' });
+    const config = await getConfig(readFn);
+
+    expect(config.jiraProject).toBe('CUSTOM');
+    expect(config.linkedProject).toBe('RHAISTRAT');
+    expect(config.autofixProjects).toEqual(DEFAULT_CONFIG.autofixProjects);
+    expect(config).toEqual({ ...DEFAULT_CONFIG, jiraProject: 'CUSTOM' });
   });
 
   it('rejects JQL-unsafe characters in string fields', async () => {

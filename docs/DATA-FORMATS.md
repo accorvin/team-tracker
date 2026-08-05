@@ -729,6 +729,128 @@ Quality assessment data pushed from the rfe-quality-dashboard CI pipeline. Store
 - The file is written atomically (write-to-temp-then-rename) to prevent corruption from mid-write crashes.
 - On DELETE, the file is written as `{ "lastSyncedAt": null, "totalAssessed": 0, "assessments": {} }` (never `null`).
 
+## AI Impact — Feature Decomposer (`data/ai-impact/decomposer.json`)
+
+Epic-decomposition results pushed from the **epic-decomposer pipeline**
+(`gitlab.com/redhat/rhel-ai/agentic-ci/epic-decomposer-results` →
+`epic-decomposer-dashboard`). The dashboard's `generate-dashboard.py` emits a
+canonical `data.json` that feeds both the GitLab-Pages dashboard and Org Pulse.
+The pipeline **pushes the whole `data.json`** to Org Pulse (single-document
+snapshot per run, not a per-item bulk array); Org Pulse stores a **subset** of
+it — the dashboard remains the full-fidelity consumer.
+
+### Canonical `data.json` contract (dashboard superset — what the pipeline pushes)
+
+```json
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-07-24T00:00:00Z",
+  "source": { "data_dir": "…", "pipeline_id": "", "commit_sha": "" },
+  "signal_names": ["change_specificity", "pattern_precedent", "…"],
+  "investigation_signal_names": ["question_specificity", "…"],
+  "counts": { "runs": 9, "strategies": 25 },
+  "runs": [
+    {
+      "run_id": "2026-07-22T18-49-17Z", "started": "…", "completed": "…",
+      "duration_minutes": 10.7, "batch_size": 50,
+      "total": 2, "passed": 2, "failed": 0, "errors": 0,
+      "avg_score": 14, "score_max": 14, "submitted_epics": 9,
+      "results": [{ "strat_id": "RHAISTRAT-1", "status": "passed", "epic_count": 4, "score": 14 }]
+    }
+  ],
+  "strategies": {
+    "RHAISTRAT-1": {
+      "strat_id": "RHAISTRAT-1", "title": "…", "priority": "Major",
+      "labels": ["…"], "epic_count": 4, "critical_path_length": 3, "revised": true,
+      "mermaid_dag": "graph TD…",
+      "review": { "score": 14, "pass": true, "recommendation": "accept", "issues": [], "error": null },
+      "epics": [
+        {
+          "epic_id": "RHAISTRAT-1-E001", "title": "…", "type": "Implementation",
+          "implementation_type": "standard", "priority": "P0", "component": "MLflow",
+          "team": "…", "dependencies": [], "ai_implementability": "High",
+          "ai_implementability_score": 2, "ai_signals": { "change_specificity": 1 },
+          "investigation_signals": {}, "jira_key": "RHAI-137", "branch": null
+        }
+      ],
+      "run_history": [{ "run_id": "…", "score": 14, "status": "passed", "epic_count": 2 }]
+    }
+  },
+  "aggregates": {
+    "unique_strategies": 25, "total_epics": 132, "pass_rate": 96,
+    "avg_score_normalized": 98.3, "avg_epics_per_strategy": 5.5, "avg_critical_path": 3.2,
+    "investigation_epic_count": 7, "strats_with_investigations": 7,
+    "failed_strategies": 1, "recovered_strategies": 5,
+    "failed_ids": ["RHAISTRAT-1939"], "recovered_ids": ["…"],
+    "implementability_distribution": { "High": 111, "Medium": 17, "Low": 4 },
+    "type_distribution": { "Implementation": 124, "Investigation": 8 },
+    "priority_distribution": { "P0": 49, "P1": 26, "P2": 14 },
+    "component_distribution": { "MLflow": 21, "…": 0 },
+    "signal_aggregates": { "change_specificity": { "pos": 59, "zero": 21, "neg": 1 } },
+    "criterion_failure_counts": {}, "severity_counts": { "critical": 1, "major": 0, "minor": 5 }
+  },
+  "epic_bodies": { "RHAISTRAT-1-E001": "# markdown body…" }
+}
+```
+
+### Stored Pulse subset (`data/ai-impact/decomposer.json`)
+
+Org Pulse validates the envelope leniently (`runs` array, `strategies` object,
+`aggregates` object; extra fields tolerated) and projects to this subset —
+dropping `epic_bodies`, per-run `results`, per-epic signal maps, and strategy
+`labels`, while **keeping** `aggregates`, slim `runs`, `mermaid_dag`, and slim
+`epics[]` for the expandable strategy rows:
+
+```json
+{
+  "lastSyncedAt": "2026-07-24T21:21:48.739Z",
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-07-24T00:00:00Z",
+  "source": { "data_dir": "…" },
+  "signalNames": ["…"],
+  "investigationSignalNames": ["…"],
+  "counts": { "runs": 9, "strategies": 25 },
+  "aggregates": { "…": "verbatim from data.json" },
+  "runs": [
+    { "run_id": "…", "started": "…", "completed": "…", "duration_minutes": 10.7,
+      "total": 2, "passed": 2, "failed": 0, "errors": 0, "avg_score": 14,
+      "score_max": 14, "submitted_epics": 9 }
+  ],
+  "strategies": [
+    { "strat_id": "RHAISTRAT-1", "title": "…", "priority": "Major",
+      "epic_count": 4, "critical_path_length": 3, "revised": true,
+      "mermaid_dag": "graph TD…",
+      "review": { "score": 14, "pass": true, "recommendation": "accept" },
+      "epics": [
+        { "epic_id": "RHAISTRAT-1-E001", "title": "…", "type": "Implementation",
+          "implementation_type": "standard", "priority": "P0", "component": "MLflow",
+          "ai_implementability": "High", "jira_key": "RHAI-137", "dependencies": [] }
+      ],
+      "run_history": [{ "run_id": "…", "score": 14, "status": "passed", "epic_count": 2 }] }
+  ]
+}
+```
+
+### API
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/api/modules/ai-impact/decomposer` | `ai-impact:read` | Snapshot for the Feature Decomposer tab (adds `jiraHost` from `JIRA_HOST`). |
+| `GET` | `/api/modules/ai-impact/decomposer/status` | admin, `ai-impact:read` | `{ lastSyncedAt, generatedAt, counts }`. |
+| `POST` | `/api/modules/ai-impact/decomposer` | admin, `ai-impact:write` | Push the canonical `data.json`; stores the projected subset. Returns `{ status: "stored", runs, strategies }`. No-op in demo mode. |
+| `DELETE` | `/api/modules/ai-impact/decomposer` | admin, `ai-impact:write` | Clears the snapshot (writes the empty skeleton, never `null`). |
+
+**Notes:**
+- Push model mirrors strat-creator → `/features/bulk`, but the decomposer store is
+  **self-contained** in `ai-impact` (not forwarded to releases) — decomposition
+  results are an AI-Impact-only concern.
+- The KPI tiles and distribution charts render straight from the pre-computed
+  `aggregates`; Org Pulse does **no** re-aggregation (display-layer only). The
+  "Showing" date filter scopes the strategy list + volume-by-run trend (using
+  `run_history` timestamps); the `aggregates`-backed cards remain all-time.
+- The demo fixture at `fixtures/ai-impact/decomposer.json` is a real subset
+  projected from a pipeline `data.json`.
+
 ## AI Impact — Features (`data/ai-impact/features.json`) — DEPRECATED
 
 > **Deprecated.** Feature review data is now stored in the unified releases
@@ -1232,7 +1354,7 @@ Heuristic narrative signals for the Feature detail **Traffic Signals** panel (bl
 
 ## Releases — Execution Config (`data/releases/execution/config.json`)
 
-Admin-configurable settings for GitLab CI artifact fetching and Jira enrichment.
+Admin-configurable settings for GitLab CI artifact fetching and Jira sync.
 
 ```json
 {
@@ -1244,10 +1366,7 @@ Admin-configurable settings for GitLab CI artifact fetching and Jira enrichment.
   "refreshIntervalHours": 12,
   "enabled": false,
   "jiraEnrichment": {
-    "enabled": false,
-    "syncIntervalHours": 6,
-    "discoveryEnabled": false,
-    "discoveryJql": "project = RHAISTRAT AND issuetype IN (Feature, Initiative) AND created >= -365d"
+    "enabled": false
   }
 }
 ```
@@ -1255,28 +1374,26 @@ Admin-configurable settings for GitLab CI artifact fetching and Jira enrichment.
 **Notes:**
 - `enabled` defaults to `false`. Module does nothing until an admin enables it in Settings.
 - `artifactPath` is the directory prefix stripped from zip entry paths (e.g., `output/index.json` becomes `index.json`).
-- `jiraEnrichment.enabled` enables periodic Jira sync of feature data (6h default cadence).
-- `jiraEnrichment.discoveryEnabled` enables Jira JQL discovery of features not yet in the store.
-- `jiraEnrichment.discoveryJql` is bounded by `created >= -365d` by default to prevent unbounded results.
+- `jiraEnrichment.enabled` enables periodic Jira sync of feature data (12h default cadence). The sync fetches all RHAISTRAT features from Jira as the authoritative source.
 
 ## Releases — Execution Last Enrichment (`data/releases/execution/last-enrichment.json`)
 
-Metadata from the most recent Jira enrichment sync.
+Metadata from the most recent Jira sync.
 
 ```json
 {
   "status": "success",
   "timestamp": "2026-06-05T08:30:00Z",
-  "featureCount": 632,
-  "enrichedCount": 630,
-  "duration": 24500,
-  "lastKey": "RHAISTRAT-1500"
+  "featureCount": 2400,
+  "newCount": 15,
+  "updatedCount": 2385,
+  "duration": 124500
 }
 ```
 
 **Notes:**
-- `enrichedCount` may be less than `featureCount` if some Jira lookups failed (partial failure handling).
-- `lastKey` is for diagnostics only.
+- `featureCount` is the total number of features returned by Jira.
+- `newCount` / `updatedCount` track how many features were created vs updated in the store.
 
 ## Releases — Execution Last Fetch (`data/releases/execution/last-fetch.json`)
 
@@ -1592,6 +1709,111 @@ Disconnected readiness reports tracking repository readiness scores for disconne
 - `ruleCount`: Total rules evaluated
 - `rulesPassedCount`: Rules that passed
 - `date`: Assessment timestamp
+
+## System Health — Quality Reports (`data/system-health/quality/reports.json`)
+
+Quality analysis reports tracking repository testing, CI/CD, and code quality practices across 8 dimensions. Reports are pushed from the quality-repo-analysis CI pipeline via the bulk API, or pulled from GitLab CI artifacts.
+
+```json
+{
+  "lastSyncedAt": "2026-07-28T10:30:00.000Z",
+  "totalReports": 5,
+  "reports": {
+    "kserve--kserve": {
+      "latest": {
+        "repository": "kserve/kserve",
+        "overallScore": 7.4,
+        "scorecard": [
+          { "dimension": "Unit Tests", "score": 8.0, "status": "Comprehensive pytest suite with 800+ tests" },
+          { "dimension": "Integration/E2E", "score": 7.5, "status": "E2E tests via KServe test framework" },
+          { "dimension": "Build Integration", "score": 8.0, "status": "Multi-stage Docker builds with CI" },
+          { "dimension": "Image Testing", "score": 6.0, "status": "Basic container smoke tests" },
+          { "dimension": "Coverage Tracking", "score": 5.0, "status": "No coverage enforcement or PR gates" },
+          { "dimension": "CI/CD Automation", "score": 9.0, "status": "GitHub Actions with matrix builds" },
+          { "dimension": "Static Analysis", "score": 8.0, "status": "golangci-lint, mypy, ruff" },
+          { "dimension": "Agent Rules", "score": 7.5, "status": "Basic CLAUDE.md with project conventions" }
+        ],
+        "criticalGaps": [
+          { "title": "No coverage enforcement", "impact": "Regression risk", "severity": "HIGH", "effort": "4-8 hours" }
+        ],
+        "quickWins": [
+          { "title": "Add Codecov integration", "effort": "2-3 hours", "impact": "Immediate coverage visibility" }
+        ],
+        "tier": "upstream",
+        "component": "Model Serving",
+        "team": "",
+        "githubUrl": "https://github.com/kserve/kserve",
+        "hasHtmlReport": false,
+        "assessedAt": "2026-07-28T10:00:00.000Z"
+      },
+      "history": [
+        { "overallScore": 6.8, "gapCount": 3, "assessedAt": "2026-07-21T10:00:00.000Z" }
+      ]
+    }
+  }
+}
+```
+
+**Top-level fields:**
+- `lastSyncedAt`: ISO timestamp when reports were last synced (push or pull)
+- `totalReports`: Total number of repositories with reports
+- `reports`: Object mapping repo keys (`owner--repo` format, `--` separator) to report data
+
+**Repo key format:** `owner--repo` (double-dash separator). Generated from `repository` field (`owner/repo` → `owner--repo`) or provided as `id` in the bulk payload. Must match `/^[a-zA-Z0-9._-]+--[a-zA-Z0-9._-]+$/`.
+
+**Per-repository structure:**
+- `latest`: Most recent quality assessment with full scorecard
+- `history`: Array of prior assessments (summary only, sorted newest-first, capped at 52)
+
+**Latest assessment fields:**
+- `repository`: Repository identifier in `owner/repo` format
+- `overallScore`: Weighted average score (0-10, one decimal)
+- `scorecard`: Array of 8 dimension scores (see dimensions below)
+- `criticalGaps`: Array of identified quality gaps with severity
+- `quickWins`: Array of low-effort improvement suggestions
+- `tier`: Repository tier (`"upstream"`, `"midstream"`, or `"downstream"`), or `null`
+- `component`: RHOAI component name, or `null`
+- `team`: Team name, or `null`/empty string
+- `githubUrl`: Repository URL, or `null`
+- `hasHtmlReport`: Boolean, true when an HTML report is stored
+- `assessedAt`: ISO timestamp of the assessment
+
+**Scorecard dimensions (8):**
+`Unit Tests`, `Integration/E2E`, `Build Integration`, `Image Testing`, `Coverage Tracking`, `CI/CD Automation`, `Static Analysis`, `Agent Rules`
+
+Each entry has: `dimension` (name), `score` (0-10), `status` (human-readable summary).
+
+**Critical gap fields:**
+- `title`: Short description of the gap
+- `impact`: Expected consequence
+- `severity`: `"HIGH"`, `"MEDIUM"`, or `"LOW"`
+- `effort`: Estimated remediation effort
+
+**Quick win fields:**
+- `title`: Short description
+- `effort`: Estimated effort
+- `impact`: Expected benefit
+
+**History entry fields:**
+- `overallScore`: Score at time of assessment
+- `gapCount`: Number of critical gaps at time of assessment
+- `assessedAt`: Assessment timestamp
+
+**HTML reports:** Stored separately at `system-health/quality/html/{owner--repo}.html`. Served via `GET /api/modules/system-health/quality/reports/{key}/html`.
+
+**API:**
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/api/modules/system-health/quality/reports` | `system-health:read` | List all reports (slim projection) |
+| `GET` | `/api/modules/system-health/quality/reports/{key}` | `system-health:read` | Full report with history |
+| `GET` | `/api/modules/system-health/quality/reports/{key}/html` | `system-health:read` | HTML report |
+| `POST` | `/api/modules/system-health/quality/reports/bulk` | admin, `system-health:write` | Bulk upsert from CI pipeline |
+| `DELETE` | `/api/modules/system-health/quality/reports` | admin, `system-health:write` | Clear all data |
+| `GET` | `/api/modules/system-health/quality/reports/status` | admin, `system-health:read` | Data freshness info |
+| `GET` | `/api/modules/system-health/quality/config` | admin, `system-health:read` | GitLab fetch config |
+| `POST` | `/api/modules/system-health/quality/config` | admin, `system-health:write` | Update GitLab fetch config |
+| `POST` | `/api/modules/system-health/quality/refresh` | admin, `system-health:write` | Trigger manual fetch |
 
 ---
 

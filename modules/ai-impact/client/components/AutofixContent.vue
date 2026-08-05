@@ -98,6 +98,10 @@ function getWindowBounds(timeWindow) {
       return { start: Date.now() - 30 * 24 * 60 * 60 * 1000, end: Date.now(), useTerminalDate: false }
     case 'last90':
       return { start: Date.now() - 90 * 24 * 60 * 60 * 1000, end: Date.now(), useTerminalDate: false }
+    case 'last180':
+      return { start: Date.now() - 180 * 24 * 60 * 60 * 1000, end: Date.now(), useTerminalDate: false }
+    case 'all':
+      return { start: 0, end: Date.now(), useTerminalDate: false }
     default:
       return { start: Date.now() - 30 * 24 * 60 * 60 * 1000, end: Date.now(), useTerminalDate: false }
   }
@@ -116,6 +120,7 @@ function formatUTCShortDate(d) {
 }
 
 const windowDateRange = computed(() => {
+  if (props.timeWindow === 'all') return 'All Time'
   const { start, end } = getWindowBounds(props.timeWindow)
   if (props.timeWindow === 'lastWeek') {
     const s = new Date(start)
@@ -311,7 +316,7 @@ const trendData = computed(() => {
   const issues = projectFilteredIssues.value
   const { useTerminalDate } = getWindowBounds(props.timeWindow)
   const tw = props.timeWindow
-  const weekCounts = (tw === 'week' || tw === 'lastWeek' || tw === 'last7') ? 4 : (tw === 'month' || tw === 'lastMonth' || tw === 'last30') ? 8 : 13
+  const weekCounts = (tw === 'week' || tw === 'lastWeek' || tw === 'last7') ? 4 : (tw === 'month' || tw === 'lastMonth' || tw === 'last30') ? 8 : tw === 'last180' ? 26 : tw === 'all' ? 52 : 13
   const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000
   let anchor
   if (tw === 'lastWeek') {
@@ -755,6 +760,8 @@ function buildJiraLabelUrl(jiraLabels, excludeLabels) {
           <option value="lastMonth">Last Month</option>
           <option value="last30">Last 30 Days</option>
           <option value="last90">Last 90 Days</option>
+          <option value="last180">Last 6 Months</option>
+          <option value="all">All Time</option>
         </select>
       </div>
     </header>

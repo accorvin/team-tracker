@@ -44,5 +44,17 @@ export const reports = [
     icon: 'ShieldAlert',
     tags: ['Security', 'CVE', 'Sustaining'],
     component: defineAsyncComponent(() => import('./CveSustainingReport.vue'))
+  },
+  {
+    id: 'capacity-commitment',
+    label: 'Program Level Release Report',
+    description: 'Key deadlines, team capacity, and commitment overview for a selected release.',
+    component: defineAsyncComponent(() => import('./CapacityCommitmentReport.vue'))
+  },
+  {
+    id: 'ai-adoption',
+    label: 'AI Adoption Report',
+    description: 'Scorecard tracking AI pipeline adoption across components, with release-over-release trends.',
+    component: defineAsyncComponent(() => import('./AiAdoptionReport.vue'))
   }
 ]
