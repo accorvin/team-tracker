@@ -90,6 +90,27 @@ watch(
       </button>
     </div>
 
+    <div
+      v-if="!loading && !error && reports.length === 0"
+      class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-5 py-4"
+    >
+      <div class="flex gap-3">
+        <svg class="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+        </svg>
+        <div>
+          <p class="text-sm font-medium text-amber-800 dark:text-amber-200">
+            Quality reports are temporarily unavailable
+          </p>
+          <p class="text-sm text-amber-700 dark:text-amber-300 mt-1">
+            We are migrating to a new automated publish model for quality analysis reports.
+            Full availability is expected by mid next week (August 11).
+            We apologize for the inconvenience.
+          </p>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="flex items-center justify-center py-20">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
     </div>
