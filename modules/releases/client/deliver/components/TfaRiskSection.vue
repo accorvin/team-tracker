@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between mb-1">
       <div>
         <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Test Sign-Off Risk Assessment</h3>
-        <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Grouped by product pillar. Click a segment or row to view component details.</p>
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Click any segment or row to expand details.</p>
       </div>
       <div v-if="overallStats.signoffTotal > 0" class="flex items-center gap-2">
         <span class="text-xs text-gray-400 dark:text-gray-500">
@@ -81,21 +81,33 @@
     <!-- Content -->
     <template v-else>
       <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <!-- Chart (left, col-span-2) -->
-        <div class="lg:col-span-2">
+        <!-- Charts (left, col-span-2) -->
+        <div class="lg:col-span-2 space-y-3">
+          <p class="text-xs font-medium text-gray-500 dark:text-gray-400 px-1">TFA Completion by Pillar</p>
+          <p class="text-xs text-gray-400 dark:text-gray-500 px-1">Grouped by product pillar. Outer ring = pillars, inner ring = done vs remaining.</p>
           <TfaRiskChart
             :pillar-data="pillarRiskData"
             :overall-pct="overallStats.signoffPct"
+            :overall-done="overallStats.signoffDone"
+            :overall-total="overallStats.signoffTotal"
             :selected-pillar="lastClickedPillar"
-            :thresholds="{ green: effectiveGreenThreshold, yellow: effectiveRedThreshold }"
             @select-pillar="handleChartClick"
+            @select-status="handleStatusClick"
           />
+          <div>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 px-1">Sign-offs vs Failed Tests</p>
+            <TfaOutcomeChart
+              :signoff-done="overallStats.signoffDone"
+              :failed-open="overallStats.failedOpen"
+              @select-outcome="handleOutcomeClick"
+            />
+          </div>
         </div>
 
         <!-- Pillar summary table (right, col-span-3) -->
-        <div class="lg:col-span-3 overflow-y-auto" style="max-height: 240px;">
+        <div class="lg:col-span-3 overflow-y-auto scrollable-table" style="max-height: 520px;">
           <div class="space-y-1">
-            <div v-for="(pillar, idx) in pillarRiskData" :key="pillar.pillarName">
+            <div v-for="pillar in pillarRiskData" :key="pillar.pillarName">
               <!-- Pillar row -->
               <button
                 @click="togglePillar(pillar.pillarName)"
@@ -110,14 +122,14 @@
                   :class="riskBadgeClass(pillar.riskLevel)"
                 >{{ riskLabel(pillar.riskLevel) }}</span>
 
-                <!-- Color dot -->
-                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" :style="{ backgroundColor: pillarColor(idx) }"></span>
+                <!-- Color dot (matches chart segment) -->
+                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" :style="{ backgroundColor: pillarColorBorder(pillar.pillarName) }"></span>
 
                 <!-- Pillar name -->
-                <span class="text-sm font-medium text-gray-800 dark:text-gray-200 min-w-0 truncate">{{ pillar.pillarName }}</span>
+                <span class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate" style="width: 130px; flex-shrink: 0;">{{ pillar.pillarName }}</span>
 
                 <!-- Progress bar -->
-                <div class="flex-1 min-w-0">
+                <div class="flex-1 min-w-0" style="min-width: 80px;">
                   <div class="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
                     <div
                       class="h-full rounded-full transition-all"
@@ -193,13 +205,9 @@
 <script setup>
 import { computed, ref, toRef } from 'vue'
 import TfaRiskChart from './TfaRiskChart.vue'
+import TfaOutcomeChart from './TfaOutcomeChart.vue'
 import { useTfaRiskAssessment } from '../composables/useTfaRiskAssessment.js'
-
-var PILLAR_COLORS = [
-  'rgb(59, 130, 246)', 'rgb(139, 92, 246)', 'rgb(20, 184, 166)',
-  'rgb(245, 158, 11)', 'rgb(236, 72, 153)', 'rgb(16, 185, 129)',
-  'rgb(239, 68, 68)', 'rgb(107, 114, 128)'
-]
+import { getPillarColor } from '../composables/pillarColors.js'
 
 var props = defineProps({
   version: { type: String, required: true }
@@ -265,26 +273,49 @@ function togglePillar(name) {
 }
 
 function handleChartClick(name) {
-  if (name) {
-    togglePillar(name)
-  } else {
-    lastClickedPillar.value = null
-  }
+  togglePillar(name)
 }
 
-function expandAtRiskPillars() {
-  var copy = Object.assign({}, expandedPillars.value)
+function toggleGroup(matchFn) {
   var data = pillarRiskData.value
+  var targets = []
   for (var i = 0; i < data.length; i++) {
-    if (data[i].riskLevel === 'red' || data[i].riskLevel === 'yellow') {
-      copy[data[i].pillarName] = true
+    if (matchFn(data[i])) targets.push(data[i].pillarName)
+  }
+  var allOpen = targets.every(function (n) { return expandedPillars.value[n] })
+  var copy = Object.assign({}, expandedPillars.value)
+  for (var j = 0; j < targets.length; j++) {
+    if (allOpen) {
+      delete copy[targets[j]]
+    } else {
+      copy[targets[j]] = true
     }
   }
   expandedPillars.value = copy
 }
 
-function pillarColor(idx) {
-  return PILLAR_COLORS[idx % PILLAR_COLORS.length]
+function handleStatusClick(status) {
+  toggleGroup(function (p) {
+    if (status === 'done') return p.done > 0 && p.done === p.total
+    return p.total > p.done || p.failedOpen > 0
+  })
+}
+
+function handleOutcomeClick(outcome) {
+  toggleGroup(function (p) {
+    if (outcome === 'done') return p.done > 0
+    return p.failedOpen > 0
+  })
+}
+
+function expandAtRiskPillars() {
+  toggleGroup(function (p) {
+    return p.riskLevel === 'red' || p.riskLevel === 'yellow'
+  })
+}
+
+function pillarColorBorder(name) {
+  return getPillarColor(name).border
 }
 
 function uniqueAssignees(comp) {
@@ -360,3 +391,22 @@ var verdictText = computed(function () {
   return 'All pillars on track for release'
 })
 </script>
+
+<style scoped>
+.scrollable-table {
+  scrollbar-width: thin;
+}
+.scrollable-table::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollable-table::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollable-table::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.4);
+  border-radius: 3px;
+}
+.scrollable-table::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.6);
+}
+</style>
