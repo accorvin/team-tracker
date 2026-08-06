@@ -81,6 +81,10 @@ function resolveRfeSignal(rfeData, featureKey) {
 }
 
 function resolveFeatureSignal(featuresData, featureKey) {
+  if (!featuresData || !featuresData.features) {
+    return { completed: false, current: false, aiUsed: null, detail: 'No data' };
+  }
+
   const entry = featuresData.features[featureKey];
   if (!entry) {
     return { completed: false, current: false, aiUsed: null, detail: 'No feature data' };
