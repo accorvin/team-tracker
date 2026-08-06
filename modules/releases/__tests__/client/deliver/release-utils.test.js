@@ -11,6 +11,8 @@ describe('KNOWN_PRODUCTS', () => {
     expect(KNOWN_PRODUCTS).toContain('rhoai')
     expect(KNOWN_PRODUCTS).toContain('rhel-ai')
     expect(KNOWN_PRODUCTS).toContain('rhaii')
+    expect(KNOWN_PRODUCTS).toContain('rhelai')
+    expect(KNOWN_PRODUCTS).toContain('rhaiis')
     expect(KNOWN_PRODUCTS).toContain('base-images')
   })
 })
@@ -51,6 +53,23 @@ describe('extractProduct', () => {
   it('returns empty for bare versions', () => {
     expect(extractProduct('3.4')).toBe('')
     expect(extractProduct('1.0')).toBe('')
+  })
+
+  it('extracts product from new RHAISTRAT naming convention', () => {
+    expect(extractProduct('3.5 GA RHOAI RELEASE')).toBe('rhoai')
+    expect(extractProduct('3.5 EA1 RHOAI RELEASE')).toBe('rhoai')
+    expect(extractProduct('3.6 EA2 RHOAI RELEASE')).toBe('rhoai')
+    expect(extractProduct('3.5 GA RHAII RELEASE')).toBe('rhaii')
+    expect(extractProduct('3.6 EA1 RHAII RELEASE')).toBe('rhaii')
+    expect(extractProduct('3.5 GA RHELAI RELEASE')).toBe('rhelai')
+    expect(extractProduct('3.6 EA1 RHELAI RELEASE')).toBe('rhelai')
+    expect(extractProduct('3.5 GA RHAIIS RELEASE')).toBe('rhaiis')
+  })
+
+  it('extracts rhelai and rhaiis from prefix-style names', () => {
+    expect(extractProduct('rhelai-3.5')).toBe('rhelai')
+    expect(extractProduct('rhaiis-3.5')).toBe('rhaiis')
+    expect(extractProduct('RHELAI-3.5.EA1')).toBe('rhelai')
   })
 })
 

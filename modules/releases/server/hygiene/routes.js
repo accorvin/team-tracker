@@ -10,6 +10,7 @@ const { evaluateHygiene, hygieneRules, RULE_CATEGORIES } = require('./hygiene-ru
 const { fetchHygieneFeatures } = require('./jira-fetch');
 const { logAudit } = require('../planning/audit-log');
 const { readRegistry } = require('../registry');
+const { normalizeVersionName } = require('../version-utils');
 
 const DATA_PREFIX = 'releases/hygiene';
 const COOLDOWN_MS = 5 * 60 * 1000;
@@ -667,9 +668,20 @@ module.exports = async function registerHygieneRoutes(router, context) {
         }
       }
 
+      // Prefer fixVersion matching current RHAISTRAT convention (e.g. "3.5 GA RHOAI RELEASE")
+      var displayName = (rel && rel.displayName) || data.version || versionId;
+      if (rel && rel.fixVersions) {
+        for (var fvi = 0; fvi < rel.fixVersions.length; fvi++) {
+          if (/^\d+\.\d+\s+(GA|EA\d+)\s+\w+\s+RELEASE$/i.test(rel.fixVersions[fvi])) {
+            displayName = rel.fixVersions[fvi];
+            break;
+          }
+        }
+      }
+
       versions.push({
         versionId: versionId,
-        displayName: (rel && rel.displayName) || data.version || versionId,
+        displayName: displayName,
         gaDate: gaDate || null,
         isReleased: !!isReleased,
         fetchedAt: data.fetchedAt || null,
@@ -682,6 +694,32 @@ module.exports = async function registerHygieneRoutes(router, context) {
         features: featureList
       });
     }
+
+    // Deduplicate versions that normalize to the same logical release
+    // (e.g. "rhoai-3.5", "3.5 GA RHOAI RELEASE", and "rhoai-3.5.z" all map to the same release)
+    var dedupMap = {};
+    for (var di = 0; di < versions.length; di++) {
+      var dv = versions[di];
+      var normKey = normalizeVersionName(dv.versionId) || dv.versionId;
+      if (!dedupMap[normKey]) {
+        dedupMap[normKey] = dv;
+      } else {
+        var existing = dedupMap[normKey];
+        var existingTime = existing.fetchedAt ? new Date(existing.fetchedAt).getTime() : 0;
+        var newTime = dv.fetchedAt ? new Date(dv.fetchedAt).getTime() : 0;
+        if (newTime > existingTime) {
+          var prevName = existing.displayName;
+          dedupMap[normKey] = dv;
+          // Preserve the more descriptive display name
+          if (/RELEASE$/i.test(prevName) && !/RELEASE$/i.test(dv.displayName)) {
+            dedupMap[normKey].displayName = prevName;
+          }
+        } else if (/RELEASE$/i.test(dv.displayName) && !/RELEASE$/i.test(existing.displayName)) {
+          existing.displayName = dv.displayName;
+        }
+      }
+    }
+    versions = Object.values(dedupMap);
 
     // Build cross-version aggregates
     var totalViolationsByRule = {};
