@@ -377,6 +377,67 @@ const perComponentRows = computed(() => {
   return rows
 })
 
+const throughputRows = computed(() => {
+  const groups = scorecardGroups.value
+  if (!groups.length) return []
+
+  const compMap = {}
+  for (const rg of groups) {
+    for (const c of rg.components || []) {
+      if (!compMap[c.name]) {
+        compMap[c.name] = { name: c.name, releases: {}, totalAiTouched: 0, totalFeatures: 0, pipelines: {} }
+        for (const k of PIPELINE_KEYS) compMap[c.name].pipelines[k] = 0
+      }
+      compMap[c.name].totalAiTouched += c.aiTouched
+      compMap[c.name].totalFeatures += c.total
+      for (const k of PIPELINE_KEYS) compMap[c.name].pipelines[k] += (c.pipelines[k] || 0)
+      const aiPct = c.total > 0 ? Math.round((c.aiTouched / c.total) * 100) : 0
+      compMap[c.name].releases[rg.releaseGroup] = {
+        features: c.total,
+        aiTouched: c.aiTouched,
+        aiPct,
+        aggregateEffort: c.aggregateEffort || 0,
+        avgEffort: c.avgEffort || 0
+      }
+    }
+  }
+
+  const baselineName = selectedBaseline.value
+  const latestName = groups[groups.length - 1].releaseGroup
+
+  const rows = Object.values(compMap).map(row => {
+    const bl = row.releases[baselineName]
+    const lt = row.releases[latestName]
+    row.baselineAvg = bl ? bl.avgEffort : 0
+    row.latestAvg = lt ? lt.avgEffort : 0
+    row.baselineFeatures = bl ? bl.features : 0
+    row.latestFeatures = lt ? lt.features : 0
+    row.latestAiPct = lt ? lt.aiPct : 0
+    const blThroughput = row.baselineFeatures * (row.baselineAvg || 1)
+    const ltThroughput = row.latestFeatures * (row.latestAvg || 1)
+    row.baselineThroughput = Math.round(blThroughput * 10) / 10
+    row.latestThroughput = Math.round(ltThroughput * 10) / 10
+    row.throughputDelta = blThroughput > 0
+      ? Math.round(((ltThroughput - blThroughput) / blThroughput) * 100)
+      : (ltThroughput > 0 ? 100 : 0)
+    row.overallAiPct = row.totalFeatures > 0 ? Math.round((row.totalAiTouched / row.totalFeatures) * 100) : 0
+    row.dominantPipelines = PIPELINE_KEYS.filter(k => row.pipelines[k] > 0).map(k => PIPELINE_META[k].short).join(', ') || 'None'
+    return row
+  })
+
+  rows.sort((a, b) => b.totalAiTouched - a.totalAiTouched)
+
+  return rows
+})
+
+function effortCellClass(avgEffort, baselineAvg) {
+  if (!baselineAvg || baselineAvg === 0) return ''
+  const ratio = avgEffort / baselineAvg
+  if (ratio >= 0.9) return 'text-emerald-700 dark:text-emerald-400'
+  if (ratio >= 0.7) return 'text-amber-700 dark:text-amber-400'
+  return 'text-red-600 dark:text-red-400'
+}
+
 function togglePipeline(key) {
   expandedPipelines.value[key] = !expandedPipelines.value[key]
 }
@@ -979,6 +1040,127 @@ const executiveSummary = computed(() => {
         </div>
       </div>
 
+
+      <!-- Component Throughput table -->
+      <div v-if="selectedComponent === 'all' && throughputRows.length > 1" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 overflow-x-auto shadow-sm">
+        <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-1 h-4 rounded-full bg-violet-500"></span>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Component Throughput</h3>
+              </div>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 ml-3">Feature delivery and normalized effort per component across releases — proving AI adoption drives genuine throughput, not inflated counts</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-8 mt-3 ml-3">
+            <div class="flex flex-col items-center px-5 py-2.5 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-200 dark:border-gray-600 min-w-[80px]">
+              <span class="font-bold text-gray-900 dark:text-gray-100 text-base leading-tight">17</span>
+              <span class="font-semibold text-emerald-700 dark:text-emerald-400 text-xs mt-0.5">4.3 avg</span>
+              <span class="text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">35% AI</span>
+            </div>
+            <div class="flex flex-col gap-2 text-[11px] text-gray-600 dark:text-gray-300">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-gray-900 dark:text-gray-100 text-sm w-8 text-right">17</span>
+                <span class="text-gray-300 dark:text-gray-600">→</span>
+                <span>Total features delivered in this release</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-emerald-700 dark:text-emerald-400 text-sm w-8 text-right">4.3</span>
+                <span class="text-gray-300 dark:text-gray-600">→</span>
+                <span>Avg effort per feature normalized using RICE Score, Story Points, # of child issues</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-gray-500 dark:text-gray-400 text-sm w-8 text-right">35%</span>
+                <span class="text-gray-300 dark:text-gray-600">→</span>
+                <span>AI pipeline adoption rate</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b-2 border-gray-200 dark:border-gray-600">
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider sticky left-0 bg-white dark:bg-gray-800">Component</th>
+              <template v-for="rg in scorecardGroups" :key="rg.releaseGroup">
+                <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap" :class="rg.releaseGroup === selectedBaseline ? 'text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-900/10' : 'text-gray-500 dark:text-gray-400'">
+                  <div class="flex flex-col items-center gap-0.5">
+                    <span>{{ rg.releaseGroup }}</span>
+                    <span class="text-[9px] font-normal text-gray-400 dark:text-gray-500">{{ rg.totalFeatures }} features</span>
+                  </div>
+                </th>
+              </template>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-l border-gray-200 dark:border-gray-600 group relative cursor-help">
+                <span class="inline-flex items-center gap-1">Dominant Pipelines
+                  <svg class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </span>
+                <div class="hidden group-hover:block absolute z-20 top-full left-0 mt-1 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-3 text-left normal-case tracking-normal">
+                  <p class="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1.5">AI Pipeline Key</p>
+                  <div class="space-y-1.5 text-[11px] font-normal">
+                    <div><span class="font-semibold text-gray-800 dark:text-gray-200">Strat</span> <span class="text-gray-500 dark:text-gray-400">— Auto-generates feature strategy definitions</span></div>
+                    <div><span class="font-semibold text-gray-800 dark:text-gray-200">RFE</span> <span class="text-gray-500 dark:text-gray-400">— Auto-creates RFEs with feasibility checks</span></div>
+                    <div><span class="font-semibold text-gray-800 dark:text-gray-200">Test Plan</span> <span class="text-gray-500 dark:text-gray-400">— Auto-generates and revises test plans</span></div>
+                    <div><span class="font-semibold text-gray-800 dark:text-gray-200">QG1</span> <span class="text-gray-500 dark:text-gray-400">— Automated RICE scoring and quality gates</span></div>
+                    <div><span class="font-semibold text-gray-800 dark:text-gray-200">AI Doc</span> <span class="text-gray-500 dark:text-gray-400">— AI-contributed documentation and Jira content</span></div>
+                    <div><span class="font-semibold text-gray-800 dark:text-gray-200">UXD</span> <span class="text-gray-500 dark:text-gray-400">— AI-assisted UX design and validation</span></div>
+                    <div><span class="font-semibold text-gray-800 dark:text-gray-200">Epic Creator</span> <span class="text-gray-500 dark:text-gray-400">— Decomposes strategies into implementation epics</span></div>
+                  </div>
+                </div>
+              </th>
+              <th class="px-3 py-3 text-center text-xs font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider border-l-2 border-violet-200 dark:border-violet-700/50 bg-violet-50/40 dark:bg-violet-900/10 group relative cursor-help">
+                <span class="inline-flex items-center gap-1">Throughput Delta
+                  <svg class="w-3.5 h-3.5 text-violet-400 dark:text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </span>
+                <div class="hidden group-hover:block absolute z-20 top-full right-0 mt-1 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-3 text-left normal-case tracking-normal cursor-default" @click.stop>
+                  <p class="text-[10px] font-semibold text-violet-600 dark:text-violet-400 uppercase mb-1.5">Formula</p>
+                  <div class="text-[11px] font-normal text-gray-700 dark:text-gray-300 space-y-1.5">
+                    <div class="bg-violet-50 dark:bg-violet-900/20 rounded px-2 py-1.5 font-mono text-[10px]">
+                      <div>Throughput = Features × Avg Effort</div>
+                      <div class="mt-1">Delta = (Latest − Baseline) / Baseline × 100</div>
+                    </div>
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400">Effort-weighted to prevent inflation from splitting features into smaller, low-effort items.</p>
+                  </div>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, idx) in throughputRows" :key="row.name" :class="idx % 2 === 0 ? 'bg-gray-50/50 dark:bg-gray-800/50' : ''" class="border-b border-gray-100 dark:border-gray-700/40 hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-colors">
+              <td class="px-4 py-2.5 font-medium text-gray-900 dark:text-gray-100 sticky left-0 bg-inherit whitespace-nowrap">{{ row.name }}</td>
+              <template v-for="rg in scorecardGroups" :key="rg.releaseGroup + row.name">
+                <td class="px-3 py-2.5 text-center" :class="rg.releaseGroup === selectedBaseline ? 'bg-amber-50/30 dark:bg-amber-900/5' : ''">
+                  <template v-if="row.releases[rg.releaseGroup]">
+                    <div class="font-semibold text-gray-900 dark:text-gray-100 text-[13px]">{{ row.releases[rg.releaseGroup].features }}</div>
+                    <div class="text-[11px] mt-0.5 tabular-nums" :class="effortCellClass(row.releases[rg.releaseGroup].avgEffort, row.baselineAvg)">
+                      {{ row.releases[rg.releaseGroup].avgEffort }} avg
+                    </div>
+                    <div class="text-[9px] mt-0.5 tabular-nums text-gray-400 dark:text-gray-500">{{ row.releases[rg.releaseGroup].aiPct }}% AI</div>
+                  </template>
+                  <span v-else class="text-gray-300 dark:text-gray-600">—</span>
+                </td>
+              </template>
+              <td class="px-3 py-2.5 text-gray-600 dark:text-gray-400 text-xs border-l border-gray-100 dark:border-gray-700/40">{{ row.dominantPipelines }}</td>
+              <td class="px-3 py-2.5 text-center border-l-2 border-violet-100 dark:border-violet-800/40 bg-violet-50/20 dark:bg-violet-900/5 group/delta relative">
+                <template v-if="row.baselineThroughput > 0 || row.latestThroughput > 0">
+                  <span class="font-bold text-sm tabular-nums" :class="row.throughputDelta > 0 ? 'text-emerald-600 dark:text-emerald-400' : row.throughputDelta === 0 ? 'text-gray-500 dark:text-gray-400' : 'text-red-600 dark:text-red-400'">
+                    {{ row.throughputDelta > 0 ? '+' : '' }}{{ row.throughputDelta }}%
+                  </span>
+                  <div class="text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">{{ row.baselineThroughput }} → {{ row.latestThroughput }}</div>
+                  <div class="hidden group-hover/delta:block absolute z-20 bottom-full right-0 mb-1 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-2.5 text-left text-[10px] font-normal tracking-normal">
+                    <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1">{{ row.name }}</p>
+                    <div class="space-y-0.5 text-gray-500 dark:text-gray-400 font-mono">
+                      <div>Baseline: {{ row.baselineFeatures }} feat × {{ row.baselineAvg }} avg = <span class="text-gray-700 dark:text-gray-200 font-semibold">{{ row.baselineThroughput }}</span></div>
+                      <div>Latest: {{ row.latestFeatures }} feat × {{ row.latestAvg }} avg = <span class="text-gray-700 dark:text-gray-200 font-semibold">{{ row.latestThroughput }}</span></div>
+                      <div class="border-t border-gray-100 dark:border-gray-700 pt-0.5 mt-0.5">Delta: ({{ row.latestThroughput }} − {{ row.baselineThroughput }}) / {{ row.baselineThroughput }} = <span class="font-semibold" :class="row.throughputDelta > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">{{ row.throughputDelta > 0 ? '+' : '' }}{{ row.throughputDelta }}%</span></div>
+                    </div>
+                  </div>
+                </template>
+                <span v-else class="text-[10px] text-gray-400 dark:text-gray-500">—</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <!-- Per-component breakdown (when All Components) -->
       <div v-if="selectedComponent === 'all' && perComponentRows.length > 1" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 overflow-x-auto shadow-sm">
