@@ -35,10 +35,8 @@ function handleRetry() {
 
 function handleSelectFeature(feature) {
   if (feature) {
-    crossNavigate('releases', 'feature-detail', {
-      key: feature.key,
-      fromFeatureReview: '1'
-    })
+    selectedFeature.value = feature
+    moduleNav.navigateTo('feature-review', { select: feature.key })
   }
 }
 
@@ -53,6 +51,25 @@ function handleNavigateToRFE(rfeKey) {
 
 function handleNavigateToTestPlan(sourceKey) {
   moduleNav.navigateTo('test-plan-review', { select: sourceKey })
+}
+
+function handleNavigateToDecomposer(featureKey) {
+  moduleNav.navigateTo('feature-decomposer', { select: featureKey })
+}
+
+function handleNavigateToDocumentation(featureKey) {
+  moduleNav.navigateTo('documentation', { highlight: featureKey })
+}
+
+function handleNavigateToBuildRelease(featureKey) {
+  moduleNav.navigateTo('build-release', { highlight: featureKey })
+}
+
+function handleViewInReleases(featureKey) {
+  crossNavigate('releases', 'feature-detail', {
+    key: featureKey,
+    fromFeatureReview: '1'
+  })
 }
 
 // Handle incoming select param (cross-link from RFE Review)
@@ -121,6 +138,10 @@ watch(() => Object.keys(features.value).length, () => {
       @close="handleCloseModal"
       @navigateToRFE="handleNavigateToRFE"
       @navigateToTestPlan="handleNavigateToTestPlan"
+      @navigateToDecomposer="handleNavigateToDecomposer"
+      @navigateToDocumentation="handleNavigateToDocumentation"
+      @navigateToBuildRelease="handleNavigateToBuildRelease"
+      @viewInReleases="handleViewInReleases"
     />
 
     <AIImpactGuide />
