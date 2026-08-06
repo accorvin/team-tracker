@@ -8,8 +8,8 @@ function extractLinkedKey(issueLinks, config) {
   const { linkTypeName, linkedProject } = config;
   for (const link of issueLinks) {
     if (link.type.name !== linkTypeName) continue;
-    // "is cloned by" from RFE perspective = outwardIssue points to RHAISTRAT
-    const linked = link.outwardIssue;
+    // Check both directions: outwardIssue ("clones") and inwardIssue ("is cloned by")
+    const linked = link.outwardIssue || link.inwardIssue;
     if (!linked || !linked.key.startsWith(linkedProject)) continue;
     return linked.key;
   }
