@@ -46,7 +46,7 @@ async function loadTestPlanDetail(key) {
     detailCache.value[key] = data
     return data
   } catch (e) {
-    if (e.message && e.message.includes('404')) {
+    if (e.status === 404) {
       return null
     }
     throw e

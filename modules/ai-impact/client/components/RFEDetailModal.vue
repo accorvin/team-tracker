@@ -39,12 +39,13 @@ watch(
     try {
       assessmentDetail.value = await props.loadAssessmentDetail(key)
       if (props.rfe?.linkedFeature?.key) {
-        const [tp, signals] = await Promise.all([
-          loadTestPlanDetail(props.rfe.linkedFeature.key),
-          loadPipelineSignals(props.rfe.linkedFeature.key)
+        const featureKey = props.rfe.linkedFeature.key
+        const [tp, signals] = await Promise.allSettled([
+          loadTestPlanDetail(featureKey),
+          loadPipelineSignals(featureKey)
         ])
-        testPlanData.value = tp
-        pipelineSignals.value = signals
+        testPlanData.value = tp.status === 'fulfilled' ? tp.value : null
+        pipelineSignals.value = signals.status === 'fulfilled' ? signals.value : null
       }
     } catch {
       // Silently fail - slim data still shows
