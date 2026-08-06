@@ -2,7 +2,7 @@ const { fetchAllJqlResults } = require('../../../../shared/server/jira');
 
 /**
  * Extract linked feature key from an RFE's issuelinks.
- * Returns the first matching outward link key, or null.
+ * Returns the first matching link key (outward preferred), or null.
  */
 function extractLinkedKey(issueLinks, config) {
   const { linkTypeName, linkedProject } = config;
