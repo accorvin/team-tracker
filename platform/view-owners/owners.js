@@ -56,6 +56,7 @@ export const viewOwners = {
   'product-builds/package-analysis':               'Einat Pacifici',
   'product-builds/rhaiis':                         'Pavol Pitonak',
   'product-builds/rhel-ai':                        'Pavol Pitonak',
+  'product-builds/search':                         'Rishabh Kothari',
   'product-builds/series-detail':                  'Giulia Naponiello',
   'product-builds/wheel-collections':              'Pavol Pitonak',
 

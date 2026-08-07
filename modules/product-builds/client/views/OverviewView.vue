@@ -3,6 +3,7 @@ import { ref, onMounted, inject, defineAsyncComponent } from 'vue'
 import { useOverviewData } from '../composables/useOverviewData'
 import { formatDate } from '../utils/formatting'
 import DropTimeline from '../components/DropTimeline.vue'
+import PersistentSearchBar from '../components/PersistentSearchBar.vue'
 
 const ImageDependencyGraph = defineAsyncComponent(() => import('../components/ImageDependencyGraph.vue'))
 const ProductionTimelineChart = defineAsyncComponent(() => import('../components/ProductionTimelineChart.vue'))
@@ -51,11 +52,14 @@ function shortDate(iso) {
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div>
-      <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Product Builds Overview</h1>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-        Cross-product build and release dashboard
-      </p>
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Product Builds Overview</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Cross-product build and release dashboard
+        </p>
+      </div>
+      <PersistentSearchBar />
     </div>
 
     <!-- Loading -->
