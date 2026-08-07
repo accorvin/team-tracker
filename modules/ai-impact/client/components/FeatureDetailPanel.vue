@@ -35,14 +35,14 @@ watch(
     if (!props.show || !key || !props.loadFeatureDetail) return
     detailLoading.value = true
     try {
-      const [detail, tp, signals] = await Promise.all([
+      const [detail, tp, signals] = await Promise.allSettled([
         props.loadFeatureDetail(key),
         loadTestPlanDetail(key),
         loadPipelineSignals(key)
       ])
-      featureDetail.value = detail
-      testPlanData.value = tp
-      pipelineSignals.value = signals
+      featureDetail.value = detail.status === 'fulfilled' ? detail.value : null
+      testPlanData.value = tp.status === 'fulfilled' ? tp.value : null
+      pipelineSignals.value = signals.status === 'fulfilled' ? signals.value : null
     } catch {
       // Silently fail - slim data still shows
     } finally {
