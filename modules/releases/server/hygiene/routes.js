@@ -669,6 +669,7 @@ module.exports = async function registerHygieneRoutes(router, context) {
 
       versions.push({
         versionId: versionId,
+        registryId: rel ? rel.id : null,
         displayName: (rel && rel.displayName) || data.version || versionId,
         gaDate: gaDate || null,
         isReleased: !!isReleased,
