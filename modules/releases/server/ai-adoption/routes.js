@@ -62,7 +62,10 @@ function applyFilters(cached, { releaseGroup, component }) {
  *         description: Filter to a single component name
  *     responses:
  *       200:
- *         description: Array of release group adoption results
+ *         description: >
+ *           Release group adoption results including per-component effort
+ *           metrics (effortSignal, aggregateEffort, avgEffort) resolved
+ *           from customfield_10430, RICE Effort, or subtask count
  *       503:
  *         description: Jira client not configured
  */
