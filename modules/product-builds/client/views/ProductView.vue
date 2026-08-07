@@ -5,6 +5,7 @@ import { useProduct, useDrops, useSeries } from '../composables/useDrops'
 import { useArtifacts } from '../composables/useArtifacts'
 import { formatDate, envBadgeClass } from '../utils/formatting'
 import ChiBadge from '../components/ChiBadge.vue'
+import PersistentSearchBar from '../components/PersistentSearchBar.vue'
 
 const PRODUCT_CONFIGS = {
   'rhaiis':            { key: 'rhaiis',        artifactType: 'containers' },
@@ -132,13 +133,16 @@ const groupedDrops = computed(() => {
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div>
-      <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">
-        {{ productConfig.label || product?.product_name || product?.short_name || productKey }}
-      </h1>
-      <p v-if="product" class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-        Overview of {{ product.short_name || productKey }} product series and their available drops
-      </p>
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">
+          {{ productConfig.label || product?.product_name || product?.short_name || productKey }}
+        </h1>
+        <p v-if="product" class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Overview of {{ product.short_name || productKey }} product series and their available drops
+        </p>
+      </div>
+      <PersistentSearchBar />
     </div>
 
     <!-- Loading / Error -->

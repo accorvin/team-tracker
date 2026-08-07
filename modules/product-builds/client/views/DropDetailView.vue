@@ -6,6 +6,7 @@ import { apiRequest } from '@shared/client/services/api'
 import { formatDate, envBadgeClass, archBadgeClass, konfluxStateBadgeClass, testStatusBadgeClass, testStatusLabel, formatDuration, getCommitUrl, getRegistryUrl, getQuayDirectTagUrl, getQuayAllTagsUrl, getDigestUrl } from '../utils/formatting'
 import ChiBadge from '../components/ChiBadge.vue'
 import DropTimeline from '../components/DropTimeline.vue'
+import PersistentSearchBar from '../components/PersistentSearchBar.vue'
 
 const BASE = '/modules/product-builds'
 const nav = inject('moduleNav')
@@ -224,30 +225,33 @@ const totalColumns = 7
 
     <template v-if="drop">
       <!-- Header -->
-      <div>
-        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Drop: {{ drop.name }}</h1>
-        <div class="flex items-center gap-3 mt-2 text-sm text-gray-500 dark:text-gray-400 flex-wrap">
-          <span>Version: <span class="text-gray-900 dark:text-gray-100">{{ drop.product_version }}</span></span>
-          <span v-if="drop.git_branch">&middot; Branch: <span class="text-gray-900 dark:text-gray-100">{{ drop.git_branch }}</span></span>
-          <span v-if="dropCommit">&middot; Commit:
-            <a
-              v-if="getCommitUrl(dropCommit)"
-              :href="getCommitUrl(dropCommit)"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="font-mono text-primary-600 dark:text-blue-400 hover:underline"
-            >{{ dropCommit.commit.slice(0, 8) }}</a>
-            <span v-else class="font-mono text-gray-900 dark:text-gray-100">{{ dropCommit.commit.slice(0, 8) }}</span>
-          </span>
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Drop: {{ drop.name }}</h1>
+          <div class="flex items-center gap-3 mt-2 text-sm text-gray-500 dark:text-gray-400 flex-wrap">
+            <span>Version: <span class="text-gray-900 dark:text-gray-100">{{ drop.product_version }}</span></span>
+            <span v-if="drop.git_branch">&middot; Branch: <span class="text-gray-900 dark:text-gray-100">{{ drop.git_branch }}</span></span>
+            <span v-if="dropCommit">&middot; Commit:
+              <a
+                v-if="getCommitUrl(dropCommit)"
+                :href="getCommitUrl(dropCommit)"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-mono text-primary-600 dark:text-blue-400 hover:underline"
+              >{{ dropCommit.commit.slice(0, 8) }}</a>
+              <span v-else class="font-mono text-gray-900 dark:text-gray-100">{{ dropCommit.commit.slice(0, 8) }}</span>
+            </span>
+          </div>
+          <div v-if="drop.environments?.length" class="flex gap-1 mt-2">
+            <span
+              v-for="env in drop.environments"
+              :key="env"
+              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+              :class="envBadgeClass(env)"
+            >{{ env }}</span>
+          </div>
         </div>
-        <div v-if="drop.environments?.length" class="flex gap-1 mt-2">
-          <span
-            v-for="env in drop.environments"
-            :key="env"
-            class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-            :class="envBadgeClass(env)"
-          >{{ env }}</span>
-        </div>
+        <PersistentSearchBar />
       </div>
 
       <!-- Release timing -->
