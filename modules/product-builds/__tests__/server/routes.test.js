@@ -76,6 +76,8 @@ describe('product-builds routes', () => {
       expect(paths).toContain('/artifacts/:key')
       expect(paths).toContain('/artifacts/:key/wheels')
       expect(paths).toContain('/artifacts/:key/containers')
+      expect(paths).toContain('/search')
+      expect(paths).toContain('/search/filters')
       expect(paths).toContain('/package-reports')
       expect(paths).toContain('/package-reports/latest')
       expect(paths).toContain('/package-reports/onboarded')

@@ -101,4 +101,35 @@ test.describe('Product Builds Module @product-builds', () => {
     const appErrors = page.errors.filter(e => !/status of (429|404|503)/.test(e.message));
     expect(appErrors).toHaveLength(0);
   });
+
+  test('should navigate to Search view and show empty state', async ({ page }) => {
+    await page.goto('/#/product-builds/search');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    expect(page.url()).toMatch(/product-builds\/search/);
+
+    const searchInput = page.locator('input[type="text"]');
+    await expect(searchInput).toBeVisible();
+    await expect(page.locator('text=Enter a search query')).toBeVisible();
+
+    const appErrors = page.errors.filter(e => !/status of (429|404|503)/.test(e.message));
+    expect(appErrors).toHaveLength(0);
+  });
+
+  test('should run a search and update the URL query param', async ({ page }) => {
+    await page.goto('/#/product-builds/search');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const searchInput = page.locator('input[type="text"]');
+    await searchInput.fill('rhaiis');
+    await searchInput.press('Enter');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    expect(page.url()).toMatch(/[?&]q=rhaiis/);
+
+    const appErrors = page.errors.filter(e => !/status of (429|404|503)/.test(e.message));
+    expect(appErrors).toHaveLength(0);
+  });
 });
