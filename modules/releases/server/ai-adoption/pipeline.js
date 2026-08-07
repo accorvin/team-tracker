@@ -204,7 +204,7 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
     const fvList = group.fixVersions.map(v => `"${v}"`).join(', ');
     const projectList = PROJECTS.join(', ');
     const jql = `project in (${projectList}) AND issuetype = Feature AND fixVersion in (${fvList}) ORDER BY key ASC`;
-    const fields = `summary,status,labels,components,fixVersions,subtasks,${EFFORT_FIELD},${RICE_EFFORT_FIELD}`;
+    const fields = `summary,status,labels,components,fixVersions,${EFFORT_FIELD},${RICE_EFFORT_FIELD}`;
 
     let issues;
     try {
