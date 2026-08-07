@@ -2,20 +2,6 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import BigRockExpandedRow from '../../../client/plan/components/BigRockExpandedRow.vue'
 
-// ─── RiskBadge ───
-
-// ─── HealthSummaryCards ───
-
-// ─── RiceScoreDisplay ───
-
-// ─── HealthFilterBar ───
-
-// ─── MilestoneTimeline ───
-
-// ─── FeatureHealthTable ───
-
-// ─── BigRockExpandedRow ───
-
 describe('BigRockExpandedRow', function() {
   var sampleFeatures = [
     {
