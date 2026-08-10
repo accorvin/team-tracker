@@ -3,6 +3,9 @@ import { describe, it, expect, vi } from 'vitest';
 const {
   scanLabels,
   fetchAiAdoptionData,
+  fetchChildRollups,
+  resolveEffortSignal,
+  applyEffortSignal,
   AI_PIPELINE_TAXONOMY,
   PIPELINE_KEYS,
   RELEASE_GROUPS,
@@ -278,5 +281,199 @@ describe('fetchAiAdoptionData', () => {
     expect(results).toHaveLength(1);
     expect(results[0].totalFeatures).toBe(0);
     expect(results[0].components).toEqual([]);
+  });
+
+  it('accumulates effort signals and resolves effort per group', async () => {
+    const issues = [
+      {
+        key: 'E-1',
+        fields: {
+          summary: 'E-1', status: { name: 'Done' }, labels: ['strat-creator-auto-created'],
+          components: [{ name: 'Alpha' }], fixVersions: [],
+          customfield_10430: 5, customfield_10637: 3
+        }
+      },
+      {
+        key: 'E-2',
+        fields: {
+          summary: 'E-2', status: { name: 'Done' }, labels: [],
+          components: [{ name: 'Alpha' }], fixVersions: [],
+          customfield_10430: 3, customfield_10637: null
+        }
+      },
+      {
+        key: 'E-3',
+        fields: {
+          summary: 'E-3', status: { name: 'Done' }, labels: [],
+          components: [{ name: 'Beta' }], fixVersions: [],
+          customfield_10430: null, customfield_10637: null
+        }
+      }
+    ];
+
+    const childIssues = [
+      { key: 'C-1', fields: { parent: { key: 'E-1' }, customfield_10016: 5, customfield_10637: null, timeoriginalestimate: null }},
+      { key: 'C-2', fields: { parent: { key: 'E-1' }, customfield_10016: 3, customfield_10637: null, timeoriginalestimate: null }},
+      { key: 'C-3', fields: { parent: { key: 'E-2' }, customfield_10016: 2, customfield_10637: null, timeoriginalestimate: null }}
+    ];
+
+    let callCount = 0;
+    const jira = {
+      fetchAllJqlResults: vi.fn(async () => {
+        callCount++;
+        if (callCount === 1) return issues;
+        return childIssues;
+      })
+    };
+    const results = await fetchAiAdoptionData(jira, { releaseGroup: '3.4 GA' });
+    expect(results).toHaveLength(1);
+    const g = results[0];
+
+    expect(g.effortSignal).toBe('effort');
+    expect(g.aggregateEffort).toBe(8);
+    expect(g.avgEffort).toBe(2.7);
+
+    const alpha = g.components.find(c => c.name === 'Alpha');
+    expect(alpha.effortSum).toBe(8);
+    expect(alpha.effortCount).toBe(2);
+    expect(alpha.aggregateEffort).toBe(8);
+    expect(alpha.avgEffort).toBe(4);
+    expect(alpha.childSpSum).toBe(10);
+
+    const beta = g.components.find(c => c.name === 'Beta');
+    expect(beta.effortSum).toBe(0);
+    expect(beta.aggregateEffort).toBe(0);
+    expect(beta.childIssueSum).toBe(1);
+  });
+
+  it('falls back to childSp when custom fields are empty', async () => {
+    const issues = [
+      { key: 'F-1', fields: { summary: 'F-1', status: { name: 'Done' }, labels: [], components: [{ name: 'Comp' }], fixVersions: [], customfield_10430: null, customfield_10637: null }},
+      { key: 'F-2', fields: { summary: 'F-2', status: { name: 'Done' }, labels: [], components: [{ name: 'Comp' }], fixVersions: [], customfield_10430: null, customfield_10637: null }},
+      { key: 'F-3', fields: { summary: 'F-3', status: { name: 'Done' }, labels: [], components: [{ name: 'Comp' }], fixVersions: [], customfield_10430: null, customfield_10637: null }}
+    ];
+
+    const childIssues = [
+      { key: 'C-1', fields: { parent: { key: 'F-1' }, customfield_10016: 3, customfield_10637: null, timeoriginalestimate: null }},
+      { key: 'C-2', fields: { parent: { key: 'F-1' }, customfield_10016: 5, customfield_10637: null, timeoriginalestimate: null }},
+      { key: 'C-3', fields: { parent: { key: 'F-2' }, customfield_10016: 2, customfield_10637: null, timeoriginalestimate: null }}
+    ];
+
+    let callCount = 0;
+    const jira = {
+      fetchAllJqlResults: vi.fn(async () => {
+        callCount++;
+        if (callCount === 1) return issues;
+        return childIssues;
+      })
+    };
+    const results = await fetchAiAdoptionData(jira, { releaseGroup: '3.4 GA' });
+    const g = results[0];
+
+    expect(g.effortSignal).toBe('childSp');
+    expect(g.aggregateEffort).toBe(10);
+    expect(g.avgEffort).toBe(3.3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveEffortSignal
+// ---------------------------------------------------------------------------
+describe('resolveEffortSignal', () => {
+  it('returns effort when customfield_10430 covers >= 50%', () => {
+    expect(resolveEffortSignal({ effortCount: 5, riceEffortCount: 2, childSpCount: 3 }, 10)).toBe('effort');
+    expect(resolveEffortSignal({ effortCount: 10, riceEffortCount: 0, childSpCount: 0 }, 10)).toBe('effort');
+  });
+
+  it('falls back to rice when effort is under 50% but rice is >= 50%', () => {
+    expect(resolveEffortSignal({ effortCount: 2, riceEffortCount: 6, childSpCount: 4 }, 10)).toBe('rice');
+  });
+
+  it('falls back to childSp when effort and rice are under 50% but childSp >= 30%', () => {
+    expect(resolveEffortSignal({ effortCount: 1, riceEffortCount: 1, childSpCount: 4 }, 10)).toBe('childSp');
+  });
+
+  it('falls back to children when no signal meets threshold', () => {
+    expect(resolveEffortSignal({ effortCount: 1, riceEffortCount: 1, childSpCount: 2 }, 10)).toBe('children');
+  });
+
+  it('returns children when totalFeatures is 0', () => {
+    expect(resolveEffortSignal({ effortCount: 0, riceEffortCount: 0, childSpCount: 0 }, 0)).toBe('children');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyEffortSignal
+// ---------------------------------------------------------------------------
+describe('applyEffortSignal', () => {
+  const entry = {
+    total: 4,
+    effortSum: 20,
+    riceEffortSum: 12,
+    childSpSum: 15,
+    childIssueSum: 8
+  };
+
+  it('uses effortSum when signal is effort', () => {
+    const result = applyEffortSignal(entry, 'effort');
+    expect(result.aggregateEffort).toBe(20);
+    expect(result.avgEffort).toBe(5);
+  });
+
+  it('uses riceEffortSum when signal is rice', () => {
+    const result = applyEffortSignal(entry, 'rice');
+    expect(result.aggregateEffort).toBe(12);
+    expect(result.avgEffort).toBe(3);
+  });
+
+  it('uses childSpSum when signal is childSp', () => {
+    const result = applyEffortSignal(entry, 'childSp');
+    expect(result.aggregateEffort).toBe(15);
+    expect(result.avgEffort).toBe(3.8);
+  });
+
+  it('uses childIssueSum when signal is children', () => {
+    const result = applyEffortSignal(entry, 'children');
+    expect(result.aggregateEffort).toBe(8);
+    expect(result.avgEffort).toBe(2);
+  });
+
+  it('returns 0 avgEffort when total is 0', () => {
+    const result = applyEffortSignal({ total: 0, effortSum: 0, riceEffortSum: 0, childSpSum: 0, childIssueSum: 0 }, 'effort');
+    expect(result.avgEffort).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchChildRollups
+// ---------------------------------------------------------------------------
+describe('fetchChildRollups', () => {
+  it('returns empty map when no parent keys', async () => {
+    const jira = { fetchAllJqlResults: vi.fn() };
+    const result = await fetchChildRollups(jira, []);
+    expect(result.size).toBe(0);
+    expect(jira.fetchAllJqlResults).not.toHaveBeenCalled();
+  });
+
+  it('rolls up child count and story points per parent', async () => {
+    const childIssues = [
+      { key: 'C-1', fields: { parent: { key: 'P-1' }, customfield_10016: 3, customfield_10637: null, timeoriginalestimate: null }},
+      { key: 'C-2', fields: { parent: { key: 'P-1' }, customfield_10016: 5, customfield_10637: null, timeoriginalestimate: null }},
+      { key: 'C-3', fields: { parent: { key: 'P-2' }, customfield_10016: null, customfield_10637: 2, timeoriginalestimate: null }},
+      { key: 'C-4', fields: { parent: { key: 'P-2' }, customfield_10016: null, customfield_10637: null, timeoriginalestimate: 7200 }}
+    ];
+    const jira = { fetchAllJqlResults: vi.fn(async () => childIssues) };
+    const result = await fetchChildRollups(jira, ['P-1', 'P-2']);
+
+    expect(result.get('P-1').childCount).toBe(2);
+    expect(result.get('P-1').childSpSum).toBe(8);
+    expect(result.get('P-2').childCount).toBe(2);
+    expect(result.get('P-2').childSpSum).toBe(4);
+  });
+
+  it('handles fetch errors gracefully', async () => {
+    const jira = { fetchAllJqlResults: vi.fn(async () => { throw new Error('timeout'); }) };
+    const result = await fetchChildRollups(jira, ['X-1']);
+    expect(result.size).toBe(0);
   });
 });

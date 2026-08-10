@@ -4,6 +4,7 @@ import { useWheelBrowse, useWheelPackageSearch, useWheelFilters } from '../compo
 import { formatDate, envBadgeClass, archBadgeClass, getCommitUrl } from '../utils/formatting'
 import { apiRequest, getApiBase } from '@shared/client/services/api'
 import { impersonatingUid } from '@shared/client/state/impersonation'
+import PersistentSearchBar from '../components/PersistentSearchBar.vue'
 
 const nav = inject('moduleNav')
 
@@ -328,11 +329,14 @@ onUnmounted(() => { clearTimeout(searchTimeout); clearTimeout(containerHoverTime
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div>
-      <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Wheel Collections</h1>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-        Browse wheel collection releases or search for specific packages across releases
-      </p>
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Wheel Collections</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Browse wheel collection releases or search for specific packages across releases
+        </p>
+      </div>
+      <PersistentSearchBar />
     </div>
 
     <!-- Tabs -->

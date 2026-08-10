@@ -20,12 +20,20 @@
     "hiddenRoutes": {
       "series-detail": "$product",
       "drop-detail": "$product",
-      "artifact-detail": "$product"
+      "artifact-detail": "$product",
+      "search": null
     },
     "settingsComponent": "./client/components/ProductBuildsSettings.vue"
   },
   "server": {
     "entry": "./server/index.js"
+  },
+  "search": {
+    "enabled": true,
+    "keywords": ["build", "release", "drop", "artifact", "container", "pullspec", "wheel", "package", "image"],
+    "views": [
+      { "viewId": "search", "paramName": "q", "placeholder": "Search drops, artifacts, commits..." }
+    ]
   },
   "secrets": {
     "platform": ["jira", "gitlab", "google"],

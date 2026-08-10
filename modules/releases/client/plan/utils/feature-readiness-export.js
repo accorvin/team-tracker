@@ -76,7 +76,8 @@ function exportFeatureReadinessCsv(features) {
     { label: 'Team', getter: function(f) { return f.team || '' } },
     { label: 'Status', getter: function(f) { return f.status || '' } },
     { label: 'Priority', getter: function(f) { return f.priority || '' } },
-    { label: 'Confidence', getter: function(f) { return f.confidence || '' } }
+    { label: 'Confidence', getter: function(f) { return f.confidence || '' } },
+    { label: 'Labels', getter: function(f) { return Array.isArray(f.labels) ? f.labels.join('; ') : (f.labels || '') } }
   ]
 
   var header = columns.map(function(c) { return escapeCsv(c.label) }).join(',')

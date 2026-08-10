@@ -49,6 +49,18 @@ function handleNavigateToRFE(rfeKey) {
   moduleNav.navigateTo('rfe-review', { select: rfeKey })
 }
 
+function handleNavigateToDecomposer(featureKey) {
+  moduleNav.navigateTo('feature-decomposer', { select: featureKey })
+}
+
+function handleNavigateToDocumentation(featureKey) {
+  moduleNav.navigateTo('documentation', { highlight: featureKey })
+}
+
+function handleNavigateToBuildRelease(featureKey) {
+  moduleNav.navigateTo('build-release', { highlight: featureKey })
+}
+
 // Handle incoming select param (cross-link from other views)
 watch(() => moduleNav.params.value, (params) => {
   if (params?.select && Object.keys(testPlans.value).length > 0) {
@@ -109,6 +121,9 @@ watch(() => Object.keys(testPlans.value).length, () => {
       @close="handleCloseModal"
       @navigateToFeature="handleNavigateToFeature"
       @navigateToRFE="handleNavigateToRFE"
+      @navigateToDecomposer="handleNavigateToDecomposer"
+      @navigateToDocumentation="handleNavigateToDocumentation"
+      @navigateToBuildRelease="handleNavigateToBuildRelease"
     />
 
     <AIImpactGuide defaultTab="testplans" />
