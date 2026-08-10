@@ -4,8 +4,8 @@ import { useWheelOverrides } from '../composables/useWheelCollections'
 
 const wheelOverrides = useWheelOverrides()
 
-const BUILDER_REPO_URL = 'https://gitlab.com/redhat/rhel-ai/wheels/builder'
-const OVERRIDE_VARIANTS = ['cpu-ubi9', 'cuda-ubi9', 'gaudi-ubi9', 'neuron-ubi9', 'rocm-ubi9', 'spyre-ubi9', 'tpu-ubi9']
+const BUILDER_REPO_URL = 'https://gitlab.com/redhat/rhel-ai/wheels/fondue'
+const OVERRIDE_VARIANTS = ['cpu-ubi9', 'cuda-ubi9', 'gaudi-ubi9', 'neuron-ubi9', 'rocm-ubi9', 'rubin-ubi9', 'spyre-ubi9', 'tpu-ubi9']
 
 function getOverrideFileUrl(override) {
   if (!override.source_file) return null
