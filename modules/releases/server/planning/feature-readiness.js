@@ -2,7 +2,7 @@ var { getConfiguredReleases, loadBigRocks } = require('./config')
 var { loadIndex } = require('./cache-reader')
 var { CLOSED_STATUSES, EARLY_STATUSES } = require('./constants')
 var { deriveHumanReviewStatus: sharedDeriveStatus } = require('../execution/ai-review-fields')
-var { computeFPDoRReadiness, extractRubricData } = require('./fpdor')
+var { computeFPDoRReadiness } = require('./fpdor')
 var { computePriorityScores } = require('./health/priority-scorer')
 
 var BLOCKING_HYGIENE_RULES = []
@@ -36,19 +36,21 @@ function computeBlockers(feature, productPath) {
 }
 
 function computeReadiness(feature) {
-  var rubricData = extractRubricData(feature)
-  var fpdor = computeFPDoRReadiness(feature, rubricData)
+  // Rubric scores are display/priority only — FPDoR uses labels + fields + description.
+  var fpdor = computeFPDoRReadiness(feature)
 
   // Informational only — early status does not gate readiness (FPDoR-only ready).
   var pastRefinement = !!feature.status && EARLY_STATUSES.indexOf(feature.status) === -1
   var noBlockingViolations = !hasBlockingViolations(feature.violations)
 
-  var isReady = fpdor.passedCount === fpdor.totalCount
+  // N/A (pass === null) does not fail readiness; only explicit fails block ready.
+  var isReady = !!fpdor.allApplicablePassed
 
   var gates = {
     fpDorPassed: fpdor.passedCount,
     fpDorTotal: fpdor.totalCount,
     fpDorEvaluated: fpdor.evaluatedCount,
+    fpDorApplicable: fpdor.applicableCount,
     pastRefinement: pastRefinement,
     noBlockingViolations: noBlockingViolations
   }
@@ -131,10 +133,23 @@ async function loadExecutionData(readFromStorage) {
             approvedBy: fullFeature.aiReview.approvedBy || null,
             approvedAt: fullFeature.aiReview.approvedAt || null,
             riceScore: fullFeature.riceScore || null,
-            labels: fullFeature.labels || []
+            labels: fullFeature.labels || [],
+            docsRequired: fullFeature.docsRequired != null ? fullFeature.docsRequired : null,
+            releaseType: fullFeature.releaseType || null
           },
           history: fullFeature.aiReview.history || []
         }
+        // Prefer full feature file fields on the exec map entry used by mergeFeatureData
+        Object.assign(arEntry, {
+          riceScore: fullFeature.riceScore != null ? fullFeature.riceScore : arEntry.riceScore,
+          docsRequired: fullFeature.docsRequired != null ? fullFeature.docsRequired : arEntry.docsRequired,
+          releaseType: fullFeature.releaseType || arEntry.releaseType,
+          epicCount: fullFeature.epicCount != null ? fullFeature.epicCount : arEntry.epicCount,
+          assignee: fullFeature.assignee || arEntry.assignee,
+          pm: fullFeature.pm || arEntry.pm,
+          labels: fullFeature.labels || arEntry.labels,
+          linkedRfeKey: fullFeature.linkedRfeKey || arEntry.linkedRfeKey
+        })
       }
     }
   }
@@ -347,7 +362,7 @@ function mergeFeatureData(key, jiraFeatures, aiReviewMap, candidateIndex, health
     deliveryOwner = null
   }
 
-  var pmOwner = (health && health.pmOwner) || (jira && jira.pmOwner) || null
+  var pmOwner = (health && health.pmOwner) || (jira && jira.pmOwner) || (exec && exec.pm) || null
 
   var team = teamIndex.get(key) || (jira && jira.team) || (exec && exec.team) || null
 
@@ -411,15 +426,19 @@ function mergeFeatureData(key, jiraFeatures, aiReviewMap, candidateIndex, health
 
   var hygieneStatus = computeHygieneStatus(violations)
 
-  var storyPoints = (health && health.storyPoints) || (candidate && candidate.storyPoints) || (jira && jira.storyPoints) || null
-  var epicCount = (health && health.epicCount) || (candidate && candidate.epicCount) || 0
-  var releaseType = (health && health.releaseType) || (candidate && candidate.phase) || (jira && jira.releaseType) || null
+  var storyPoints = (health && health.storyPoints) || (candidate && candidate.storyPoints) || (jira && jira.storyPoints) || (exec && exec.storyPoints) || null
+  var epicCount = (health && health.epicCount) || (candidate && candidate.epicCount) || (exec && exec.epicCount) || 0
+  var releaseType = (health && health.releaseType) || (candidate && candidate.phase) || (jira && jira.releaseType) || (exec && exec.releaseType) || null
   var assignee = deliveryOwner
-  var pm = pmOwner || (health && health.pm) || (candidate && candidate.pm) || null
-  var docsRequired = (health && health.docsRequired) || (jira && jira.docsRequired) || null
-  var effort = (jira && jira.effort) || null
+  var pm = pmOwner || (health && health.pm) || (candidate && candidate.pm) || (exec && exec.pm) || null
+  var docsRequired = (health && health.docsRequired) || (jira && jira.docsRequired) || (exec && exec.docsRequired) || null
+  var effort = (jira && jira.effort) || (exec && exec.effort) || null
   var tshirtSize = (health && health.tshirtSize) || (aiReview && aiReview.size) || null
   var descriptionSignals = (jira && jira.descriptionSignals) || (health && health.descriptionSignals) || null
+
+  if (!pmOwner && pm) pmOwner = pm
+  if (!sourceRfe && exec && exec.linkedRfeKey) sourceRfe = exec.linkedRfeKey
+  if (!sourceRfe && jira && jira.linkedRfeKey) sourceRfe = jira.linkedRfeKey
 
   return {
     key: key,

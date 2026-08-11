@@ -217,13 +217,22 @@ function formatSyncDate(dateStr) {
                     </div>
                     <div class="flex items-center gap-2">
                       <span class="w-2.5 h-2.5 rounded-full bg-yellow-500 shrink-0"></span>
-                      <span class="text-gray-600 dark:text-gray-300"><strong>Ready</strong> — passes gates, not yet committed</span>
+                      <span class="text-gray-600 dark:text-gray-300"><strong>Ready</strong> — passes Planning DoR, not yet committed</span>
                     </div>
                     <div class="flex items-center gap-2">
                       <span class="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0"></span>
-                      <span class="text-gray-600 dark:text-gray-300"><strong>Not Ready</strong> — does not pass readiness gates</span>
+                      <span class="text-gray-600 dark:text-gray-300"><strong>Not Ready</strong> — does not pass Planning DoR</span>
                     </div>
                   </div>
+                  <p class="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
+                    DoR checklist:
+                    <a
+                      href="https://redhat.atlassian.net/wiki/spaces/RHAI/pages/442958832/Planning+Phase+-+Definition+of+Ready+Definition+of+Done"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-primary-600 dark:text-primary-400 hover:underline"
+                    >Confluence</a>
+                  </p>
                 </div>
               </span>
               <span v-else-if="header.hasScoreTooltip" class="inline-flex items-center gap-1 group relative">

@@ -1,20 +1,31 @@
 import { escapeCsv, triggerDownload } from './health-export.js'
 
-var FPDOR_ITEM_NAMES = [
-  'Requirements Clarity',
-  'Acceptance Criteria',
-  'Scope Defined',
-  'RICE Score',
-  'Cross-functional Engineering',
-  'Documentation',
-  'UXD',
-  'Architectural Alignment',
-  'Risks & Assumptions',
-  'Release Type',
+var FPDOR_CONFLUENCE_URL = 'https://redhat.atlassian.net/wiki/spaces/RHAI/pages/442958832/Planning+Phase+-+Definition+of+Ready+Definition+of+Done'
+
+var FPDOR_MANDATORY_NAMES = [
   'Target Version',
-  'Assignee',
-  'PM Assigned'
+  'Release Type',
+  'Components',
+  'PM',
+  'Delivery Owner',
+  'Priority',
+  'RICE (4 dims)',
+  'Docs impact'
 ]
+
+var FPDOR_CRITERIA_NAMES = [
+  'Source RFE / AI SDLC',
+  'Requirements clarity',
+  'Acceptance criteria',
+  'Risks & assumptions',
+  'Architectural alignment',
+  'UXD',
+  'Cross-team deps',
+  'Feature human sign-off',
+  'Child epics'
+]
+
+var FPDOR_ITEM_NAMES = FPDOR_MANDATORY_NAMES.concat(FPDOR_CRITERIA_NAMES)
 
 var KNOWN_PRODUCTS = ['RHOAI', 'RHAIIS', 'RHELAI']
 
@@ -57,7 +68,8 @@ function exportFeatureReadinessCsv(features) {
       label: 'FPDoR',
       getter: function(f) {
         if (!f.fpdor) return ''
-        return f.fpdor.passedCount + '/' + f.fpdor.totalCount
+        var applicable = f.fpdor.applicableCount != null ? f.fpdor.applicableCount : f.fpdor.totalCount
+        return f.fpdor.passedCount + '/' + applicable
       }
     },
     { label: 'Failed FPDoR Items', getter: function(f) { return failedFpdorNames(f).join('; ') } },
@@ -124,10 +136,13 @@ function featureMatchesSharedFilters(feature, filterState, selectedVersion, opti
 
 export {
   FPDOR_ITEM_NAMES,
+  FPDOR_MANDATORY_NAMES,
+  FPDOR_CRITERIA_NAMES,
+  FPDOR_CONFLUENCE_URL,
   KNOWN_PRODUCTS,
   featureMatchesProduct,
   featureFailsSelectedFpdorItems,
   failedFpdorNames,
-  featureMatchesSharedFilters,
-  exportFeatureReadinessCsv
+  exportFeatureReadinessCsv,
+  featureMatchesSharedFilters
 }

@@ -18,7 +18,7 @@ const { getConfig, getConfiguredReleases, loadBigRocks } = require('../config')
 const { JIRA_BROWSE_URL, CLOSED_STATUSES, PLANNING_DEADLINE_OFFSET_DAYS, VALID_PHASES, STRAT_CREATOR_LABELS } = require('../constants')
 const { enrichFeatures } = require('./jira-enrichment')
 const { computeFeatureRisk } = require('./risk-engine')
-var { computeFPDoRReadiness, extractRubricData } = require('../fpdor')
+var { computeFPDoRReadiness } = require('../fpdor')
 const { computePriorityScores } = require('./priority-scorer')
 const { getRegistryReleasesFlat } = require('../../registry')
 
@@ -52,8 +52,9 @@ function computePlanningChecks(feature) {
 
 function derivePlanningStatus(fpdorResult) {
   if (!fpdorResult) return 'not-ready'
-  if (fpdorResult.passedCount === fpdorResult.totalCount) return 'ready-for-execution'
-  if (fpdorResult.passedCount >= Math.ceil(fpdorResult.totalCount / 2)) return 'in-planning'
+  if (fpdorResult.allApplicablePassed) return 'ready-for-execution'
+  var applicable = fpdorResult.applicableCount != null ? fpdorResult.applicableCount : fpdorResult.totalCount
+  if (applicable > 0 && fpdorResult.passedCount >= Math.ceil(applicable / 2)) return 'in-planning'
   return 'not-ready'
 }
 
@@ -125,6 +126,12 @@ function passesPhaseFilter(candidate, version, phase) {
  * @returns {object}
  */
 function mapCandidateToHealthFeature(candidate) {
+  var labels = candidate.labels
+  if (Array.isArray(labels)) {
+    labels = labels.slice()
+  } else {
+    labels = splitCommaString(labels)
+  }
   return {
     key: candidate.issueKey,
     summary: candidate.summary || '',
@@ -137,11 +144,17 @@ function mapCandidateToHealthFeature(candidate) {
     assignee: candidate.deliveryOwner || '',
     deliveryOwner: candidate.deliveryOwner || '',
     pm: candidate.pm || '',
+    pmOwner: candidate.pm || '',
     bigRock: candidate.bigRock || '',
     tier: candidate.tier || null,
     rfe: candidate.rfe || '',
-    labels: splitCommaString(candidate.labels),
-    parentKey: candidate.rfe || ''
+    sourceRfe: candidate.rfe || candidate.sourceRfe || '',
+    linkedRfeKey: candidate.linkedRfeKey || candidate.rfe || null,
+    labels: labels,
+    parentKey: candidate.rfe || '',
+    docsRequired: candidate.docsRequired != null ? candidate.docsRequired : null,
+    epicCount: candidate.epicCount != null ? candidate.epicCount : 0,
+    riceScore: candidate.riceScore != null ? candidate.riceScore : null
   }
 }
 
@@ -612,8 +625,7 @@ async function runHealthPipeline(version, readFromStorage, writeToStorage, jiraR
       descriptionSignals: enrichment ? enrichment.descriptionSignals || null : null,
       scores: feature.scores || null
     })
-    var rubricData = extractRubricData(featureForFpdor)
-    var fpdorResult = computeFPDoRReadiness(featureForFpdor, rubricData)
+    var fpdorResult = computeFPDoRReadiness(featureForFpdor)
 
     var planningStatus = derivePlanningStatus(fpdorResult)
     byPlanningStatus[planningStatus] = (byPlanningStatus[planningStatus] || 0) + 1
@@ -776,7 +788,7 @@ async function runHealthPipeline(version, readFromStorage, writeToStorage, jiraR
   var fpdorFullyPassedCount = 0
   for (var fpi = 0; fpi < healthFeatures.length; fpi++) {
     var fpd = healthFeatures[fpi].fpdor
-    if (fpd && fpd.passedCount === fpd.evaluatedCount && fpd.evaluatedCount >= 6) {
+    if (fpd && (fpd.allApplicablePassed || (fpd.passedCount === fpd.evaluatedCount && fpd.evaluatedCount >= 6))) {
       fpdorFullyPassedCount++
     }
   }
