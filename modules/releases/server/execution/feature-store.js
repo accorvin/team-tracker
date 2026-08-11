@@ -33,6 +33,21 @@ const PIPELINE_INDEX_FIELDS = [
 const AI_REVIEW_FIELDS = ['aiReview'];
 
 /**
+ * Prefer Jira-discovered child Epic list over pipeline metrics.totalEpics.
+ * fullJiraSync stores linked Epics on feature.epics; pipeline totalEpics can be stale.
+ *
+ * @param {object} feature
+ * @returns {number}
+ */
+function deriveEpicCount(feature) {
+  if (!feature) return 0
+  if (Array.isArray(feature.epics) && feature._sources && feature._sources.jira) {
+    return feature.epics.length
+  }
+  return feature.metrics ? (feature.metrics.totalEpics || 0) : 0
+}
+
+/**
  * Merge data from existing store, pipeline ingest, and Jira enrichment.
  * All three inputs are optional (may be null).
  *
@@ -197,9 +212,9 @@ async function rebuildIndex(storage) {
         : null,
       fixVersions: feature.fixVersions || [],
       labels: feature.labels || [],
-      // Derived from metrics
+      // Derived from metrics (epicCount prefers Jira feature.epics when synced)
       completionPct: feature.metrics ? (feature.metrics.completionPct || 0) : 0,
-      epicCount: feature.metrics ? (feature.metrics.totalEpics || 0) : 0,
+      epicCount: deriveEpicCount(feature),
       issueCount: feature.metrics ? (feature.metrics.totalIssues || 0) : 0,
       blockerCount: feature.metrics ? (feature.metrics.blockerCount || 0) : 0,
       health: feature.metrics ? (feature.metrics.health || null) : null,
@@ -242,6 +257,7 @@ module.exports = {
   mergeFeatureData,
   writeFeatures,
   rebuildIndex,
+  deriveEpicCount,
   DATA_PREFIX,
   JIRA_FIELDS,
   PIPELINE_FIELDS,

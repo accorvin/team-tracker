@@ -1,5 +1,6 @@
 var { CUSTOM_FIELDS, serializeField, numericField } = require('../hygiene/jira-fetch')
 var { parseDescriptionSignals } = require('./health/description-scanner')
+var { fetchEpicsForFeatures } = require('../execution/jira-enrich')
 
 var QUERY_FIELDS = [
   'summary', 'status', 'issuetype', 'assignee', 'fixVersions',
@@ -18,13 +19,6 @@ var QUERY_FIELDS = [
 ].join(',')
 
 var JQL = 'project = RHAISTRAT AND issuetype IN (Feature, Initiative) AND status NOT IN (Closed, Done, Resolved, Cancelled)'
-
-var EPIC_BATCH_SIZE = 40
-var EPIC_THROTTLE_MS = 500
-
-function sleep(ms) {
-  return new Promise(function(resolve) { setTimeout(resolve, ms) })
-}
 
 function normalizeIssue(issue) {
   var fields = issue.fields || {}
@@ -82,7 +76,8 @@ function normalizeIssue(issue) {
 
 /**
  * Count Epic children linked via parent / Epic Link for each feature key.
- * Matches Confluence Child epics DoR (Child Issues section).
+ * Delegates to execution fetchEpicsForFeatures — offline / pipeline use only.
+ * Do not call from GET /feature-readiness (gateway timeout).
  *
  * @param {object} jiraClient
  * @param {Map<string, object>} featureMap
@@ -91,30 +86,13 @@ async function enrichChildEpicCounts(jiraClient, featureMap) {
   if (!jiraClient || !jiraClient.fetchAllJqlResults || !featureMap || featureMap.size === 0) return
 
   var keys = Array.from(featureMap.keys())
-  for (var start = 0; start < keys.length; start += EPIC_BATCH_SIZE) {
-    if (start > 0) await sleep(EPIC_THROTTLE_MS)
-    var batchKeys = keys.slice(start, start + EPIC_BATCH_SIZE)
-    var keyList = batchKeys.map(function(k) { return '"' + k + '"' }).join(', ')
-    // Epic type only — Confluence: "Linked child epics in engineering projects"
-    var jql = 'issuetype = Epic AND (parent in (' + keyList + ') OR "Epic Link" in (' + keyList + '))'
-    try {
-      var children = await jiraClient.fetchAllJqlResults(jql, 'parent,customfield_10014', { maxResults: 100 })
-      for (var i = 0; i < children.length; i++) {
-        var fields = children[i].fields || {}
-        var parentKey = (fields.parent && fields.parent.key) || fields.customfield_10014 || null
-        if (!parentKey || !featureMap.has(parentKey)) continue
-        var feat = featureMap.get(parentKey)
-        feat.epicCount = (feat.epicCount || 0) + 1
-      }
-    } catch (err) {
-      console.warn(
-        '[releases/planning] Child epic count batch ' +
-          (Math.floor(start / EPIC_BATCH_SIZE) + 1) +
-          ' failed: ' +
-          (err && err.message ? err.message : err)
-      )
-    }
-  }
+  var epicMap = await fetchEpicsForFeatures(keys, null, function(jql, fields, opts) {
+    return jiraClient.fetchAllJqlResults(jql, fields, opts)
+  })
+  epicMap.forEach(function(epics, parentKey) {
+    if (!featureMap.has(parentKey)) return
+    featureMap.get(parentKey).epicCount = Array.isArray(epics) ? epics.length : 0
+  })
 }
 
 async function fetchFeatures(jiraClient) {
@@ -126,7 +104,8 @@ async function fetchFeatures(jiraClient) {
     var normalized = normalizeIssue(issues[i])
     if (normalized.key) map.set(normalized.key, normalized)
   }
-  await enrichChildEpicCounts(jiraClient, map)
+  // Child epic counts come from execution store (fullJiraSync → feature.epics).
+  // Live enrichChildEpicCounts on this path caused Features List HTTP 504.
   return map
 }
 
