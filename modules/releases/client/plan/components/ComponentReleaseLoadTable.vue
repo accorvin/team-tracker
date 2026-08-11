@@ -11,6 +11,12 @@ import {
   pathChipClass,
   pathChipTitle
 } from '../utils/fpdor-severity.js'
+import {
+  docsRequiredState,
+  docsRequiredLabel,
+  docsRequiredTitle,
+  docsRequiredChipClass
+} from '../utils/docs-required-display.js'
 
 const props = defineProps({
   groups: { type: Array, default: () => [] },
@@ -19,7 +25,7 @@ const props = defineProps({
   initialSort: { type: Object, default: () => ({ column: null, direction: 'asc' }) }
 })
 
-var emit = defineEmits(['sort-changed'])
+var emit = defineEmits(['sort-changed', 'select'])
 
 function getComponentVelocity(componentName) {
   if (!props.velocity || !props.velocity.components) return null
@@ -96,7 +102,13 @@ function getSortValue(feature, column) {
   }
   if (column === 'assignee') return (feature.assignee || '').toLowerCase()
   if (column === 'pmOwner') return (feature.pmOwner || '').toLowerCase()
-  if (column === 'docs') return feature.docsRequired === 'Yes' ? 0 : 1
+  if (column === 'docs') {
+    var docsState = docsRequiredState(feature)
+    if (docsState === 'yes') return 0
+    if (docsState === 'yes-missing-component') return 1
+    if (docsState === 'no') return 2
+    return 3
+  }
   return ''
 }
 
@@ -225,6 +237,7 @@ var componentGroups = computed(function() {
           cg.features[feat.key] = {
             key: feat.key,
             summary: feat.summary,
+            title: feat.title || feat.summary || '',
             status: feat.status,
             colorStatus: feat.colorStatus,
             statusSummary: feat.statusSummary,
@@ -237,6 +250,8 @@ var componentGroups = computed(function() {
             confidence: feat.confidence || null,
             isAiFirst: !!feat.isAiFirst,
             labels: feat.labels || [],
+            riceScore: feat.riceScore != null ? feat.riceScore : null,
+            linkedRfeKey: feat.linkedRfeKey || null,
             components: feat.components,
             fixVersions: feat.fixVersions || [],
             targetVersions: feat.targetVersions || [],
@@ -433,8 +448,12 @@ defineExpose({ expandAll, collapseAll })
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSort('pmOwner')">
               <span class="inline-flex items-center gap-1">PM Owner<SortArrow :direction="sortIcon('pmOwner')" /></span>
             </th>
-            <th class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSort('docs')">
-              <span class="inline-flex items-center gap-1 justify-center">Docs<SortArrow :direction="sortIcon('docs')" /></span>
+            <th
+              class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              @click="toggleSort('docs')"
+              title="Jira Docs Required field. Yes without a Documentation component fails Docs impact readiness."
+            >
+              <span class="inline-flex items-center gap-1 justify-center">Docs Required<SortArrow :direction="sortIcon('docs')" /></span>
             </th>
           </tr>
 
@@ -443,7 +462,12 @@ defineExpose({ expandAll, collapseAll })
             <tr
               v-for="feature in sortFeatures(comp.features)"
               :key="feature.key"
-              class="border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+              role="button"
+              tabindex="0"
+              class="border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
+              @click="emit('select', feature)"
+              @keydown.enter.prevent="emit('select', feature)"
+              @keydown.space.prevent="emit('select', feature)"
             >
               <td class="px-3 py-2.5 whitespace-nowrap">
                 <a
@@ -451,6 +475,7 @@ defineExpose({ expandAll, collapseAll })
                   target="_blank"
                   rel="noopener"
                   class="font-mono text-xs font-medium text-primary-600 dark:text-blue-400 hover:underline hover:text-primary-700 dark:hover:text-blue-300 transition-colors"
+                  @click.stop
                 >{{ feature.key }}</a>
               </td>
               <td class="px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100">
@@ -571,13 +596,15 @@ defineExpose({ expandAll, collapseAll })
               </td>
               <td class="px-3 py-2.5 text-center">
                 <span
-                  v-if="feature.docsRequired === 'Yes'"
-                  class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
-                >Yes</span>
-                <span
-                  v-else
-                  class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500"
-                >{{ feature.docsRequired || '—' }}</span>
+                  class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                  :class="docsRequiredChipClass(feature)"
+                  :title="docsRequiredTitle(feature)"
+                >
+                  <template v-if="docsRequiredState(feature) === 'yes-missing-component'">
+                    Yes<span aria-hidden="true">⚠</span>
+                  </template>
+                  <template v-else>{{ docsRequiredLabel(feature) }}</template>
+                </span>
               </td>
             </tr>
           </template>

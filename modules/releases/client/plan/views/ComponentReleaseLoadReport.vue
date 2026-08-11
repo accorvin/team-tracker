@@ -243,7 +243,7 @@
             @click="toggleFilter('filterDocs', dv)"
             class="px-2.5 py-1 text-[11px] font-medium transition-colors"
             :class="filterDocs.includes(dv) ? 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'"
-          >{{ dv === 'Not set' ? 'Docs ?' : 'Docs ' + dv }}</button>
+          >{{ dv === 'Not set' ? 'Docs Required ?' : 'Docs Required ' + dv }}</button>
         </div>
 
         <!-- Delivery Owner -->
@@ -393,6 +393,7 @@
       :velocity="velocity"
       :initialSort="savedSort"
       @sort-changed="onSortChanged"
+      @select="selectedFeature = $event"
     />
 
     <!-- Pillar config panel -->
@@ -402,15 +403,45 @@
       @close="pillarPanelOpen = false"
       @saved="onPillarConfigSaved"
     />
+
+    <FeatureReadinessDrawer
+      :feature="drawerFeature"
+      :jiraBaseUrl="jiraBaseUrl"
+      @close="selectedFeature = null"
+      @navigate="navigateToFeature"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue'
 import { getApiBase } from '@shared/client/services/api'
 import { buildComponentLeadsMap } from '../../composables/componentLeads'
 import ComponentReleaseLoadTable from '../components/ComponentReleaseLoadTable.vue'
 import PillarConfigPanel from '../components/PillarConfigPanel.vue'
+import FeatureReadinessDrawer from '../components/FeatureReadinessDrawer.vue'
+
+const nav = inject('moduleNav', null)
+const jiraBaseUrl = 'https://issues.redhat.com/browse'
+
+function navigateToFeature(key) {
+  if (nav && typeof nav.navigateTo === 'function') {
+    nav.navigateTo('feature-detail', { key, from: 'plan-pm-hub' })
+  }
+}
+
+/** Normalize PM Hub row shape for FeatureReadinessDrawer. */
+function toDrawerFeature(feature) {
+  if (!feature) return null
+  var fixVersions = feature.fixVersions || []
+  return Object.assign({}, feature, {
+    title: feature.title || feature.summary || '',
+    fixVersion: feature.fixVersion || (fixVersions.length ? fixVersions[0] : null),
+    deliveryOwner: feature.deliveryOwner || feature.assignee || null,
+    sourceRfe: feature.sourceRfe || feature.linkedRfeKey || null,
+    dataSource: feature.dataSource || 'pm-hub'
+  })
+}
 
 const API_BASE = '/modules/releases/pm-hub'
 var STORAGE_KEY = 'pm-hub-filters'
@@ -449,6 +480,10 @@ var hasFetched = ref(false)
 var tableRef = ref(null)
 var fetchedAt = ref(null)
 var autoRefreshTimer = ref(null)
+var selectedFeature = ref(null)
+var drawerFeature = computed(function() {
+  return toDrawerFeature(selectedFeature.value)
+})
 
 var filterProduct = ref([])
 var filterType = ref([])
