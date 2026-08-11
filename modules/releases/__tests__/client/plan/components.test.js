@@ -263,35 +263,4 @@ describe('FilterBar', () => {
     expect(wrapper.text()).not.toContain('Clear Filters')
   })
 
-  it('shows empty-rocks toggle on big-rocks tab with hidden count', () => {
-    const wrapper = mount(FilterBar, {
-      props: {
-        filterOptions,
-        activeTab: 'big-rocks',
-        showEmptyRocks: false,
-        emptyRockCount: 3
-      }
-    })
-    expect(wrapper.text()).toContain('Show empty rocks')
-    expect(wrapper.text()).toContain('(3 hidden)')
-    const checkbox = wrapper.find('input[type="checkbox"]')
-    expect(checkbox.exists()).toBe(true)
-    expect(checkbox.element.checked).toBe(false)
-  })
-
-  it('hides empty-rocks toggle on features tab', () => {
-    const wrapper = mount(FilterBar, {
-      props: { filterOptions, activeTab: 'features', emptyRockCount: 3 }
-    })
-    expect(wrapper.text()).not.toContain('Show empty rocks')
-  })
-
-  it('emits update:showEmptyRocks when toggle changes', async () => {
-    const wrapper = mount(FilterBar, {
-      props: { filterOptions, activeTab: 'big-rocks', showEmptyRocks: false, emptyRockCount: 1 }
-    })
-    await wrapper.find('input[type="checkbox"]').setValue(true)
-    expect(wrapper.emitted('update:showEmptyRocks')).toBeTruthy()
-    expect(wrapper.emitted('update:showEmptyRocks')[0]).toEqual([true])
-  })
 })
