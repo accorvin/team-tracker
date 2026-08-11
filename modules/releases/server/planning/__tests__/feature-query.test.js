@@ -281,7 +281,7 @@ describe('feature-query', function() {
       expect(feature.riceScore).toBe(150)
     })
 
-    it('counts linked child Epics via parent field', async function() {
+    it('does not run live child-epic enrichment on the request path', async function() {
       var features = [
         { key: 'RHAISTRAT-2198', fields: { summary: 'Validated Models' } }
       ]
@@ -298,10 +298,11 @@ describe('feature-query', function() {
       var client = mockJiraClient(features, children)
 
       var result = await fetchFeatures(client)
-      expect(result.get('RHAISTRAT-2198').epicCount).toBe(2)
+      expect(result.get('RHAISTRAT-2198').epicCount).toBe(0)
+      expect(client.fetchAllJqlResults).toHaveBeenCalledTimes(1)
       expect(client.fetchAllJqlResults.mock.calls.some(function(c) {
         return String(c[0]).indexOf('issuetype = Epic') !== -1
-      })).toBe(true)
+      })).toBe(false)
     })
   })
 

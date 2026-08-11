@@ -126,7 +126,10 @@ async function fetchFeatures(jiraClient) {
     var normalized = normalizeIssue(issues[i])
     if (normalized.key) map.set(normalized.key, normalized)
   }
-  await enrichChildEpicCounts(jiraClient, map)
+  // Do not run enrichChildEpicCounts here — batched live Jira searches over all
+  // open Features timeout the /feature-readiness gateway (HTTP 504). Keep the
+  // helper exported for offline/pipeline use; mergeFeatureData still prefers
+  // jira.epicCount when present.
   return map
 }
 
