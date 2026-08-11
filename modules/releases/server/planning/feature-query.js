@@ -76,7 +76,7 @@ function normalizeIssue(issue) {
     pmOwner: pmOwner,
     effort: numericField(fields[CUSTOM_FIELDS.effort]),
     descriptionSignals: parseDescriptionSignals(fields.description),
-    epicCount: 0
+    epicCount: null
   }
 }
 

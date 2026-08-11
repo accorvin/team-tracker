@@ -231,7 +231,7 @@ describe('feature-query', function() {
       expect(result.size).toBe(2)
       expect(result.get('RHAISTRAT-100').summary).toBe('Feature A')
       expect(result.get('RHAISTRAT-200').summary).toBe('Feature B')
-      expect(result.get('RHAISTRAT-100').epicCount).toBe(0)
+      expect(result.get('RHAISTRAT-100').epicCount).toBeNull()
     })
 
     it('skips issues without a key', async function() {
@@ -298,7 +298,7 @@ describe('feature-query', function() {
       var client = mockJiraClient(features, children)
 
       var result = await fetchFeatures(client)
-      expect(result.get('RHAISTRAT-2198').epicCount).toBe(0)
+      expect(result.get('RHAISTRAT-2198').epicCount).toBeNull()
       expect(client.fetchAllJqlResults).toHaveBeenCalledTimes(1)
       expect(client.fetchAllJqlResults.mock.calls.some(function(c) {
         return String(c[0]).indexOf('issuetype = Epic') !== -1
