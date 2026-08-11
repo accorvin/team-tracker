@@ -113,6 +113,10 @@ function buildComponentGroups(groups) {
             releaseType: feat.releaseType,
             priority: feat.priority,
             isBlocked: feat.isBlocked,
+            pmDoAligned: !!feat.pmDoAligned,
+            fpdor: feat.fpdor || null,
+            confidence: feat.confidence || null,
+            isAiFirst: !!feat.isAiFirst,
             components: feat.components,
             fixVersions: feat.fixVersions || [],
             targetVersions: feat.targetVersions || [],
@@ -145,12 +149,12 @@ function buildComponentGroups(groups) {
     var reqCount = 0
     var comCount = 0
     var blkCount = 0
-    var riskCount = 0
+    var notAlignedCount = 0
     for (var fli = 0; fli < featureList.length; fli++) {
       if (featureList[fli].isRequested) reqCount++
       if (featureList[fli].isCommitted) comCount++
       if (featureList[fli].isBlocked) blkCount++
-      if (featureList[fli].riskLevel === 'high' || featureList[fli].riskLevel === 'medium') riskCount++
+      if (!featureList[fli].pmDoAligned) notAlignedCount++
     }
 
     result.push({
@@ -159,7 +163,7 @@ function buildComponentGroups(groups) {
       requestedCount: reqCount,
       committedCount: comCount,
       blockedCount: blkCount,
-      atRiskCount: riskCount
+      notAlignedCount: notAlignedCount
     })
   }
 
@@ -184,7 +188,8 @@ function makeFeature(overrides) {
     fixVersions: ['rhoai-3.5'],
     targetVersions: ['rhoai-3.5'],
     assignee: 'Alice',
-    pmOwner: 'Bob'
+    pmOwner: 'Bob',
+    pmDoAligned: true
   }, overrides)
 }
 
