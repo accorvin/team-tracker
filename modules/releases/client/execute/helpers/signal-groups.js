@@ -25,7 +25,7 @@ export function isFeatureCompleteForSignals(feature) {
   if (!feature) return false
   if (feature.completionPct >= 100) return true
   if (feature.statusCategory === 'Done') return true
-  var status = typeof feature.status === 'string'
+  const status = typeof feature.status === 'string'
     ? feature.status.trim().toLowerCase()
     : ''
   return DONE_STATUS_NAMES.has(status)
@@ -36,21 +36,21 @@ export function isFeatureCompleteForSignals(feature) {
  * @returns {object[]} Signal group objects with id, title, features, etc.
  */
 export function categorizeFeatures(features) {
-  var all = features || []
+  const all = features || []
   // Jira done-delivery or pipeline 100% — stale pipeline health should not override.
-  var complete = all.filter(isFeatureCompleteForSignals)
-  var active = all.filter(function(f) { return !isFeatureCompleteForSignals(f) })
+  const complete = all.filter(isFeatureCompleteForSignals)
+  const active = all.filter(f => !isFeatureCompleteForSignals(f))
 
-  var blocked = active.filter(function(f) { return effectiveHealth(f) === 'RED' && f.blockerCount > 0 })
-  var redOther = active.filter(function(f) { return effectiveHealth(f) === 'RED' && f.blockerCount === 0 })
+  const blocked = active.filter(f => effectiveHealth(f) === 'RED' && f.blockerCount > 0)
+  const redOther = active.filter(f => effectiveHealth(f) === 'RED' && f.blockerCount === 0)
   // "Not Started" requires both pipeline (completionPct 0) and Jira (not "In Progress") agreement.
-  var notStarted = active.filter(function(f) {
-    return effectiveHealth(f) === 'YELLOW' && f.completionPct === 0 && f.statusCategory !== 'In Progress'
-  })
-  var atRisk = active.filter(function(f) {
-    return effectiveHealth(f) === 'YELLOW' && (f.completionPct > 0 || f.statusCategory === 'In Progress')
-  })
-  var onTrack = active.filter(function(f) { return effectiveHealth(f) === 'GREEN' })
+  const notStarted = active.filter(f =>
+    effectiveHealth(f) === 'YELLOW' && f.completionPct === 0 && f.statusCategory !== 'In Progress'
+  )
+  const atRisk = active.filter(f =>
+    effectiveHealth(f) === 'YELLOW' && (f.completionPct > 0 || f.statusCategory === 'In Progress')
+  )
+  const onTrack = active.filter(f => effectiveHealth(f) === 'GREEN')
 
   return [
     {
@@ -119,7 +119,7 @@ export function categorizeFeatures(features) {
       textClass: 'text-green-600 dark:text-green-400',
       dotClass: 'bg-green-400'
     }
-  ].filter(function(g) { return g.features.length > 0 })
+  ].filter(g => g.features.length > 0)
 }
 
 /**
