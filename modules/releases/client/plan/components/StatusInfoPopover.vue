@@ -48,9 +48,9 @@ var { isVisible, isPinned, popoverId, onMouseEnter, onMouseLeave, onClick, dismi
         <div>
           <div class="font-semibold text-gray-900 dark:text-gray-100 mb-1">Statuses:</div>
           <ul class="space-y-0.5 pl-2">
-            <li><span class="font-medium text-red-600 dark:text-red-400">Not Ready</span> -- DoR not passed</li>
-            <li><span class="font-medium text-yellow-600 dark:text-yellow-400">In Planning</span> -- DoR passed, DoD not passed</li>
-            <li><span class="font-medium text-green-600 dark:text-green-400">Ready</span> -- Both DoR and DoD passed</li>
+            <li><span class="font-medium text-red-600 dark:text-red-400">Not Ready</span> -- FPDoR not passed</li>
+            <li><span class="font-medium text-yellow-600 dark:text-yellow-400">In Planning</span> -- partially passing FPDoR</li>
+            <li><span class="font-medium text-green-600 dark:text-green-400">Ready</span> -- all applicable FPDoR items passed</li>
           </ul>
         </div>
         <p class="text-gray-500 dark:text-gray-400">
