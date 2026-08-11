@@ -2,6 +2,11 @@
 import { computed } from 'vue'
 import { usePopover } from '../composables/usePopover'
 import { FPDOR_CONFLUENCE_URL } from '../utils/feature-readiness-export.js'
+import {
+  worstFailedSeverity,
+  severityBadgeClass,
+  severityLabel
+} from '../utils/fpdor-severity.js'
 
 var props = defineProps({
   fpdor: { type: Object, default: null },
@@ -20,22 +25,27 @@ var badgeLabel = computed(function() {
   return props.fpdor.passedCount + '/' + applicable
 })
 
-var badgeClass = computed(function() {
-  switch (props.confidence) {
-    case 'committed': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
-    case 'ready':     return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200'
-    case 'not-ready': return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
-    default:          return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-  }
+var failSeverity = computed(function() {
+  return worstFailedSeverity(props.fpdor)
 })
 
-var confidenceLabel = computed(function() {
-  switch (props.confidence) {
-    case 'committed': return 'Ready'
-    case 'ready':     return 'Ready'
-    case 'not-ready': return 'Not Ready'
-    default:          return '—'
-  }
+var badgeClass = computed(function() {
+  return severityBadgeClass(failSeverity.value)
+})
+
+var badgeTitle = computed(function() {
+  if (!props.fpdor) return ''
+  if (!failSeverity.value) return 'Ready — all applicable FPDoR items pass'
+  return 'Not Ready — worst fail severity: ' + severityLabel(failSeverity.value)
+})
+
+var isReady = computed(function() {
+  if (props.fpdor && props.fpdor.allApplicablePassed != null) return !!props.fpdor.allApplicablePassed
+  return !failSeverity.value
+})
+
+var isCommitted = computed(function() {
+  return props.confidence === 'committed'
 })
 
 var mandatoryItems = computed(function() {
@@ -64,8 +74,9 @@ var confluenceUrl = computed(function() {
     :aria-expanded="isVisible"
     tabindex="0"
     role="button"
+    :title="badgeTitle"
   >
-    <!-- Trigger badge -->
+    <!-- Trigger badge — color from fail severity, not Fix Version -->
     <span
       class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium cursor-pointer"
       :class="badgeClass"
@@ -147,10 +158,17 @@ var confluenceUrl = computed(function() {
         </div>
       </div>
 
-      <!-- Footer -->
+      <!-- Footer — readiness vs commitment kept separate -->
       <div class="px-3 py-1.5 border-t border-gray-100 dark:border-gray-700 text-[10px] text-gray-400 dark:text-gray-500 flex items-center justify-between gap-2">
-        <span v-if="confidence">
-          Confidence: <span class="font-medium" :class="confidence === 'not-ready' ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'">{{ confidenceLabel }}</span>
+        <span class="flex items-center gap-2 min-w-0">
+          <span>
+            Readiness:
+            <span
+              class="font-medium"
+              :class="isReady ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'"
+            >{{ isReady ? 'Ready' : 'Not Ready' }}</span>
+          </span>
+          <span v-if="isCommitted" class="font-medium text-blue-600 dark:text-blue-400">Committed</span>
         </span>
         <a
           :href="confluenceUrl"
