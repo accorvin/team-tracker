@@ -361,7 +361,8 @@ async function fetchEpicsForFeatures(featureKeys, jiraRequestFn, fetchAllJqlResu
 
     const batchKeys = batches[bi];
     const keyList = batchKeys.map(k => '"' + k + '"').join(', ');
-    const jql = '("Epic Link" in (' + keyList + ') OR parent in (' + keyList + '))';
+    // Epic type only — matches Confluence Child epics DoR (linked child Epics)
+    const jql = 'issuetype = Epic AND (parent in (' + keyList + ') OR "Epic Link" in (' + keyList + '))';
     const fields = 'summary,status,parent,customfield_10014';
 
     try {

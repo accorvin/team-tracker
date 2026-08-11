@@ -5,7 +5,8 @@ const {
   transformForEnrichment,
   extractIssueLinks,
   checkIsBlocked,
-  findLinkedRfeKey
+  findLinkedRfeKey,
+  fetchEpicsForFeatures
 } = require('../../../server/execution/jira-enrich')
 
 function makeJiraIssue(key, overrides = {}) {
@@ -295,5 +296,26 @@ describe('enrichFeatures', () => {
     expect(result.get('RHAISTRAT-1').epics).toEqual([{
       key: 'RHOAIENG-500', summary: 'Child epic', status: 'In Progress'
     }])
+  })
+})
+
+describe('fetchEpicsForFeatures', () => {
+  it('queries issuetype = Epic for parent / Epic Link children', async () => {
+    const mockFetchAll = vi.fn().mockResolvedValue([
+      {
+        key: 'RHOAIENG-1',
+        fields: {
+          summary: 'Child',
+          status: { name: 'New' },
+          parent: { key: 'RHAISTRAT-1' }
+        }
+      }
+    ])
+
+    const map = await fetchEpicsForFeatures(['RHAISTRAT-1'], null, mockFetchAll)
+
+    expect(mockFetchAll).toHaveBeenCalled()
+    expect(String(mockFetchAll.mock.calls[0][0])).toContain('issuetype = Epic')
+    expect(map.get('RHAISTRAT-1')).toHaveLength(1)
   })
 })
