@@ -533,21 +533,6 @@ test.describe('Releases Planning Health @releases', () => {
     expect(page.errors).toHaveLength(0);
   });
 
-  test('Big Rocks tab has Show empty rocks toggle (off by default)', async ({ page }) => {
-    await page.goto('/#/releases/plan');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
-
-    const toggle = page.getByRole('checkbox', { name: /Show empty rocks/ });
-    await expect(toggle).toBeVisible();
-    await expect(toggle).not.toBeChecked();
-
-    await toggle.check();
-    await expect(toggle).toBeChecked();
-
-    expect(page.errors).toHaveLength(0);
-  });
-
   // Health tab is temporarily hidden from PlanView — skip until re-enabled
   test.skip('Health tab loads and shows planning mode banner when applicable', async ({ page }) => {
     await page.goto('/#/releases/plan?tab=health');
@@ -734,32 +719,38 @@ test.describe('Releases FPDoR Readiness @releases', () => {
     expect(sample.fpdor).toHaveProperty('passedCount');
     expect(sample.fpdor).toHaveProperty('totalCount');
     expect(sample.fpdor).toHaveProperty('evaluatedCount');
+    expect(sample.fpdor).toHaveProperty('applicableCount');
+    expect(sample.fpdor).toHaveProperty('allApplicablePassed');
+    expect(sample.fpdor).toHaveProperty('groups');
     expect(Array.isArray(sample.fpdor.items)).toBe(true);
-    expect(sample.fpdor.totalCount).toBe(13);
-    expect(sample.fpdor.items.length).toBe(13);
+    expect(sample.fpdor.totalCount).toBe(17);
+    expect(sample.fpdor.items.length).toBe(17);
 
     var itemNames = sample.fpdor.items.map(function(i) { return i.name });
-    expect(itemNames).toContain('Cross-functional Engineering');
-    expect(itemNames).toContain('Documentation');
+    expect(itemNames).toContain('Target Version');
     expect(itemNames).toContain('UXD');
-    expect(itemNames).not.toContain('Cross-functional Engagement');
+    expect(itemNames).toContain('Cross-team deps');
 
     var item = sample.fpdor.items[0];
     expect(item).toHaveProperty('name');
     expect(item).toHaveProperty('pass');
     expect(item).toHaveProperty('source');
     expect(item).toHaveProperty('state');
+    expect(item).toHaveProperty('group');
+    expect(['mandatory', 'criteria']).toContain(item.group);
     expect(item.source).toBe('jira');
-    expect(['passed', 'failed']).toContain(item.state);
+    expect(['passed', 'failed', 'not-checked']).toContain(item.state);
 
     expect(sample).toHaveProperty('readinessGates');
     expect(sample.readinessGates).toHaveProperty('fpDorPassed');
     expect(sample.readinessGates).toHaveProperty('fpDorTotal');
     expect(sample.readinessGates).toHaveProperty('fpDorEvaluated');
+    expect(sample.readinessGates).toHaveProperty('fpDorApplicable');
     expect(sample.readinessGates).toHaveProperty('pastRefinement');
     expect(sample.readinessGates).toHaveProperty('noBlockingViolations');
     expect(typeof sample.readinessGates.fpDorPassed).toBe('number');
     expect(typeof sample.readinessGates.fpDorTotal).toBe('number');
+    expect(typeof sample.readinessGates.fpDorApplicable).toBe('number');
     expect(typeof sample.readinessGates.pastRefinement).toBe('boolean');
   });
 
@@ -1026,6 +1017,347 @@ test.describe('Releases Big Rocks hybrid candidates @releases', () => {
 
     // Rock names from demo candidates fixture should render
     await expect(page.getByText('MaaS', { exact: false }).first()).toBeVisible({ timeout: 10000 });
+    expect(page.errors).toHaveLength(0);
+  });
+});
+
+/**
+ * CVE Sustaining Report
+ *
+ * Verify the CVE sustaining report renders from fixture data, displays
+ * charts/tables, supports client-side filtering, and opens drill-down
+ * modals on click.
+ */
+test.describe('Releases CVE Sustaining Report @releases', () => {
+  test.beforeEach(async ({ page }) => {
+    setupErrorTracking(page);
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    logCapturedErrors(page, testInfo);
+  });
+
+  test('CVE sustaining report card is visible in Reports hub', async ({ page }) => {
+    await page.goto('/#/releases/reports');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    var card = page.locator('text=RHOAI Sustaining (CVEs)');
+    await expect(card.first()).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('CVE sustaining report loads with charts and tables', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=cve-sustaining');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Report heading
+    await expect(page.locator('text=RHOAI Sustaining (CVEs)').first()).toBeVisible();
+
+    // Open CVEs banner
+    await expect(page.locator('text=Open CVEs').first()).toBeVisible();
+
+    // Due date section
+    await expect(page.locator('text=CVEs by Due Date').first()).toBeVisible();
+    await expect(page.locator('text=Due Date Passed').first()).toBeVisible();
+
+    // Bar chart section
+    await expect(page.locator('text=RHOAI Open CVEs').first()).toBeVisible();
+
+    // Version matrix table
+    await expect(page.locator('text=CVEs across all versions').first()).toBeVisible();
+
+    // Assignee table
+    await expect(page.locator('text=CVEs by Assignee').first()).toBeVisible();
+
+    // Time series charts
+    await expect(page.locator('text=Created vs Resolved').first()).toBeVisible();
+    await expect(page.locator('text=Unresolved').first()).toBeVisible();
+    await expect(page.locator('text=RHOAI False Positives').first()).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('CVE sustaining API returns cached fixture data', async ({ request }) => {
+    var res = await request.get('/api/modules/releases/cve-sustaining');
+    expect(res.ok()).toBe(true);
+    var body = await res.json();
+
+    expect(body).toHaveProperty('lastRefreshed');
+    expect(body).toHaveProperty('totalOpen');
+    expect(body).toHaveProperty('totalAll');
+    expect(body).toHaveProperty('openCvesByComponent');
+    expect(body).toHaveProperty('cvesByDueDate');
+    expect(body).toHaveProperty('cvesAcrossVersions');
+    expect(body).toHaveProperty('openCvesByVersion');
+    expect(body).toHaveProperty('cvesByAssigneeStatus');
+    expect(body).toHaveProperty('falsePositivesByVex');
+    expect(body).toHaveProperty('createdVsResolved');
+    expect(body).toHaveProperty('unresolved');
+    expect(body).toHaveProperty('falsePositivesTrend');
+    expect(body).toHaveProperty('openIssueRecords');
+    expect(body).toHaveProperty('jiraSearchBase');
+
+    expect(Array.isArray(body.openIssueRecords)).toBe(true);
+    expect(body.openIssueRecords.length).toBeGreaterThan(0);
+
+    var record = body.openIssueRecords[0];
+    expect(record).toHaveProperty('key');
+    expect(record).toHaveProperty('summary');
+    expect(record).toHaveProperty('component');
+    expect(record).toHaveProperty('components');
+    expect(record).toHaveProperty('versions');
+    expect(record).toHaveProperty('status');
+    expect(record).toHaveProperty('assignee');
+  });
+
+  test('filter bar is visible and shows default state', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=cve-sustaining');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Default no-filter text
+    await expect(page.locator('text=Showing all open CVEs').first()).toBeVisible();
+
+    // Edit Filters button should be present
+    var editBtn = page.locator('button', { hasText: 'Manage Filters' }).first();
+    await expect(editBtn).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('filter modal opens and shows filter fields', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=cve-sustaining');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Open filter modal
+    var editBtn = page.locator('button', { hasText: 'Manage Filters' }).first();
+    await editBtn.click();
+    await page.waitForTimeout(500);
+
+    // Modal should be visible with filter fields
+    await expect(page.locator('text=Filters').first()).toBeVisible();
+    await expect(page.locator('text=Component').first()).toBeVisible();
+    await expect(page.locator('text=Target Version').first()).toBeVisible();
+    await expect(page.locator('text=Assignee').first()).toBeVisible();
+    await expect(page.locator('text=Status').first()).toBeVisible();
+
+    // Close modal
+    var doneBtn = page.locator('button', { hasText: 'Done' });
+    await doneBtn.click();
+    await page.waitForTimeout(500);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('applying a filter updates the report', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=cve-sustaining');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Open filter modal
+    await page.locator('button', { hasText: 'Manage Filters' }).first().click();
+    await page.waitForTimeout(500);
+
+    // Click Component field
+    await page.locator('button', { hasText: 'Component' }).first().click();
+    await page.waitForTimeout(300);
+
+    // Select "Model Serving" checkbox
+    var checkbox = page.locator('label').filter({ hasText: 'Model Serving' }).locator('input[type="checkbox"]');
+    await checkbox.click();
+    await page.waitForTimeout(300);
+
+    // Close modal
+    await page.locator('button', { hasText: 'Done' }).click();
+    await page.waitForTimeout(500);
+
+    // Filter narrative should update
+    await expect(page.locator('text=Showing all open CVEs').first()).not.toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('due date card click opens drill-down modal', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=cve-sustaining');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Click on a due date card
+    var dueDateCard = page.locator('button', { hasText: 'Due Date Passed' });
+    await expect(dueDateCard).toBeVisible();
+    await dueDateCard.click();
+    await page.waitForTimeout(500);
+
+    // Drill-down modal should appear with issue table
+    await expect(page.locator('text=Due Date Passed').nth(1)).toBeVisible();
+    await expect(page.locator('th', { hasText: 'Key' }).first()).toBeVisible();
+    await expect(page.locator('th', { hasText: 'Summary' }).first()).toBeVisible();
+
+    // "View in Jira" button should be present
+    await expect(page.locator('a', { hasText: 'View in Jira' }).first()).toBeVisible();
+
+    // Issue keys should be clickable links
+    var issueLink = page.locator('a[href*="/browse/"]').first();
+    await expect(issueLink).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('version matrix cell click opens drill-down modal', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=cve-sustaining');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Find a clickable cell in the version matrix table
+    var matrixSection = page.locator('section').filter({ hasText: 'CVEs across all versions' });
+    var cellButton = matrixSection.locator('button').first();
+    await expect(cellButton).toBeVisible();
+    await cellButton.click();
+    await page.waitForTimeout(500);
+
+    // Drill-down modal should appear
+    await expect(page.locator('th', { hasText: 'Key' }).first()).toBeVisible();
+    await expect(page.locator('th', { hasText: 'Summary' }).first()).toBeVisible();
+
+    // Close via Escape
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('assignee table cell click opens drill-down modal', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=cve-sustaining');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Find a clickable cell in the assignee status table
+    var assigneeSection = page.locator('section').filter({ hasText: 'CVEs by Assignee' });
+    var cellButton = assigneeSection.locator('button').first();
+    await expect(cellButton).toBeVisible();
+    await cellButton.click();
+    await page.waitForTimeout(500);
+
+    // Drill-down modal should appear with issue links
+    await expect(page.locator('a[href*="/browse/"]').first()).toBeVisible();
+    await expect(page.locator('a', { hasText: 'View in Jira' }).first()).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+});
+
+/**
+ * Program Hygiene Report
+ *
+ * Verify the Program Hygiene Report loads, renders the release selector,
+ * summary cards, violation charts, feature table, and team accountability
+ * table. Also tests the hygiene program-report API endpoint.
+ */
+test.describe('Program Hygiene Report @releases', () => {
+  test.beforeEach(async ({ page }) => {
+    setupErrorTracking(page);
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    logCapturedErrors(page, testInfo);
+  });
+
+  test('program hygiene report loads with heading and selector', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=program-hygiene');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await expect(page.locator('text=Program Hygiene Report').first()).toBeVisible();
+
+    // Should show the release selector button (either in empty state or selection bar)
+    await expect(page.locator('button', { hasText: 'Select Release' }).first()).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('program hygiene API returns expected shape', async ({ request }) => {
+    const res = await request.get('/api/modules/releases/hygiene/program-report');
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body).toHaveProperty('versions');
+    expect(Array.isArray(body.versions)).toBe(true);
+    expect(body).toHaveProperty('ruleDefinitions');
+    expect(typeof body.ruleDefinitions).toBe('object');
+  });
+
+  test('release selector modal opens and has expected fields', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=program-hygiene');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Open the selector modal
+    await page.locator('button', { hasText: 'Select Release' }).first().click();
+    await page.waitForTimeout(300);
+
+    // Modal should show family, version, and phase sections
+    await expect(page.locator('text=Product Family').first()).toBeVisible();
+    await expect(page.locator('text=Version').first()).toBeVisible();
+    await expect(page.locator('text=Phase').first()).toBeVisible();
+
+    // Cancel and Apply buttons
+    await expect(page.locator('button', { hasText: 'Cancel' }).first()).toBeVisible();
+    await expect(page.locator('button', { hasText: 'Apply' }).first()).toBeVisible();
+
+    // Close via Escape
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('shows summary cards and violation charts when data is available', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=program-hygiene');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // If data loaded and a selection was auto-applied, we should see summary cards
+    const versionsCard = page.locator('text=Versions').first();
+    const hasData = await versionsCard.isVisible().catch(() => false);
+
+    if (hasData) {
+      await expect(page.locator('text=Total Features').first()).toBeVisible();
+      await expect(page.locator('text=Features with Violations').first()).toBeVisible();
+      await expect(page.locator('text=Total Violations').first()).toBeVisible();
+
+      // Violation charts
+      await expect(page.locator('text=Violations by Rule').first()).toBeVisible();
+      await expect(page.locator('text=Violations by Team').first()).toBeVisible();
+
+      // Feature table tab
+      await expect(page.locator('button', { hasText: 'Features' }).first()).toBeVisible();
+      await expect(page.locator('button', { hasText: 'Team Accountability' }).first()).toBeVisible();
+    }
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('team accountability tab renders table', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=program-hygiene');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Switch to Team Accountability tab if visible
+    const teamTab = page.locator('button', { hasText: 'Team Accountability' }).first();
+    const tabVisible = await teamTab.isVisible().catch(() => false);
+
+    if (tabVisible) {
+      await teamTab.click();
+      await page.waitForTimeout(300);
+
+      // Team table headers
+      await expect(page.locator('th', { hasText: 'Team' }).first()).toBeVisible();
+      await expect(page.locator('th', { hasText: 'With Violations' }).first()).toBeVisible();
+    }
+
     expect(page.errors).toHaveLength(0);
   });
 });

@@ -7,6 +7,7 @@ const { getRegistryReleasesFlat, readRegistry, writeRegistry, normalizeRelease }
 const registerConformaRoutes = require('./conforma')
 const { registerConformaFetcher } = require('./conforma-fetcher')
 const registerBlockerRoutes = require('./blockers')
+const registerTfaRiskRoutes = require('./tfa-risk')
 const { logAudit } = require('../planning/audit-log')
 const { stripZStream: sharedStripZStream, normalizeVersionName, extractProduct: sharedExtractProduct } = require('../version-utils')
 
@@ -1005,6 +1006,7 @@ module.exports = async function registerRoutes(router, context) {
   registerConformaRoutes(router, context)
   registerConformaFetcher(router, context)
   registerBlockerRoutes(router, context)
+  registerTfaRiskRoutes(router, context)
 
   const { storage, requireAuth, requireAdmin, requireScope } = context
   const { readFromStorage, writeToStorage } = storage
@@ -1814,7 +1816,7 @@ module.exports = async function registerRoutes(router, context) {
         return res.json({ labels: [], datasets: [] })
       }
 
-      const allBugs = loadAllBugs(config.projectKeys)
+      const allBugs = await loadAllBugs(config.projectKeys)
 
       const versionSet = new Set(versions)
       let filteredBugs = allBugs.filter(bug =>
@@ -1851,7 +1853,7 @@ module.exports = async function registerRoutes(router, context) {
   router.get('/quality/components', requireAuth, requireScope('releases:read'), async function(req, res) {
     try {
       const config = await getConfig(readFromStorage)
-      const allBugs = loadAllBugs(config.projectKeys)
+      const allBugs = await loadAllBugs(config.projectKeys)
 
       const componentCounts = {}
       for (const bug of allBugs) {
@@ -1933,7 +1935,7 @@ module.exports = async function registerRoutes(router, context) {
         cacheAge: bugsCache.timestamp ? Date.now() - bugsCache.timestamp : null
       }
 
-      const allBugs = loadAllBugs(config.projectKeys)
+      const allBugs = await loadAllBugs(config.projectKeys)
 
       const bugsByProject = {}
       for (const project of config.projectKeys) {
@@ -2125,7 +2127,7 @@ module.exports = async function registerRoutes(router, context) {
     try {
       const config = await getConfig(readFromStorage)
       const versions = await readFromStorage('releases/delivery/quality/versions.json') || []
-      const allBugs = loadAllBugs(config.projectKeys)
+      const allBugs = await loadAllBugs(config.projectKeys)
       const releases = compute90DaySummary(null, allBugs, versions)
       res.json({ releases: releases })
     } catch (error) {
@@ -2153,7 +2155,7 @@ module.exports = async function registerRoutes(router, context) {
     try {
       const config = await getConfig(readFromStorage)
       const versions = await readFromStorage('releases/delivery/quality/versions.json') || []
-      const allBugs = loadAllBugs(config.projectKeys)
+      const allBugs = await loadAllBugs(config.projectKeys)
       const configReleases = req.body && req.body.releases ? req.body.releases : null
       const releases = compute90DaySummary(configReleases, allBugs, versions)
       res.json({ releases: releases })

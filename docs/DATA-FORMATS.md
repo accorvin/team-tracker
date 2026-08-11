@@ -1354,7 +1354,7 @@ Heuristic narrative signals for the Feature detail **Traffic Signals** panel (bl
 
 ## Releases — Execution Config (`data/releases/execution/config.json`)
 
-Admin-configurable settings for GitLab CI artifact fetching and Jira enrichment.
+Admin-configurable settings for GitLab CI artifact fetching and Jira sync.
 
 ```json
 {
@@ -1366,10 +1366,7 @@ Admin-configurable settings for GitLab CI artifact fetching and Jira enrichment.
   "refreshIntervalHours": 12,
   "enabled": false,
   "jiraEnrichment": {
-    "enabled": false,
-    "syncIntervalHours": 6,
-    "discoveryEnabled": false,
-    "discoveryJql": "project = RHAISTRAT AND issuetype IN (Feature, Initiative) AND created >= -365d"
+    "enabled": false
   }
 }
 ```
@@ -1377,28 +1374,26 @@ Admin-configurable settings for GitLab CI artifact fetching and Jira enrichment.
 **Notes:**
 - `enabled` defaults to `false`. Module does nothing until an admin enables it in Settings.
 - `artifactPath` is the directory prefix stripped from zip entry paths (e.g., `output/index.json` becomes `index.json`).
-- `jiraEnrichment.enabled` enables periodic Jira sync of feature data (6h default cadence).
-- `jiraEnrichment.discoveryEnabled` enables Jira JQL discovery of features not yet in the store.
-- `jiraEnrichment.discoveryJql` is bounded by `created >= -365d` by default to prevent unbounded results.
+- `jiraEnrichment.enabled` enables periodic Jira sync of feature data (12h default cadence). The sync fetches all RHAISTRAT features from Jira as the authoritative source.
 
 ## Releases — Execution Last Enrichment (`data/releases/execution/last-enrichment.json`)
 
-Metadata from the most recent Jira enrichment sync.
+Metadata from the most recent Jira sync.
 
 ```json
 {
   "status": "success",
   "timestamp": "2026-06-05T08:30:00Z",
-  "featureCount": 632,
-  "enrichedCount": 630,
-  "duration": 24500,
-  "lastKey": "RHAISTRAT-1500"
+  "featureCount": 2400,
+  "newCount": 15,
+  "updatedCount": 2385,
+  "duration": 124500
 }
 ```
 
 **Notes:**
-- `enrichedCount` may be less than `featureCount` if some Jira lookups failed (partial failure handling).
-- `lastKey` is for diagnostics only.
+- `featureCount` is the total number of features returned by Jira.
+- `newCount` / `updatedCount` track how many features were created vs updated in the store.
 
 ## Releases — Execution Last Fetch (`data/releases/execution/last-fetch.json`)
 
@@ -1714,6 +1709,111 @@ Disconnected readiness reports tracking repository readiness scores for disconne
 - `ruleCount`: Total rules evaluated
 - `rulesPassedCount`: Rules that passed
 - `date`: Assessment timestamp
+
+## System Health — Quality Reports (`data/system-health/quality/reports.json`)
+
+Quality analysis reports tracking repository testing, CI/CD, and code quality practices across 8 dimensions. Reports are pushed from the quality-repo-analysis CI pipeline via the bulk API, or pulled from GitLab CI artifacts.
+
+```json
+{
+  "lastSyncedAt": "2026-07-28T10:30:00.000Z",
+  "totalReports": 5,
+  "reports": {
+    "kserve--kserve": {
+      "latest": {
+        "repository": "kserve/kserve",
+        "overallScore": 7.4,
+        "scorecard": [
+          { "dimension": "Unit Tests", "score": 8.0, "status": "Comprehensive pytest suite with 800+ tests" },
+          { "dimension": "Integration/E2E", "score": 7.5, "status": "E2E tests via KServe test framework" },
+          { "dimension": "Build Integration", "score": 8.0, "status": "Multi-stage Docker builds with CI" },
+          { "dimension": "Image Testing", "score": 6.0, "status": "Basic container smoke tests" },
+          { "dimension": "Coverage Tracking", "score": 5.0, "status": "No coverage enforcement or PR gates" },
+          { "dimension": "CI/CD Automation", "score": 9.0, "status": "GitHub Actions with matrix builds" },
+          { "dimension": "Static Analysis", "score": 8.0, "status": "golangci-lint, mypy, ruff" },
+          { "dimension": "Agent Rules", "score": 7.5, "status": "Basic CLAUDE.md with project conventions" }
+        ],
+        "criticalGaps": [
+          { "title": "No coverage enforcement", "impact": "Regression risk", "severity": "HIGH", "effort": "4-8 hours" }
+        ],
+        "quickWins": [
+          { "title": "Add Codecov integration", "effort": "2-3 hours", "impact": "Immediate coverage visibility" }
+        ],
+        "tier": "upstream",
+        "component": "Model Serving",
+        "team": "",
+        "githubUrl": "https://github.com/kserve/kserve",
+        "hasHtmlReport": false,
+        "assessedAt": "2026-07-28T10:00:00.000Z"
+      },
+      "history": [
+        { "overallScore": 6.8, "gapCount": 3, "assessedAt": "2026-07-21T10:00:00.000Z" }
+      ]
+    }
+  }
+}
+```
+
+**Top-level fields:**
+- `lastSyncedAt`: ISO timestamp when reports were last synced (push or pull)
+- `totalReports`: Total number of repositories with reports
+- `reports`: Object mapping repo keys (`owner--repo` format, `--` separator) to report data
+
+**Repo key format:** `owner--repo` (double-dash separator). Generated from `repository` field (`owner/repo` → `owner--repo`) or provided as `id` in the bulk payload. Must match `/^[a-zA-Z0-9._-]+--[a-zA-Z0-9._-]+$/`.
+
+**Per-repository structure:**
+- `latest`: Most recent quality assessment with full scorecard
+- `history`: Array of prior assessments (summary only, sorted newest-first, capped at 52)
+
+**Latest assessment fields:**
+- `repository`: Repository identifier in `owner/repo` format
+- `overallScore`: Weighted average score (0-10, one decimal)
+- `scorecard`: Array of 8 dimension scores (see dimensions below)
+- `criticalGaps`: Array of identified quality gaps with severity
+- `quickWins`: Array of low-effort improvement suggestions
+- `tier`: Repository tier (`"upstream"`, `"midstream"`, or `"downstream"`), or `null`
+- `component`: RHOAI component name, or `null`
+- `team`: Team name, or `null`/empty string
+- `githubUrl`: Repository URL, or `null`
+- `hasHtmlReport`: Boolean, true when an HTML report is stored
+- `assessedAt`: ISO timestamp of the assessment
+
+**Scorecard dimensions (8):**
+`Unit Tests`, `Integration/E2E`, `Build Integration`, `Image Testing`, `Coverage Tracking`, `CI/CD Automation`, `Static Analysis`, `Agent Rules`
+
+Each entry has: `dimension` (name), `score` (0-10), `status` (human-readable summary).
+
+**Critical gap fields:**
+- `title`: Short description of the gap
+- `impact`: Expected consequence
+- `severity`: `"HIGH"`, `"MEDIUM"`, or `"LOW"`
+- `effort`: Estimated remediation effort
+
+**Quick win fields:**
+- `title`: Short description
+- `effort`: Estimated effort
+- `impact`: Expected benefit
+
+**History entry fields:**
+- `overallScore`: Score at time of assessment
+- `gapCount`: Number of critical gaps at time of assessment
+- `assessedAt`: Assessment timestamp
+
+**HTML reports:** Stored separately at `system-health/quality/html/{owner--repo}.html`. Served via `GET /api/modules/system-health/quality/reports/{key}/html`.
+
+**API:**
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/api/modules/system-health/quality/reports` | `system-health:read` | List all reports (slim projection) |
+| `GET` | `/api/modules/system-health/quality/reports/{key}` | `system-health:read` | Full report with history |
+| `GET` | `/api/modules/system-health/quality/reports/{key}/html` | `system-health:read` | HTML report |
+| `POST` | `/api/modules/system-health/quality/reports/bulk` | admin, `system-health:write` | Bulk upsert from CI pipeline |
+| `DELETE` | `/api/modules/system-health/quality/reports` | admin, `system-health:write` | Clear all data |
+| `GET` | `/api/modules/system-health/quality/reports/status` | admin, `system-health:read` | Data freshness info |
+| `GET` | `/api/modules/system-health/quality/config` | admin, `system-health:read` | GitLab fetch config |
+| `POST` | `/api/modules/system-health/quality/config` | admin, `system-health:write` | Update GitLab fetch config |
+| `POST` | `/api/modules/system-health/quality/refresh` | admin, `system-health:write` | Trigger manual fetch |
 
 ---
 

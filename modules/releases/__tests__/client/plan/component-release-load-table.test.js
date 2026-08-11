@@ -113,6 +113,10 @@ function buildComponentGroups(groups) {
             releaseType: feat.releaseType,
             priority: feat.priority,
             isBlocked: feat.isBlocked,
+            pmDoAligned: !!feat.pmDoAligned,
+            fpdor: feat.fpdor || null,
+            confidence: feat.confidence || null,
+            isAiFirst: !!feat.isAiFirst,
             components: feat.components,
             fixVersions: feat.fixVersions || [],
             targetVersions: feat.targetVersions || [],
@@ -145,12 +149,12 @@ function buildComponentGroups(groups) {
     var reqCount = 0
     var comCount = 0
     var blkCount = 0
-    var riskCount = 0
+    var notAlignedCount = 0
     for (var fli = 0; fli < featureList.length; fli++) {
       if (featureList[fli].isRequested) reqCount++
       if (featureList[fli].isCommitted) comCount++
       if (featureList[fli].isBlocked) blkCount++
-      if (featureList[fli].riskLevel === 'high' || featureList[fli].riskLevel === 'medium') riskCount++
+      if (!featureList[fli].pmDoAligned) notAlignedCount++
     }
 
     result.push({
@@ -159,7 +163,7 @@ function buildComponentGroups(groups) {
       requestedCount: reqCount,
       committedCount: comCount,
       blockedCount: blkCount,
-      atRiskCount: riskCount
+      notAlignedCount: notAlignedCount
     })
   }
 
@@ -184,7 +188,8 @@ function makeFeature(overrides) {
     fixVersions: ['rhoai-3.5'],
     targetVersions: ['rhoai-3.5'],
     assignee: 'Alice',
-    pmOwner: 'Bob'
+    pmOwner: 'Bob',
+    pmDoAligned: true
   }, overrides)
 }
 
@@ -564,7 +569,7 @@ describe('buildComponentGroups', function () {
 // Sort logic — inlined from ComponentReleaseLoadTable.vue
 // ---------------------------------------------------------------------------
 
-var SORT_COLUMNS = ['key', 'summary', 'priority', 'type', 'releaseType', 'status', 'colorStatus', 'fixVersion', 'targetVersion', 'blocked', 'assignee', 'pmOwner']
+var SORT_COLUMNS = ['key', 'summary', 'priority', 'releaseType', 'status', 'colorStatus', 'fixVersion', 'targetVersion', 'blocked', 'pmDoAligned', 'readiness', 'assignee', 'pmOwner', 'docs']
 var PRIORITY_ORDER = { 'Blocker': 0, 'Critical': 1, 'Major': 2, 'Normal': 3 }
 var COLOR_STATUS_ORDER = { 'red': 0, 'yellow': 1, 'green': 2 }
 
@@ -588,8 +593,15 @@ function getSortValue(feature, column) {
     return feature.targetVersions && feature.targetVersions.length > 0 ? feature.targetVersions[0] : ''
   }
   if (column === 'blocked') return feature.isBlocked ? 1 : 0
+  if (column === 'pmDoAligned') return feature.pmDoAligned ? 0 : 1
+  if (column === 'readiness') {
+    if (!feature.fpdor) return 99
+    if (feature.fpdor.allApplicablePassed) return 0
+    return 1
+  }
   if (column === 'assignee') return (feature.assignee || '').toLowerCase()
   if (column === 'pmOwner') return (feature.pmOwner || '').toLowerCase()
+  if (column === 'docs') return feature.docsRequired === 'Yes' ? 0 : 1
   return ''
 }
 
@@ -912,7 +924,7 @@ describe('toggleSort', function () {
   })
 
   it('works for all valid sort columns', function () {
-    var columns = ['key', 'summary', 'priority', 'type', 'releaseType', 'status', 'colorStatus', 'fixVersion', 'targetVersion', 'blocked', 'assignee', 'pmOwner']
+    var columns = ['key', 'summary', 'priority', 'releaseType', 'status', 'colorStatus', 'fixVersion', 'targetVersion', 'blocked', 'pmDoAligned', 'readiness', 'assignee', 'pmOwner', 'docs']
     for (var i = 0; i < columns.length; i++) {
       var result = toggleSort({ column: null, direction: 'asc' }, columns[i])
       expect(result.column).toBe(columns[i])

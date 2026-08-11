@@ -11,8 +11,6 @@ const props = defineProps({
   selectedPriority: { type: String, default: '' },
   selectedTeams: { type: Array, default: () => [] },
   searchQuery: { type: String, default: '' },
-  showEmptyRocks: { type: Boolean, default: false },
-  emptyRockCount: { type: Number, default: 0 },
   hasActiveFilters: { type: Boolean, default: false }
 })
 
@@ -23,7 +21,6 @@ const emit = defineEmits([
   'update:selectedPriority',
   'update:selectedTeams',
   'update:searchQuery',
-  'update:showEmptyRocks',
   'clearFilters'
 ])
 
@@ -151,26 +148,6 @@ useClickOutside(teamsDropdownRef, function() {
         </label>
       </div>
     </div>
-
-    <label
-      v-if="activeTab === 'big-rocks'"
-      class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none"
-      title="Rocks with 0 Features and 0 RFEs for this release are hidden by default"
-    >
-      <input
-        type="checkbox"
-        :checked="showEmptyRocks"
-        @change="$emit('update:showEmptyRocks', $event.target.checked)"
-        class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-      />
-      <span>Show empty rocks</span>
-      <span
-        v-if="!showEmptyRocks && emptyRockCount > 0"
-        class="text-xs text-gray-500 dark:text-gray-400"
-      >
-        ({{ emptyRockCount }} hidden)
-      </span>
-    </label>
 
     <button
       v-if="hasActiveFilters"

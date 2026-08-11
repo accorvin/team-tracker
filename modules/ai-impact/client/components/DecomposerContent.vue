@@ -2,7 +2,6 @@
 import { ref, computed, watch } from 'vue'
 import DecomposerMetricsRow from './DecomposerMetricsRow.vue'
 import DecomposerCharts from './DecomposerCharts.vue'
-import MermaidDiagram from './MermaidDiagram.vue'
 
 const props = defineProps({
   snapshot: { type: Object, default: null },
@@ -10,14 +9,13 @@ const props = defineProps({
   error: { type: String, default: null }
 })
 
-defineEmits(['retry'])
+defineEmits(['retry', 'selectStrategy'])
 
 const PAGE_SIZE = 10
 
 const searchQuery = ref('')
 const timeWindow = ref('month') // all | week | month | 3months
 const currentPage = ref(1)
-const expandedId = ref(null)
 
 const WINDOW_DAYS = { week: 7, month: 30, '3months': 90 }
 
@@ -96,15 +94,10 @@ const pagedStrategies = computed(() => {
   return filteredStrategies.value.slice(start, start + PAGE_SIZE)
 })
 
-watch([searchQuery, timeWindow], () => { currentPage.value = 1; expandedId.value = null })
+watch([searchQuery, timeWindow], () => { currentPage.value = 1 })
 
 function goToPage(p) {
   currentPage.value = Math.min(Math.max(1, p), totalPages.value)
-  expandedId.value = null
-}
-
-function toggleExpand(id) {
-  expandedId.value = expandedId.value === id ? null : id
 }
 
 function recClass(rec) {
@@ -198,9 +191,9 @@ function recClass(rec) {
             </thead>
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
               <template v-for="s in pagedStrategies" :key="s.strat_id">
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer" @click="toggleExpand(s.strat_id)">
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer" @click="$emit('selectStrategy', s)">
                   <td class="px-2 py-2 text-gray-400">
-                    <svg class="h-4 w-4 transition-transform" :class="{ 'rotate-90': expandedId === s.strat_id }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
                   </td>
@@ -221,41 +214,6 @@ function recClass(rec) {
                     <span class="px-2 py-0.5 rounded text-xs font-medium" :class="recClass(s.review?.recommendation)">
                       {{ s.review?.pass ? 'pass' : 'fail' }} · {{ s.review?.recommendation || '—' }}
                     </span>
-                  </td>
-                </tr>
-                <!-- Expanded detail: DAG + epics -->
-                <tr v-if="expandedId === s.strat_id" class="bg-gray-50 dark:bg-gray-800/40">
-                  <td colspan="7" class="px-6 py-4">
-                    <div class="grid gap-6 lg:grid-cols-2">
-                      <div>
-                        <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Decomposition DAG</h4>
-                        <div v-if="s.mermaid_dag" class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
-                          <MermaidDiagram :chart="s.mermaid_dag" />
-                        </div>
-                        <p v-else class="text-xs text-gray-400">No DAG available.</p>
-                      </div>
-                      <div>
-                        <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Epics ({{ s.epics?.length || 0 }})</h4>
-                        <ul class="space-y-1">
-                          <li v-for="e in s.epics" :key="e.epic_id" class="text-xs flex items-start gap-2">
-                            <span class="font-mono text-gray-400 shrink-0">{{ e.epic_id?.split('-').pop() }}</span>
-                            <span class="dark:text-gray-200">
-                              {{ e.title }}
-                              <span class="text-gray-400">· {{ e.type }} · {{ e.priority }} · {{ e.component }}</span>
-                              <span v-if="e.ai_implementability" class="ml-1 px-1 rounded bg-gray-200 dark:bg-gray-700">AI: {{ e.ai_implementability }}</span>
-                              <a
-                                v-if="e.jira_key"
-                                :href="browseUrl(e.jira_key)"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="ml-1 text-blue-600 dark:text-blue-400 hover:underline"
-                                @click.stop
-                              >{{ e.jira_key }}</a>
-                            </span>
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
                   </td>
                 </tr>
               </template>

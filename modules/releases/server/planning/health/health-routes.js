@@ -16,7 +16,7 @@ const { logAudit } = require('../audit-log')
 const { getRegistryReleasesFlat } = require('../../registry')
 var { blockDuringImpersonation } = require('../../../../../shared/server/auth')
 var sharedJira = require('../../../../../shared/server/jira')
-var { computeFPDoRReadiness, extractRubricData } = require('../fpdor')
+var { computeFPDoRReadiness } = require('../fpdor')
 var { loadFeatureDetail } = require('../cache-reader')
 
 var DATA_PREFIX = 'releases/planning'
@@ -352,8 +352,7 @@ async function healthRoutes(router, context) {
       var cachedReleaseType = feature.releaseType || ''
       if (execDetail.releaseType !== cachedReleaseType) {
         feature = Object.assign({}, feature, { releaseType: execDetail.releaseType })
-        var rubricData = extractRubricData(feature)
-        feature.fpdor = computeFPDoRReadiness(feature, rubricData)
+        feature.fpdor = computeFPDoRReadiness(feature)
         feature.planningStatus = derivePlanningStatus(feature.fpdor)
       }
     }

@@ -44,9 +44,15 @@ describe('parseDescriptionSignals', function() {
     expect(result.hasAcceptanceCriteria).toBe(true)
   })
 
-  it('detects success criteria keyword', function() {
-    var result = parseDescriptionSignals('Success Criteria\n- Users can log in with SSO')
+  it('detects Success Criteria section with body', function() {
+    var result = parseDescriptionSignals('## Success Criteria\n- Users can log in with SSO\n- Session persists across refresh')
     expect(result.hasAcceptanceCriteria).toBe(true)
+    expect(result.matchedSections.some(function(m) { return m.title === 'Success Criteria' })).toBe(true)
+  })
+
+  it('does not pass empty Acceptance Criteria heading', function() {
+    var result = parseDescriptionSignals('## Acceptance Criteria\n\n## Other\nSome other content here that is long enough')
+    expect(result.hasAcceptanceCriteria).toBe(false)
   })
 
   it('detects use case signals', function() {
@@ -99,33 +105,33 @@ describe('parseDescriptionSignals', function() {
     expect(result.hasRisks).toBe(true)
   })
 
-  it('detects risks and assumptions heading without colon', function() {
-    var result = parseDescriptionSignals('Risks and Assumptions\n- API may change\n- Team capacity limited')
+  it('detects risks and assumptions heading with body', function() {
+    var result = parseDescriptionSignals('## Risks and Assumptions\n- API may change\n- Team capacity limited')
     expect(result.hasRisks).toBe(true)
   })
 
-  it('detects dependencies heading without colon', function() {
-    var result = parseDescriptionSignals('Dependencies\n- Requires auth service v2\n- Needs DB migration')
+  it('detects dependencies heading with body', function() {
+    var result = parseDescriptionSignals('## Dependencies\n- Requires auth service v2\n- Needs DB migration')
     expect(result.hasRisks).toBe(true)
   })
 
-  it('detects blockers heading without colon', function() {
-    var result = parseDescriptionSignals('Blockers\n- Waiting on legal review')
+  it('detects blockers heading with body', function() {
+    var result = parseDescriptionSignals('## Blockers\n- Waiting on legal review for the release')
     expect(result.hasRisks).toBe(true)
   })
 
-  it('detects constraints heading without colon', function() {
-    var result = parseDescriptionSignals('Constraints\n- Must run on RHEL 9\n- Budget limit $50k')
+  it('detects constraints heading with body', function() {
+    var result = parseDescriptionSignals('## Constraints\n- Must run on RHEL 9\n- Budget limit $50k')
     expect(result.hasRisks).toBe(true)
   })
 
   it('detects architecture signal with technical approach heading', function() {
-    var result = parseDescriptionSignals('Technical Approach\nWe will use a microservices architecture with event-driven communication')
+    var result = parseDescriptionSignals('## Technical Approach\nWe will use a microservices architecture with event-driven communication')
     expect(result.hasArchitectureSignal).toBe(true)
   })
 
   it('detects architecture heading as review artifact', function() {
-    var result = parseDescriptionSignals('## Architecture\nService mesh topology and API boundaries')
+    var result = parseDescriptionSignals('## Architecture\nService mesh topology and API boundaries for the control plane')
     expect(result.hasArchitectureSignal).toBe(true)
   })
 
@@ -137,6 +143,16 @@ describe('parseDescriptionSignals', function() {
   it('does not treat bare narrative architecture as a review signal', function() {
     var result = parseDescriptionSignals('The agent architecture matters for latency in production workloads')
     expect(result.hasArchitectureSignal).toBe(false)
+  })
+
+  it('detects architecture not required phrase', function() {
+    var result = parseDescriptionSignals('Architecture is not required for this documentation-only change.')
+    expect(result.hasArchitectureNotRequired).toBe(true)
+  })
+
+  it('detects N/A – no UX phrase', function() {
+    var result = parseDescriptionSignals('N/A – no UX for this API-only feature.')
+    expect(result.hasNaNoUx).toBe(true)
   })
 
   it('detects cross-functional dependency language', function() {
@@ -166,19 +182,21 @@ describe('parseDescriptionSignals', function() {
     expect(result.hasRisks).toBe(false)
   })
 
-  it('handles ADF input format', function() {
+  it('handles ADF heading sections with body', function() {
     var adf = {
       type: 'doc',
       content: [
-        { type: 'paragraph', content: [{ type: 'text', text: 'AC: The feature must work. ' }] },
-        { type: 'paragraph', content: [{ type: 'text', text: 'Use case: Admin manages users' }] }
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Acceptance Criteria' }] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'The feature must work for admins and operators.' }] },
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Use Cases' }] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'Admin manages users in the console daily.' }] }
       ]
     }
     var result = parseDescriptionSignals(adf)
     expect(result.hasContent).toBe(true)
     expect(result.hasAcceptanceCriteria).toBe(true)
     expect(result.hasUseCases).toBe(true)
-    expect(result.signalCount).toBe(2)
+    expect(result.signalCount).toBeGreaterThanOrEqual(2)
   })
 
   it('handles ADF with empty content', function() {
@@ -186,5 +204,18 @@ describe('parseDescriptionSignals', function() {
     var result = parseDescriptionSignals(adf)
     expect(result.hasContent).toBe(false)
     expect(result.signalCount).toBe(0)
+  })
+
+  it('ADF empty Acceptance Criteria heading does not pass', function() {
+    var adf = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Acceptance Criteria' }] },
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Other' }] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'Some other substantive paragraph content here.' }] }
+      ]
+    }
+    var result = parseDescriptionSignals(adf)
+    expect(result.hasAcceptanceCriteria).toBe(false)
   })
 })

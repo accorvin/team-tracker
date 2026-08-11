@@ -1,6 +1,14 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import HygieneViolations from '@shared/client/components/HygieneViolations.vue'
+import {
+  worstFailedSeverity,
+  severityBadgeClass,
+  severityLabel,
+  pathLabel,
+  pathChipClass,
+  pathChipTitle
+} from '../utils/fpdor-severity.js'
 
 const props = defineProps({
   feature: { type: Object, default: null },
@@ -99,32 +107,22 @@ function initials(name) {
   return (name || '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 }
 
-const confidenceClass = computed(() => {
-  switch (props.feature?.confidence) {
-    case 'committed': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
-    case 'ready':     return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200'
-    case 'not-ready': return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
-    default:          return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-  }
+const readinessSeverity = computed(() => worstFailedSeverity(props.feature))
+
+const readinessClass = computed(() => severityBadgeClass(readinessSeverity.value))
+
+const readinessLabel = computed(() => {
+  if (!props.feature) return '—'
+  return readinessSeverity.value ? 'Not Ready' : 'Ready'
 })
 
-const confidenceLabel = computed(() => {
-  switch (props.feature?.confidence) {
-    case 'committed': return 'Ready'
-    case 'ready':     return 'Ready'
-    case 'not-ready': return 'Not Ready'
-    default:          return '—'
-  }
+const readinessTooltip = computed(() => {
+  if (!props.feature) return ''
+  if (!readinessSeverity.value) return 'Ready — all applicable FPDoR items pass'
+  return 'Not Ready — worst fail severity: ' + severityLabel(readinessSeverity.value)
 })
 
-const confidenceTooltip = computed(() => {
-  switch (props.feature?.confidence) {
-    case 'committed': return 'Committed — fix version assigned to a release'
-    case 'ready':     return 'Ready — passes readiness gates, not yet committed'
-    case 'not-ready': return 'Not Ready — does not pass readiness gates'
-    default:          return ''
-  }
-})
+const isCommitted = computed(() => props.feature?.confidence === 'committed')
 
 const rubricTotal = computed(() => {
   if (!props.feature) return 0
@@ -146,19 +144,23 @@ const hasBlockers = computed(() =>
 )
 
 const FPDOR_TO_HYGIENE = {
-  'Requirements Clarity': 'Add requirement details to the Jira description',
-  'Acceptance Criteria': 'Add acceptance criteria to the Jira description',
-  'Scope Defined': 'Add child epics, set sizing (story points/t-shirt), or link an RFE',
-  'RICE Score': 'Set RICE score in Jira',
-  'Cross-functional Engineering': 'Assign ≥2 engineering components (excl. Docs/UXD) or document cross-team dependencies',
-  'Documentation': 'Set docsRequired (or Documentation component); without release type, docs stay not-checked until assessed',
-  'UXD': 'Add the UXD component',
-  'Architectural Alignment': 'Add architecture review artifacts (ADR/RFC/design doc/arch review)',
-  'Risks & Assumptions': 'Document risks and assumptions in description',
-  'Release Type': 'Set release type (phase) in Jira',
-  'Target Version': 'Set target version in Jira',
-  'Assignee': 'Assign a delivery owner',
-  'PM Assigned': 'Assign a product manager'
+  'Target Version': 'Set Target Version in Jira (or obtain rp-qg1-pass)',
+  'Release Type': 'Set Release Type (DP / TP / GA) in Jira (or obtain rp-qg1-pass)',
+  'Components': 'Assign ≥1 engineering component excluding Documentation/UXD (or obtain rp-qg1-pass)',
+  'PM': 'Assign a product manager',
+  'Delivery Owner': 'Assign a delivery owner (Assignee)',
+  'Priority': 'Set Priority in Jira (or obtain rp-qg1-pass)',
+  'RICE': 'Set RICE score / Reach, Impact, Confidence, Effort (or obtain rp-qg1-pass)',
+  'Docs impact': 'Set Docs Required Yes/No; if Yes, add Documentation component (or obtain rp-qg1-pass)',
+  'Source RFE / AI SDLC': 'Link an RFE (cloned-by / parent) or ensure strat-creator-auto-created',
+  'Requirements clarity': 'Add problem/scope/out-of-scope sections, or obtain strat-creator-rubric-pass / human sign-off',
+  'Acceptance criteria': 'Add Acceptance/Success Criteria (or Given/When/Then), or obtain strat-creator-rubric-pass',
+  'Risks & assumptions': 'Document risks and assumptions, or obtain strat-creator-rubric-pass / human sign-off',
+  'Architectural alignment': 'Add architecture notes or “not required”, or obtain strat-creator-rubric-pass / human sign-off',
+  'UXD': 'Add the UXD component or note “N/A – no UX” in the description',
+  'Cross-team deps': 'Assign ≥2 eng components, document dependencies, or obtain epic-creator-auto-decomposed',
+  'Feature human sign-off': 'Add a strat-creator-human* label (or rp-qg1-pass) for AI First features',
+  'Child epics': 'Link child epics in engineering projects or obtain epic-creator-auto-decomposed'
 }
 
 const fpdorItems = computed(() => {
@@ -167,14 +169,31 @@ const fpdorItems = computed(() => {
   return fpdor.items
 })
 
+const mandatoryFpdorItems = computed(() => {
+  if (!fpdorItems.value) return []
+  return fpdorItems.value.filter(item => item.group === 'mandatory')
+})
+
+const criteriaFpdorItems = computed(() => {
+  if (!fpdorItems.value) return []
+  return fpdorItems.value.filter(item => item.group !== 'mandatory')
+})
+
 const fpdorSummary = computed(() => {
   var fpdor = props.feature?.fpdor
-  if (!fpdor) return { passedCount: 0, totalCount: 0, allPassed: false }
+  if (!fpdor) return { passedCount: 0, totalCount: 0, applicableCount: 0, allPassed: false }
+  var applicable = fpdor.applicableCount != null ? fpdor.applicableCount : fpdor.totalCount
   return {
     passedCount: fpdor.passedCount || 0,
     totalCount: fpdor.totalCount || 0,
-    allPassed: fpdor.passedCount === fpdor.totalCount && fpdor.totalCount > 0
+    applicableCount: applicable,
+    allPassed: !!fpdor.allApplicablePassed
   }
+})
+
+const fpdorConfluenceUrl = computed(() => {
+  return props.feature?.fpdor?.confluenceUrl
+    || 'https://redhat.atlassian.net/wiki/spaces/RHAI/pages/442958832/Planning+Phase+-+Definition+of+Ready+Definition+of+Done'
 })
 
 const failedFpdorActions = computed(() => {
@@ -262,13 +281,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           </div>
 
           <div class="flex flex-wrap gap-1.5 mt-2.5">
-            <!-- Confidence badge (all features) -->
+            <!-- Readiness badge — severity color, not Fix Version -->
             <span
-              v-if="feature.confidence"
+              v-if="feature.fpdor || feature.confidence"
               class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
-              :class="confidenceClass"
-              :title="confidenceTooltip"
-            >{{ confidenceLabel }}</span>
+              :class="readinessClass"
+              :title="readinessTooltip"
+            >{{ readinessLabel }}</span>
+            <span
+              v-if="isCommitted"
+              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+              title="Committed — fix version assigned to a release"
+            >Committed</span>
+            <span
+              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+              :class="pathChipClass(feature)"
+              :title="pathChipTitle(feature)"
+            >{{ pathLabel(feature) }}</span>
 
             <!-- Health pipeline badges -->
             <template v-if="isHealthPipeline">
@@ -378,25 +407,55 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
           <!-- FPDoR Readiness -->
           <section v-if="fpdorItems" class="px-4 py-4">
-            <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">
+            <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">
               FPDoR Readiness
-              <span class="font-normal ml-1" :class="fpdorSummary.allPassed ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'">({{ fpdorSummary.passedCount }}/{{ fpdorSummary.totalCount }} passed)</span>
+              <span class="font-normal ml-1" :class="fpdorSummary.allPassed ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'">({{ fpdorSummary.passedCount }}/{{ fpdorSummary.applicableCount }} applicable passed)</span>
             </p>
-            <div class="space-y-2">
-              <div v-for="item in fpdorItems" :key="item.name" class="flex items-start gap-2 text-xs">
-                <svg v-if="item.pass === true" class="w-3.5 h-3.5 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                <svg v-else-if="item.pass === false" class="w-3.5 h-3.5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                <svg v-else class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
-                </svg>
-                <div class="flex-1 min-w-0">
-                  <span :class="item.pass === true ? 'text-gray-700 dark:text-gray-300' : item.pass === false ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'">{{ item.name }}</span>
-                  <span v-if="item.humanVerified" class="inline-flex items-center ml-1 px-1 py-0 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" title="Human verified via strat-creator sign-off">Verified</span>
-                  <div v-if="item.detail && item.pass !== true" class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 truncate">{{ item.detail }}</div>
+            <p class="text-[10px] text-gray-400 dark:text-gray-500 mb-3">
+              Source of truth:
+              <a :href="fpdorConfluenceUrl" target="_blank" rel="noopener noreferrer" class="text-primary-600 dark:text-primary-400 hover:underline">Planning Phase DoR</a>
+            </p>
+
+            <div v-if="mandatoryFpdorItems.length" class="mb-4">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Mandatory Jira fields</p>
+              <div class="space-y-2">
+                <div v-for="item in mandatoryFpdorItems" :key="item.name" class="flex items-start gap-2 text-xs">
+                  <svg v-if="item.pass === true" class="w-3.5 h-3.5 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <svg v-else-if="item.pass === false" class="w-3.5 h-3.5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
+                  </svg>
+                  <div class="flex-1 min-w-0">
+                    <span :class="item.pass === true ? 'text-gray-700 dark:text-gray-300' : item.pass === false ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'">{{ item.name }}</span>
+                    <span v-if="item.humanVerified" class="inline-flex items-center ml-1 px-1 py-0 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" title="Human verified via strat-creator sign-off">Verified</span>
+                    <div v-if="item.detail" class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{{ item.detail }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="criteriaFpdorItems.length">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Criteria</p>
+              <div class="space-y-2">
+                <div v-for="item in criteriaFpdorItems" :key="item.name" class="flex items-start gap-2 text-xs">
+                  <svg v-if="item.pass === true" class="w-3.5 h-3.5 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <svg v-else-if="item.pass === false" class="w-3.5 h-3.5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
+                  </svg>
+                  <div class="flex-1 min-w-0">
+                    <span :class="item.pass === true ? 'text-gray-700 dark:text-gray-300' : item.pass === false ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'">{{ item.name }}</span>
+                    <span v-if="item.humanVerified" class="inline-flex items-center ml-1 px-1 py-0 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" title="Human verified via strat-creator sign-off">Verified</span>
+                    <div v-if="item.detail" class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{{ item.detail }}</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -448,10 +507,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             </div>
           </section>
 
-          <!-- Rubric (strat-creator features only) -->
+          <!-- Rubric (strat-creator features only; display/priority — does not gate FPDoR) -->
           <section v-if="!isHealthPipeline" class="px-4 py-4">
-            <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">
+            <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">
               Rubric — {{ rubricTotal }} / 8
+            </p>
+            <p class="text-[10px] text-gray-400 dark:text-gray-500 mb-3">
+              Rubric scores are informational and do not gate FPDoR (labels + fields + description do).
             </p>
             <div class="space-y-2.5">
               <div v-for="dim in RUBRIC_DIMS" :key="dim" class="flex items-center gap-2">

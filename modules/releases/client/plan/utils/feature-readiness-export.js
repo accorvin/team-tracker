@@ -1,20 +1,32 @@
 import { escapeCsv, triggerDownload } from './health-export.js'
+import { pathLabel } from './fpdor-severity.js'
 
-var FPDOR_ITEM_NAMES = [
-  'Requirements Clarity',
-  'Acceptance Criteria',
-  'Scope Defined',
-  'RICE Score',
-  'Cross-functional Engineering',
-  'Documentation',
-  'UXD',
-  'Architectural Alignment',
-  'Risks & Assumptions',
-  'Release Type',
+var FPDOR_CONFLUENCE_URL = 'https://redhat.atlassian.net/wiki/spaces/RHAI/pages/442958832/Planning+Phase+-+Definition+of+Ready+Definition+of+Done'
+
+var FPDOR_MANDATORY_NAMES = [
   'Target Version',
-  'Assignee',
-  'PM Assigned'
+  'Release Type',
+  'Components',
+  'PM',
+  'Delivery Owner',
+  'Priority',
+  'RICE',
+  'Docs impact'
 ]
+
+var FPDOR_CRITERIA_NAMES = [
+  'Source RFE / AI SDLC',
+  'Requirements clarity',
+  'Acceptance criteria',
+  'Risks & assumptions',
+  'Architectural alignment',
+  'UXD',
+  'Cross-team deps',
+  'Feature human sign-off',
+  'Child epics'
+]
+
+var FPDOR_ITEM_NAMES = FPDOR_MANDATORY_NAMES.concat(FPDOR_CRITERIA_NAMES)
 
 var KNOWN_PRODUCTS = ['RHOAI', 'RHAIIS', 'RHELAI']
 
@@ -57,10 +69,12 @@ function exportFeatureReadinessCsv(features) {
       label: 'FPDoR',
       getter: function(f) {
         if (!f.fpdor) return ''
-        return f.fpdor.passedCount + '/' + f.fpdor.totalCount
+        var applicable = f.fpdor.applicableCount != null ? f.fpdor.applicableCount : f.fpdor.totalCount
+        return f.fpdor.passedCount + '/' + applicable
       }
     },
     { label: 'Failed FPDoR Items', getter: function(f) { return failedFpdorNames(f).join('; ') } },
+    { label: 'Path', getter: function(f) { return pathLabel(f) } },
     { label: 'Outcome', getter: function(f) { return f.bigRock || '' } },
     {
       label: 'Target Versions',
@@ -76,7 +90,8 @@ function exportFeatureReadinessCsv(features) {
     { label: 'Team', getter: function(f) { return f.team || '' } },
     { label: 'Status', getter: function(f) { return f.status || '' } },
     { label: 'Priority', getter: function(f) { return f.priority || '' } },
-    { label: 'Confidence', getter: function(f) { return f.confidence || '' } }
+    { label: 'Confidence', getter: function(f) { return f.confidence || '' } },
+    { label: 'Labels', getter: function(f) { return Array.isArray(f.labels) ? f.labels.join('; ') : (f.labels || '') } }
   ]
 
   var header = columns.map(function(c) { return escapeCsv(c.label) }).join(',')
@@ -123,10 +138,13 @@ function featureMatchesSharedFilters(feature, filterState, selectedVersion, opti
 
 export {
   FPDOR_ITEM_NAMES,
+  FPDOR_MANDATORY_NAMES,
+  FPDOR_CRITERIA_NAMES,
+  FPDOR_CONFLUENCE_URL,
   KNOWN_PRODUCTS,
   featureMatchesProduct,
   featureFailsSelectedFpdorItems,
   failedFpdorNames,
-  featureMatchesSharedFilters,
-  exportFeatureReadinessCsv
+  exportFeatureReadinessCsv,
+  featureMatchesSharedFilters
 }

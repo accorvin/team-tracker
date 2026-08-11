@@ -334,9 +334,9 @@
           <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-amber-100 dark:bg-amber-900/40">
             <svg class="w-3 h-3 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
           </span>
-          <span class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">At Risk</span>
+          <span class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Not Aligned</span>
         </div>
-        <div class="text-2xl font-bold ml-7" :class="totalAtRisk > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-gray-100'">{{ totalAtRisk }}</div>
+        <div class="text-2xl font-bold ml-7" :class="totalNotAligned > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-gray-100'" title="PM/DO Aligned = No (TV and FV missing or mismatch)">{{ totalNotAligned }}</div>
       </div>
       <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
         <div class="absolute top-0 left-0 w-1 h-full bg-violet-500 rounded-l-xl" />
@@ -756,7 +756,7 @@ function filterGroups(includeTypeFilter) {
         requestedCount: newReq.length,
         committedCount: newCom.length,
         blockedCount: filtered.filter(function(ff) { return ff.isBlocked }).length,
-        atRiskCount: filtered.filter(function(ff) { return ff.riskLevel === 'high' || ff.riskLevel === 'medium' }).length
+        notAlignedCount: filtered.filter(function(ff) { return !ff.pmDoAligned }).length
       })
     }).filter(function(comp) {
       return (comp.requestedFeatures.length + comp.committedFeatures.length) > 0
@@ -956,7 +956,7 @@ var blockedPercent = computed(function() {
   return Math.round((totalBlocked.value / total) * 100)
 })
 
-var totalAtRisk = computed(function() {
+var totalNotAligned = computed(function() {
   var source = summaryFilteredGroups.value
   var seen = {}
   var count = 0
@@ -967,7 +967,7 @@ var totalAtRisk = computed(function() {
       for (var li = 0; li < lists.length; li++) {
         for (var fi = 0; fi < lists[li].length; fi++) {
           var f = lists[li][fi]
-          if (!seen[f.key] && (f.riskLevel === 'high' || f.riskLevel === 'medium')) {
+          if (!seen[f.key] && !f.pmDoAligned) {
             seen[f.key] = true
             count++
           }

@@ -20,7 +20,7 @@ function makeLatest(overrides) {
   return Object.assign({
     key: 'RHAISTRAT-1',
     title: 'Test Feature',
-    sourceRfe: null,
+    sourceRfe: 'RHAIRFE-1',
     priority: 'Normal',
     status: 'In Progress',
     size: 'M',
@@ -30,13 +30,14 @@ function makeLatest(overrides) {
     scores: { feasibility: 2, testability: 2, scope: 2, architecture: 2 },
     reviewers: { feasibility: 'approve', testability: 'approve', scope: 'approve', architecture: 'approve' },
     reviewedAt: '2026-01-01T00:00:00.000Z',
-    components: ['Platform', 'Serving', 'UXD'],
+    components: ['Platform', 'Serving', 'UXD', 'Documentation'],
+    labels: ['strat-creator-auto-created', 'strat-creator-rubric-pass', 'strat-creator-human-sign-off'],
     approvedBy: null,
     approvedAt: null,
     riceScore: 100,
     storyPoints: 5,
     epicCount: 3,
-    docsRequired: 'Required',
+    docsRequired: 'Yes',
     effort: 5,
     releaseType: 'GA'
   }, overrides)
@@ -74,6 +75,11 @@ function convertToUnifiedFormat(aiData) {
       labels: latest.labels || [],
       riceScore: latest.riceScore != null ? latest.riceScore : null,
       linkedRfeKey: latest.sourceRfe || null,
+      docsRequired: latest.docsRequired != null ? latest.docsRequired : null,
+      releaseType: latest.releaseType || null,
+      epicCount: latest.epicCount != null ? latest.epicCount : 3,
+      assignee: latest.deliveryOwner || latest.assignee || 'Alice',
+      pm: latest.pmOwner || latest.pm || 'Jane',
       aiReview: {
         title: latest.title || '',
         sourceRfe: latest.sourceRfe || null,
@@ -104,7 +110,7 @@ function convertToUnifiedFormat(aiData) {
       fixVersions: [],
       labels: latest.labels || [],
       completionPct: 0,
-      epicCount: 3,
+      epicCount: latest.epicCount != null ? latest.epicCount : 3,
       issueCount: 0,
       blockerCount: 0,
       health: null,
@@ -399,7 +405,7 @@ describe('buildFeatureReadiness', function() {
       var store = makeFeaturesStore({
         'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
       })
-      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }] }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }] }
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
         'releases/planning/config.json': CONFIG_3_6,
@@ -462,7 +468,7 @@ describe('buildFeatureReadiness', function() {
       var candidateCache = {
         data: { features: [{ issueKey: 'RHAISTRAT-1', tier: 1, fixVersion: '3.6.0', targetRelease: 'rhoai-3.6' }] }
       }
-      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }] }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }] }
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
         'releases/planning/config.json': CONFIG_3_6,
@@ -471,13 +477,15 @@ describe('buildFeatureReadiness', function() {
       })
       var result = await buildFeatureReadiness(readFromStorage)
       expect(result.ready[0].confidence).toBe('committed')
+      expect(result.ready[0].isAiFirst).toBe(true)
+      expect(Array.isArray(result.ready[0].labels)).toBe(true)
     })
 
     it('approved feature without fixVersion gets confidence=ready', async function() {
       var store = makeFeaturesStore({
         'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
       })
-      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }] }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }] }
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
         'releases/planning/config.json': CONFIG_3_6,
@@ -543,7 +551,7 @@ describe('buildFeatureReadiness', function() {
       var hygieneCache = {
         features: { 'RHAISTRAT-1': { key: 'RHAISTRAT-1', team: 'Alpha', violations: violations } }
       }
-      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }] }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }] }
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
         'releases/planning/config.json': CONFIG_3_6,
@@ -554,7 +562,7 @@ describe('buildFeatureReadiness', function() {
       expect(result.ready[0].violations).toEqual(violations)
     })
 
-    it('blocking hygiene violation moves approved feature to pendingReview', async function() {
+    it('hygiene violations do not move approved ready features to pendingReview', async function() {
       var store = makeFeaturesStore({
         'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
       })
@@ -562,7 +570,7 @@ describe('buildFeatureReadiness', function() {
       var hygieneCache = {
         features: { 'RHAISTRAT-1': { key: 'RHAISTRAT-1', team: 'Alpha', violations: violations } }
       }
-      var healthCache = { features: [{ key: 'RHAISTRAT-1', priorityScore: null, storyPoints: 5, releaseType: 'GA', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6' }] }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }] }
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
         'releases/planning/config.json': CONFIG_3_6,
@@ -570,9 +578,10 @@ describe('buildFeatureReadiness', function() {
         'releases/hygiene/features-3.6.json': hygieneCache
       })
       var result = await buildFeatureReadiness(readFromStorage)
-      expect(result.pendingReview).toHaveLength(1)
-      expect(result.pendingReview[0].confidence).toBe('not-ready')
-      expect(result.pendingReview[0].readinessGates.noBlockingViolations).toBe(true)
+      expect(result.ready).toHaveLength(1)
+      expect(result.ready[0].confidence).not.toBe('not-ready')
+      expect(result.ready[0].readinessGates.noBlockingViolations).toBe(true)
+      expect(result.ready[0].violations).toEqual(violations)
     })
 
     it('non-blocking violations do not affect readiness', async function() {
@@ -583,7 +592,7 @@ describe('buildFeatureReadiness', function() {
       var hygieneCache = {
         features: { 'RHAISTRAT-1': { key: 'RHAISTRAT-1', team: 'Alpha', violations: violations } }
       }
-      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }] }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }] }
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
         'releases/planning/config.json': CONFIG_3_6,
@@ -706,7 +715,7 @@ describe('buildFeatureReadiness', function() {
           ]
         }
       }
-      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }] }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }] }
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
         'releases/planning/config.json': CONFIG_3_6,
@@ -830,7 +839,7 @@ describe('buildFeatureReadiness', function() {
         data: { features: [{ issueKey: 'RHAISTRAT-1', tier: 1, bigRock: 'AI Speed', targetRelease: 'rhoai-3.6-cand', fixVersion: '3.6.0-cand' }] }
       }
       var healthCache = {
-        features: [{ key: 'RHAISTRAT-1', tier: 'T3', bigRock: 'Platform', targetRelease: 'rhoai-3.6-health', fixVersions: '3.6.0-health', deliveryOwner: 'Alice', pmOwner: 'Jane', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }]
+        features: [{ key: 'RHAISTRAT-1', tier: 'T3', bigRock: 'Platform', targetRelease: 'rhoai-3.6-health', fixVersions: '3.6.0-health', deliveryOwner: 'Alice', pmOwner: 'Jane', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }]
       }
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
@@ -872,7 +881,7 @@ describe('buildFeatureReadiness', function() {
         'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
       })
       var healthCache = {
-        features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }]
+        features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }]
       }
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
@@ -890,7 +899,7 @@ describe('buildFeatureReadiness', function() {
         'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
       })
       var healthCache = {
-        features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }]
+        features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }]
       }
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
@@ -914,8 +923,8 @@ describe('buildFeatureReadiness', function() {
       })
       var healthCache = {
         features: [
-          { key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' },
-          { key: 'RHAISTRAT-2', deliveryOwner: 'Bob', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }
+          { key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' },
+          { key: 'RHAISTRAT-2', deliveryOwner: 'Bob', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }
         ]
       }
       var readFromStorage = makeReadFromStorage({
@@ -1083,7 +1092,7 @@ describe('buildFeatureReadiness', function() {
       var store = makeFeaturesStore({
         'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
       })
-      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'wrong-owner', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }] }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'wrong-owner', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }] }
       var hygieneCache = { features: { 'RHAISTRAT-1': { key: 'RHAISTRAT-1', team: 'Real Team' } } }
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
@@ -1107,7 +1116,7 @@ describe('buildFeatureReadiness', function() {
       })
       var healthCache = {
         features: [
-          { key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' },
+          { key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' },
           { key: 'RHAISTRAT-2', priorityScore: null },
           { key: 'RHAISTRAT-3', priorityScore: null }
         ]
@@ -1258,8 +1267,8 @@ describe('buildFeatureReadiness', function() {
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
         'releases/planning/config.json': config,
-        'releases/planning/health-cache-3.5-all.json': { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.5', priorityScore: 80, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }] },
-        'releases/planning/health-cache-3.6-all.json': { features: [{ key: 'RHAISTRAT-2', deliveryOwner: 'Bob', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: 60, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }] }
+        'releases/planning/health-cache-3.5-all.json': { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.5', priorityScore: 80, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }] },
+        'releases/planning/health-cache-3.6-all.json': { features: [{ key: 'RHAISTRAT-2', deliveryOwner: 'Bob', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: 60, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }] }
       })
       var result = await buildFeatureReadiness(readFromStorage)
       expect(result.ready).toHaveLength(2)
@@ -1312,28 +1321,45 @@ describe('buildFeatureReadiness', function() {
         releaseType: 'GA',
         deliveryOwner: 'Alice',
         pmOwner: 'Jane',
+        priority: 'Major',
+        sourceRfe: 'RHAIRFE-1',
         components: ['Documentation', 'UXD', 'Platform', 'Serving'],
-        docsRequired: 'Required',
+        docsRequired: 'Yes',
         effort: 5,
         scores: { testability: 2, architecture: 2, feasibility: 2, scope: 2 },
-        descriptionSignals: { hasContent: true, signalCount: 3, hasAcceptanceCriteria: true, hasUseCases: true, hasScopeDefinition: true, hasRequirements: false, hasRisks: true, hasArchitectureSignal: true, hasCrossFunctionalDependency: false },
+        labels: [],
+        descriptionSignals: {
+          hasContent: true,
+          signalCount: 4,
+          hasAcceptanceCriteria: true,
+          hasUseCases: true,
+          hasScopeDefinition: true,
+          hasRequirements: true,
+          hasRisks: true,
+          hasArchitectureSignal: true,
+          hasArchitectureNotRequired: false,
+          hasCrossFunctionalDependency: false,
+          hasNaNoUx: false,
+          matchedSections: [
+            { kind: 'acceptanceCriteria', title: 'Acceptance Criteria' },
+            { kind: 'requirements', title: 'Requirements' },
+            { kind: 'risks', title: 'Risks' },
+            { kind: 'architecture', title: 'Architecture' }
+          ]
+        },
         status: 'In Progress',
         violations: null
       }, overrides)
     }
 
-    it('returns isReady=true when all FPDoR items pass (FPDoR-only; pastRefinement informational)', function() {
+    it('returns isReady=true when all applicable FPDoR items pass', function() {
       var result = computeReadiness(readyFeature())
       expect(result.isReady).toBe(true)
-      expect(result.gates.fpDorPassed).toBe(13)
-      expect(result.gates.fpDorTotal).toBe(13)
-      expect(result.gates.fpDorEvaluated).toBe(13)
+      expect(result.gates.fpDorTotal).toBe(17)
+      expect(result.fpdor.allApplicablePassed).toBe(true)
+      expect(result.fpdor.totalCount).toBe(17)
       expect(result.gates.pastRefinement).toBe(true)
       expect(result.gates.noBlockingViolations).toBe(true)
-      expect(result.fpdor).toBeDefined()
-      expect(result.fpdor.items).toBeDefined()
-      expect(Array.isArray(result.fpdor.items)).toBe(true)
-      expect(result.fpdor.totalCount).toBe(13)
     })
 
     it('returns isReady=false when riceScore is 0', function() {
@@ -1342,13 +1368,15 @@ describe('buildFeatureReadiness', function() {
       expect(result.gates.fpDorPassed).toBeLessThan(result.gates.fpDorEvaluated)
     })
 
-    it('returns isReady=false when scope not defined (no sizing, no breakdown)', function() {
-      var result = computeReadiness(readyFeature({ storyPoints: 0, epicCount: 0, effort: null, tshirtSize: null, scores: {} }))
+    it('returns isReady=false when child epics missing (no epicCount / decomposition label)', function() {
+      var result = computeReadiness(readyFeature({ epicCount: 0, labels: [] }))
       expect(result.isReady).toBe(false)
+      var child = result.fpdor.items.find(function(i) { return i.name === 'Child epics' })
+      expect(child.pass).toBe(false)
     })
 
-    it('returns isReady=true when storyPoints=0 but has tshirtSize and epicCount > 0', function() {
-      var result = computeReadiness(readyFeature({ storyPoints: 0, epicCount: 3, tshirtSize: 'M' }))
+    it('returns isReady=true when epicCount > 0', function() {
+      var result = computeReadiness(readyFeature({ epicCount: 3 }))
       expect(result.isReady).toBe(true)
     })
 
@@ -1372,21 +1400,21 @@ describe('buildFeatureReadiness', function() {
       expect(result.isReady).toBe(false)
     })
 
-    it('isReady=false when Docs/UXD missing even if engineering is cross-functional', function() {
-      var result = computeReadiness(readyFeature({ components: ['Platform', 'UI'], docsRequired: null }))
+    it('docs impact fails without Docs Required; UXD is N/A without component or N/A note', function() {
+      var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving'], docsRequired: null }))
       expect(result.isReady).toBe(false)
-      var engItem = result.fpdor.items.find(function(i) { return i.name === 'Cross-functional Engineering' })
-      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Documentation' })
+      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Docs impact' })
       var uxdItem = result.fpdor.items.find(function(i) { return i.name === 'UXD' })
+      var engItem = result.fpdor.items.find(function(i) { return i.name === 'Cross-team deps' })
       expect(engItem.pass).toBe(true)
       expect(docsItem.pass).toBe(false)
-      expect(uxdItem.pass).toBe(false)
+      expect(uxdItem.pass).toBeNull()
     })
 
-    it('isReady=false with single eng component and no docs/UXD', function() {
-      var result = computeReadiness(readyFeature({ components: ['Platform'], docsRequired: null }))
+    it('cross-team deps fails with single eng component and no dependency signal', function() {
+      var result = computeReadiness(readyFeature({ components: ['Platform', 'Documentation', 'UXD'], docsRequired: 'Yes' }))
       expect(result.isReady).toBe(false)
-      var engItem = result.fpdor.items.find(function(i) { return i.name === 'Cross-functional Engineering' })
+      var engItem = result.fpdor.items.find(function(i) { return i.name === 'Cross-team deps' })
       expect(engItem.pass).toBe(false)
     })
 
@@ -1420,94 +1448,76 @@ describe('buildFeatureReadiness', function() {
       expect(result.gates.noBlockingViolations).toBe(true)
     })
 
-    it('gates has fpDorPassed, fpDorTotal, fpDorEvaluated', function() {
+    it('gates has fpDorPassed, fpDorTotal, fpDorEvaluated, fpDorApplicable', function() {
       var result = computeReadiness(readyFeature())
       expect(typeof result.gates.fpDorPassed).toBe('number')
       expect(typeof result.gates.fpDorTotal).toBe('number')
       expect(typeof result.gates.fpDorEvaluated).toBe('number')
+      expect(typeof result.gates.fpDorApplicable).toBe('number')
     })
 
-    it('fpdor object contains items array with individual checks', function() {
+    it('fpdor object contains items array with individual checks and groups', function() {
       var result = computeReadiness(readyFeature())
-      expect(result.fpdor.items.length).toBeGreaterThan(0)
+      expect(result.fpdor.items.length).toBe(17)
       for (var i = 0; i < result.fpdor.items.length; i++) {
         expect(result.fpdor.items[i]).toHaveProperty('name')
         expect(result.fpdor.items[i]).toHaveProperty('pass')
         expect(result.fpdor.items[i]).toHaveProperty('source')
+        expect(result.fpdor.items[i]).toHaveProperty('group')
       }
+      expect(result.fpdor.confluenceUrl).toContain('442958832')
     })
 
-    // --- Scope Defined tests ---
+    // --- Child epics (formerly Scope Defined) ---
 
-    it('scope defined passes with epicCount > 0 (no pipeline)', function() {
-      var result = computeReadiness(readyFeature({ scores: {}, epicCount: 3, storyPoints: 0 }))
-      var scopeItem = result.fpdor.items.find(function(i) { return i.name === 'Scope Defined' })
-      expect(scopeItem.pass).toBe(true)
+    it('child epics passes with epicCount > 0', function() {
+      var result = computeReadiness(readyFeature({ epicCount: 3 }))
+      var child = result.fpdor.items.find(function(i) { return i.name === 'Child epics' })
+      expect(child.pass).toBe(true)
     })
 
-    it('scope defined passes with storyPoints > 0 (no pipeline)', function() {
-      var result = computeReadiness(readyFeature({ scores: {}, epicCount: 0, storyPoints: 5 }))
-      var scopeItem = result.fpdor.items.find(function(i) { return i.name === 'Scope Defined' })
-      expect(scopeItem.pass).toBe(true)
+    it('child epics fails when epicCount is 0 and no decomposition label', function() {
+      var result = computeReadiness(readyFeature({ epicCount: 0, labels: [] }))
+      var child = result.fpdor.items.find(function(i) { return i.name === 'Child epics' })
+      expect(child.pass).toBe(false)
     })
 
-    it('scope defined passes with effort > 0 (no pipeline)', function() {
-      var result = computeReadiness(readyFeature({ scores: {}, epicCount: 0, storyPoints: 0, effort: 5 }))
-      var scopeItem = result.fpdor.items.find(function(i) { return i.name === 'Scope Defined' })
-      expect(scopeItem.pass).toBe(true)
+    it('child epics passes via epic-creator-auto-decomposed without epicCount', function() {
+      var result = computeReadiness(readyFeature({ epicCount: 0, labels: ['epic-creator-auto-decomposed'] }))
+      var child = result.fpdor.items.find(function(i) { return i.name === 'Child epics' })
+      expect(child.pass).toBe(true)
+      expect(child.detail).toContain('epic-creator-auto-decomposed')
     })
 
-    it('scope defined passes with tshirtSize (no pipeline)', function() {
-      var result = computeReadiness(readyFeature({ scores: {}, epicCount: 0, storyPoints: 0, tshirtSize: 'L' }))
-      var scopeItem = result.fpdor.items.find(function(i) { return i.name === 'Scope Defined' })
-      expect(scopeItem.pass).toBe(true)
-    })
-
-    it('scope defined fails when no epicCount and no sizing (no pipeline)', function() {
-      var result = computeReadiness(readyFeature({ scores: {}, epicCount: 0, storyPoints: 0, effort: null, tshirtSize: null }))
-      var scopeItem = result.fpdor.items.find(function(i) { return i.name === 'Scope Defined' })
-      expect(scopeItem.pass).toBe(false)
-    })
-
-    it('scope defined passes with scope score >= 2 (pipeline)', function() {
-      var result = computeReadiness(readyFeature({ scores: { scope: 2, testability: 2, architecture: 2, feasibility: 2 } }))
-      var scopeItem = result.fpdor.items.find(function(i) { return i.name === 'Scope Defined' })
-      expect(scopeItem.pass).toBe(true)
-    })
-
-    it('scope defined passes with RFE link as fallback (no pipeline, no sizing)', function() {
-      var result = computeReadiness(readyFeature({ scores: {}, epicCount: 0, storyPoints: 0, effort: null, tshirtSize: null, sourceRfe: 'RFE-123' }))
-      var scopeItem = result.fpdor.items.find(function(i) { return i.name === 'Scope Defined' })
-      expect(scopeItem.pass).toBe(true)
-    })
-
-    it('scope defined passes with linkedRfeKey as fallback', function() {
-      var result = computeReadiness(readyFeature({ scores: {}, epicCount: 0, storyPoints: 0, effort: null, tshirtSize: null, linkedRfeKey: 'RFE-456' }))
-      var scopeItem = result.fpdor.items.find(function(i) { return i.name === 'Scope Defined' })
-      expect(scopeItem.pass).toBe(true)
+    it('source RFE passes with RFE link; sizing alone does not satisfy child epics', function() {
+      var result = computeReadiness(readyFeature({ epicCount: 0, storyPoints: 5, sourceRfe: 'RFE-123', labels: [] }))
+      var child = result.fpdor.items.find(function(i) { return i.name === 'Child epics' })
+      var rfe = result.fpdor.items.find(function(i) { return i.name === 'Source RFE / AI SDLC' })
+      expect(child.pass).toBe(false)
+      expect(rfe.pass).toBe(true)
     })
 
     // --- Strat-creator sign-off (humanVerified) tests ---
 
-    it('humanVerified is set on rubric items when strat-creator-human-sign-off label present', function() {
-      var result = computeReadiness(readyFeature({ labels: ['strat-creator-human-sign-off'] }))
+    it('humanVerified is set on criteria items when strat-creator-human-sign-off label present', function() {
+      var result = computeReadiness(readyFeature({ labels: ['strat-creator-auto-created', 'strat-creator-human-sign-off'] }))
       var items = result.fpdor.items
-      var reqItem = items.find(function(i) { return i.name === 'Requirements Clarity' })
-      var acItem = items.find(function(i) { return i.name === 'Acceptance Criteria' })
-      var archItem = items.find(function(i) { return i.name === 'Architectural Alignment' })
-      var riskItem = items.find(function(i) { return i.name === 'Risks & Assumptions' })
+      var reqItem = items.find(function(i) { return i.name === 'Requirements clarity' })
+      var acItem = items.find(function(i) { return i.name === 'Acceptance criteria' })
+      var archItem = items.find(function(i) { return i.name === 'Architectural alignment' })
+      var riskItem = items.find(function(i) { return i.name === 'Risks & assumptions' })
       expect(reqItem.humanVerified).toBe(true)
       expect(acItem.humanVerified).toBe(true)
       expect(archItem.humanVerified).toBe(true)
       expect(riskItem.humanVerified).toBe(true)
     })
 
-    it('humanVerified is not set on non-rubric items when sign-off label present', function() {
-      var result = computeReadiness(readyFeature({ labels: ['strat-creator-human-sign-off'] }))
+    it('humanVerified is not set on mandatory field items when sign-off label present', function() {
+      var result = computeReadiness(readyFeature({ labels: ['strat-creator-auto-created', 'strat-creator-human-sign-off'] }))
       var items = result.fpdor.items
-      var riceItem = items.find(function(i) { return i.name === 'RICE Score' })
-      var engItem = items.find(function(i) { return i.name === 'Cross-functional Engineering' })
-      var docsItem = items.find(function(i) { return i.name === 'Documentation' })
+      var riceItem = items.find(function(i) { return i.name === 'RICE' })
+      var engItem = items.find(function(i) { return i.name === 'Cross-team deps' })
+      var docsItem = items.find(function(i) { return i.name === 'Docs impact' })
       var tvItem = items.find(function(i) { return i.name === 'Target Version' })
       expect(riceItem.humanVerified).toBeUndefined()
       expect(engItem.humanVerified).toBeUndefined()
@@ -1518,107 +1528,104 @@ describe('buildFeatureReadiness', function() {
     it('humanVerified is not set when sign-off label is absent', function() {
       var result = computeReadiness(readyFeature({ labels: [] }))
       var items = result.fpdor.items
-      var reqItem = items.find(function(i) { return i.name === 'Requirements Clarity' })
+      var reqItem = items.find(function(i) { return i.name === 'Requirements clarity' })
       expect(reqItem.humanVerified).toBeUndefined()
     })
 
-    // --- Cross-functional Engineering / Documentation / UXD ---
+    it('feature human sign-off is N/A for Legacy features', function() {
+      var result = computeReadiness(readyFeature({ labels: [] }))
+      var signOff = result.fpdor.items.find(function(i) { return i.name === 'Feature human sign-off' })
+      expect(signOff.pass).toBeNull()
+    })
 
-    it('cross-functional engineering passes with ≥2 eng components (Docs/UXD excluded)', function() {
+    it('feature human sign-off passes via strat-creator-human* for AI First', function() {
+      var result = computeReadiness(readyFeature({ labels: ['strat-creator-auto-created', 'strat-creator-human-sign-off'] }))
+      var signOff = result.fpdor.items.find(function(i) { return i.name === 'Feature human sign-off' })
+      expect(signOff.pass).toBe(true)
+      expect(signOff.detail).toContain('strat-creator-human')
+    })
+
+    it('feature human sign-off fails for AI First without human* or rp-qg1-pass', function() {
+      var result = computeReadiness(readyFeature({ labels: ['strat-creator-auto-created'] }))
+      var signOff = result.fpdor.items.find(function(i) { return i.name === 'Feature human sign-off' })
+      expect(signOff.pass).toBe(false)
+      expect(result.isReady).toBe(false)
+    })
+
+    // --- Cross-team deps / Docs impact / UXD ---
+
+    it('cross-team deps passes with ≥2 eng components (Docs/UXD excluded)', function() {
       var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving', 'Documentation', 'UXD'] }))
-      var engItem = result.fpdor.items.find(function(i) { return i.name === 'Cross-functional Engineering' })
+      var engItem = result.fpdor.items.find(function(i) { return i.name === 'Cross-team deps' })
       expect(engItem.pass).toBe(true)
     })
 
-    it('cross-functional engineering fails with only Documentation and UXD (no eng multi-comp)', function() {
-      var result = computeReadiness(readyFeature({ components: ['Documentation', 'UXD'], docsRequired: 'Required' }))
-      var engItem = result.fpdor.items.find(function(i) { return i.name === 'Cross-functional Engineering' })
+    it('cross-team deps fails with only Documentation and UXD', function() {
+      var result = computeReadiness(readyFeature({ components: ['Documentation', 'UXD'], docsRequired: 'Yes' }))
+      var engItem = result.fpdor.items.find(function(i) { return i.name === 'Cross-team deps' })
       expect(engItem.pass).toBe(false)
     })
 
-    it('cross-functional engineering passes with single eng component plus dependency signal', function() {
+    it('cross-team deps passes with single eng component plus dependency signal', function() {
       var result = computeReadiness(readyFeature({
-        components: ['Platform'],
+        components: ['Platform', 'Documentation', 'UXD'],
+        docsRequired: 'Yes',
         descriptionSignals: {
           hasContent: true,
           signalCount: 3,
           hasAcceptanceCriteria: true,
           hasUseCases: true,
           hasScopeDefinition: true,
-          hasRequirements: false,
+          hasRequirements: true,
           hasRisks: true,
           hasArchitectureSignal: true,
-          hasCrossFunctionalDependency: true
+          hasCrossFunctionalDependency: true,
+          matchedSections: []
         }
       }))
-      var engItem = result.fpdor.items.find(function(i) { return i.name === 'Cross-functional Engineering' })
+      var engItem = result.fpdor.items.find(function(i) { return i.name === 'Cross-team deps' })
       expect(engItem.pass).toBe(true)
     })
 
-    it('documentation passes for GA with docsRequired', function() {
-      var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Yes', releaseType: 'GA' }))
-      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Documentation' })
+    it('docs impact passes for Docs Required Yes with Documentation component', function() {
+      var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }))
+      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Docs impact' })
       expect(docsItem.pass).toBe(true)
     })
 
-    it('documentation fails for GA when docsRequired is No and no Doc component', function() {
-      var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving', 'UXD'], docsRequired: 'No', releaseType: 'GA' }))
-      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Documentation' })
+    it('docs impact passes when Docs Required is No', function() {
+      var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving', 'UXD'], docsRequired: 'No' }))
+      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Docs impact' })
+      expect(docsItem.pass).toBe(true)
+    })
+
+    it('docs impact fails when Docs Required is Yes without Documentation component', function() {
+      var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Yes' }))
+      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Docs impact' })
       expect(docsItem.pass).toBe(false)
     })
 
-    it('documentation for Dev Preview passes when docsRequired is No (assessed)', function() {
-      var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving', 'UXD'], docsRequired: 'No', releaseType: 'Dev Preview' }))
-      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Documentation' })
-      expect(docsItem.pass).toBe(true)
-    })
-
-    it('documentation for Dev Preview fails when docsRequired unset', function() {
-      var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving', 'UXD'], docsRequired: null, releaseType: 'Dev Preview' }))
-      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Documentation' })
+    it('docs impact fails when Docs Required unset', function() {
+      var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving', 'UXD'], docsRequired: null }))
+      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Docs impact' })
       expect(docsItem.pass).toBe(false)
     })
 
-    it('documentation is not-checked when release type is null and docsRequired unset', function() {
+    it('docs impact passes via rp-qg1-pass without fields', function() {
       var result = computeReadiness(readyFeature({
         components: ['Platform', 'Serving', 'UXD'],
         docsRequired: null,
-        releaseType: null
+        labels: ['rp-qg1-pass']
       }))
-      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Documentation' })
-      expect(docsItem.pass).toBeNull()
-      expect(docsItem.state).toBe('not-checked')
-      expect(docsItem.detail).toContain('Not checked')
-      expect(result.isReady).toBe(false)
-      expect(result.fpdor.evaluatedCount).toBe(12)
-    })
-
-    it('documentation passes when release type is null but docsRequired is filled', function() {
-      var result = computeReadiness(readyFeature({
-        components: ['Platform', 'Serving', 'UXD'],
-        docsRequired: 'Yes',
-        releaseType: null
-      }))
-      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Documentation' })
+      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Docs impact' })
       expect(docsItem.pass).toBe(true)
-      expect(docsItem.state).toBe('passed')
+      expect(docsItem.detail).toContain('rp-qg1-pass')
     })
 
-    it('documentation passes when release type is null but Documentation component is present', function() {
-      var result = computeReadiness(readyFeature({
-        components: ['Platform', 'Serving', 'UXD', 'Documentation'],
-        docsRequired: null,
-        releaseType: null
-      }))
-      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Documentation' })
-      expect(docsItem.pass).toBe(true)
-    })
-
-    it('UXD fails without UXD component', function() {
-      var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving', 'Documentation'], docsRequired: 'Required' }))
+    it('UXD is not-checked without UXD component or N/A note', function() {
+      var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving', 'Documentation'], docsRequired: 'Yes' }))
       var uxdItem = result.fpdor.items.find(function(i) { return i.name === 'UXD' })
-      expect(uxdItem.pass).toBe(false)
-      expect(uxdItem.detail).toContain('UXD')
+      expect(uxdItem.pass).toBeNull()
     })
 
     it('UXD passes with UXD component', function() {
@@ -1627,36 +1634,134 @@ describe('buildFeatureReadiness', function() {
       expect(uxdItem.pass).toBe(true)
     })
 
-    // --- Requirements Clarity tests ---
-
-    it('requirements clarity passes with scope score >= 2', function() {
-      var result = computeReadiness(readyFeature({ scores: { testability: 2, architecture: 2, feasibility: 2, scope: 2 } }))
-      var reqItem = result.fpdor.items.find(function(i) { return i.name === 'Requirements Clarity' })
-      expect(reqItem.pass).toBe(true)
+    it('UXD passes via N/A – no UX in description signals', function() {
+      var result = computeReadiness(readyFeature({
+        components: ['Platform', 'Serving', 'Documentation'],
+        docsRequired: 'Yes',
+        descriptionSignals: Object.assign({}, readyFeature().descriptionSignals, { hasNaNoUx: true })
+      }))
+      var uxdItem = result.fpdor.items.find(function(i) { return i.name === 'UXD' })
+      expect(uxdItem.pass).toBe(true)
+      expect(uxdItem.detail).toMatch(/N\/A/i)
     })
 
-    it('requirements clarity fails with scope score < 2', function() {
-      var result = computeReadiness(readyFeature({ scores: { testability: 2, architecture: 2, feasibility: 2, scope: 1 } }))
-      var reqItem = result.fpdor.items.find(function(i) { return i.name === 'Requirements Clarity' })
+    // --- Requirements / AC / Risks / Arch (labels then description; no rubric scores) ---
+
+    it('requirements clarity passes via strat-creator-rubric-pass (not scores)', function() {
+      var result = computeReadiness(readyFeature({
+        scores: {},
+        descriptionSignals: { hasContent: true, signalCount: 0, hasRequirements: false, hasUseCases: false, hasScopeDefinition: false, hasAcceptanceCriteria: false, hasRisks: false, hasArchitectureSignal: false, matchedSections: [] },
+        labels: ['strat-creator-rubric-pass']
+      }))
+      var reqItem = result.fpdor.items.find(function(i) { return i.name === 'Requirements clarity' })
+      expect(reqItem.pass).toBe(true)
+      expect(reqItem.detail).toContain('strat-creator-rubric-pass')
+    })
+
+    it('requirements clarity ignores low rubric scores and uses description', function() {
+      var result = computeReadiness(readyFeature({
+        scores: { scope: 1, testability: 1, architecture: 1, feasibility: 1 },
+        descriptionSignals: {
+          hasContent: true,
+          hasRequirements: true,
+          hasUseCases: false,
+          hasScopeDefinition: false,
+          hasAcceptanceCriteria: true,
+          hasRisks: true,
+          hasArchitectureSignal: true,
+          matchedSections: [{ kind: 'requirements', title: 'Problem Statement' }]
+        }
+      }))
+      var reqItem = result.fpdor.items.find(function(i) { return i.name === 'Requirements clarity' })
+      expect(reqItem.pass).toBe(true)
+      expect(reqItem.detail).toContain('description')
+    })
+
+    it('requirements clarity fails without label or requirement-oriented signals', function() {
+      var result = computeReadiness(readyFeature({
+        scores: {},
+        labels: [],
+        descriptionSignals: {
+          hasContent: true,
+          signalCount: 1,
+          hasRequirements: false,
+          hasUseCases: false,
+          hasScopeDefinition: false,
+          hasAcceptanceCriteria: true,
+          hasRisks: true,
+          hasArchitectureSignal: false,
+          matchedSections: []
+        }
+      }))
+      var reqItem = result.fpdor.items.find(function(i) { return i.name === 'Requirements clarity' })
       expect(reqItem.pass).toBe(false)
     })
 
-    it('requirements clarity falls back to description signals when no scope score', function() {
-      var result = computeReadiness(readyFeature({ scores: { testability: 2, architecture: 2, feasibility: 2 }, descriptionSignals: { hasContent: true, signalCount: 3 } }))
-      var reqItem = result.fpdor.items.find(function(i) { return i.name === 'Requirements Clarity' })
-      expect(reqItem.pass).toBe(true)
+    it('acceptance criteria passes via description Success Criteria section', function() {
+      var result = computeReadiness(readyFeature({
+        scores: {},
+        labels: [],
+        descriptionSignals: {
+          hasContent: true,
+          hasAcceptanceCriteria: true,
+          hasRequirements: true,
+          hasUseCases: true,
+          hasScopeDefinition: true,
+          hasRisks: true,
+          hasArchitectureSignal: true,
+          matchedSections: [{ kind: 'acceptanceCriteria', title: 'Success Criteria' }]
+        }
+      }))
+      var acItem = result.fpdor.items.find(function(i) { return i.name === 'Acceptance criteria' })
+      expect(acItem.pass).toBe(true)
+      expect(acItem.detail).toContain('Success Criteria')
     })
 
-    it('requirements clarity fails when description has < 2 signals and no scope score', function() {
-      var result = computeReadiness(readyFeature({ scores: { testability: 2, architecture: 2, feasibility: 2 }, descriptionSignals: { hasContent: true, signalCount: 1 } }))
-      var reqItem = result.fpdor.items.find(function(i) { return i.name === 'Requirements Clarity' })
-      expect(reqItem.pass).toBe(false)
+    it('architectural alignment is not-checked without signals', function() {
+      var result = computeReadiness(readyFeature({
+        scores: {},
+        labels: [],
+        descriptionSignals: {
+          hasContent: true,
+          hasAcceptanceCriteria: true,
+          hasRequirements: true,
+          hasUseCases: true,
+          hasScopeDefinition: true,
+          hasRisks: true,
+          hasArchitectureSignal: false,
+          hasArchitectureNotRequired: false,
+          matchedSections: []
+        }
+      }))
+      var archItem = result.fpdor.items.find(function(i) { return i.name === 'Architectural alignment' })
+      expect(archItem.pass).toBeNull()
     })
 
-    it('FPDoR has 13 items total', function() {
+    it('architectural alignment passes when architecture not required', function() {
+      var result = computeReadiness(readyFeature({
+        scores: {},
+        labels: [],
+        descriptionSignals: Object.assign({}, readyFeature().descriptionSignals, {
+          hasArchitectureSignal: false,
+          hasArchitectureNotRequired: true
+        })
+      }))
+      var archItem = result.fpdor.items.find(function(i) { return i.name === 'Architectural alignment' })
+      expect(archItem.pass).toBe(true)
+    })
+
+    it('priority passes via field; Components passes with eng component', function() {
+      var result = computeReadiness(readyFeature({ priority: 'Critical' }))
+      expect(result.fpdor.items.find(function(i) { return i.name === 'Priority' }).pass).toBe(true)
+      expect(result.fpdor.items.find(function(i) { return i.name === 'Components' }).pass).toBe(true)
+      expect(result.fpdor.items.find(function(i) { return i.name === 'Delivery Owner' }).pass).toBe(true)
+      expect(result.fpdor.items.find(function(i) { return i.name === 'PM' }).pass).toBe(true)
+    })
+
+    it('FPDoR has 17 items total', function() {
       var result = computeReadiness(readyFeature())
-      expect(result.fpdor.items.length).toBe(13)
-      expect(result.fpdor.totalCount).toBe(13)
+      expect(result.fpdor.totalCount).toBe(17)
+      expect(result.fpdor.items).toHaveLength(17)
     })
   })
 
@@ -1725,7 +1830,7 @@ describe('buildFeatureReadiness', function() {
         'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
       })
       var healthCache = {
-        features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: 70, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }]
+        features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: 70, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }]
       }
       var readFromStorage = makeReadFromStorage({
         ...convertToUnifiedFormat(store),
@@ -1823,7 +1928,7 @@ describe('buildFeatureReadiness', function() {
       })
       var healthCache = {
         features: [
-          { key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: 70, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' },
+          { key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: 70, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' },
           { key: 'AIPCC-1000', summary: 'AIPCC Ready', status: 'In Progress', priority: 'Major', deliveryOwner: 'Alice', blockerCount: 0, targetRelease: 'rhoai-3.6' }
         ]
       }
@@ -1847,7 +1952,7 @@ describe('buildFeatureReadiness', function() {
       var hygieneCache = {
         features: { 'RHAISTRAT-1': { key: 'RHAISTRAT-1', team: 'Alpha', violations: violations } }
       }
-      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }] }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }] }
       var registryData = {
         releases: [
           { id: 'rhoai-3.6', displayName: 'RHOAI 3.6', fixVersions: ['RHOAI-3.6'], state: 'active', milestones: {} }
@@ -1897,7 +2002,7 @@ describe('buildFeatureReadiness', function() {
       })
       var directViolations = [{ id: 'stale-status-summary', name: 'Direct', category: 'timeliness', message: 'Direct' }]
       var aliasViolations = [{ id: 'missing-assignee', name: 'Alias', category: 'ownership', message: 'Alias' }]
-      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD'], docsRequired: 'Required' }] }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', deliveryOwner: 'Alice', pmOwner: 'Jane', targetRelease: 'rhoai-3.6', priorityScore: null, storyPoints: 5, epicCount: 3, releaseType: 'GA', components: ['Platform', 'Serving', 'UXD', 'Documentation'], docsRequired: 'Yes' }] }
       var registryData = {
         releases: [
           { id: 'rhoai-3.6', displayName: 'RHOAI 3.6', fixVersions: [], state: 'active', milestones: {} }

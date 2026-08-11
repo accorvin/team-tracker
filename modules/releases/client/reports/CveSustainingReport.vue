@@ -57,15 +57,24 @@
 
     <!-- Data -->
     <div v-else class="space-y-6">
+      <!-- Filter bar -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-5 py-3">
+        <ReportFilterNarrative
+          :filters="filters"
+          no-filter-text="Showing all open CVEs."
+          filter-prefix="Showing open CVEs filtered by"
+        />
+      </div>
+
       <!-- Total count banner -->
       <div class="bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-700 dark:to-orange-700 rounded-lg px-6 py-4 text-white shadow">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-widest text-red-200">Open CVEs</p>
-            <a :href="data.totalOpen_jql" target="_blank" rel="noopener noreferrer"
+            <p class="text-xs font-semibold uppercase tracking-widest text-red-200">Open CVEs{{ filters.hasActiveFilters.value ? ' (filtered)' : '' }}</p>
+            <a :href="agg.totalOpen_jql.value" target="_blank" rel="noopener noreferrer"
               class="text-3xl font-extrabold hover:underline decoration-dotted cursor-pointer inline-flex items-center gap-1.5"
               title="View open CVEs in Jira">
-              {{ data.totalOpen.toLocaleString() }}
+              {{ agg.totalOpen.value.toLocaleString() }}
               <svg class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
             </a>
           </div>
@@ -85,16 +94,17 @@
       <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">CVEs by Due Date</h3>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <a v-for="bucket in dueDateBuckets" :key="bucket.key" :href="bucket.jql" target="_blank" rel="noopener noreferrer"
-            class="rounded-lg border p-4 text-center hover:shadow-md transition-shadow cursor-pointer block" :class="bucket.classes"
-            :title="`${bucket.label}: ${bucket.count} issues — click to view in Jira`">
+          <button v-for="bucket in dueDateBuckets" :key="bucket.key"
+            class="rounded-lg border p-4 text-center hover:shadow-md transition-shadow cursor-pointer block w-full" :class="bucket.classes"
+            :title="`${bucket.label}: ${bucket.count} issues — click to view list`"
+            @click="drillDownByDueDate(bucket.key, bucket.label, bucket.jql)">
             <p class="text-3xl font-extrabold">{{ bucket.pct }}%</p>
             <p class="text-[10px] font-semibold uppercase tracking-wide mt-1 opacity-80">{{ bucket.label }}</p>
             <p class="text-xs mt-1 opacity-60">{{ bucket.count }} issues</p>
-          </a>
+          </button>
         </div>
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-3 text-right">
-          {{ data.cvesByDueDate.total.toLocaleString() }} issues
+          {{ agg.cvesByDueDate.value.total.toLocaleString() }} issues
         </p>
       </section>
 
@@ -105,7 +115,7 @@
           <Bar :data="openCvesChartData" :options="openCvesChartOptions" />
         </div>
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-2 text-right">
-          Issues by Components &middot; {{ (data.openCvesByComponent || []).length }}
+          Issues by Components &middot; {{ agg.openCvesByComponent.value.length }}
         </p>
       </section>
 
@@ -117,12 +127,15 @@
             <Pie :data="versionPieData" :options="versionPieOptions" />
           </div>
           <p class="text-xs text-gray-400 dark:text-gray-500 mt-2 text-right">
-            {{ data.totalOpen.toLocaleString() }} issues &middot; Issues by Target Version
+            {{ agg.totalOpen.value.toLocaleString() }} issues &middot; Issues by Target Version
           </p>
         </section>
 
         <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
-          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">False Positive by VEX Justification</h3>
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            False Positive by VEX Justification
+            <span v-if="filters.hasActiveFilters.value" class="text-[10px] font-normal text-gray-400 dark:text-gray-500 ml-1">(all data)</span>
+          </h3>
           <div style="height: 300px;">
             <Doughnut :data="vexDoughnutData" :options="vexPieOptions" />
           </div>
@@ -139,86 +152,95 @@
           <thead>
             <tr class="border-b border-gray-200 dark:border-gray-700">
               <th class="text-left py-2 pr-3 font-semibold text-gray-700 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">Components</th>
-              <th v-for="ver in data.cvesAcrossVersions.versions" :key="ver" class="text-right py-2 px-2 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ ver }}</th>
+              <th v-for="ver in agg.cvesAcrossVersions.value.versions" :key="ver" class="text-right py-2 px-2 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ ver }}</th>
               <th class="text-right py-2 pl-3 font-bold text-gray-900 dark:text-gray-100">Total</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in data.cvesAcrossVersions.rows" :key="row.component" class="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
+            <tr v-for="row in agg.cvesAcrossVersions.value.rows" :key="row.component" class="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
               <td class="py-1.5 pr-3 text-gray-800 dark:text-gray-200 sticky left-0 bg-white dark:bg-gray-800 z-10">{{ row.component }}</td>
-              <td v-for="ver in data.cvesAcrossVersions.versions" :key="ver" class="text-right py-1.5 px-2 tabular-nums">
-                <ClickableCount v-if="row.cells[ver]" :count="row.cells[ver]" :jql="row.cellJqls[ver] || ''" />
+              <td v-for="ver in agg.cvesAcrossVersions.value.versions" :key="ver" class="text-right py-1.5 px-2 tabular-nums">
+                <button v-if="row.cells[ver]" class="font-semibold text-blue-600 dark:text-blue-400 underline decoration-dotted hover:decoration-solid cursor-pointer" @click="drillDownByMatrixCell(row.component, ver, row.cellJqls[ver])">{{ row.cells[ver] }}</button>
                 <span v-else class="text-gray-400 dark:text-gray-500">0</span>
               </td>
               <td class="text-right py-1.5 pl-3 font-bold tabular-nums">
-                <ClickableCount :count="row.total" :jql="row.total_jql || ''" />
+                <button v-if="row.total" class="font-semibold text-blue-600 dark:text-blue-400 underline decoration-dotted hover:decoration-solid cursor-pointer" @click="drillDownByMatrixRow(row.component, row.total_jql)">{{ row.total }}</button>
+                <span v-else class="font-semibold text-gray-600 dark:text-gray-400">0</span>
               </td>
             </tr>
           </tbody>
           <tfoot>
             <tr class="border-t-2 border-gray-300 dark:border-gray-600">
               <td class="py-2 pr-3 font-bold text-gray-900 dark:text-gray-100 sticky left-0 bg-white dark:bg-gray-800 z-10">Total</td>
-              <td v-for="ver in data.cvesAcrossVersions.versions" :key="ver" class="text-right py-2 px-2 font-bold tabular-nums">
-                <ClickableCount :count="data.cvesAcrossVersions.columnTotals[ver] || 0" :jql="data.cvesAcrossVersions.columnJqls[ver] || ''" />
+              <td v-for="ver in agg.cvesAcrossVersions.value.versions" :key="ver" class="text-right py-2 px-2 font-bold tabular-nums">
+                <button v-if="agg.cvesAcrossVersions.value.columnTotals[ver]" class="font-semibold text-blue-600 dark:text-blue-400 underline decoration-dotted hover:decoration-solid cursor-pointer" @click="drillDownByMatrixColumn(ver, agg.cvesAcrossVersions.value.columnJqls[ver])">{{ agg.cvesAcrossVersions.value.columnTotals[ver] }}</button>
+                <span v-else class="font-semibold text-gray-600 dark:text-gray-400">0</span>
               </td>
               <td class="text-right py-2 pl-3 font-bold tabular-nums">
-                <ClickableCount :count="data.cvesAcrossVersions.grandTotal" :jql="data.cvesAcrossVersions.grandTotal_jql || ''" />
+                <button v-if="agg.cvesAcrossVersions.value.grandTotal" class="font-semibold text-blue-600 dark:text-blue-400 underline decoration-dotted hover:decoration-solid cursor-pointer" @click="openDrillDown('All CVEs', filteredIssues, agg.cvesAcrossVersions.value.grandTotal_jql)">{{ agg.cvesAcrossVersions.value.grandTotal }}</button>
+                <span v-else class="font-semibold text-gray-600 dark:text-gray-400">0</span>
               </td>
             </tr>
           </tfoot>
         </table>
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-3 text-right">
-          Issues by Target Version &middot; {{ data.cvesAcrossVersions.versions.length }} versions &middot; Components {{ data.cvesAcrossVersions.rows.length }}
+          Issues by Target Version &middot; {{ agg.cvesAcrossVersions.value.versions.length }} versions &middot; Components {{ agg.cvesAcrossVersions.value.rows.length }}
         </p>
       </section>
 
       <!-- 5. CVEs by RHOAI Sustaining (assignee x status table) -->
       <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 overflow-x-auto">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">CVEs by RHOAI Sustaining</h3>
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">CVEs by Assignee</h3>
         <table class="w-full text-xs">
           <thead>
             <tr class="border-b border-gray-200 dark:border-gray-700">
               <th class="text-left py-2 pr-3 font-semibold text-gray-700 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">Status</th>
-              <th v-for="a in data.cvesByAssigneeStatus.assignees" :key="a" class="text-right py-2 px-2 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ a }}</th>
+              <th v-for="a in agg.cvesByAssigneeStatus.value.assignees" :key="a" class="text-right py-2 px-2 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ a }}</th>
               <th class="text-right py-2 pl-3 font-bold text-gray-900 dark:text-gray-100">Total</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in data.cvesByAssigneeStatus.rows" :key="row.status" class="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
+            <tr v-for="row in agg.cvesByAssigneeStatus.value.rows" :key="row.status" class="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
               <td class="py-1.5 pr-3 sticky left-0 bg-white dark:bg-gray-800 z-10">
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide" :class="statusBadgeClass(row.status)">
                   {{ row.status }}
                 </span>
               </td>
-              <td v-for="a in data.cvesByAssigneeStatus.assignees" :key="a" class="text-right py-1.5 px-2 tabular-nums">
-                <ClickableCount v-if="row.cells[a]" :count="row.cells[a]" :jql="row.cellJqls[a] || ''" />
+              <td v-for="a in agg.cvesByAssigneeStatus.value.assignees" :key="a" class="text-right py-1.5 px-2 tabular-nums">
+                <button v-if="row.cells[a]" class="font-semibold text-blue-600 dark:text-blue-400 underline decoration-dotted hover:decoration-solid cursor-pointer" @click="drillDownByAssigneeStatus(row.status, a, row.cellJqls[a])">{{ row.cells[a] }}</button>
                 <span v-else class="text-gray-400 dark:text-gray-500">0</span>
               </td>
               <td class="text-right py-1.5 pl-3 font-bold tabular-nums">
-                <ClickableCount :count="row.total" :jql="row.total_jql || ''" />
+                <button v-if="row.total" class="font-semibold text-blue-600 dark:text-blue-400 underline decoration-dotted hover:decoration-solid cursor-pointer" @click="drillDownByStatus(row.status, row.total_jql)">{{ row.total }}</button>
+                <span v-else class="font-semibold text-gray-600 dark:text-gray-400">0</span>
               </td>
             </tr>
           </tbody>
           <tfoot>
             <tr class="border-t-2 border-gray-300 dark:border-gray-600">
               <td class="py-2 pr-3 font-bold text-gray-900 dark:text-gray-100 sticky left-0 bg-white dark:bg-gray-800 z-10">Total</td>
-              <td v-for="a in data.cvesByAssigneeStatus.assignees" :key="a" class="text-right py-2 px-2 font-bold tabular-nums">
-                <ClickableCount :count="data.cvesByAssigneeStatus.columnTotals[a] || 0" :jql="data.cvesByAssigneeStatus.columnJqls[a] || ''" />
+              <td v-for="a in agg.cvesByAssigneeStatus.value.assignees" :key="a" class="text-right py-2 px-2 font-bold tabular-nums">
+                <button v-if="agg.cvesByAssigneeStatus.value.columnTotals[a]" class="font-semibold text-blue-600 dark:text-blue-400 underline decoration-dotted hover:decoration-solid cursor-pointer" @click="drillDownByAssignee(a, agg.cvesByAssigneeStatus.value.columnJqls[a])">{{ agg.cvesByAssigneeStatus.value.columnTotals[a] }}</button>
+                <span v-else class="font-semibold text-gray-600 dark:text-gray-400">0</span>
               </td>
               <td class="text-right py-2 pl-3 font-bold tabular-nums">
-                <ClickableCount :count="data.cvesByAssigneeStatus.grandTotal" :jql="data.cvesByAssigneeStatus.grandTotal_jql || ''" />
+                <button v-if="agg.cvesByAssigneeStatus.value.grandTotal" class="font-semibold text-blue-600 dark:text-blue-400 underline decoration-dotted hover:decoration-solid cursor-pointer" @click="openDrillDown('All CVEs', filteredIssues, agg.cvesByAssigneeStatus.value.grandTotal_jql)">{{ agg.cvesByAssigneeStatus.value.grandTotal }}</button>
+                <span v-else class="font-semibold text-gray-600 dark:text-gray-400">0</span>
               </td>
             </tr>
           </tfoot>
         </table>
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-3 text-right">
-          {{ data.cvesByAssigneeStatus.grandTotal }} issues &middot; Issues by Assignee + Status
+          {{ agg.cvesByAssigneeStatus.value.grandTotal }} issues &middot; Issues by Assignee + Status
         </p>
       </section>
 
       <!-- 7. Created vs Resolved (line chart) -->
       <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Created vs Resolved Chart around CVEs</h3>
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          Created vs Resolved Chart around CVEs
+          <span v-if="filters.hasActiveFilters.value" class="text-[10px] font-normal text-gray-400 dark:text-gray-500 ml-1">(all data)</span>
+        </h3>
         <div style="height: 300px;">
           <Line :data="createdVsResolvedData" :options="createdResolvedOptions" />
         </div>
@@ -229,7 +251,10 @@
 
       <!-- 8. Unresolved (line chart) -->
       <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Unresolved</h3>
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          Unresolved
+          <span v-if="filters.hasActiveFilters.value" class="text-[10px] font-normal text-gray-400 dark:text-gray-500 ml-1">(all data)</span>
+        </h3>
         <div style="height: 300px;">
           <Line :data="unresolvedData" :options="unresolvedOptions" />
         </div>
@@ -240,7 +265,10 @@
 
       <!-- 9. RHOAI False Positives (multi-series line) -->
       <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">RHOAI False Positives</h3>
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          RHOAI False Positives
+          <span v-if="filters.hasActiveFilters.value" class="text-[10px] font-normal text-gray-400 dark:text-gray-500 ml-1">(all data)</span>
+        </h3>
         <div style="height: 300px;">
           <Line :data="falsePositivesTrendData" :options="falsePositivesOptions" />
         </div>
@@ -249,11 +277,24 @@
         </p>
       </section>
     </div>
+
+    <!-- Filter modal -->
+    <ReportFilterModal :filters="filters" :available-filter-values="availableFilterValues" />
+
+    <!-- Issue list drill-down modal -->
+    <CveIssueListModal
+      :visible="drillDown.visible"
+      :title="drillDown.title"
+      :issues="drillDown.issues"
+      :jql="drillDown.jql"
+      :dot-color="drillDown.dotColor"
+      @close="closeDrillDown"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { ArrowLeft, RefreshCw, Shield } from 'lucide-vue-next'
 import { Bar, Pie, Doughnut, Line } from 'vue-chartjs'
 import {
@@ -269,12 +310,130 @@ import {
   Legend
 } from 'chart.js'
 import { useCveSustaining } from './composables/useCveSustaining'
-import ClickableCount from '../components/ClickableCount.vue'
+import { useReportFilters } from './composables/useReportFilters.js'
+import { useCveAggregation } from './composables/useCveAggregation.js'
+import ReportFilterModal from './components/ReportFilterModal.vue'
+import ReportFilterNarrative from './components/ReportFilterNarrative.vue'
+import CveIssueListModal from './components/CveIssueListModal.vue'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Filler, Tooltip, Legend)
 
 const nav = inject('moduleNav')
 const { data, loading, error, refreshing, loadData, refresh } = useCveSustaining()
+
+// ─── Filters ──────────────────────────────────────────────────────────────────
+
+const CVE_FILTER_FIELDS = [
+  { key: 'component', label: 'Component' },
+  { key: 'versions', label: 'Target Version' },
+  { key: 'assignee', label: 'Assignee' },
+  { key: 'status', label: 'Status' }
+]
+
+const filters = useReportFilters({
+  storageKeyPrefix: 'cve-sustaining',
+  filterFields: CVE_FILTER_FIELDS
+})
+
+const openIssueRecords = computed(() => data.value?.openIssueRecords || [])
+const jiraSearchBase = computed(() => data.value?.jiraSearchBase || '')
+
+const filteredIssues = computed(() => filters.filterItems(openIssueRecords.value))
+
+const agg = useCveAggregation(filteredIssues, jiraSearchBase, filters.activeFilterDisplay)
+
+const availableFilterValues = computed(() => {
+  const issues = openIssueRecords.value
+  if (issues.length === 0) return {}
+  return {
+    component: [...new Set(issues.map(i => i.component))].sort(),
+    versions: [...new Set(issues.flatMap(i => i.versions))].sort(),
+    assignee: [...new Set(issues.map(i => i.assignee))].sort(),
+    status: [...new Set(issues.map(i => i.status))].sort()
+  }
+})
+
+// ─── Drill-down modal ─────────────────────────────────────────────────────────
+
+const drillDown = ref({ visible: false, title: '', issues: [], jql: '', dotColor: '' })
+
+function openDrillDown(title, issues, jql, dotColor) {
+  drillDown.value = { visible: true, title, issues, jql: jql || '', dotColor: dotColor || '' }
+}
+
+function closeDrillDown() {
+  drillDown.value = { visible: false, title: '', issues: [], jql: '', dotColor: '' }
+}
+
+function drillDownByComponent(componentName) {
+  const issues = filteredIssues.value.filter(i => i.component === componentName || (componentName === 'None' && i.component === 'None'))
+  const item = agg.openCvesByComponent.value.find(c => c.component === componentName)
+  openDrillDown(componentName, issues, item?.jql)
+}
+
+function drillDownByVersion(versionName) {
+  const issues = filteredIssues.value.filter(i => i.versions.includes(versionName) || (versionName === 'None' && i.versions.includes('None')))
+  const item = agg.openCvesByVersion.value.find(v => v.version === versionName)
+  openDrillDown(versionName, issues, item?.jql)
+}
+
+function drillDownByDueDate(bucketKey, label, jql) {
+  const now = new Date()
+  const issues = filteredIssues.value.filter(i => {
+    if (!i.duedate) return bucketKey === 'none'
+    const due = new Date(i.duedate)
+    const diffDays = Math.floor((due - now) / (1000 * 60 * 60 * 24))
+    if (bucketKey === 'passed') return diffDays < 0
+    if (bucketKey === 'lt30') return diffDays >= 0 && diffDays < 30
+    if (bucketKey === '30-90') return diffDays >= 30 && diffDays <= 90
+    if (bucketKey === 'gt90') return diffDays > 90
+    return false
+  })
+  openDrillDown(label, issues, jql)
+}
+
+function drillDownByMatrixCell(componentName, versionName, jql) {
+  const issues = filteredIssues.value.filter(i =>
+    i.components.includes(componentName) && i.versions.includes(versionName)
+  )
+  openDrillDown(`${componentName} / ${versionName}`, issues, jql)
+}
+
+function drillDownByMatrixRow(componentName, jql) {
+  const issues = filteredIssues.value.filter(i => i.components.includes(componentName))
+  openDrillDown(componentName, issues, jql)
+}
+
+function drillDownByMatrixColumn(versionName, jql) {
+  const issues = filteredIssues.value.filter(i => i.versions.includes(versionName))
+  openDrillDown(versionName, issues, jql)
+}
+
+function drillDownByAssigneeStatus(status, assignee, jql) {
+  const issues = filteredIssues.value.filter(i => i.status === status && i.assignee === assignee)
+  openDrillDown(`${status} / ${assignee}`, issues, jql)
+}
+
+function drillDownByStatus(status, jql) {
+  const issues = filteredIssues.value.filter(i => i.status === status)
+  openDrillDown(status, issues, jql)
+}
+
+function drillDownByAssignee(assignee, jql) {
+  const issues = filteredIssues.value.filter(i => i.assignee === assignee)
+  openDrillDown(assignee, issues, jql)
+}
+
+function handleEscape(e) {
+  if (e.key !== 'Escape') return
+  if (filters.filterModalOpen.value) { filters.closeFilterModal(); return }
+  if (drillDown.value.visible) closeDrillDown()
+}
+
+onMounted(() => document.addEventListener('keydown', handleEscape))
+onUnmounted(() => document.removeEventListener('keydown', handleEscape))
+
+// ─── Navigation & data ────────────────────────────────────────────────────────
 
 function goBack() {
   nav.navigateTo('reports')
@@ -299,7 +458,7 @@ function formatDate(iso) {
 // ─── Due Date Buckets ────────────────────────────────────────────────────────
 
 const dueDateBuckets = computed(() => {
-  const dd = data.value?.cvesByDueDate
+  const dd = agg.cvesByDueDate.value
   if (!dd) return []
   return [
     { key: 'passed', label: 'Due Date Passed', pct: dd.passed.pct, count: dd.passed.count, jql: dd.passed.jql, classes: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' },
@@ -338,7 +497,7 @@ const CHART_COLORS = [
 // ─── 1. Open CVEs Bar Chart ─────────────────────────────────────────────────
 
 const openCvesChartData = computed(() => {
-  const items = data.value?.openCvesByComponent || []
+  const items = agg.openCvesByComponent.value
   const top = items.slice(0, 20)
   return {
     labels: top.map(i => truncateLabel(i.component, 18)),
@@ -359,9 +518,9 @@ const openCvesChartOptions = computed(() => ({
   onClick: (_event, elements) => {
     if (elements.length > 0) {
       const idx = elements[0].index
-      const items = data.value?.openCvesByComponent || []
+      const items = agg.openCvesByComponent.value
       const item = items[idx]
-      if (item?.jql) window.open(item.jql, '_blank', 'noopener,noreferrer')
+      if (item) drillDownByComponent(item.component)
     }
   },
   onHover: (event, elements) => {
@@ -372,9 +531,9 @@ const openCvesChartOptions = computed(() => ({
     tooltip: {
       callbacks: {
         label: (ctx) => {
-          const items = data.value?.openCvesByComponent || []
+          const items = agg.openCvesByComponent.value
           const item = items[ctx.dataIndex]
-          return item ? `${ctx.raw} issues (${item.pct}%) — click to view in Jira` : `${ctx.raw} issues`
+          return item ? `${ctx.raw} issues (${item.pct}%) — click to view list` : `${ctx.raw} issues`
         }
       }
     }
@@ -396,7 +555,7 @@ const openCvesChartOptions = computed(() => ({
 // ─── 4. Version Pie Chart ────────────────────────────────────────────────────
 
 const versionPieData = computed(() => {
-  const items = data.value?.openCvesByVersion || []
+  const items = agg.openCvesByVersion.value
   return {
     labels: items.map(i => `${i.version} (${i.count} / ${i.pct}%)`),
     datasets: [{
@@ -408,7 +567,7 @@ const versionPieData = computed(() => {
   }
 })
 
-// ─── 6. VEX Justification Doughnut ──────────────────────────────────────────
+// ─── 6. VEX Justification Doughnut (unfiltered — uses allIssues data) ──────
 
 const vexDoughnutData = computed(() => {
   const items = data.value?.falsePositivesByVex?.items || []
@@ -423,47 +582,46 @@ const vexDoughnutData = computed(() => {
   }
 })
 
-function makePieOptions(dataKey, itemJqlAccessor) {
-  return computed(() => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    onClick: (_event, elements) => {
-      if (elements.length > 0) {
-        const idx = elements[0].index
-        const items = itemJqlAccessor()
-        const item = items[idx]
-        if (item?.jql) window.open(item.jql, '_blank', 'noopener,noreferrer')
-      }
-    },
-    onHover: (event, elements) => {
-      event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default'
-    },
-    plugins: {
-      legend: {
-        display: true,
-        position: 'right',
-        labels: {
-          padding: 8,
-          font: { size: 10 },
-          color: '#6b7280',
-          usePointStyle: true,
-          pointStyle: 'circle',
-          boxWidth: 8
-        }
-      },
-      tooltip: {
-        callbacks: {
-          label: (ctx) => `${ctx.raw} issues — click to view in Jira`
-        }
-      }
-    }
-  }))
+const PIE_LEGEND = {
+  display: true,
+  position: 'right',
+  labels: { padding: 8, font: { size: 10 }, color: '#6b7280', usePointStyle: true, pointStyle: 'circle', boxWidth: 8 }
 }
 
-const versionPieOptions = makePieOptions('openCvesByVersion', () => data.value?.openCvesByVersion || [])
-const vexPieOptions = makePieOptions('falsePositivesByVex', () => data.value?.falsePositivesByVex?.items || [])
+const versionPieOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  onClick: (_event, elements) => {
+    if (elements.length > 0) {
+      const item = agg.openCvesByVersion.value[elements[0].index]
+      if (item) drillDownByVersion(item.version)
+    }
+  },
+  onHover: (event, elements) => { event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default' },
+  plugins: {
+    legend: PIE_LEGEND,
+    tooltip: { callbacks: { label: (ctx) => `${ctx.raw} issues — click to view list` } }
+  }
+}))
 
-// ─── 7. Created vs Resolved Line Chart ──────────────────────────────────────
+const vexPieOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  onClick: (_event, elements) => {
+    if (elements.length > 0) {
+      const items = data.value?.falsePositivesByVex?.items || []
+      const item = items[elements[0].index]
+      if (item?.jql) window.open(item.jql, '_blank', 'noopener,noreferrer')
+    }
+  },
+  onHover: (event, elements) => { event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default' },
+  plugins: {
+    legend: PIE_LEGEND,
+    tooltip: { callbacks: { label: (ctx) => `${ctx.raw} issues — click to view in Jira` } }
+  }
+}))
+
+// ─── 7. Created vs Resolved Line Chart (unfiltered) ─────────────────────────
 
 const createdVsResolvedData = computed(() => {
   const series = data.value?.createdVsResolved || []
@@ -494,7 +652,7 @@ const createdVsResolvedData = computed(() => {
   }
 })
 
-// ─── 8. Unresolved Line Chart ───────────────────────────────────────────────
+// ─── 8. Unresolved Line Chart (unfiltered) ───────────────────────────────────
 
 const unresolvedData = computed(() => {
   const series = data.value?.unresolved || []
@@ -513,7 +671,7 @@ const unresolvedData = computed(() => {
   }
 })
 
-// ─── 9. False Positives Trend (Multi-Series) ────────────────────────────────
+// ─── 9. False Positives Trend (unfiltered) ────────────────────────────────────
 
 const FP_COLORS = {
   'Not a bug': 'rgba(239, 68, 68, 1)',

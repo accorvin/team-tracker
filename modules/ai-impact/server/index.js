@@ -52,6 +52,10 @@ module.exports = function registerRoutes(router, context) {
   const registerDecomposerRoutes = require('./decomposer/routes');
   registerDecomposerRoutes(router, context);
 
+  // Pipeline signals routes (cross-store lineage resolution)
+  const registerPipelineSignalRoutes = require('./pipeline-signals/routes');
+  registerPipelineSignalRoutes(router, context);
+
   // ─── Refresh state (in-memory) ───
 
   const refreshState = {

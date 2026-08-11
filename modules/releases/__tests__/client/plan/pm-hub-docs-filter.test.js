@@ -50,6 +50,7 @@ function makeFeature(overrides) {
     fixVersions: ['rhoai-3.5'],
     targetVersions: ['rhoai-3.5'],
     riskLevel: 'low',
+    pmDoAligned: true,
     assignee: 'Alice',
     pmOwner: 'Bob',
     docsRequired: null
@@ -178,6 +179,7 @@ describe('buildFeatureObj includes docsRequired', function() {
       fixVersions: f.fixVersions || [],
       targetVersions: tv,
       riskLevel: 'low',
+    pmDoAligned: true,
       assignee: f.assignee || null,
       pmOwner: f.pmOwner || null,
       docsRequired: f.docsRequired || null

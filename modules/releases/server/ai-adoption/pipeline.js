@@ -77,6 +77,11 @@ const AI_PIPELINE_TAXONOMY = {
 
 const PIPELINE_KEYS = Object.keys(AI_PIPELINE_TAXONOMY);
 
+const EFFORT_FIELD = 'customfield_10430';
+const RICE_EFFORT_FIELD = 'customfield_10637';
+const STORY_POINTS_FIELD = 'customfield_10016';
+const CHILD_BATCH_SIZE = 40;
+
 /**
  * Scan a single issue's labels and return which pipelines are present.
  * @param {string[]} labels
@@ -101,6 +106,85 @@ function scanLabels(labels) {
 }
 
 /**
+ * Determine which effort signal has best coverage for a release group.
+ * Priority: customfield_10430 > RICE Effort > child story points > child count
+ * @param {{ effortCount: number, riceEffortCount: number, childSpCount?: number }} acc
+ * @param {number} totalFeatures
+ * @returns {'effort'|'rice'|'childSp'|'children'}
+ */
+function resolveEffortSignal(acc, totalFeatures) {
+  if (totalFeatures === 0) return 'children';
+  if (acc.effortCount / totalFeatures >= 0.5) return 'effort';
+  if (acc.riceEffortCount / totalFeatures >= 0.5) return 'rice';
+  if ((acc.childSpCount || 0) / totalFeatures >= 0.3) return 'childSp';
+  return 'children';
+}
+
+/**
+ * Compute resolved aggregateEffort and avgEffort using the selected signal.
+ * @param {{ effortSum: number, riceEffortSum: number, childSpSum?: number, childIssueSum: number, total?: number }} entry
+ * @param {'effort'|'rice'|'childSp'|'children'} signal
+ */
+function applyEffortSignal(entry, signal) {
+  const n = entry.total || 0;
+  let raw;
+  if (signal === 'effort') raw = entry.effortSum;
+  else if (signal === 'rice') raw = entry.riceEffortSum;
+  else if (signal === 'childSp') raw = entry.childSpSum || 0;
+  else raw = entry.childIssueSum;
+  return {
+    aggregateEffort: Math.round(raw * 10) / 10,
+    avgEffort: n > 0 ? Math.round((raw / n) * 10) / 10 : 0
+  };
+}
+
+/**
+ * Fetch child issues for a batch of parent feature keys and roll up
+ * child count + story point sum per parent.
+ *
+ * @param {object} jiraClient - { fetchAllJqlResults }
+ * @param {string[]} parentKeys - Feature issue keys
+ * @returns {Promise<Map<string, { childCount: number, childSpSum: number }>>}
+ */
+async function fetchChildRollups(jiraClient, parentKeys) {
+  const rollups = new Map();
+  if (!parentKeys.length) return rollups;
+
+  for (let i = 0; i < parentKeys.length; i += CHILD_BATCH_SIZE) {
+    const batch = parentKeys.slice(i, i + CHILD_BATCH_SIZE);
+    const parentList = batch.join(', ');
+    const jql = `parent in (${parentList}) ORDER BY parent ASC`;
+    const fields = `parent,${STORY_POINTS_FIELD},${RICE_EFFORT_FIELD},timeoriginalestimate`;
+
+    try {
+      const children = await jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 200 });
+      for (const child of children) {
+        const cf = child.fields || {};
+        const parentKey = cf.parent && cf.parent.key;
+        if (!parentKey) continue;
+
+        if (!rollups.has(parentKey)) {
+          rollups.set(parentKey, { childCount: 0, childSpSum: 0 });
+        }
+        const entry = rollups.get(parentKey);
+        entry.childCount++;
+
+        const sp = parseFloat(cf[STORY_POINTS_FIELD]) || 0;
+        const rice = parseFloat(typeof cf[RICE_EFFORT_FIELD] === 'object' && cf[RICE_EFFORT_FIELD]
+          ? cf[RICE_EFFORT_FIELD].value : cf[RICE_EFFORT_FIELD]) || 0;
+        const timeEst = cf.timeoriginalestimate
+          ? Math.round(cf.timeoriginalestimate / 3600) : 0;
+        entry.childSpSum += sp || rice || timeEst;
+      }
+    } catch (err) {
+      console.warn(`[ai-adoption] Child issue fetch failed for batch ${i}: ${err.message}`);
+    }
+  }
+
+  return rollups;
+}
+
+/**
  * Fetch AI adoption data for the specified release groups.
  *
  * @param {object} jiraClient - { fetchAllJqlResults }
@@ -120,7 +204,7 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
     const fvList = group.fixVersions.map(v => `"${v}"`).join(', ');
     const projectList = PROJECTS.join(', ');
     const jql = `project in (${projectList}) AND issuetype = Feature AND fixVersion in (${fvList}) ORDER BY key ASC`;
-    const fields = 'summary,status,labels,components,fixVersions';
+    const fields = `summary,status,labels,components,fixVersions,${EFFORT_FIELD},${RICE_EFFORT_FIELD}`;
 
     let issues;
     try {
@@ -130,6 +214,9 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
       issues = [];
     }
 
+    const featureKeys = issues.map(i => i.key).filter(Boolean);
+    const childRollups = await fetchChildRollups(jiraClient, featureKeys);
+
     const componentMap = {};
     let totalFeatures = 0;
     let aiTouchedFeatures = 0;
@@ -137,6 +224,12 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
     let filteredAiTouched = 0;
     const groupPipelines = {};
     for (const key of PIPELINE_KEYS) groupPipelines[key] = 0;
+    const groupEffort = {
+      effortSum: 0, effortCount: 0,
+      riceEffortSum: 0, riceEffortCount: 0,
+      childIssueSum: 0,
+      childSpSum: 0, childSpCount: 0
+    };
 
     for (const issue of issues) {
       const f = issue.fields || {};
@@ -144,9 +237,24 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
       const components = (f.components || []).map(c => c.name);
       const { touched, pipelines } = scanLabels(labels);
 
+      const effortVal = parseFloat(f[EFFORT_FIELD]) || 0;
+      const hasEffort = effortVal > 0;
+      const riceRaw = f[RICE_EFFORT_FIELD];
+      const riceVal = parseFloat(typeof riceRaw === 'object' && riceRaw ? riceRaw.value : riceRaw) || 0;
+      const hasRice = riceVal > 0;
+
+      const rollup = childRollups.get(issue.key) || { childCount: 0, childSpSum: 0 };
+      const childCount = rollup.childCount;
+      const childSp = rollup.childSpSum;
+      const hasChildSp = childSp > 0;
+
       totalFeatures++;
       if (touched) aiTouchedFeatures++;
       for (const key of PIPELINE_KEYS) groupPipelines[key] += pipelines[key];
+      if (hasEffort) { groupEffort.effortSum += effortVal; groupEffort.effortCount++; }
+      if (hasRice) { groupEffort.riceEffortSum += riceVal; groupEffort.riceEffortCount++; }
+      groupEffort.childIssueSum += Math.max(1, childCount);
+      if (hasChildSp) { groupEffort.childSpSum += childSp; groupEffort.childSpCount++; }
 
       if (options.component && !components.includes(options.component)) continue;
 
@@ -158,7 +266,13 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
         : (components.length > 0 ? components : ['(No Component)']);
       for (const compName of compNames) {
         if (!componentMap[compName]) {
-          componentMap[compName] = { name: compName, total: 0, aiTouched: 0, pipelines: {} };
+          componentMap[compName] = {
+            name: compName, total: 0, aiTouched: 0, pipelines: {},
+            effortSum: 0, effortCount: 0,
+            riceEffortSum: 0, riceEffortCount: 0,
+            childIssueSum: 0,
+            childSpSum: 0, childSpCount: 0
+          };
           for (const key of PIPELINE_KEYS) componentMap[compName].pipelines[key] = 0;
         }
         componentMap[compName].total++;
@@ -166,10 +280,20 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
         for (const key of PIPELINE_KEYS) {
           componentMap[compName].pipelines[key] += pipelines[key];
         }
+        if (hasEffort) { componentMap[compName].effortSum += effortVal; componentMap[compName].effortCount++; }
+        if (hasRice) { componentMap[compName].riceEffortSum += riceVal; componentMap[compName].riceEffortCount++; }
+        componentMap[compName].childIssueSum += Math.max(1, childCount);
+        if (hasChildSp) { componentMap[compName].childSpSum += childSp; componentMap[compName].childSpCount++; }
       }
     }
 
-    const componentList = Object.values(componentMap).sort((a, b) => b.aiTouched - a.aiTouched);
+    const n = options.component ? filteredTotal : totalFeatures;
+    const effortSource = resolveEffortSignal(groupEffort, n);
+
+    const componentList = Object.values(componentMap).map(c => {
+      const resolved = applyEffortSignal(c, effortSource);
+      return { ...c, ...resolved };
+    }).sort((a, b) => b.aiTouched - a.aiTouched);
 
     const filteredPipelines = {};
     if (options.component) {
@@ -178,12 +302,17 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
       }
     }
 
+    const groupResolved = applyEffortSignal({ ...groupEffort, total: n }, effortSource);
+
     results.push({
       releaseGroup: group.name,
       totalFeatures: options.component ? filteredTotal : totalFeatures,
       aiTouchedFeatures: options.component ? filteredAiTouched : aiTouchedFeatures,
       pipelines: options.component ? filteredPipelines : groupPipelines,
-      components: componentList
+      components: componentList,
+      effortSignal: effortSource,
+      aggregateEffort: groupResolved.aggregateEffort,
+      avgEffort: groupResolved.avgEffort
     });
   }
 
@@ -192,9 +321,16 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
 
 module.exports = {
   fetchAiAdoptionData,
+  fetchChildRollups,
   scanLabels,
+  resolveEffortSignal,
+  applyEffortSignal,
   AI_PIPELINE_TAXONOMY,
   PIPELINE_KEYS,
   RELEASE_GROUPS,
-  PROJECTS
+  PROJECTS,
+  EFFORT_FIELD,
+  RICE_EFFORT_FIELD,
+  STORY_POINTS_FIELD,
+  CHILD_BATCH_SIZE
 };

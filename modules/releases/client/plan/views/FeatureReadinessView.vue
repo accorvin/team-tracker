@@ -121,7 +121,7 @@ const headers = [
   { id: 'h-comp',       label: 'Components',      scope: 'col' },
   { id: 'h-team',       label: 'Team',            scope: 'col' },
   { id: 'h-rubric',     label: 'Rubric',          scope: 'col' },
-  { id: 'h-rec',        label: 'Recommendation',  scope: 'col' },
+  { id: 'h-rec',        label: 'AI First Recommends',  scope: 'col', info: 'AI review verdict from the strat-creator (AI First) pipeline.' },
   { id: 'h-status',     label: 'Status',          scope: 'col' },
   { id: 'h-priority',   label: 'Priority',        scope: 'col' },
   { id: 'h-attention',  label: '',                scope: 'col' },
@@ -209,21 +209,41 @@ function formatSyncDate(dateStr) {
                 <div
                   class="absolute z-50 top-full mt-1 left-0 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 text-xs text-left font-normal normal-case tracking-normal hidden group-hover:block"
                 >
-                  <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Confidence Legend</p>
+                  <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Readiness color</p>
                   <div class="space-y-1">
                     <div class="flex items-center gap-2">
                       <span class="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0"></span>
-                      <span class="text-gray-600 dark:text-gray-300"><strong>Committed</strong> — fix version assigned</span>
+                      <span class="text-gray-600 dark:text-gray-300"><strong>Ready</strong> — all applicable FPDoR items pass</span>
                     </div>
                     <div class="flex items-center gap-2">
-                      <span class="w-2.5 h-2.5 rounded-full bg-yellow-500 shrink-0"></span>
-                      <span class="text-gray-600 dark:text-gray-300"><strong>Ready</strong> — passes gates, not yet committed</span>
+                      <span class="w-2.5 h-2.5 rounded-full bg-yellow-400 shrink-0"></span>
+                      <span class="text-gray-600 dark:text-gray-300"><strong>Soft</strong> — soft fails only</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></span>
+                      <span class="text-gray-600 dark:text-gray-300"><strong>Medium</strong> — medium severity fails</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0"></span>
+                      <span class="text-gray-600 dark:text-gray-300"><strong>High</strong> — high severity fails</span>
                     </div>
                     <div class="flex items-center gap-2">
                       <span class="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0"></span>
-                      <span class="text-gray-600 dark:text-gray-300"><strong>Not Ready</strong> — does not pass readiness gates</span>
+                      <span class="text-gray-600 dark:text-gray-300"><strong>Critical</strong> — critical severity fails</span>
                     </div>
                   </div>
+                  <p class="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
+                    Color is fail severity triage — not commitment. Fix Version stays in its own column.
+                  </p>
+                  <p class="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500">
+                    DoR checklist:
+                    <a
+                      href="https://redhat.atlassian.net/wiki/spaces/RHAI/pages/442958832/Planning+Phase+-+Definition+of+Ready+Definition+of+Done"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-primary-600 dark:text-primary-400 hover:underline"
+                    >Confluence</a>
+                  </p>
                 </div>
               </span>
               <span v-else-if="header.hasScoreTooltip" class="inline-flex items-center gap-1 group relative">

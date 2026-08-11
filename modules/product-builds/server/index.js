@@ -535,6 +535,82 @@ module.exports = function registerRoutes(router, context) {
     await upstream(`/artifacts/${encodeURIComponent(req.params.key)}/containers`, req, res);
   });
 
+  /**
+   * @openapi
+   * /api/modules/product-builds/search:
+   *   get:
+   *     tags: [Product Builds]
+   *     summary: Cross-entity search across drops and artifacts
+   *     description: Searches drop keys/names and artifact keys/commits/alternative_names, grouped by entity type. Backed by the AIPCC Dashboard's search endpoint.
+   *     parameters:
+   *       - name: q
+   *         in: query
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Search query string
+   *       - name: types
+   *         in: query
+   *         schema:
+   *           type: string
+   *         description: Filter by artifact type, or "drops" to show only drops
+   *       - name: products
+   *         in: query
+   *         schema:
+   *           type: string
+   *         description: Filter by product key (e.g. rhaiis, rhel-ai)
+   *       - name: envs
+   *         in: query
+   *         schema:
+   *           type: string
+   *         description: Filter artifacts by environment (e.g. production, stage)
+   *       - name: archs
+   *         in: query
+   *         schema:
+   *           type: string
+   *         description: Filter artifacts by architecture (e.g. x86_64, aarch64)
+   *       - name: date
+   *         in: query
+   *         schema:
+   *           type: string
+   *           enum: [7d, 30d, 90d]
+   *         description: Filter artifacts by creation date range
+   *       - name: accel
+   *         in: query
+   *         schema:
+   *           type: string
+   *         description: Filter artifacts by accelerator (e.g. cuda, rocm, cpu)
+   *       - name: limit
+   *         in: query
+   *         schema:
+   *           type: integer
+   *           default: 200
+   *         description: Maximum total results to return. The client always sends 200 explicitly rather than relying on the upstream default.
+   *     responses:
+   *       200:
+   *         description: Search results grouped by type (drops array, artifacts object keyed by type)
+   *       503:
+   *         description: AIPCC Dashboard API not configured
+   */
+  router.get('/search', async function(req, res) {
+    await upstream('/search', req, res);
+  });
+
+  /**
+   * @openapi
+   * /api/modules/product-builds/search/filters:
+   *   get:
+   *     tags: [Product Builds]
+   *     summary: Get available search filter values
+   *     description: Returns distinct artifact types, environments, architectures, and accelerators present in the data, used to populate search filter dropdowns.
+   *     responses:
+   *       200:
+   *         description: Object with artifact_types, environments, architectures, accelerators arrays
+   */
+  router.get('/search/filters', async function(req, res) {
+    await upstream('/search/filters', req, res);
+  });
+
   // --- Package Analysis ---
 
   let _jira;

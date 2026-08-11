@@ -138,7 +138,7 @@ export function useHealthAggregation(healthData, features, _rfes, _bigRocks) {
         }
         if (h.fpdor) {
           result[rockName].fpdorTotal++
-          if (h.fpdor.passedCount === h.fpdor.evaluatedCount && h.fpdor.evaluatedCount >= 6) {
+          if (h.fpdor.allApplicablePassed || (h.fpdor.passedCount === h.fpdor.evaluatedCount && h.fpdor.evaluatedCount >= 6)) {
             result[rockName].fpdorReady++
           }
         }
