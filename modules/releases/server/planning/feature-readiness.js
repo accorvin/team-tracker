@@ -427,7 +427,18 @@ function mergeFeatureData(key, jiraFeatures, aiReviewMap, candidateIndex, health
   var hygieneStatus = computeHygieneStatus(violations)
 
   var storyPoints = (health && health.storyPoints) || (candidate && candidate.storyPoints) || (jira && jira.storyPoints) || (exec && exec.storyPoints) || null
-  var epicCount = (health && health.epicCount) || (candidate && candidate.epicCount) || (exec && exec.epicCount) || 0
+  var epicCount
+  if (jira && jira.epicCount != null) {
+    epicCount = jira.epicCount
+  } else if (health && health.epicCount != null) {
+    epicCount = health.epicCount
+  } else if (candidate && candidate.epicCount != null) {
+    epicCount = candidate.epicCount
+  } else if (exec && exec.epicCount != null) {
+    epicCount = exec.epicCount
+  } else {
+    epicCount = 0
+  }
   var releaseType = (health && health.releaseType) || (candidate && candidate.phase) || (jira && jira.releaseType) || (exec && exec.releaseType) || null
   var assignee = deliveryOwner
   var pm = pmOwner || (health && health.pm) || (candidate && candidate.pm) || (exec && exec.pm) || null
@@ -576,6 +587,7 @@ async function buildFeatureReadiness(readFromStorage, jiraFeatures, listStorageF
       dataSource: merged.dataSource,
       labels: merged.labels || [],
       isAiFirst: isAiFirstFeature(merged),
+      epicCount: merged.epicCount || 0,
       confidence: confidence,
       readinessGates: readinessResult.gates,
       fpdor: readinessResult.fpdor,
