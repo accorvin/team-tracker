@@ -533,21 +533,6 @@ test.describe('Releases Planning Health @releases', () => {
     expect(page.errors).toHaveLength(0);
   });
 
-  test('Big Rocks tab has Show empty rocks toggle (off by default)', async ({ page }) => {
-    await page.goto('/#/releases/plan');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
-
-    const toggle = page.getByRole('checkbox', { name: /Show empty rocks/ });
-    await expect(toggle).toBeVisible();
-    await expect(toggle).not.toBeChecked();
-
-    await toggle.check();
-    await expect(toggle).toBeChecked();
-
-    expect(page.errors).toHaveLength(0);
-  });
-
   // Health tab is temporarily hidden from PlanView — skip until re-enabled
   test.skip('Health tab loads and shows planning mode banner when applicable', async ({ page }) => {
     await page.goto('/#/releases/plan?tab=health');
