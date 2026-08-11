@@ -121,7 +121,7 @@ const headers = [
   { id: 'h-comp',       label: 'Components',      scope: 'col' },
   { id: 'h-team',       label: 'Team',            scope: 'col' },
   { id: 'h-rubric',     label: 'Rubric',          scope: 'col' },
-  { id: 'h-rec',        label: 'Recommendation',  scope: 'col' },
+  { id: 'h-rec',        label: 'AI First Recommends',  scope: 'col', info: 'AI review verdict from the strat-creator (AI First) pipeline.' },
   { id: 'h-status',     label: 'Status',          scope: 'col' },
   { id: 'h-priority',   label: 'Priority',        scope: 'col' },
   { id: 'h-attention',  label: '',                scope: 'col' },

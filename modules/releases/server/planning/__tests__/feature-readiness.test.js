@@ -1515,7 +1515,7 @@ describe('buildFeatureReadiness', function() {
     it('humanVerified is not set on mandatory field items when sign-off label present', function() {
       var result = computeReadiness(readyFeature({ labels: ['strat-creator-auto-created', 'strat-creator-human-sign-off'] }))
       var items = result.fpdor.items
-      var riceItem = items.find(function(i) { return i.name === 'RICE (4 dims)' })
+      var riceItem = items.find(function(i) { return i.name === 'RICE' })
       var engItem = items.find(function(i) { return i.name === 'Cross-team deps' })
       var docsItem = items.find(function(i) { return i.name === 'Docs impact' })
       var tvItem = items.find(function(i) { return i.name === 'Target Version' })

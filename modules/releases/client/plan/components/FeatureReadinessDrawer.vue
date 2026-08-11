@@ -150,7 +150,7 @@ const FPDOR_TO_HYGIENE = {
   'PM': 'Assign a product manager',
   'Delivery Owner': 'Assign a delivery owner (Assignee)',
   'Priority': 'Set Priority in Jira (or obtain rp-qg1-pass)',
-  'RICE (4 dims)': 'Set RICE score / Reach, Impact, Confidence, Effort (or obtain rp-qg1-pass)',
+  'RICE': 'Set RICE score / Reach, Impact, Confidence, Effort (or obtain rp-qg1-pass)',
   'Docs impact': 'Set Docs Required Yes/No; if Yes, add Documentation component (or obtain rp-qg1-pass)',
   'Source RFE / AI SDLC': 'Link an RFE (cloned-by / parent) or ensure strat-creator-auto-created',
   'Requirements clarity': 'Add problem/scope/out-of-scope sections, or obtain strat-creator-rubric-pass / human sign-off',

@@ -247,11 +247,12 @@ var scoreBreakdown = computed(function() {
       <RubricScoreBadge v-else :scores="feature.scores" :show-total="false" />
     </td>
 
-    <!-- Recommendation -->
+    <!-- AI First Recommends -->
     <td class="px-3 py-2.5 whitespace-nowrap">
       <span
         class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
         :class="recommendationClass(feature.recommendation)"
+        title="AI First pipeline recommendation"
       >{{ recommendationLabel(feature.recommendation) }}</span>
     </td>
 
