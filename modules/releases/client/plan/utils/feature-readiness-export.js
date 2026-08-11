@@ -10,7 +10,7 @@ var FPDOR_MANDATORY_NAMES = [
   'PM',
   'Delivery Owner',
   'Priority',
-  'RICE (4 dims)',
+  'RICE',
   'Docs impact'
 ]
 

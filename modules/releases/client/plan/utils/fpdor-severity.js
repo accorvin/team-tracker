@@ -21,7 +21,7 @@ var FPDOR_SEVERITY_BY_NAME = {
   // High
   'Release Type': 'high',
   Priority: 'high',
-  'RICE (4 dims)': 'high',
+  'RICE': 'high',
   'Docs impact': 'high',
   // Medium
   'Cross-team deps': 'medium',

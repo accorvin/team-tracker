@@ -14,7 +14,7 @@ var MANDATORY_ITEMS = [
   'PM',
   'Delivery Owner',
   'Priority',
-  'RICE (4 dims)',
+  'RICE',
   'Docs impact'
 ]
 
@@ -269,10 +269,10 @@ function evalPriority(feature) {
 }
 
 function evalRice(feature) {
-  if (hasRiceScore(feature)) return passViaField('RICE (4 dims)', 'Passed via RICE score', 'mandatory')
-  if (hasRpQg1Pass(feature)) return passViaLabel('RICE (4 dims)', 'rp-qg1-pass', 'mandatory')
-  if (feature.riceScore == null) return evalItem('RICE (4 dims)', false, 'No RICE score in Jira', 'mandatory')
-  return evalItem('RICE (4 dims)', false, 'RICE score is 0', 'mandatory')
+  if (hasRiceScore(feature)) return passViaField('RICE', 'Passed via RICE score', 'mandatory')
+  if (hasRpQg1Pass(feature)) return passViaLabel('RICE', 'rp-qg1-pass', 'mandatory')
+  if (feature.riceScore == null) return evalItem('RICE', false, 'No RICE score in Jira', 'mandatory')
+  return evalItem('RICE', false, 'RICE score is 0', 'mandatory')
 }
 
 function evalDocsImpact(feature) {

@@ -16,7 +16,7 @@ describe('fpdor-severity', function() {
     expect(fpdorItemSeverity('Delivery Owner')).toBe('critical')
     expect(fpdorItemSeverity('Child epics')).toBe('critical')
     expect(fpdorItemSeverity('Docs impact')).toBe('high')
-    expect(fpdorItemSeverity('RICE (4 dims)')).toBe('high')
+    expect(fpdorItemSeverity('RICE')).toBe('high')
     expect(fpdorItemSeverity('Acceptance criteria')).toBe('medium')
     expect(fpdorItemSeverity('UXD')).toBe('soft')
     expect(fpdorItemSeverity('Source RFE / AI SDLC')).toBe('soft')
@@ -25,7 +25,7 @@ describe('fpdor-severity', function() {
   it('covers all Confluence checklist names', function() {
     var expected = [
       'Target Version', 'Release Type', 'Components', 'PM', 'Delivery Owner',
-      'Priority', 'RICE (4 dims)', 'Docs impact',
+      'Priority', 'RICE', 'Docs impact',
       'Source RFE / AI SDLC', 'Requirements clarity', 'Acceptance criteria',
       'Risks & assumptions', 'Architectural alignment', 'UXD', 'Cross-team deps',
       'Feature human sign-off', 'Child epics'
