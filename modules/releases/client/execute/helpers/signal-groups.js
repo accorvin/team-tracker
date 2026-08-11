@@ -2,22 +2,54 @@
  * Categorize features into signal groups for the traffic overview.
  *
  * Uses both pipeline metrics (health, completionPct, blockerCount) and
- * Jira statusCategory to avoid stale pipeline data causing misclassification.
+ * Jira status (category + done status names) to avoid stale pipeline data
+ * causing misclassification.
+ */
+
+const DONE_STATUS_NAMES = new Set([
+  'closed',
+  'done',
+  'resolved',
+  'cancelled',
+  'release pending'
+])
+
+/**
+ * Complete = pipeline 100% OR Jira done-delivery status.
+ * Status-name fallback covers Closed / Release Pending when statusCategory is missing.
  *
+ * @param {object} feature
+ * @returns {boolean}
+ */
+export function isFeatureCompleteForSignals(feature) {
+  if (!feature) return false
+  if (feature.completionPct >= 100) return true
+  if (feature.statusCategory === 'Done') return true
+  const status = typeof feature.status === 'string'
+    ? feature.status.trim().toLowerCase()
+    : ''
+  return DONE_STATUS_NAMES.has(status)
+}
+
+/**
  * @param {object[]} features - Array of feature index entries
  * @returns {object[]} Signal group objects with id, title, features, etc.
  */
 export function categorizeFeatures(features) {
-  // Jira "Done" (Closed, Resolved, Release Pending, etc.) or pipeline 100%
-  // both indicate completion — stale pipeline health should not override.
-  const complete = features.filter(f => f.completionPct >= 100 || f.statusCategory === 'Done')
-  const active = features.filter(f => f.completionPct < 100 && f.statusCategory !== 'Done')
+  const all = features || []
+  // Jira done-delivery or pipeline 100% — stale pipeline health should not override.
+  const complete = all.filter(isFeatureCompleteForSignals)
+  const active = all.filter(f => !isFeatureCompleteForSignals(f))
 
   const blocked = active.filter(f => effectiveHealth(f) === 'RED' && f.blockerCount > 0)
   const redOther = active.filter(f => effectiveHealth(f) === 'RED' && f.blockerCount === 0)
   // "Not Started" requires both pipeline (completionPct 0) and Jira (not "In Progress") agreement.
-  const notStarted = active.filter(f => effectiveHealth(f) === 'YELLOW' && f.completionPct === 0 && f.statusCategory !== 'In Progress')
-  const atRisk = active.filter(f => effectiveHealth(f) === 'YELLOW' && (f.completionPct > 0 || f.statusCategory === 'In Progress'))
+  const notStarted = active.filter(f =>
+    effectiveHealth(f) === 'YELLOW' && f.completionPct === 0 && f.statusCategory !== 'In Progress'
+  )
+  const atRisk = active.filter(f =>
+    effectiveHealth(f) === 'YELLOW' && (f.completionPct > 0 || f.statusCategory === 'In Progress')
+  )
   const onTrack = active.filter(f => effectiveHealth(f) === 'GREEN')
 
   return [

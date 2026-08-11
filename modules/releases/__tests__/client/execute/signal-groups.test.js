@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { categorizeFeatures, effectiveHealth } from '../../../client/execute/helpers/signal-groups';
+import {
+  categorizeFeatures,
+  effectiveHealth,
+  isFeatureCompleteForSignals
+} from '../../../client/execute/helpers/signal-groups';
 
 function findGroup(groups, id) {
   return groups.find(g => g.id === id);
@@ -159,5 +163,71 @@ describe('categorizeFeatures', () => {
     ];
     const groups = categorizeFeatures(features);
     expect(groupIds(groups)).toEqual(['blocked', 'red-other', 'at-risk', 'not-started', 'on-track', 'complete']);
+  });
+
+  it('places Closed by status name in complete when statusCategory is missing', () => {
+    const features = [
+      { key: 'F-1', completionPct: 0, health: 'YELLOW', status: 'Closed', statusCategory: null, blockerCount: 0 }
+    ];
+    const groups = categorizeFeatures(features);
+    expect(findGroup(groups, 'not-started')).toBeUndefined();
+    expect(findGroup(groups, 'complete').features).toHaveLength(1);
+  });
+
+  it('places Release Pending by status name in complete when statusCategory is missing', () => {
+    const features = [
+      { key: 'F-1', completionPct: 0, health: 'YELLOW', status: 'Release Pending', statusCategory: null, blockerCount: 0 }
+    ];
+    const groups = categorizeFeatures(features);
+    expect(findGroup(groups, 'complete').features).toHaveLength(1);
+  });
+});
+
+describe('isFeatureCompleteForSignals', () => {
+  it('returns true when completionPct is 100', () => {
+    expect(isFeatureCompleteForSignals({
+      completionPct: 100,
+      statusCategory: 'In Progress',
+      status: 'In Progress'
+    })).toBe(true);
+  });
+
+  it('returns true when statusCategory is Done', () => {
+    expect(isFeatureCompleteForSignals({
+      completionPct: 0,
+      statusCategory: 'Done',
+      status: 'Closed',
+      health: 'YELLOW'
+    })).toBe(true);
+  });
+
+  it('returns true for Release Pending by status name when category missing', () => {
+    expect(isFeatureCompleteForSignals({
+      completionPct: 0,
+      statusCategory: null,
+      status: 'Release Pending'
+    })).toBe(true);
+  });
+
+  it('returns true for Closed by status name (case-insensitive) when category missing', () => {
+    expect(isFeatureCompleteForSignals({
+      completionPct: 0,
+      statusCategory: null,
+      status: 'closed'
+    })).toBe(true);
+  });
+
+  it('returns false for In Progress with 0%', () => {
+    expect(isFeatureCompleteForSignals({
+      completionPct: 0,
+      statusCategory: 'In Progress',
+      status: 'In Progress',
+      health: 'YELLOW'
+    })).toBe(false);
+  });
+
+  it('returns false for null/undefined feature', () => {
+    expect(isFeatureCompleteForSignals(null)).toBe(false);
+    expect(isFeatureCompleteForSignals(undefined)).toBe(false);
   });
 });
