@@ -9,7 +9,9 @@
 const { CUSTOM_FIELDS, transformIssue } = require('../hygiene/jira-fetch')
 const { blockDuringImpersonation } = require('../../../../shared/server/auth')
 const { JIRA_HOST } = require('../../../../shared/server/jira')
-const { filterCommittedFixVersions } = require('./committed-definition')
+const { filterCommittedFixVersions, parseReleaseName, compareReleasesTemporally } = require('./committed-definition')
+const { parseDescriptionSignals } = require('../planning/health/description-scanner')
+const { computeFPDoRReadiness, isAiFirstFeature } = require('../planning/fpdor')
 
 const JIRA_SEARCH = JIRA_HOST + '/issues/?jql='
 const PM_HUB_PROJECTS = ['RHAIENG', 'RHOAIENG', 'INFERENG', 'AIPCC', 'RHAISTRAT', 'RHAIRFE']
@@ -370,31 +372,89 @@ function formatAvg(value) {
 const DEFAULT_ISSUE_TYPES = ['Feature', 'Initiative']
 const FIELDS_TO_FETCH = [
   'summary', 'status', 'issuetype', 'assignee', 'priority', 'fixVersions', 'versions',
-  'components', 'labels', 'issuelinks',
+  'components', 'labels', 'issuelinks', 'description',
   CUSTOM_FIELDS.team,
   CUSTOM_FIELDS.releaseType,
   CUSTOM_FIELDS.statusSummary,
   CUSTOM_FIELDS.colorStatus,
   CUSTOM_FIELDS.productManager,
-  CUSTOM_FIELDS.docsRequired
+  CUSTOM_FIELDS.docsRequired,
+  CUSTOM_FIELDS.riceScore
 ].join(',')
 
-function computeRiskLevel(f, targetVersions) {
-  var hasFixVersion = f.fixVersions && f.fixVersions.length > 0
-  var hasTargetVersion = targetVersions && targetVersions.length > 0
-  if (!hasFixVersion && hasTargetVersion) return 'high'
-  if (hasFixVersion) {
-    var cs = (f.colorStatus || '').toLowerCase()
-    if (f.isBlocked || cs === 'red' || cs === 'yellow') return 'medium'
-  }
-  return 'low'
+/**
+ * PM/DO Aligned: Yes when some Fix Version strictly matches some Target Version.
+ * Match = identical string, or same normalized product + major.minor + event (cmp === 0).
+ * Missing TV or FV → not aligned. Early delivery (FV before TV) is NOT aligned.
+ */
+function versionsStrictMatch(a, b) {
+  if (!a || !b) return false
+  if (a === b) return true
+  var pa = parseReleaseName(a)
+  var pb = parseReleaseName(b)
+  if (!pa || !pb) return false
+  if (pa.product !== pb.product || pa.major !== pb.major || pa.minor !== pb.minor) return false
+  var cmp = compareReleasesTemporally(a, b)
+  return cmp === 0
 }
 
-function buildFeatureObj(f, targetVersions) {
+function computePmDoAligned(fixVersions, targetVersions) {
+  var fvs = Array.isArray(fixVersions) ? fixVersions : []
+  var tvs = Array.isArray(targetVersions) ? targetVersions : []
+  if (fvs.length === 0 || tvs.length === 0) return false
+  for (var i = 0; i < fvs.length; i++) {
+    for (var j = 0; j < tvs.length; j++) {
+      if (versionsStrictMatch(fvs[i], tvs[j])) return true
+    }
+  }
+  return false
+}
+
+function computeConfidence(isReady, fixVersion) {
+  if (!isReady) return 'not-ready'
+  if (fixVersion) return 'committed'
+  return 'ready'
+}
+
+function buildFeatureObj(f, targetVersions, rawIssue) {
   var tv = targetVersions || []
+  var labels = Array.isArray(f.labels) ? f.labels : []
+  var fixVersions = f.fixVersions || []
+  var descriptionSignals = { hasContent: false, signalCount: 0 }
+  if (rawIssue && rawIssue.fields) {
+    var fields = rawIssue.fields
+    var rendered = rawIssue.renderedFields || {}
+    var desc = rendered.description != null ? rendered.description : fields.description
+    descriptionSignals = parseDescriptionSignals(desc)
+  }
+
+  var fpdorInput = {
+    labels: labels,
+    targetVersions: tv,
+    fixVersion: fixVersions.length > 0 ? fixVersions[0] : null,
+    releaseType: f.releaseType || null,
+    components: f.components || [],
+    assignee: f.assignee || null,
+    deliveryOwner: f.assignee || null,
+    pmOwner: f.pmOwner || null,
+    pm: f.pmOwner || null,
+    priority: f.priority || null,
+    riceScore: f.riceScore != null ? f.riceScore : null,
+    docsRequired: f.docsRequired || null,
+    linkedRfeKey: f.linkedRfeKey || null,
+    sourceRfe: f.linkedRfeKey || null,
+    descriptionSignals: descriptionSignals,
+    epicCount: f.openChildCount || 0
+  }
+
+  var fpdor = computeFPDoRReadiness(fpdorInput)
+  var isAiFirst = isAiFirstFeature(fpdorInput)
+  var confidence = computeConfidence(!!fpdor.allApplicablePassed, fpdorInput.fixVersion)
+
   return {
     key: f.key,
     summary: f.summary || '',
+    title: f.summary || '',
     status: f.status || null,
     statusCategory: f.statusCategory || null,
     colorStatus: f.colorStatus || null,
@@ -404,12 +464,18 @@ function buildFeatureObj(f, targetVersions) {
     isBlocked: f.isBlocked || false,
     blockedBy: f.blockedBy || [],
     components: f.components || [],
-    fixVersions: f.fixVersions || [],
+    fixVersions: fixVersions,
     targetVersions: tv,
-    riskLevel: computeRiskLevel(f, tv),
+    pmDoAligned: computePmDoAligned(fixVersions, tv),
     assignee: f.assignee || null,
     pmOwner: f.pmOwner || null,
-    docsRequired: f.docsRequired || null
+    docsRequired: f.docsRequired || null,
+    labels: labels,
+    riceScore: f.riceScore != null ? f.riceScore : null,
+    linkedRfeKey: f.linkedRfeKey || null,
+    fpdor: fpdor,
+    isAiFirst: isAiFirst,
+    confidence: confidence
   }
 }
 
@@ -729,7 +795,7 @@ module.exports = async function registerPmHubRoutes(router, context) {
               if (componentNames.length > 0 && componentNames.indexOf(ucName) === -1) continue
               var uGroup = ensureGroup(committedFvOnly[ufi], ucName)
               if (!uGroup.committedFeatures.some(function(e) { return e.key === f.key })) {
-                uGroup.committedFeatures.push(buildFeatureObj(f, tvNames))
+                uGroup.committedFeatures.push(buildFeatureObj(f, tvNames, rawIssue))
                 uGroup.committedCount++
                 if (f.isBlocked) uGroup.blockedCount++
               }
@@ -763,7 +829,7 @@ module.exports = async function registerPmHubRoutes(router, context) {
         if (groupVersionKeys.length === 0) continue
 
         var isRequested = matchingTv.length > 0
-        var featureObj = buildFeatureObj(f, tvNames)
+        var featureObj = buildFeatureObj(f, tvNames, rawIssue)
 
         for (var gvi = 0; gvi < groupVersionKeys.length; gvi++) {
           var vKey = groupVersionKeys[gvi]
@@ -846,3 +912,5 @@ module.exports.computeVelocity = computeVelocity
 module.exports.buildFeatureObj = buildFeatureObj
 module.exports.extractTargetVersions = extractTargetVersions
 module.exports.filterCommittedFixVersions = filterCommittedFixVersions
+module.exports.computePmDoAligned = computePmDoAligned
+module.exports.versionsStrictMatch = versionsStrictMatch
