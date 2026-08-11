@@ -86,7 +86,6 @@ describe('PM Hub feature slide tray', function() {
       },
       global: {
         stubs: {
-          HygieneViolations: true,
           Teleport: true
         }
       }

@@ -129,7 +129,7 @@ function pathChipClass(feature) {
 
 function pathChipTitle(feature) {
   if (isAiFirstFeature(feature)) {
-    return 'AI First — has strat-creator-* label (Confluence path)'
+    return 'AI First — has strat-creator-* label'
   }
   return 'Legacy — no strat-creator-* label'
 }

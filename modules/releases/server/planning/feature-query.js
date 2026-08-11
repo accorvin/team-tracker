@@ -19,6 +19,13 @@ var QUERY_FIELDS = [
 
 var JQL = 'project = RHAISTRAT AND issuetype IN (Feature, Initiative) AND status NOT IN (Closed, Done, Resolved, Cancelled)'
 
+var EPIC_BATCH_SIZE = 40
+var EPIC_THROTTLE_MS = 500
+
+function sleep(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms) })
+}
+
 function normalizeIssue(issue) {
   var fields = issue.fields || {}
   var assignee = fields.assignee
@@ -68,7 +75,45 @@ function normalizeIssue(issue) {
     targetEnd: serializeField(fields[CUSTOM_FIELDS.targetEnd]),
     pmOwner: pmOwner,
     effort: numericField(fields[CUSTOM_FIELDS.effort]),
-    descriptionSignals: parseDescriptionSignals(fields.description)
+    descriptionSignals: parseDescriptionSignals(fields.description),
+    epicCount: 0
+  }
+}
+
+/**
+ * Count Epic children linked via parent / Epic Link for each feature key.
+ * Matches Confluence Child epics DoR (Child Issues section).
+ *
+ * @param {object} jiraClient
+ * @param {Map<string, object>} featureMap
+ */
+async function enrichChildEpicCounts(jiraClient, featureMap) {
+  if (!jiraClient || !jiraClient.fetchAllJqlResults || !featureMap || featureMap.size === 0) return
+
+  var keys = Array.from(featureMap.keys())
+  for (var start = 0; start < keys.length; start += EPIC_BATCH_SIZE) {
+    if (start > 0) await sleep(EPIC_THROTTLE_MS)
+    var batchKeys = keys.slice(start, start + EPIC_BATCH_SIZE)
+    var keyList = batchKeys.map(function(k) { return '"' + k + '"' }).join(', ')
+    // Epic type only — Confluence: "Linked child epics in engineering projects"
+    var jql = 'issuetype = Epic AND (parent in (' + keyList + ') OR "Epic Link" in (' + keyList + '))'
+    try {
+      var children = await jiraClient.fetchAllJqlResults(jql, 'parent,customfield_10014', { maxResults: 100 })
+      for (var i = 0; i < children.length; i++) {
+        var fields = children[i].fields || {}
+        var parentKey = (fields.parent && fields.parent.key) || fields.customfield_10014 || null
+        if (!parentKey || !featureMap.has(parentKey)) continue
+        var feat = featureMap.get(parentKey)
+        feat.epicCount = (feat.epicCount || 0) + 1
+      }
+    } catch (err) {
+      console.warn(
+        '[releases/planning] Child epic count batch ' +
+          (Math.floor(start / EPIC_BATCH_SIZE) + 1) +
+          ' failed: ' +
+          (err && err.message ? err.message : err)
+      )
+    }
   }
 }
 
@@ -81,7 +126,14 @@ async function fetchFeatures(jiraClient) {
     var normalized = normalizeIssue(issues[i])
     if (normalized.key) map.set(normalized.key, normalized)
   }
+  await enrichChildEpicCounts(jiraClient, map)
   return map
 }
 
-module.exports = { fetchFeatures: fetchFeatures, normalizeIssue: normalizeIssue, JQL: JQL, QUERY_FIELDS: QUERY_FIELDS }
+module.exports = {
+  fetchFeatures: fetchFeatures,
+  normalizeIssue: normalizeIssue,
+  enrichChildEpicCounts: enrichChildEpicCounts,
+  JQL: JQL,
+  QUERY_FIELDS: QUERY_FIELDS
+}

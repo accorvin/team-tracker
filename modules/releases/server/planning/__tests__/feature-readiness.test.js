@@ -2418,6 +2418,43 @@ describe('buildFeatureReadiness — pass 3 (jiraFeatures)', function() {
     expect(result.pendingReview[0].title).toBe('Jira Feature RHAISTRAT-900')
   })
 
+  it('prefers live jira epicCount for Child epics over stale exec count of 0', async function() {
+    var jiraFeatures = makeJiraMap([
+      makeJiraFeature('RHAISTRAT-2198', {
+        epicCount: 2,
+        components: ['Platform', 'Serving', 'UXD', 'Documentation'],
+        docsRequired: 'Yes',
+        labels: ['strat-creator-auto-created', 'strat-creator-human-sign-off', 'rp-qg1-pass'],
+        riceScore: 50,
+        releaseType: 'GA',
+        pmOwner: 'Jane'
+      })
+    ])
+    var readFromStorage = makeReadFromStorage({
+      ...convertToUnifiedFormat(makeFeaturesStore({
+        'RHAISTRAT-2198': {
+          key: 'RHAISTRAT-2198',
+          summary: 'Validated Models',
+          status: 'In Progress',
+          epicCount: 0
+        }
+      })),
+      'releases/planning/config.json': CONFIG_3_6,
+      'releases/execution/index.json': makeExecIndex([
+        { key: 'RHAISTRAT-2198', epicCount: 0 }
+      ])
+    })
+
+    var result = await buildFeatureReadiness(readFromStorage, jiraFeatures)
+    var feature = result.pendingReview.concat(result.ready).find(function(f) {
+      return f.key === 'RHAISTRAT-2198'
+    })
+    expect(feature).toBeTruthy()
+    expect(feature.epicCount).toBe(2)
+    var child = feature.fpdor.items.find(function(i) { return i.name === 'Child epics' })
+    expect(child.pass).toBe(true)
+  })
+
   it('falls back to execution index when jiraFeatures is null', async function() {
     var readFromStorage = makeReadFromStorage({
       ...convertToUnifiedFormat(makeFeaturesStore({})),
