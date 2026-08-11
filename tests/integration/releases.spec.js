@@ -719,32 +719,38 @@ test.describe('Releases FPDoR Readiness @releases', () => {
     expect(sample.fpdor).toHaveProperty('passedCount');
     expect(sample.fpdor).toHaveProperty('totalCount');
     expect(sample.fpdor).toHaveProperty('evaluatedCount');
+    expect(sample.fpdor).toHaveProperty('applicableCount');
+    expect(sample.fpdor).toHaveProperty('allApplicablePassed');
+    expect(sample.fpdor).toHaveProperty('groups');
     expect(Array.isArray(sample.fpdor.items)).toBe(true);
-    expect(sample.fpdor.totalCount).toBe(13);
-    expect(sample.fpdor.items.length).toBe(13);
+    expect(sample.fpdor.totalCount).toBe(17);
+    expect(sample.fpdor.items.length).toBe(17);
 
     var itemNames = sample.fpdor.items.map(function(i) { return i.name });
-    expect(itemNames).toContain('Cross-functional Engineering');
-    expect(itemNames).toContain('Documentation');
+    expect(itemNames).toContain('Target Version');
     expect(itemNames).toContain('UXD');
-    expect(itemNames).not.toContain('Cross-functional Engagement');
+    expect(itemNames).toContain('Cross-team deps');
 
     var item = sample.fpdor.items[0];
     expect(item).toHaveProperty('name');
     expect(item).toHaveProperty('pass');
     expect(item).toHaveProperty('source');
     expect(item).toHaveProperty('state');
+    expect(item).toHaveProperty('group');
+    expect(['mandatory', 'criteria']).toContain(item.group);
     expect(item.source).toBe('jira');
-    expect(['passed', 'failed']).toContain(item.state);
+    expect(['passed', 'failed', 'not-checked']).toContain(item.state);
 
     expect(sample).toHaveProperty('readinessGates');
     expect(sample.readinessGates).toHaveProperty('fpDorPassed');
     expect(sample.readinessGates).toHaveProperty('fpDorTotal');
     expect(sample.readinessGates).toHaveProperty('fpDorEvaluated');
+    expect(sample.readinessGates).toHaveProperty('fpDorApplicable');
     expect(sample.readinessGates).toHaveProperty('pastRefinement');
     expect(sample.readinessGates).toHaveProperty('noBlockingViolations');
     expect(typeof sample.readinessGates.fpDorPassed).toBe('number');
     expect(typeof sample.readinessGates.fpDorTotal).toBe('number');
+    expect(typeof sample.readinessGates.fpDorApplicable).toBe('number');
     expect(typeof sample.readinessGates.pastRefinement).toBe('boolean');
   });
 
