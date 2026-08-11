@@ -32,7 +32,10 @@ function htmlReportUrl(repoKey) {
 export function useQualityReports() {
   if (!hasFetched) {
     hasFetched = true
-    loadReports()
+    loadReports().catch(() => {
+      // Reset hasFetched on error so retries are possible
+      hasFetched = false
+    })
   }
 
   const reports = computed(() => {

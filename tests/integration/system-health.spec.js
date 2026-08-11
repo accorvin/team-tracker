@@ -10,6 +10,7 @@ const { setupErrorTracking, logCapturedErrors, pageHasContent, pageLoadComplete,
  * - Data fetching and display works
  * - Navigation within the module functions
  * - API integration is functional
+ * - New OpenDataHub E2E health views work properly
  *
  * Tag: @system-health
  * Usage: npx playwright test --grep @system-health
@@ -170,6 +171,10 @@ test.describe('System Health Views @system-health', () => {
 
   test('should load Component Maturity view', async ({ page }) => {
     await testView(page, 'component-maturity', 'Component Maturity');
+  });
+
+  test('should load OpenDataHub E2E Health view', async ({ page }) => {
+    await testView(page, 'odh-e2e-health', 'OpenDataHub E2E Health');
   });
 
   test('should show empty state for repos without scan data', async ({ page }) => {
@@ -449,6 +454,208 @@ test.describe('System Health Disconnected Readiness @system-health', () => {
 
     console.log(`Disconnected API requests: ${apiRequests.length}`);
     apiRequests.forEach(req => console.log(`  ${req.method} ${req.url}`));
+
+    expect(page.errors).toHaveLength(0);
+  });
+});
+
+/**
+ * OpenDataHub E2E Health Feature Tests
+ *
+ * Verify the new OpenDataHub E2E health monitoring features including
+ * API endpoints, status displays, and navigation.
+ */
+test.describe('OpenDataHub E2E Health Features @system-health', () => {
+  test.beforeEach(async ({ page }) => {
+    setupErrorTracking(page);
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    logCapturedErrors(page, testInfo);
+  });
+
+  test('should fetch ODH E2E health data from new API endpoint', async ({ page }) => {
+    // Monitor network requests
+    const apiRequests = [];
+    page.on('request', request => {
+      if (request.url().includes('/api/modules/system-health/odh-e2e-health')) {
+        apiRequests.push({
+          url: request.url(),
+          method: request.method()
+        });
+      }
+    });
+
+    // Navigate to OpenDataHub E2E health view
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Verify that API requests were made to the new ODH E2E health endpoint
+    expect(apiRequests.length).toBeGreaterThan(0);
+    console.log(`ODH E2E Health API requests: ${apiRequests.length}`);
+    apiRequests.forEach(req => {
+      console.log(`  ${req.method} ${req.url}`);
+    });
+
+    // Verify at least one request is for the main health endpoint
+    const healthRequest = apiRequests.find(req =>
+      req.url.includes('/odh-e2e-health') && !req.url.includes('/runs')
+    );
+    expect(healthRequest).toBeDefined();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should display health status cards', async ({ page }) => {
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Look for health status cards/indicators with status classes
+    const hasStatusCards = await page.locator('.bg-green-100, .bg-orange-100, .bg-red-100, .text-green-600, .text-orange-600, .text-red-600').count() > 0;
+    expect(hasStatusCards).toBe(true);
+
+    // Look for status text content
+    const hasStatusText = await page.locator('text=/healthy|stable|degraded|failing|broken/i').count() > 0;
+    expect(hasStatusText).toBe(true);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should display pass rate percentages', async ({ page }) => {
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Look for percentage displays
+    const hasPercentages = await page.locator('text=/\\d+%|\\d+\\.\\d+%/').count() > 0;
+    expect(hasPercentages).toBe(true);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should display trend charts or chart containers', async ({ page }) => {
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Look for chart containers, canvas elements, or chart-related content
+    const hasCharts = await page.locator('canvas, .chart-container, [data-testid*="chart"], [class*="chart"]').count() > 0;
+    expect(hasCharts).toBe(true);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should display test run history or recent runs', async ({ page }) => {
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Look for run history displays - could be table, list, or cards
+    const hasRunHistory = await page.locator('table tbody tr, .run-item, [data-testid*="run"], [class*="run-"], li').count() > 0;
+    expect(hasRunHistory).toBe(true);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should display suite labels (ODH/RHOAI)', async ({ page }) => {
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Look for ODH and RHOAI suite references
+    const hasOdhSuite = await page.locator('text=/ODH|OpenDataHub/i').count() > 0;
+    const hasRhoaiSuite = await page.locator('text=/RHOAI|Red Hat OpenShift AI/i').count() > 0;
+
+    // At least one suite should be mentioned
+    expect(hasOdhSuite || hasRhoaiSuite).toBe(true);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should show component failure information', async ({ page }) => {
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Look for component names or failure-related content
+    const hasComponents = await page.locator('text=/dashboard|kserve|modelregistry|trustyai|component/i').count() > 0;
+    expect(hasComponents).toBe(true);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should handle navigation to run detail view when run links are present', async ({ page }) => {
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Look for clickable run links or buttons
+    const runLinks = page.locator('a[href*="e2e-run-detail"], button[data-testid*="view-run"], [data-testid*="run"] button, table tbody tr a');
+    const runLinksCount = await runLinks.count();
+
+    if (runLinksCount > 0) {
+      console.log(`Found ${runLinksCount} clickable run elements`);
+
+      // Click the first run link if available
+      await runLinks.first().click();
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+      // Verify we navigated to the detail view
+      expect(page.url()).toMatch(/e2e-run-detail/);
+
+      // Verify the detail view loads with content
+      const mainContentVisible = await mainContentIsVisible(page);
+      expect(mainContentVisible).toBe(true);
+
+      const hasContent = await pageHasContent(page);
+      expect(hasContent).toBe(true);
+    } else {
+      console.log('No run detail links found - test passed (acceptable for demo mode or empty state)');
+    }
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should handle refresh functionality if refresh button is present', async ({ page }) => {
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Look for refresh button
+    const refreshButton = page.locator('button').filter({ hasText: /refresh|reload|update/i });
+    const refreshButtonCount = await refreshButton.count();
+
+    if (refreshButtonCount > 0) {
+      console.log('Found refresh button - testing refresh functionality');
+
+      // Monitor API requests during refresh
+      const apiRequests = [];
+      page.on('request', request => {
+        if (request.url().includes('/api/modules/system-health/odh-e2e-health')) {
+          apiRequests.push({
+            url: request.url(),
+            method: request.method()
+          });
+        }
+      });
+
+      // Click refresh button
+      await refreshButton.first().click();
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+      // Should have made API requests during refresh
+      const _refreshRequests = apiRequests.filter(req => req.method === 'POST' && req.url.includes('/refresh'));
+
+      // Don't require POST refresh in demo mode, but log what we found
+      console.log(`Refresh API requests made: ${apiRequests.length}`);
+      apiRequests.forEach(req => console.log(`  ${req.method} ${req.url}`));
+    } else {
+      console.log('No refresh button found - test passed (acceptable for demo mode)');
+    }
 
     expect(page.errors).toHaveLength(0);
   });

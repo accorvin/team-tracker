@@ -10,10 +10,12 @@
     "entry": "./client/index.js",
     "navItems": [
       { "id": "quality-analysis", "label": "Quality analysis", "icon": "clipboard-list", "default": true },
-      { "id": "component-maturity", "label": "Component maturity", "icon": "layers" }
+      { "id": "component-maturity", "label": "Component maturity", "icon": "layers" },
+      { "id": "odh-e2e-health", "label": "opendatahub-operator E2E health", "icon": "activity" }
     ],
     "hiddenRoutes": {
-      "disconnected-repo-detail": "component-maturity"
+      "disconnected-repo-detail": "component-maturity",
+      "e2e-run-detail": "odh-e2e-health"
     }
   },
   "server": {

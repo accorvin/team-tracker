@@ -1710,6 +1710,183 @@ Disconnected readiness reports tracking repository readiness scores for disconne
 - `rulesPassedCount`: Rules that passed
 - `date`: Assessment timestamp
 
+## System Health — E2E Health Data (`data/system-health/odh-e2e-health.json`)
+
+E2E (end-to-end) test health data for the opendatahub-operator repository. Contains recent test runs, component failure statistics, and historical trends. Updated hourly by the E2E health scheduler.
+
+```json
+{
+  "lastSyncedAt": "2026-08-11T14:30:00.000Z",
+  "repository": "opendatahub-io/opendatahub-operator",
+  "suites": {
+    "odh": {
+      "name": "OpenDataHub E2E",
+      "suite": "odh", 
+      "dailyStatus": {
+        "status": "healthy",
+        "color": "green",
+        "class": "text-green-600 dark:text-green-400",
+        "bgClass": "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400",
+        "label": "Healthy"
+      },
+      "totalJobs": 42,
+      "passedJobs": 38,
+      "rollingWindow": "14d",
+      "lastUpdated": "2026-08-11T14:30:00.000Z",
+      "suiteStatus": "passing",
+      "successRate": 0.9,
+      "repository": "opendatahub-io/opendatahub-operator"
+    },
+    "rhoai": {
+      "name": "RHOAI E2E",
+      "suite": "rhoai",
+      "dailyStatus": {
+        "status": "degraded",
+        "color": "orange", 
+        "class": "text-orange-600 dark:text-orange-400",
+        "bgClass": "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400",
+        "label": "Degraded"
+      },
+      "totalJobs": 25,
+      "passedJobs": 18,
+      "rollingWindow": "14d",
+      "lastUpdated": "2026-08-11T14:30:00.000Z",
+      "suiteStatus": "failing",
+      "successRate": 0.72,
+      "repository": "opendatahub-io/opendatahub-operator"
+    }
+  },
+  "summary": {
+    "totalRuns": 120,
+    "passRate": 0.85,
+    "avgResolutionTime": "4h 30m",
+    "trendDirection": "improving"
+  },
+  "recentRuns": [
+    {
+      "buildId": "1723387200123",
+      "jobName": "periodic-ci-opendatahub-io-opendatahub-operator-main-odh-e2e", 
+      "suite": "odh",
+      "status": "passed",
+      "timestamp": "2026-08-11T12:00:00.000Z",
+      "prNumber": null,
+      "prowUrl": "https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/periodic-ci-opendatahub-io-opendatahub-operator-main-odh-e2e/1723387200123",
+      "failedComponents": [],
+      "runDuration": 1800
+    }
+  ],
+  "accumulatedRuns": [],
+  "componentStats": {
+    "dashboard": {
+      "totalRuns": 120,
+      "failures": 8,
+      "lastFailure": "2026-08-10T16:30:00.000Z",
+      "affectedSuites": ["odh", "rhoai"],
+      "failureRate": 0.067,
+      "consecutiveFailures": 0,
+      "classification": "ui",
+      "impact": {
+        "score": 65,
+        "level": "medium"
+      },
+      "trends": {
+        "direction": "stable"
+      },
+      "displayName": "Dashboard",
+      "testSuites": ["odh", "rhoai"]
+    }
+  },
+  "currentlyBlocking": ["kserve"],
+  "assessedAt": "2026-08-11T14:30:00.000Z",
+  "dataSource": "prowjobs-api-incremental",
+  "datasetMetadata": {
+    "accumulatedRunsCount": 120,
+    "recentRunsCount": 15,
+    "dataRetentionDays": 30,
+    "oldestRunDate": "2026-07-12T14:30:00.000Z", 
+    "newestRunDate": "2026-08-11T14:30:00.000Z"
+  },
+  "historical_trends": {
+    "daily_status": [
+      {
+        "date": "2026-08-11",
+        "odh": {
+          "status": "healthy",
+          "passRate": 0.9,
+          "totalJobs": 42,
+          "passedJobs": 38
+        },
+        "rhoai": {
+          "status": "degraded", 
+          "passRate": 0.72,
+          "totalJobs": 25,
+          "passedJobs": 18
+        }
+      }
+    ],
+    "last_updated": "2026-08-11T14:30:00.000Z"
+  }
+}
+```
+
+**Top-level fields:**
+- `lastSyncedAt`: ISO timestamp of the last data refresh
+- `repository`: Target repository being monitored
+- `suites`: Test suite health summary (keyed by suite name: `odh`, `rhoai`)
+- `summary`: Overall E2E health metrics across all suites
+- `recentRuns`: Latest test runs from the current API fetch (~48 hours of data)
+- `accumulatedRuns`: Full dataset of test runs (30-day retention for historical analysis)
+- `componentStats`: Component failure statistics and analysis
+- `currentlyBlocking`: Components currently causing test failures
+- `assessedAt`: ISO timestamp when the assessment was performed
+- `dataSource`: Data source identifier (e.g., `prowjobs-api-incremental`)
+- `datasetMetadata`: Metadata about the accumulated dataset
+- `historical_trends`: Daily status trends for charting (30-day retention)
+
+**Suite health fields:**
+- `dailyStatus.status`: Overall suite health (`healthy`, `stable`, `degraded`, `failing`, `broken`)
+- `dailyStatus.color`: Color indicator (`green`, `orange`, `red`)
+- `dailyStatus.class`/`bgClass`: Tailwind CSS classes for styling
+- `successRate`: Pass rate (0.0 to 1.0) for the rolling window
+- `suiteStatus`: Legacy status field (`passing` or `failing`)
+
+**Test run fields:**
+- `buildId`: Unique identifier for the test run
+- `jobName`: Prow CI job name  
+- `suite`: Test suite name (`odh` or `rhoai`)
+- `status`: Test result (`passed`, `failed`, `pending`, `triggered`)
+- `timestamp`: ISO timestamp when the test ran
+- `prNumber`: Pull request number if applicable, or `null`
+- `prowUrl`: Link to the Prow CI job details
+- `failedComponents`: Array of component names that failed in this run
+- `runDuration`: Test execution time in seconds
+
+**Component statistics fields:**
+- `totalRuns`: Total number of test runs analyzed
+- `failures`: Number of runs where this component failed
+- `failureRate`: Failure rate (0.0 to 1.0)
+- `consecutiveFailures`: Number of consecutive recent failures
+- `lastFailure`: ISO timestamp of the most recent failure
+- `affectedSuites`: Array of suite names where this component has failed
+- `classification`: Component type classification (e.g., `ui`, `api`, `backend`)
+- `impact.score`: Numeric impact score (0-100)
+- `impact.level`: Impact level (`low`, `medium`, `high`)
+- `trends.direction`: Trend direction (`improving`, `stable`, `worsening`)
+
+**Historical trends fields:**
+- `daily_status`: Array of daily status snapshots, sorted newest-first
+- `date`: Date in YYYY-MM-DD format
+- Per-suite status includes: `status`, `passRate`, `totalJobs`, `passedJobs`
+- `last_updated`: ISO timestamp when trends were last calculated
+
+**Notes:**
+- Data is updated hourly by the E2E health scheduler
+- Recent runs contain ~48 hours of data for operational visibility
+- Accumulated runs contain up to 30 days of data for trend analysis
+- Pending/triggered tests are filtered out during storage
+- Component statistics use 30-day accumulated data for accurate failure rates
+- Daily status thresholds: 100% = healthy, ≥70% = stable, ≥50% = degraded, ≥20% = failing, <20% = broken
+
 ## System Health — Quality Reports (`data/system-health/quality/reports.json`)
 
 Quality analysis reports tracking repository testing, CI/CD, and code quality practices across 8 dimensions. Reports are pushed from the quality-repo-analysis CI pipeline via the bulk API, or pulled from GitLab CI artifacts.
