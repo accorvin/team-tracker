@@ -495,13 +495,22 @@ onMounted(() => {
         v-if="fpdorData && fpdorData.items"
         class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5"
       >
-        <div class="flex items-center gap-3 mb-3">
+        <div class="flex items-center gap-3 mb-1">
           <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">FPDoR Readiness</span>
           <span
             class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold"
-            :class="fpdorData.passedCount === fpdorData.evaluatedCount ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'"
-          >{{ fpdorData.passedCount }}/{{ fpdorData.totalCount }}</span>
+            :class="fpdorData.allApplicablePassed ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'"
+          >{{ fpdorData.passedCount }}/{{ fpdorData.applicableCount != null ? fpdorData.applicableCount : fpdorData.totalCount }}</span>
         </div>
+        <p class="text-xs text-gray-400 dark:text-gray-500 mb-3">
+          Source of truth:
+          <a
+            :href="fpdorData.confluenceUrl || 'https://redhat.atlassian.net/wiki/spaces/RHAI/pages/442958832/Planning+Phase+-+Definition+of+Ready+Definition+of+Done'"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-primary-600 dark:text-primary-400 hover:underline"
+          >Planning Phase DoR</a>
+        </p>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
           <div v-for="item in fpdorData.items" :key="item.name" class="flex items-start gap-2 py-1 text-sm">
             <svg v-if="item.pass === true" class="w-4 h-4 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -515,7 +524,7 @@ onMounted(() => {
             </svg>
             <div class="min-w-0">
               <span :class="item.pass === true ? 'text-gray-700 dark:text-gray-300' : item.pass === false ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'">{{ item.name }}</span>
-              <div v-if="item.detail && item.pass !== true" class="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">{{ item.detail }}</div>
+              <div v-if="item.detail" class="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">{{ item.detail }}</div>
             </div>
           </div>
         </div>
