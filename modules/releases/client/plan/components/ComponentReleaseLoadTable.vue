@@ -1,6 +1,16 @@
 <script setup>
 import { reactive, computed } from 'vue'
 import { getComponentLeads } from '../../composables/componentLeads'
+import FPDoRPopover from './FPDoRPopover.vue'
+import { failedFpdorNames } from '../utils/feature-readiness-export.js'
+import {
+  fpdorItemSeverity,
+  severityChipClass,
+  severityLabel,
+  pathLabel,
+  pathChipClass,
+  pathChipTitle
+} from '../utils/fpdor-severity.js'
 
 const props = defineProps({
   groups: { type: Array, default: () => [] },
@@ -21,6 +31,7 @@ function getComponentVelocity(componentName) {
 }
 
 const JIRA_BASE = 'https://redhat.atlassian.net/browse'
+var MAX_VISIBLE_FAIL_CHIPS = 2
 
 const COMP_STYLE = {
   border: 'border-l-primary-500',
@@ -31,11 +42,10 @@ var expandedComponents = reactive({})
 
 // ═══ SORT STATE ═══
 
-var SORT_COLUMNS = ['key', 'summary', 'priority', 'releaseType', 'status', 'colorStatus', 'fixVersion', 'targetVersion', 'blocked', 'riskLevel', 'assignee', 'pmOwner', 'docs']
+var SORT_COLUMNS = ['key', 'summary', 'priority', 'releaseType', 'status', 'colorStatus', 'fixVersion', 'targetVersion', 'blocked', 'pmDoAligned', 'readiness', 'assignee', 'pmOwner', 'docs']
 
 var PRIORITY_ORDER = { 'Blocker': 0, 'Critical': 1, 'Major': 2, 'Normal': 3 }
 var COLOR_STATUS_ORDER = { 'red': 0, 'yellow': 1, 'green': 2 }
-var RISK_ORDER = { 'high': 0, 'medium': 1, 'low': 2 }
 
 var sortState = reactive({
   column: SORT_COLUMNS.indexOf(props.initialSort.column) !== -1 ? props.initialSort.column : null,
@@ -78,9 +88,11 @@ function getSortValue(feature, column) {
     return feature.targetVersions && feature.targetVersions.length > 0 ? feature.targetVersions[0] : ''
   }
   if (column === 'blocked') return feature.isBlocked ? 1 : 0
-  if (column === 'riskLevel') {
-    var ro = RISK_ORDER[(feature.riskLevel || '').toLowerCase()]
-    return ro !== undefined ? ro : 99
+  if (column === 'pmDoAligned') return feature.pmDoAligned ? 0 : 1
+  if (column === 'readiness') {
+    if (!feature.fpdor) return 99
+    if (feature.fpdor.allApplicablePassed) return 0
+    return 1
   }
   if (column === 'assignee') return (feature.assignee || '').toLowerCase()
   if (column === 'pmOwner') return (feature.pmOwner || '').toLowerCase()
@@ -106,6 +118,22 @@ function sortFeatures(features) {
 function sortIcon(column) {
   if (sortState.column !== column) return 'none'
   return sortState.direction
+}
+
+function visibleFailChips(feature) {
+  return failedFpdorNames(feature).slice(0, MAX_VISIBLE_FAIL_CHIPS)
+}
+
+function overflowFailCount(feature) {
+  return Math.max(0, failedFpdorNames(feature).length - MAX_VISIBLE_FAIL_CHIPS)
+}
+
+function chipClassForName(name) {
+  return severityChipClass(fpdorItemSeverity(name))
+}
+
+function chipTitleForName(name) {
+  return 'Failed FPDoR (' + severityLabel(fpdorItemSeverity(name)) + '): ' + name
 }
 
 function toggleComponent(component) {
@@ -204,7 +232,11 @@ var componentGroups = computed(function() {
             priority: feat.priority,
             isBlocked: feat.isBlocked,
             blockedBy: feat.blockedBy || [],
-            riskLevel: feat.riskLevel || 'low',
+            pmDoAligned: !!feat.pmDoAligned,
+            fpdor: feat.fpdor || null,
+            confidence: feat.confidence || null,
+            isAiFirst: !!feat.isAiFirst,
+            labels: feat.labels || [],
             components: feat.components,
             fixVersions: feat.fixVersions || [],
             targetVersions: feat.targetVersions || [],
@@ -242,12 +274,12 @@ var componentGroups = computed(function() {
     var reqCount = 0
     var comCount = 0
     var blkCount = 0
-    var riskCount = 0
+    var notAlignedCount = 0
     for (var fli = 0; fli < featureList.length; fli++) {
       if (featureList[fli].isRequested) reqCount++
       if (featureList[fli].isCommitted) comCount++
       if (featureList[fli].isBlocked) blkCount++
-      if (featureList[fli].riskLevel === 'high' || featureList[fli].riskLevel === 'medium') riskCount++
+      if (!featureList[fli].pmDoAligned) notAlignedCount++
     }
 
     result.push({
@@ -256,7 +288,7 @@ var componentGroups = computed(function() {
       requestedCount: reqCount,
       committedCount: comCount,
       blockedCount: blkCount,
-      atRiskCount: riskCount
+      notAlignedCount: notAlignedCount
     })
   }
 
@@ -299,7 +331,7 @@ defineExpose({ expandAll, collapseAll })
             :class="COMP_STYLE.border"
             @click="toggleComponent(comp.component)"
           >
-            <td colspan="13" class="px-4 py-3">
+            <td colspan="14" class="px-4 py-3">
               <div class="flex items-center gap-3">
                 <svg
                   class="w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-200 flex-shrink-0"
@@ -324,10 +356,10 @@ defineExpose({ expandAll, collapseAll })
                 >{{ comp.blockedCount }} blocked</span>
                 <span
                   class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                  :class="comp.atRiskCount > 0
+                  :class="comp.notAlignedCount > 0
                     ? 'bg-amber-100 dark:bg-amber-800/40 text-amber-700 dark:text-amber-300'
                     : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'"
-                >{{ comp.atRiskCount }} at risk</span>
+                >{{ comp.notAlignedCount }} not aligned</span>
                 <span
                   v-if="getComponentVelocity(comp.component)"
                   class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
@@ -389,8 +421,11 @@ defineExpose({ expandAll, collapseAll })
             <th class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSort('blocked')">
               <span class="inline-flex items-center gap-1 justify-center">Blocked<SortArrow :direction="sortIcon('blocked')" /></span>
             </th>
-            <th class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSort('riskLevel')">
-              <span class="inline-flex items-center gap-1 justify-center">At Risk<SortArrow :direction="sortIcon('riskLevel')" /></span>
+            <th class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSort('pmDoAligned')" title="Yes when Target Version and Fix Version match">
+              <span class="inline-flex items-center gap-1 justify-center">PM/DO Aligned<SortArrow :direction="sortIcon('pmDoAligned')" /></span>
+            </th>
+            <th class="px-3 py-2 text-left text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[10rem] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSort('readiness')">
+              <span class="inline-flex items-center gap-1">Readiness<SortArrow :direction="sortIcon('readiness')" /></span>
             </th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSort('assignee')">
               <span class="inline-flex items-center gap-1">Delivery Owner<SortArrow :direction="sortIcon('assignee')" /></span>
@@ -494,13 +529,39 @@ defineExpose({ expandAll, collapseAll })
               <td class="px-3 py-2.5 text-center">
                 <span
                   class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold"
-                  :class="{
-                    'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300': feature.riskLevel === 'high',
-                    'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300': feature.riskLevel === 'medium',
-                    'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300': feature.riskLevel === 'low'
-                  }"
-                  :title="feature.riskLevel === 'high' ? 'Not committed — has target version but no fix version' : feature.riskLevel === 'medium' ? 'Committed but blocked or status is red/yellow' : 'On track'"
-                >{{ feature.riskLevel === 'high' ? 'High' : feature.riskLevel === 'medium' ? 'Medium' : 'Low' }}</span>
+                  :class="feature.pmDoAligned
+                    ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'"
+                  :title="feature.pmDoAligned
+                    ? 'Target Version and Fix Version match'
+                    : 'Target Version and Fix Version missing or do not match'"
+                >{{ feature.pmDoAligned ? 'Yes' : 'No' }}</span>
+              </td>
+              <td class="px-3 py-2.5">
+                <div v-if="feature.fpdor" class="flex flex-wrap items-center gap-1 max-w-[14rem]">
+                  <FPDoRPopover
+                    :fpdor="feature.fpdor"
+                    :confidence="feature.confidence"
+                  />
+                  <span
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+                    :class="pathChipClass(feature)"
+                    :title="pathChipTitle(feature)"
+                  >{{ pathLabel(feature) }}</span>
+                  <span
+                    v-for="name in visibleFailChips(feature)"
+                    :key="name"
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+                    :class="chipClassForName(name)"
+                    :title="chipTitleForName(name)"
+                  >{{ name }}</span>
+                  <span
+                    v-if="overflowFailCount(feature) > 0"
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium text-gray-500 dark:text-gray-400"
+                    :title="failedFpdorNames(feature).slice(MAX_VISIBLE_FAIL_CHIPS).join(', ')"
+                  >+{{ overflowFailCount(feature) }}</span>
+                </div>
+                <span v-else class="text-gray-300 dark:text-gray-600 text-xs">—</span>
               </td>
               <td class="px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                 {{ feature.assignee || '--' }}
@@ -523,7 +584,7 @@ defineExpose({ expandAll, collapseAll })
 
           <!-- Empty state -->
           <tr v-if="isComponentExpanded(comp.component) && comp.features.length === 0">
-            <td colspan="13" class="px-8 py-6 text-sm text-gray-400 dark:text-gray-500 italic text-center">
+            <td colspan="14" class="px-8 py-6 text-sm text-gray-400 dark:text-gray-500 italic text-center">
               No features found for {{ comp.component }}
             </td>
           </tr>
@@ -531,7 +592,7 @@ defineExpose({ expandAll, collapseAll })
 
         <!-- No results -->
         <tr v-if="componentGroups.length === 0">
-          <td colspan="13" class="px-8 py-10 text-sm text-gray-400 dark:text-gray-500 italic text-center">
+          <td colspan="14" class="px-8 py-10 text-sm text-gray-400 dark:text-gray-500 italic text-center">
             No features match the current filters.
           </td>
         </tr>
