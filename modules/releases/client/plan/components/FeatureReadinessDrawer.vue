@@ -23,6 +23,36 @@ const isHealthPipeline = computed(() => props.feature?.dataSource === 'health-pi
 
 const RUBRIC_DIMS = ['feasibility', 'testability', 'scope', 'architecture']
 
+const hasAiReviewMeta = computed(function() {
+  var f = props.feature
+  if (!f) return false
+  return f.recommendation != null || f.humanReviewStatus != null
+})
+
+const hasRubricScores = computed(function() {
+  var s = props.feature && props.feature.scores
+  if (!s) return false
+  for (var i = 0; i < RUBRIC_DIMS.length; i++) {
+    if (s[RUBRIC_DIMS[i]] != null) return true
+  }
+  return false
+})
+
+const fixVersionDisplay = computed(function() {
+  var f = props.feature
+  if (!f) return null
+  if (f.fixVersion) return f.fixVersion
+  if (f.fixVersions && f.fixVersions.length) return f.fixVersions.join(', ')
+  return null
+})
+
+const dataSourceLabel = computed(function() {
+  var src = props.feature && props.feature.dataSource
+  if (src === 'health-pipeline') return 'Health Pipeline'
+  if (src === 'pm-hub' || src === 'jira') return 'Jira'
+  return 'Strategy Creator'
+})
+
 function reviewStatusClass(status) {
   switch (status) {
     case 'approved':        return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
@@ -306,12 +336,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               </span>
             </template>
 
-            <!-- Strat-creator badges -->
-            <template v-else>
+            <!-- Strat-creator badges — only when AI review meta exists -->
+            <template v-else-if="hasAiReviewMeta">
               <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold" :class="reviewStatusClass(feature.humanReviewStatus)">
                 {{ reviewStatusLabel(feature.humanReviewStatus) }}
               </span>
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold" :class="recommendationClass(feature.recommendation)">
+              <span
+                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+                :class="recommendationClass(feature.recommendation)"
+                title="AI First Recommends"
+              >
                 {{ recommendationLabel(feature.recommendation) }}
               </span>
             </template>
@@ -329,7 +363,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <div class="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
 
           <!-- Priority Score -->
-          <section class="px-4 py-4">
+          <section v-if="feature.effectivePriorityScore != null" class="px-4 py-4">
             <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Priority Score</p>
             <div class="flex items-center gap-3">
               <span
@@ -507,8 +541,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             </div>
           </section>
 
-          <!-- Rubric (strat-creator features only; display/priority — does not gate FPDoR) -->
-          <section v-if="!isHealthPipeline" class="px-4 py-4">
+          <!-- Rubric (strat-creator features with scores; display/priority — does not gate FPDoR) -->
+          <section v-if="hasRubricScores" class="px-4 py-4">
             <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">
               Rubric — {{ rubricTotal }} / 8
             </p>
@@ -611,7 +645,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               </dd>
 
               <dt class="text-gray-400 dark:text-gray-500">Fix Version</dt>
-              <dd class="font-mono text-gray-700 dark:text-gray-300">{{ feature.fixVersion || '—' }}</dd>
+              <dd class="font-mono text-gray-700 dark:text-gray-300">{{ fixVersionDisplay || '—' }}</dd>
 
               <dt class="text-gray-400 dark:text-gray-500 self-start">Components</dt>
               <dd>
@@ -653,7 +687,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               <dd class="text-gray-700 dark:text-gray-300">{{ feature.status || '—' }}</dd>
 
               <dt class="text-gray-400 dark:text-gray-500">Data Source</dt>
-              <dd class="text-gray-700 dark:text-gray-300">{{ isHealthPipeline ? 'Health Pipeline' : 'Strategy Creator' }}</dd>
+              <dd class="text-gray-700 dark:text-gray-300">{{ dataSourceLabel }}</dd>
 
             </dl>
           </section>

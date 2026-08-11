@@ -601,7 +601,19 @@ function getSortValue(feature, column) {
   }
   if (column === 'assignee') return (feature.assignee || '').toLowerCase()
   if (column === 'pmOwner') return (feature.pmOwner || '').toLowerCase()
-  if (column === 'docs') return feature.docsRequired === 'Yes' ? 0 : 1
+  if (column === 'docs') {
+    var docs = feature.docsRequired
+    if (docs === 'Yes') {
+      var comps = feature.components || []
+      var hasDoc = false
+      for (var di = 0; di < comps.length; di++) {
+        if (comps[di] === 'Documentation' || comps[di] === 'Docs') { hasDoc = true; break }
+      }
+      return hasDoc ? 0 : 1
+    }
+    if (docs === 'No') return 2
+    return 3
+  }
   return ''
 }
 
