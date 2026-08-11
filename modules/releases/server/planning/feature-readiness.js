@@ -2,7 +2,7 @@ var { getConfiguredReleases, loadBigRocks } = require('./config')
 var { loadIndex } = require('./cache-reader')
 var { CLOSED_STATUSES, EARLY_STATUSES } = require('./constants')
 var { deriveHumanReviewStatus: sharedDeriveStatus } = require('../execution/ai-review-fields')
-var { computeFPDoRReadiness } = require('./fpdor')
+var { computeFPDoRReadiness, isAiFirstFeature } = require('./fpdor')
 var { computePriorityScores } = require('./health/priority-scorer')
 
 var BLOCKING_HYGIENE_RULES = []
@@ -574,6 +574,8 @@ async function buildFeatureReadiness(readFromStorage, jiraFeatures, listStorageF
       blockingDimensions: blockerResult.blockingDimensions,
       actionRequired: blockerResult.actionRequired,
       dataSource: merged.dataSource,
+      labels: merged.labels || [],
+      isAiFirst: isAiFirstFeature(merged),
       confidence: confidence,
       readinessGates: readinessResult.gates,
       fpdor: readinessResult.fpdor,

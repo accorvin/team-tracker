@@ -104,6 +104,36 @@ function severityLabel(severity) {
   }
 }
 
+/** Org Pulse path: AI First = any strat-creator-* label (not rp-qg1-pass / epic-creator). */
+function isAiFirstFeature(feature) {
+  if (!feature) return false
+  if (feature.isAiFirst === true) return true
+  if (feature.isAiFirst === false) return false
+  var labels = feature.labels || []
+  for (var i = 0; i < labels.length; i++) {
+    if (String(labels[i]).indexOf('strat-creator-') === 0) return true
+  }
+  return false
+}
+
+function pathLabel(feature) {
+  return isAiFirstFeature(feature) ? 'AI First' : 'Legacy'
+}
+
+function pathChipClass(feature) {
+  if (isAiFirstFeature(feature)) {
+    return 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800'
+  }
+  return 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
+}
+
+function pathChipTitle(feature) {
+  if (isAiFirstFeature(feature)) {
+    return 'AI First — has strat-creator-* label (Confluence path)'
+  }
+  return 'Legacy — no strat-creator-* label'
+}
+
 export {
   SEVERITY_RANK,
   FPDOR_SEVERITY_BY_NAME,
@@ -111,5 +141,9 @@ export {
   worstFailedSeverity,
   severityBadgeClass,
   severityChipClass,
-  severityLabel
+  severityLabel,
+  isAiFirstFeature,
+  pathLabel,
+  pathChipClass,
+  pathChipTitle
 }

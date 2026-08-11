@@ -73,6 +73,18 @@ function exportFeatureReadinessCsv(features) {
       }
     },
     { label: 'Failed FPDoR Items', getter: function(f) { return failedFpdorNames(f).join('; ') } },
+    {
+      label: 'Path',
+      getter: function(f) {
+        if (f.isAiFirst === true) return 'AI First'
+        if (f.isAiFirst === false) return 'Legacy'
+        var labels = f.labels || []
+        for (var i = 0; i < labels.length; i++) {
+          if (String(labels[i]).indexOf('strat-creator-') === 0) return 'AI First'
+        }
+        return 'Legacy'
+      }
+    },
     { label: 'Outcome', getter: function(f) { return f.bigRock || '' } },
     {
       label: 'Target Versions',

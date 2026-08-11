@@ -7,7 +7,10 @@ import {
   fpdorItemSeverity,
   severityChipClass,
   severityLabel,
-  worstFailedSeverity
+  worstFailedSeverity,
+  pathLabel,
+  pathChipClass,
+  pathChipTitle
 } from '../utils/fpdor-severity.js'
 
 var MAX_VISIBLE_FAIL_CHIPS = 3
@@ -134,6 +137,11 @@ var scoreBreakdown = computed(function() {
           :fpdor="feature.fpdor"
           :confidence="feature.confidence"
         />
+        <span
+          class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+          :class="pathChipClass(feature)"
+          :title="pathChipTitle(feature)"
+        >{{ pathLabel(feature) }}</span>
         <span
           v-for="name in visibleFailedChips"
           :key="name"

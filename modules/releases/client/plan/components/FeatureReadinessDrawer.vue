@@ -4,7 +4,10 @@ import HygieneViolations from '@shared/client/components/HygieneViolations.vue'
 import {
   worstFailedSeverity,
   severityBadgeClass,
-  severityLabel
+  severityLabel,
+  pathLabel,
+  pathChipClass,
+  pathChipTitle
 } from '../utils/fpdor-severity.js'
 
 const props = defineProps({
@@ -290,6 +293,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
               title="Committed — fix version assigned to a release"
             >Committed</span>
+            <span
+              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+              :class="pathChipClass(feature)"
+              :title="pathChipTitle(feature)"
+            >{{ pathLabel(feature) }}</span>
 
             <!-- Health pipeline badges -->
             <template v-if="isHealthPipeline">

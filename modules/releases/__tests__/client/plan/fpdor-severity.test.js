@@ -5,7 +5,9 @@ import {
   severityBadgeClass,
   severityChipClass,
   severityLabel,
-  FPDOR_SEVERITY_BY_NAME
+  FPDOR_SEVERITY_BY_NAME,
+  isAiFirstFeature,
+  pathLabel
 } from '../../../client/plan/utils/fpdor-severity.js'
 
 describe('fpdor-severity', function() {
@@ -74,5 +76,22 @@ describe('fpdor-severity', function() {
     expect(severityChipClass('critical')).toContain('border-red-200')
     expect(severityLabel(null)).toBe('Ready')
     expect(severityLabel('soft')).toBe('Soft')
+  })
+
+  describe('AI First / Legacy path', function() {
+    it('treats strat-creator-* as AI First', function() {
+      expect(isAiFirstFeature({ isAiFirst: true })).toBe(true)
+      expect(isAiFirstFeature({ labels: ['strat-creator-auto-created'] })).toBe(true)
+      expect(pathLabel({ labels: ['strat-creator-rubric-pass'] })).toBe('AI First')
+    })
+
+    it('does not treat rp-qg1-pass alone as AI First', function() {
+      expect(isAiFirstFeature({ labels: ['rp-qg1-pass'] })).toBe(false)
+      expect(pathLabel({ labels: ['rp-qg1-pass'] })).toBe('Legacy')
+    })
+
+    it('respects explicit isAiFirst false even with labels', function() {
+      expect(isAiFirstFeature({ isAiFirst: false, labels: ['strat-creator-auto-created'] })).toBe(false)
+    })
   })
 })

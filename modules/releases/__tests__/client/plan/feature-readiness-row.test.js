@@ -106,4 +106,24 @@ describe('FeatureReadinessRow fail chips', function() {
     expect(chips[1].attributes('title')).toContain('Soft')
     expect(chips[1].classes().join(' ')).toContain('border-yellow-200')
   })
+
+  it('renders AI First / Legacy path chip', function() {
+    var ai = mountRow({
+      key: 'RHAISTRAT-5',
+      title: 'AI path',
+      isAiFirst: true,
+      fpdor: { passedCount: 17, applicableCount: 17, items: [] }
+    })
+    expect(ai.text()).toContain('AI First')
+
+    var legacy = mountRow({
+      key: 'RHAISTRAT-6',
+      title: 'Legacy path',
+      isAiFirst: false,
+      labels: ['rp-qg1-pass'],
+      fpdor: { passedCount: 17, applicableCount: 17, items: [] }
+    })
+    expect(legacy.text()).toContain('Legacy')
+    expect(legacy.text()).not.toContain('AI First')
+  })
 })

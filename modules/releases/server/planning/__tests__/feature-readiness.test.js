@@ -477,6 +477,8 @@ describe('buildFeatureReadiness', function() {
       })
       var result = await buildFeatureReadiness(readFromStorage)
       expect(result.ready[0].confidence).toBe('committed')
+      expect(result.ready[0].isAiFirst).toBe(true)
+      expect(Array.isArray(result.ready[0].labels)).toBe(true)
     })
 
     it('approved feature without fixVersion gets confidence=ready', async function() {
