@@ -2,6 +2,18 @@
 import { computed } from 'vue'
 import RubricScoreBadge from '@shared/client/components/RubricScoreBadge.vue'
 import FPDoRPopover from './FPDoRPopover.vue'
+import { failedFpdorNames } from '../utils/feature-readiness-export.js'
+import {
+  fpdorItemSeverity,
+  severityChipClass,
+  severityLabel,
+  worstFailedSeverity,
+  pathLabel,
+  pathChipClass,
+  pathChipTitle
+} from '../utils/fpdor-severity.js'
+
+var MAX_VISIBLE_FAIL_CHIPS = 3
 
 var props = defineProps({
   feature: { type: Object, required: true },
@@ -12,6 +24,33 @@ var props = defineProps({
 var emit = defineEmits(['select', 'navigate'])
 
 var isHealthPipeline = computed(function() { return props.feature.dataSource === 'health-pipeline' })
+
+var failedItems = computed(function() { return failedFpdorNames(props.feature) })
+
+var visibleFailedChips = computed(function() {
+  return failedItems.value.slice(0, MAX_VISIBLE_FAIL_CHIPS)
+})
+
+var overflowFailedCount = computed(function() {
+  return Math.max(0, failedItems.value.length - MAX_VISIBLE_FAIL_CHIPS)
+})
+
+var overflowFailedTitle = computed(function() {
+  if (overflowFailedCount.value === 0) return undefined
+  return failedItems.value.slice(MAX_VISIBLE_FAIL_CHIPS).join(', ')
+})
+
+var overflowChipClass = computed(function() {
+  return severityChipClass(worstFailedSeverity(props.feature))
+})
+
+function chipClassForName(name) {
+  return severityChipClass(fpdorItemSeverity(name))
+}
+
+function chipTitleForName(name) {
+  return 'Failed FPDoR (' + severityLabel(fpdorItemSeverity(name)) + '): ' + name
+}
 
 function recommendationClass(rec) {
   switch (rec) {
@@ -43,14 +82,6 @@ var scoreBreakdown = computed(function() {
   return bd
 })
 
-var confidenceTooltip = computed(function() {
-  switch (props.feature.confidence) {
-    case 'committed': return 'Committed — fix version assigned to a release'
-    case 'ready':     return 'Ready — passes readiness gates, not yet committed'
-    case 'not-ready': return 'Not Ready — does not pass readiness gates'
-    default:          return ''
-  }
-})
 </script>
 
 <template>
@@ -99,13 +130,32 @@ var confidenceTooltip = computed(function() {
       </span>
     </td>
 
-    <!-- Readiness (FPDoR popover) -->
-    <td class="px-3 py-2.5 whitespace-nowrap">
-      <FPDoRPopover
-        :fpdor="feature.fpdor"
-        :confidence="feature.confidence"
-        :title="confidenceTooltip"
-      />
+    <!-- Readiness (FPDoR popover + fail chips) -->
+    <td class="px-3 py-2.5">
+      <div class="flex flex-wrap items-center gap-1 min-w-[10rem] max-w-[18rem]">
+        <FPDoRPopover
+          :fpdor="feature.fpdor"
+          :confidence="feature.confidence"
+        />
+        <span
+          class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+          :class="pathChipClass(feature)"
+          :title="pathChipTitle(feature)"
+        >{{ pathLabel(feature) }}</span>
+        <span
+          v-for="name in visibleFailedChips"
+          :key="name"
+          class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+          :class="chipClassForName(name)"
+          :title="chipTitleForName(name)"
+        >{{ name }}</span>
+        <span
+          v-if="overflowFailedCount > 0"
+          class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+          :class="overflowChipClass"
+          :title="overflowFailedTitle"
+        >+{{ overflowFailedCount }}</span>
+      </div>
     </td>
 
     <!-- Key -->

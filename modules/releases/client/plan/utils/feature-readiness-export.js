@@ -1,4 +1,5 @@
 import { escapeCsv, triggerDownload } from './health-export.js'
+import { pathLabel } from './fpdor-severity.js'
 
 var FPDOR_CONFLUENCE_URL = 'https://redhat.atlassian.net/wiki/spaces/RHAI/pages/442958832/Planning+Phase+-+Definition+of+Ready+Definition+of+Done'
 
@@ -73,6 +74,7 @@ function exportFeatureReadinessCsv(features) {
       }
     },
     { label: 'Failed FPDoR Items', getter: function(f) { return failedFpdorNames(f).join('; ') } },
+    { label: 'Path', getter: function(f) { return pathLabel(f) } },
     { label: 'Outcome', getter: function(f) { return f.bigRock || '' } },
     {
       label: 'Target Versions',

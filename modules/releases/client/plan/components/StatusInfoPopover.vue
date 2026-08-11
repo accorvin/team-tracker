@@ -61,7 +61,7 @@ var { isVisible, isPinned, popoverId, onMouseEnter, onMouseLeave, onClick, dismi
             rel="noopener noreferrer"
             class="text-primary-600 dark:text-primary-400 hover:underline"
             @click.stop
-          >Planning Phase DoR</a>.
+          >Planning Phase DoR / DoD</a>.
           N/A items do not block readiness. Rubric scores are informational only.
         </p>
       </div>

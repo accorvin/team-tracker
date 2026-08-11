@@ -1,6 +1,14 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import HygieneViolations from '@shared/client/components/HygieneViolations.vue'
+import {
+  worstFailedSeverity,
+  severityBadgeClass,
+  severityLabel,
+  pathLabel,
+  pathChipClass,
+  pathChipTitle
+} from '../utils/fpdor-severity.js'
 
 const props = defineProps({
   feature: { type: Object, default: null },
@@ -99,32 +107,22 @@ function initials(name) {
   return (name || '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 }
 
-const confidenceClass = computed(() => {
-  switch (props.feature?.confidence) {
-    case 'committed': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
-    case 'ready':     return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200'
-    case 'not-ready': return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
-    default:          return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-  }
+const readinessSeverity = computed(() => worstFailedSeverity(props.feature))
+
+const readinessClass = computed(() => severityBadgeClass(readinessSeverity.value))
+
+const readinessLabel = computed(() => {
+  if (!props.feature) return '—'
+  return readinessSeverity.value ? 'Not Ready' : 'Ready'
 })
 
-const confidenceLabel = computed(() => {
-  switch (props.feature?.confidence) {
-    case 'committed': return 'Ready'
-    case 'ready':     return 'Ready'
-    case 'not-ready': return 'Not Ready'
-    default:          return '—'
-  }
+const readinessTooltip = computed(() => {
+  if (!props.feature) return ''
+  if (!readinessSeverity.value) return 'Ready — all applicable FPDoR items pass'
+  return 'Not Ready — worst fail severity: ' + severityLabel(readinessSeverity.value)
 })
 
-const confidenceTooltip = computed(() => {
-  switch (props.feature?.confidence) {
-    case 'committed': return 'Committed — fix version assigned to a release'
-    case 'ready':     return 'Ready — passes readiness gates, not yet committed'
-    case 'not-ready': return 'Not Ready — does not pass readiness gates'
-    default:          return ''
-  }
-})
+const isCommitted = computed(() => props.feature?.confidence === 'committed')
 
 const rubricTotal = computed(() => {
   if (!props.feature) return 0
@@ -283,13 +281,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           </div>
 
           <div class="flex flex-wrap gap-1.5 mt-2.5">
-            <!-- Confidence badge (all features) -->
+            <!-- Readiness badge — severity color, not Fix Version -->
             <span
-              v-if="feature.confidence"
+              v-if="feature.fpdor || feature.confidence"
               class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
-              :class="confidenceClass"
-              :title="confidenceTooltip"
-            >{{ confidenceLabel }}</span>
+              :class="readinessClass"
+              :title="readinessTooltip"
+            >{{ readinessLabel }}</span>
+            <span
+              v-if="isCommitted"
+              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+              title="Committed — fix version assigned to a release"
+            >Committed</span>
+            <span
+              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+              :class="pathChipClass(feature)"
+              :title="pathChipTitle(feature)"
+            >{{ pathLabel(feature) }}</span>
 
             <!-- Health pipeline badges -->
             <template v-if="isHealthPipeline">
