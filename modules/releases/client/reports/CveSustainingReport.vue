@@ -90,6 +90,30 @@
         </div>
       </div>
 
+      <!-- SLA Compliance (quarter-over-quarter) -->
+      <section v-if="slaQuarters.length" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+        <div class="mb-4">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">CVE SLA Compliance</h3>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Resolved on or before due date. Only CVEs with both a due date and resolution date are evaluated.</p>
+        </div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <a v-for="(q, idx) in slaQuarters" :key="q.label"
+            :href="q.total_jql" target="_blank" rel="noopener noreferrer"
+            class="rounded-lg border p-4 text-center hover:shadow-md transition-shadow cursor-pointer block"
+            :class="slaCardClasses(q.pct)"
+            :title="`${q.label}: ${q.metSla} / ${q.total} CVEs met SLA — click to view in Jira`">
+            <p class="text-3xl font-extrabold">{{ q.pct }}%</p>
+            <div v-if="idx === slaQuarters.length - 1 && slaQuarters.length >= 2" class="mt-0.5">
+              <span class="text-[10px] font-semibold" :class="slaDeltaClass">
+                {{ slaDelta > 0 ? '+' : '' }}{{ slaDelta }}pp {{ slaDelta >= 0 ? '&#9650;' : '&#9660;' }}
+              </span>
+            </div>
+            <p class="text-[10px] font-semibold uppercase tracking-wide mt-1 opacity-80">{{ q.label }}</p>
+            <p class="text-xs mt-1 opacity-60">{{ q.metSla }} / {{ q.total }} met SLA</p>
+          </a>
+        </div>
+      </section>
+
       <!-- 2. CVEs by Due Date -->
       <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">CVEs by Due Date</h3>
@@ -132,10 +156,11 @@
         </section>
 
         <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
-          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
             False Positive by VEX Justification
             <span v-if="filters.hasActiveFilters.value" class="text-[10px] font-normal text-gray-400 dark:text-gray-500 ml-1">(all data)</span>
           </h3>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">All resolved false positives across all statuses</p>
           <div style="height: 380px;">
             <Doughnut :data="vexDoughnutData" :options="vexPieOptions" />
           </div>
@@ -501,6 +526,28 @@ const dueDateBuckets = computed(() => {
     { key: 'none', label: 'None (No due date)', pct: dd.none.pct, count: dd.none.count, jql: dd.none.jql, classes: 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700' }
   ]
 })
+
+// ─── SLA Compliance ──────────────────────────────────────────────────────────
+
+const slaQuarters = computed(() => data.value?.slaCompliance?.quarters || [])
+
+const slaDelta = computed(() => {
+  const q = slaQuarters.value
+  if (q.length < 2) return 0
+  return q[q.length - 1].pct - q[q.length - 2].pct
+})
+
+const slaDeltaClass = computed(() => {
+  if (slaDelta.value > 0) return 'text-emerald-600 dark:text-emerald-400'
+  if (slaDelta.value < 0) return 'text-red-600 dark:text-red-400'
+  return 'text-gray-500 dark:text-gray-400'
+})
+
+function slaCardClasses(pct) {
+  if (pct >= 80) return 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
+  if (pct >= 60) return 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+  return 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+}
 
 // ─── Chart Colors ────────────────────────────────────────────────────────────
 
