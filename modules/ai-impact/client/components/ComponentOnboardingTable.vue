@@ -2,7 +2,7 @@
 import { ref, computed, inject } from 'vue'
 import { useModuleLink } from '@shared/client/composables/useModuleLink'
 import MultiSelectDropdown from './MultiSelectDropdown.vue'
-import { collectVersionGroups, matchesVersionGroups, formatVersionGroupLabel } from '../utils/version-group.js'
+import { extractVersionGroup, collectVersionGroups, matchesVersionGroups, formatVersionGroupLabel } from '../utils/version-group.js'
 import {
   filterChipsRowClass,
   filterChipNeutralClass,
@@ -104,6 +104,12 @@ function clearAllFilters() {
   completionFilter.value = []
   productFilter.value = 'all'
   targetVersionFilter.value = []
+}
+
+function displayVersion(raw) {
+  if (!raw) return null
+  const group = extractVersionGroup(raw)
+  return group ? formatVersionGroupLabel(group) : raw
 }
 
 // ── Derived list ──────────────────────────────────────────────────────────────
@@ -440,7 +446,7 @@ function completionStatusDotClass(status) {
               </span>
             </td>
             <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
-              {{ component.targetVersion || '—' }}
+              {{ displayVersion(component.targetVersion) || '—' }}
             </td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
@@ -507,7 +513,7 @@ function completionStatusDotClass(status) {
                     </div>
                     <div v-if="component.targetVersion" class="flex gap-2">
                       <span class="text-gray-400 w-20 flex-shrink-0">Version</span>
-                      <span class="font-medium text-gray-700 dark:text-gray-300">{{ component.targetVersion }}</span>
+                      <span class="font-medium text-gray-700 dark:text-gray-300">{{ displayVersion(component.targetVersion) }}</span>
                     </div>
                     <div v-if="component.isOperator || detailCache[component.key]?.latest?.isOperator" class="flex gap-2">
                       <span class="text-gray-400 w-20 flex-shrink-0">Type</span>
