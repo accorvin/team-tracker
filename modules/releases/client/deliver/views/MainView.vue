@@ -108,7 +108,7 @@ import { useRiskDashboardConfig } from '../composables/useRiskDashboardConfig'
 import ReleaseVersionGroup from '../components/ReleaseVersionGroup.vue'
 import RiskDashboardSettingsPanel from '../components/RiskDashboardSettingsPanel.vue'
 
-const filter = inject('releaseFilter')
+const allAnalysisReleases = inject('allAnalysisReleases')
 const analysisState = inject('analysisState')
 const { loading, refreshing, error, analysis, refreshAnalysis } = analysisState
 
@@ -171,7 +171,7 @@ const portfolioMemberSet = computed(function () {
 })
 
 const allReleases = computed(() => {
-  const releases = filter.filteredReleases.value
+  const releases = allAnalysisReleases.value
 
   const now = new Date()
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
