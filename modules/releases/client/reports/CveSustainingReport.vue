@@ -132,9 +132,9 @@
         </p>
       </section>
 
-      <!-- 1. RHOAI Open CVEs (bar chart) -->
+      <!-- 1. RHAI Open CVEs (bar chart) -->
       <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">RHOAI Open CVEs</h3>
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">RHAI Open CVEs</h3>
         <div style="height: 340px;">
           <Bar :data="openCvesChartData" :options="openCvesChartOptions" />
         </div>
@@ -292,10 +292,10 @@
         </p>
       </section>
 
-      <!-- 9. RHOAI False Positives (multi-series line) -->
+      <!-- 9. RHAI False Positives (multi-series line) -->
       <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          RHOAI False Positives
+          RHAI False Positives
           <span v-if="filters.hasActiveFilters.value" class="text-[10px] font-normal text-gray-400 dark:text-gray-500 ml-1">(all data)</span>
         </h3>
         <div style="height: 300px;">
