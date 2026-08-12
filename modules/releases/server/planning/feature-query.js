@@ -72,8 +72,9 @@ function normalizeIssue(issue) {
     pmOwner: pmOwner,
     effort: numericField(fields[CUSTOM_FIELDS.effort]),
     // null when description was not fetched — lets health/cache signals win in merge
-    descriptionSignals: fields.description ? parseDescriptionSignals(fields.description) : null,
-    epicCount: 0
+    descriptionSignals: fields.description ? parseDescriptionSignals(fields.description) : null
+    // Do not set epicCount here — live fetch does not discover child Epics.
+    // A placeholder 0 would override exec/health counts in mergeFeatureData.
   }
 }
 
