@@ -2418,7 +2418,7 @@ describe('buildFeatureReadiness — pass 3 (jiraFeatures)', function() {
     expect(result.pendingReview[0].title).toBe('Jira Feature RHAISTRAT-900')
   })
 
-  it('prefers live jira epicCount for Child epics over stale exec count of 0', async function() {
+  it('prefers explicit jira epicCount for Child epics over stale exec count of 0', async function() {
     var jiraFeatures = makeJiraMap([
       makeJiraFeature('RHAISTRAT-2198', {
         epicCount: 2,
@@ -2451,6 +2451,60 @@ describe('buildFeatureReadiness — pass 3 (jiraFeatures)', function() {
     })
     expect(feature).toBeTruthy()
     expect(feature.epicCount).toBe(2)
+    var child = feature.fpdor.items.find(function(i) { return i.name === 'Child epics' })
+    expect(child.pass).toBe(true)
+  })
+
+  it('uses exec epicCount when live jira omits epicCount (request path does not discover children)', async function() {
+    var jiraFeature = makeJiraFeature('RHAISTRAT-1473', {
+      components: ['Platform', 'Serving', 'UXD', 'Documentation'],
+      docsRequired: 'Yes',
+      labels: ['strat-creator-auto-created', 'strat-creator-human-sign-off', 'rp-qg1-pass'],
+      riceScore: 50,
+      releaseType: 'GA',
+      pmOwner: 'Jane'
+    })
+    delete jiraFeature.epicCount
+    var jiraFeatures = makeJiraMap([jiraFeature])
+    var readFromStorage = makeReadFromStorage({
+      ...convertToUnifiedFormat(makeFeaturesStore({})),
+      'releases/planning/config.json': CONFIG_3_6,
+      'releases/planning/health-cache-3.6-all.json': {
+        features: [{
+          key: 'RHAISTRAT-1473',
+          deliveryOwner: 'Alice',
+          pmOwner: 'Jane',
+          targetRelease: 'rhoai-3.6',
+          storyPoints: 5,
+          epicCount: 0,
+          releaseType: 'GA',
+          components: ['Platform', 'Serving', 'UXD', 'Documentation'],
+          docsRequired: 'Yes'
+        }]
+      },
+      'releases/execution/index.json': makeExecIndex([
+        {
+          key: 'RHAISTRAT-1473',
+          summary: 'Tool Calling',
+          status: 'Release Pending',
+          epicCount: 5,
+          components: ['Platform', 'Serving', 'UXD', 'Documentation'],
+          docsRequired: 'Yes',
+          labels: ['strat-creator-auto-created', 'strat-creator-human-sign-off', 'rp-qg1-pass'],
+          riceScore: 50,
+          releaseType: 'GA',
+          assignee: 'Alice',
+          pm: 'Jane'
+        }
+      ])
+    })
+
+    var result = await buildFeatureReadiness(readFromStorage, jiraFeatures)
+    var feature = result.pendingReview.concat(result.ready).find(function(f) {
+      return f.key === 'RHAISTRAT-1473'
+    })
+    expect(feature).toBeTruthy()
+    expect(feature.epicCount).toBe(5)
     var child = feature.fpdor.items.find(function(i) { return i.name === 'Child epics' })
     expect(child.pass).toBe(true)
   })

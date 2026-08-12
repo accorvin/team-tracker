@@ -427,17 +427,28 @@ function mergeFeatureData(key, jiraFeatures, aiReviewMap, candidateIndex, health
   var hygieneStatus = computeHygieneStatus(violations)
 
   var storyPoints = (health && health.storyPoints) || (candidate && candidate.storyPoints) || (jira && jira.storyPoints) || (exec && exec.storyPoints) || null
-  var epicCount
-  if (jira && jira.epicCount != null) {
-    epicCount = jira.epicCount
-  } else if (health && health.epicCount != null) {
-    epicCount = health.epicCount
-  } else if (candidate && candidate.epicCount != null) {
-    epicCount = candidate.epicCount
-  } else if (exec && exec.epicCount != null) {
-    epicCount = exec.epicCount
-  } else {
-    epicCount = 0
+  // Prefer any positive epicCount (jira → health → candidate → exec). A placeholder 0
+  // from live Jira or a stale health cache must not override a real exec count.
+  var epicCount = 0
+  var epicSources = [
+    jira && jira.epicCount,
+    health && health.epicCount,
+    candidate && candidate.epicCount,
+    exec && exec.epicCount
+  ]
+  for (var ei = 0; ei < epicSources.length; ei++) {
+    if (epicSources[ei] != null && epicSources[ei] > 0) {
+      epicCount = epicSources[ei]
+      break
+    }
+  }
+  if (epicCount === 0) {
+    for (var ej = 0; ej < epicSources.length; ej++) {
+      if (epicSources[ej] != null) {
+        epicCount = epicSources[ej]
+        break
+      }
+    }
   }
   var releaseType = (health && health.releaseType) || (candidate && candidate.phase) || (jira && jira.releaseType) || (exec && exec.releaseType) || null
   var assignee = deliveryOwner
