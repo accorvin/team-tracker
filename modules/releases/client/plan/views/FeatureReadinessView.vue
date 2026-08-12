@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, inject, watch } from 'vue'
 import { useFeatureReadiness } from '../composables/useFeatureReadiness'
 import { useReleases } from '../composables/useReleasePlanning'
 import { useRefreshPolling } from '../composables/useRefreshPolling'
@@ -11,6 +11,11 @@ import {
   featureMatchesSharedFilters,
   exportFeatureReadinessCsv
 } from '../utils/feature-readiness-export.js'
+import {
+  DEFAULT_FILTERS,
+  saveFeaturesListFilters,
+  restoreFeaturesListFilters
+} from '../utils/features-list-filter-storage.js'
 
 const nav = inject('moduleNav')
 const jiraBaseUrl = 'https://issues.redhat.com/browse'
@@ -50,15 +55,10 @@ useRefreshPolling(refreshing, checkRefreshStatus, function() {
   loadFeatureReadiness()
 })
 
-onMounted(function() {
-  loadFeatureReadiness()
-  loadReleases()
-})
-
 const selectedFeature = ref(null)
 const selectedVersion = ref('')
 
-const filters = ref({
+const filters = ref(Object.assign({}, DEFAULT_FILTERS, {
   outcome: [],
   targetVersion: [],
   fixVersion: [],
@@ -66,8 +66,37 @@ const filters = ref({
   priority: [],
   team: [],
   product: [],
-  fpdorItems: [],
-  readiness: null
+  fpdorItems: []
+}))
+
+function restorePersistedFilters() {
+  var saved = restoreFeaturesListFilters()
+  if (!saved) return
+  filters.value = Object.assign({}, DEFAULT_FILTERS, saved.filters, {
+    outcome: saved.filters.outcome.slice(),
+    targetVersion: saved.filters.targetVersion.slice(),
+    fixVersion: saved.filters.fixVersion.slice(),
+    component: saved.filters.component.slice(),
+    priority: saved.filters.priority.slice(),
+    team: saved.filters.team.slice(),
+    product: saved.filters.product.slice(),
+    fpdorItems: saved.filters.fpdorItems.slice()
+  })
+  selectedVersion.value = saved.selectedVersion
+}
+
+watch(
+  [filters, selectedVersion],
+  function() {
+    saveFeaturesListFilters(filters.value, selectedVersion.value)
+  },
+  { deep: true }
+)
+
+onMounted(function() {
+  restorePersistedFilters()
+  loadFeatureReadiness()
+  loadReleases()
 })
 
 function matchesFilters(feature) {
