@@ -81,6 +81,7 @@ function exportFeatureReadinessCsv(features) {
       getter: function(f) { return (f.targetVersions || []).join('; ') }
     },
     { label: 'Fix Version', getter: function(f) { return f.fixVersion || '' } },
+    { label: 'Release Type', getter: function(f) { return f.releaseType || '' } },
     {
       label: 'Components',
       getter: function(f) {
