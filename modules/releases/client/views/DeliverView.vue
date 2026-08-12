@@ -7,8 +7,8 @@
       <p class="text-xs">This may take a few minutes on first load.</p>
     </div>
 
-    <!-- Chip bar (visible once analysis has data) -->
-    <ReleaseChipBar v-if="allReleases.length" />
+    <!-- Chip bar (visible once analysis has data, hidden on Risk Dashboard which uses gear config only) -->
+    <ReleaseChipBar v-if="allReleases.length && activeTab !== 'risk-dashboard'" />
 
     <div class="border-b border-gray-200 dark:border-gray-700">
       <nav class="flex -mb-px px-4" aria-label="Deliver sub-tabs">
@@ -57,6 +57,7 @@ const allReleases = computed(() => {
 const filter = useReleaseFilter(allReleases)
 
 provide('releaseFilter', filter)
+provide('allAnalysisReleases', allReleases)
 provide('analysisState', { loading, refreshing, error, analysis, refreshAnalysis })
 provide('conformaState', conformaState)
 
