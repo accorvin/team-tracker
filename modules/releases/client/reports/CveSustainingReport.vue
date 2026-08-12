@@ -10,7 +10,7 @@
         <ArrowLeft :size="18" />
       </button>
       <div class="flex-1">
-        <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">RHOAI Sustaining (CVEs)</h2>
+        <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">RHAI Sustaining (CVEs)</h2>
         <p v-if="data?.lastRefreshed" class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
           Last refreshed: {{ formatDate(data.lastRefreshed) }}
         </p>
@@ -119,10 +119,10 @@
         </p>
       </section>
 
-      <!-- 4. Open RHOAI CVEs across all versions (pie) + 6. False Positive by VEX (doughnut) -->
+      <!-- 4. Open RHAI CVEs across all versions (pie) + 6. False Positive by VEX (doughnut) -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
-          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Open RHOAI CVEs across all versions</h3>
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Open RHAI CVEs across all versions</h3>
           <div style="height: 300px;">
             <Pie :data="versionPieData" :options="versionPieOptions" />
           </div>
@@ -136,7 +136,7 @@
             False Positive by VEX Justification
             <span v-if="filters.hasActiveFilters.value" class="text-[10px] font-normal text-gray-400 dark:text-gray-500 ml-1">(all data)</span>
           </h3>
-          <div style="height: 300px;">
+          <div style="height: 380px;">
             <Doughnut :data="vexDoughnutData" :options="vexPieOptions" />
           </div>
           <p class="text-xs text-gray-400 dark:text-gray-500 mt-2 text-right">
@@ -152,12 +152,16 @@
           <thead>
             <tr class="border-b border-gray-200 dark:border-gray-700">
               <th class="text-left py-2 pr-3 font-semibold text-gray-700 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">Components</th>
-              <th v-for="ver in agg.cvesAcrossVersions.value.versions" :key="ver" class="text-right py-2 px-2 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ ver }}</th>
-              <th class="text-right py-2 pl-3 font-bold text-gray-900 dark:text-gray-100">Total</th>
+              <th v-for="ver in agg.cvesAcrossVersions.value.versions" :key="ver" class="text-right py-2 px-2 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap cursor-pointer select-none hover:text-gray-900 dark:hover:text-gray-100" @click="toggleVersionTableSort(ver)">
+                {{ ver }} <span class="text-[9px] ml-0.5" :class="versionSortIcon(ver).active ? 'text-gray-900 dark:text-gray-100' : 'text-gray-300 dark:text-gray-600'">{{ versionSortIcon(ver).char }}</span>
+              </th>
+              <th class="text-right py-2 pl-3 font-bold text-gray-900 dark:text-gray-100 cursor-pointer select-none hover:text-primary-600 dark:hover:text-primary-400" @click="toggleVersionTableSort('total')">
+                Total <span class="text-[9px] ml-0.5" :class="versionSortIcon('total').active ? 'text-gray-900 dark:text-gray-100' : 'text-gray-300 dark:text-gray-600'">{{ versionSortIcon('total').char }}</span>
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in agg.cvesAcrossVersions.value.rows" :key="row.component" class="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
+            <tr v-for="row in sortedVersionTableRows" :key="row.component" class="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
               <td class="py-1.5 pr-3 text-gray-800 dark:text-gray-200 sticky left-0 bg-white dark:bg-gray-800 z-10">{{ row.component }}</td>
               <td v-for="ver in agg.cvesAcrossVersions.value.versions" :key="ver" class="text-right py-1.5 px-2 tabular-nums">
                 <button v-if="row.cells[ver]" class="font-semibold text-blue-600 dark:text-blue-400 underline decoration-dotted hover:decoration-solid cursor-pointer" @click="drillDownByMatrixCell(row.component, ver, row.cellJqls[ver])">{{ row.cells[ver] }}</button>
@@ -188,7 +192,7 @@
         </p>
       </section>
 
-      <!-- 5. CVEs by RHOAI Sustaining (assignee x status table) -->
+      <!-- 5. CVEs by RHAI Sustaining (assignee x status table) -->
       <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 overflow-x-auto">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">CVEs by Assignee</h3>
         <table class="w-full text-xs">
@@ -455,6 +459,35 @@ function formatDate(iso) {
   })
 }
 
+// ─── CVEs across versions table sort ─────────────────────────────────────────
+
+const versionTableSort = ref({ column: 'component', direction: 'asc' })
+
+function toggleVersionTableSort(column) {
+  if (versionTableSort.value.column === column) {
+    versionTableSort.value.direction = versionTableSort.value.direction === 'asc' ? 'desc' : 'asc'
+  } else {
+    versionTableSort.value = { column, direction: 'desc' }
+  }
+}
+
+function versionSortIcon(column) {
+  if (versionTableSort.value.column !== column) return { char: '▲▼', active: false }
+  return { char: versionTableSort.value.direction === 'asc' ? '▲' : '▼', active: true }
+}
+
+const sortedVersionTableRows = computed(() => {
+  const raw = agg.cvesAcrossVersions.value.rows
+  if (!raw || !raw.length) return []
+  const col = versionTableSort.value.column
+  const dir = versionTableSort.value.direction === 'asc' ? 1 : -1
+  return [...raw].sort((a, b) => {
+    if (col === 'component') return dir * a.component.localeCompare(b.component)
+    if (col === 'total') return dir * (a.total - b.total)
+    return dir * ((a.cells[col] || 0) - (b.cells[col] || 0))
+  })
+})
+
 // ─── Due Date Buckets ────────────────────────────────────────────────────────
 
 const dueDateBuckets = computed(() => {
@@ -465,7 +498,7 @@ const dueDateBuckets = computed(() => {
     { key: 'lt30', label: 'Due Date in Less Than 30 Days', pct: dd.lessThan30.pct, count: dd.lessThan30.count, jql: dd.lessThan30.jql, classes: 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800' },
     { key: '30-90', label: 'Due Date Between 30 and 90 Days', pct: dd.between30And90.pct, count: dd.between30And90.count, jql: dd.between30And90.jql, classes: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' },
     { key: 'gt90', label: 'Due Date More Than 90 Days', pct: dd.moreThan90.pct, count: dd.moreThan90.count, jql: dd.moreThan90.jql, classes: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' },
-    { key: 'none', label: 'None', pct: dd.none.pct, count: dd.none.count, jql: dd.none.jql, classes: 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700' }
+    { key: 'none', label: 'None (No due date)', pct: dd.none.pct, count: dd.none.count, jql: dd.none.jql, classes: 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700' }
   ]
 })
 
@@ -588,6 +621,12 @@ const PIE_LEGEND = {
   labels: { padding: 8, font: { size: 10 }, color: '#6b7280', usePointStyle: true, pointStyle: 'circle', boxWidth: 8 }
 }
 
+const PIE_LEGEND_BOTTOM = {
+  display: true,
+  position: 'bottom',
+  labels: { padding: 10, font: { size: 11 }, color: '#6b7280', usePointStyle: true, pointStyle: 'circle', boxWidth: 8 }
+}
+
 const versionPieOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -616,7 +655,7 @@ const vexPieOptions = computed(() => ({
   },
   onHover: (event, elements) => { event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default' },
   plugins: {
-    legend: PIE_LEGEND,
+    legend: PIE_LEGEND_BOTTOM,
     tooltip: { callbacks: { label: (ctx) => `${ctx.raw} issues — click to view in Jira` } }
   }
 }))

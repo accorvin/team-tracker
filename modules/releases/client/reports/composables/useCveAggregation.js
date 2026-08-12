@@ -3,7 +3,7 @@ import { computed } from 'vue'
 // ─── JQL constants (mirrored from server) ───────────────────────────────────
 
 const BASE_JQL = [
-  'project in (RHAIENG, RHOAIENG)',
+  'project in (RHAIENG, RHOAIENG, INFERENG, AIPCC)',
   '(labels not in (RHOAI-releases, RHOAI-internal, devtestops-service) OR labels is EMPTY)',
   'component not in (Documentation, PXE, Devops, testops)',
   'issuetype in (vulnerability)',
@@ -144,7 +144,11 @@ function buildVersionComponentMatrix(issues, searchBase, filterJql) {
   }
 
   const sortedComponents = [...components].sort()
-  const sortedVersions = [...versions].sort()
+  const sortedVersions = [...versions].sort().sort((a, b) => {
+    if (a === 'None') return 1
+    if (b === 'None') return -1
+    return 0
+  })
   const base = BASE_JQL + filterJql
 
   const rows = sortedComponents.map(comp => {
