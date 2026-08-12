@@ -69,6 +69,73 @@ describe('buildFeatureObj', function () {
     expect(result).not.toHaveProperty('violations')
     expect(result.linkedRfeKey).toBe('RHAIRFE-1')
   })
+
+  it('passes Child epics when execution index has epicCount', function () {
+    var input = Object.assign({}, fullInput, { openChildCount: 0 })
+    var result = buildFeatureObj(input, ['rhoai-3.5'], null, { 'RHAIENG-123': 1 })
+    var childEpics = result.fpdor.items.find(function (item) {
+      return item.name === 'Child epics'
+    })
+    expect(childEpics).toBeTruthy()
+    expect(childEpics.pass).toBe(true)
+    expect(childEpics.detail).toMatch(/linked child epics/i)
+  })
+
+  it('ignores hygiene openChildCount for Child epics FPDoR', function () {
+    var input = Object.assign({}, fullInput, { openChildCount: 5 })
+    var result = buildFeatureObj(input, ['rhoai-3.5'], null, {})
+    var childEpics = result.fpdor.items.find(function (item) {
+      return item.name === 'Child epics'
+    })
+    expect(childEpics).toBeTruthy()
+    expect(childEpics.pass).toBe(false)
+  })
+
+  it('uses f.epicCount when no execution map entry', function () {
+    var input = Object.assign({}, fullInput, { epicCount: 2, openChildCount: 0 })
+    var result = buildFeatureObj(input, ['rhoai-3.5'])
+    var childEpics = result.fpdor.items.find(function (item) {
+      return item.name === 'Child epics'
+    })
+    expect(childEpics.pass).toBe(true)
+  })
+})
+
+describe('resolveEpicCount', function () {
+  const { resolveEpicCount, loadEpicCountByKey } = require('../../../server/pm-hub/routes')
+
+  it('prefers execution map over feature.epicCount', function () {
+    expect(resolveEpicCount({ key: 'A-1', epicCount: 9 }, { 'A-1': 1 })).toBe(1)
+  })
+
+  it('returns 0 when map has explicit zero', function () {
+    expect(resolveEpicCount({ key: 'A-1', epicCount: 9 }, { 'A-1': 0 })).toBe(0)
+  })
+
+  it('falls back to feature.epicCount when key missing from map', function () {
+    expect(resolveEpicCount({ key: 'A-1', epicCount: 3 }, {})).toBe(3)
+  })
+
+  it('does not use openChildCount', function () {
+    expect(resolveEpicCount({ key: 'A-1', openChildCount: 7 }, {})).toBe(0)
+  })
+
+  it('loadEpicCountByKey maps execution index epicCount by key', async function () {
+    var readFromStorage = async function (path) {
+      if (path === 'releases/execution/index.json') {
+        return {
+          features: [
+            { key: 'RHAISTRAT-2318', epicCount: 1 },
+            { key: 'RHAISTRAT-1', epicCount: 0 }
+          ]
+        }
+      }
+      return null
+    }
+    var map = await loadEpicCountByKey(readFromStorage)
+    expect(map['RHAISTRAT-2318']).toBe(1)
+    expect(map['RHAISTRAT-1']).toBe(0)
+  })
 })
 
 describe('computePmDoAligned / versionsStrictMatch', function () {
