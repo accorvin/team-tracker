@@ -27,7 +27,7 @@ const { logAudit, getAuditLog, computeFieldDiff } = require('./audit-log')
 const { blockDuringImpersonation } = require('../../../../shared/server/auth')
 const healthRoutes = require('./health/health-routes')
 var { buildFeatureReadiness } = require('./feature-readiness')
-var { fetchFeatures } = require('./feature-query')
+var { fetchFeaturesWithTimeout } = require('./feature-query')
 
 const { isValidVersionParam } = require('../version-utils')
 
@@ -474,8 +474,7 @@ module.exports = async function registerPlanningRoutes(router, context) {
       var jiraFeatures = null
       if (jiraClient) {
         try {
-          jiraFeatures = await fetchFeatures(jiraClient)
-          if (jiraFeatures.size === 0) jiraFeatures = null
+          jiraFeatures = await fetchFeaturesWithTimeout(jiraClient)
         } catch (jiraErr) {
           console.warn('[releases/planning] Jira feature query failed, falling back to execution index:', jiraErr.message)
         }

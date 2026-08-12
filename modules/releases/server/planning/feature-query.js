@@ -5,7 +5,6 @@ var { fetchEpicsForFeatures } = require('../execution/jira-enrich')
 var QUERY_FIELDS = [
   'summary', 'status', 'issuetype', 'assignee', 'fixVersions',
   'components', 'labels', 'priority', 'created', 'updated',
-  'description',
   CUSTOM_FIELDS.team,
   CUSTOM_FIELDS.targetVersion,
   CUSTOM_FIELDS.riceScore,
@@ -19,6 +18,9 @@ var QUERY_FIELDS = [
 ].join(',')
 
 var JQL = 'project = RHAISTRAT AND issuetype IN (Feature, Initiative) AND status NOT IN (Closed, Done, Resolved, Cancelled)'
+
+/** Bound live Jira so /feature-readiness stays under the gateway timeout. */
+var FETCH_FEATURES_TIMEOUT_MS = 12000
 
 function normalizeIssue(issue) {
   var fields = issue.fields || {}
@@ -69,7 +71,8 @@ function normalizeIssue(issue) {
     targetEnd: serializeField(fields[CUSTOM_FIELDS.targetEnd]),
     pmOwner: pmOwner,
     effort: numericField(fields[CUSTOM_FIELDS.effort]),
-    descriptionSignals: parseDescriptionSignals(fields.description),
+    // null when description was not fetched — lets health/cache signals win in merge
+    descriptionSignals: fields.description ? parseDescriptionSignals(fields.description) : null,
     epicCount: 0
   }
 }
@@ -109,10 +112,44 @@ async function fetchFeatures(jiraClient) {
   return map
 }
 
+/**
+ * Like fetchFeatures, but abandons the wait after timeoutMs so the Features List
+ * can respond from execution/health cache instead of gateway-timing-out.
+ * The underlying Jira fetch may still complete in the background.
+ *
+ * @param {object} jiraClient
+ * @param {number} [timeoutMs]
+ * @returns {Promise<Map|null>} feature map, or null on timeout / empty / missing client
+ */
+async function fetchFeaturesWithTimeout(jiraClient, timeoutMs) {
+  if (!jiraClient || !jiraClient.fetchAllJqlResults) return null
+  var ms = timeoutMs != null ? timeoutMs : FETCH_FEATURES_TIMEOUT_MS
+  var timedOut = false
+  var timeout = new Promise(function(resolve) {
+    setTimeout(function() {
+      timedOut = true
+      resolve(null)
+    }, ms)
+  })
+  var result = await Promise.race([fetchFeatures(jiraClient), timeout])
+  if (timedOut || result == null) {
+    if (timedOut) {
+      console.warn(
+        '[releases/planning] Live Jira feature fetch exceeded ' + ms + 'ms; using cached readiness sources'
+      )
+    }
+    return null
+  }
+  if (result.size === 0) return null
+  return result
+}
+
 module.exports = {
   fetchFeatures: fetchFeatures,
+  fetchFeaturesWithTimeout: fetchFeaturesWithTimeout,
   normalizeIssue: normalizeIssue,
   enrichChildEpicCounts: enrichChildEpicCounts,
   JQL: JQL,
-  QUERY_FIELDS: QUERY_FIELDS
+  QUERY_FIELDS: QUERY_FIELDS,
+  FETCH_FEATURES_TIMEOUT_MS: FETCH_FEATURES_TIMEOUT_MS
 }

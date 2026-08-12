@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 const {
   fetchFeatures,
+  fetchFeaturesWithTimeout,
   normalizeIssue,
   enrichChildEpicCounts,
   JQL,
@@ -51,6 +52,10 @@ describe('feature-query', function() {
       expect(QUERY_FIELDS).toContain(CUSTOM_FIELDS.team)
       expect(QUERY_FIELDS).toContain(CUSTOM_FIELDS.targetVersion)
       expect(QUERY_FIELDS).toContain(CUSTOM_FIELDS.riceScore)
+    })
+
+    it('omits description to keep the Features List request path light', function() {
+      expect(QUERY_FIELDS).not.toContain('description')
     })
   })
 
@@ -303,6 +308,35 @@ describe('feature-query', function() {
       expect(client.fetchAllJqlResults.mock.calls.some(function(c) {
         return String(c[0]).indexOf('issuetype = Epic') !== -1
       })).toBe(false)
+    })
+  })
+
+  describe('fetchFeaturesWithTimeout', function() {
+    it('returns null when jiraClient is missing', async function() {
+      expect(await fetchFeaturesWithTimeout(null)).toBeNull()
+    })
+
+    it('returns the feature map when fetch completes in time', async function() {
+      var client = mockJiraClient([
+        { key: 'RHAISTRAT-1', fields: { summary: 'Fast' } }
+      ])
+      var result = await fetchFeaturesWithTimeout(client, 5000)
+      expect(result).toBeInstanceOf(Map)
+      expect(result.get('RHAISTRAT-1').summary).toBe('Fast')
+    })
+
+    it('returns null when the live fetch exceeds the timeout', async function() {
+      var client = {
+        fetchAllJqlResults: vi.fn().mockImplementation(function() {
+          return new Promise(function(resolve) {
+            setTimeout(function() {
+              resolve([{ key: 'RHAISTRAT-SLOW', fields: { summary: 'Late' } }])
+            }, 200)
+          })
+        })
+      }
+      var result = await fetchFeaturesWithTimeout(client, 20)
+      expect(result).toBeNull()
     })
   })
 
