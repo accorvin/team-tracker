@@ -12,6 +12,7 @@ const { JIRA_HOST } = require('../../../../shared/server/jira')
 const { filterCommittedFixVersions, parseReleaseName, compareReleasesTemporally } = require('./committed-definition')
 const { parseDescriptionSignals } = require('../planning/health/description-scanner')
 const { computeFPDoRReadiness, isAiFirstFeature } = require('../planning/fpdor')
+const { loadIndex } = require('../planning/cache-reader')
 
 const JIRA_SEARCH = JIRA_HOST + '/issues/?jql='
 const PM_HUB_PROJECTS = ['RHAIENG', 'RHOAIENG', 'INFERENG', 'AIPCC', 'RHAISTRAT', 'RHAIRFE']
@@ -416,7 +417,46 @@ function computeConfidence(isReady, fixVersion) {
   return 'ready'
 }
 
-function buildFeatureObj(f, targetVersions, rawIssue) {
+/**
+ * Child-epics FPDoR count for PM Hub.
+ * Prefer execution-index epicCount (same source as Features List / jira-sync).
+ * Do not use hygiene openChildCount — that is only filled for terminal features
+ * and counts any open child, not Epic children.
+ *
+ * @param {object} f - Transformed hygiene feature (or partial)
+ * @param {object} [epicCountByKey] - Map of issue key → epicCount from execution index
+ * @returns {number}
+ */
+function resolveEpicCount(f, epicCountByKey) {
+  var key = f && f.key
+  if (key && epicCountByKey && epicCountByKey[key] != null) {
+    return epicCountByKey[key] || 0
+  }
+  if (f && f.epicCount != null) return f.epicCount || 0
+  return 0
+}
+
+/**
+ * Build a key → epicCount map from the execution index (one storage read).
+ * @param {Function} readFromStorage
+ * @returns {Promise<object>}
+ */
+async function loadEpicCountByKey(readFromStorage) {
+  var byKey = {}
+  try {
+    var execIndex = await loadIndex(readFromStorage)
+    var features = (execIndex && execIndex.features) || []
+    for (var i = 0; i < features.length; i++) {
+      var ef = features[i]
+      if (ef && ef.key) byKey[ef.key] = ef.epicCount || 0
+    }
+  } catch (err) {
+    console.warn('[releases/pm-hub] Failed to load execution epic counts:', err.message)
+  }
+  return byKey
+}
+
+function buildFeatureObj(f, targetVersions, rawIssue, epicCountByKey) {
   var tv = targetVersions || []
   var labels = Array.isArray(f.labels) ? f.labels : []
   var fixVersions = f.fixVersions || []
@@ -444,7 +484,7 @@ function buildFeatureObj(f, targetVersions, rawIssue) {
     linkedRfeKey: f.linkedRfeKey || null,
     sourceRfe: f.linkedRfeKey || null,
     descriptionSignals: descriptionSignals,
-    epicCount: f.openChildCount || 0
+    epicCount: resolveEpicCount(f, epicCountByKey)
   }
 
   var fpdor = computeFPDoRReadiness(fpdorInput)
@@ -743,6 +783,8 @@ module.exports = async function registerPmHubRoutes(router, context) {
       }
 
       var versionGroups = {}
+      // Same Child epics source as Features List (jira-sync → execution index).
+      var epicCountByKey = await loadEpicCountByKey(context.storage.readFromStorage)
 
       function ensureGroup(vName, cName) {
         if (!versionGroups[vName]) {
@@ -795,7 +837,7 @@ module.exports = async function registerPmHubRoutes(router, context) {
               if (componentNames.length > 0 && componentNames.indexOf(ucName) === -1) continue
               var uGroup = ensureGroup(committedFvOnly[ufi], ucName)
               if (!uGroup.committedFeatures.some(function(e) { return e.key === f.key })) {
-                uGroup.committedFeatures.push(buildFeatureObj(f, tvNames, rawIssue))
+                uGroup.committedFeatures.push(buildFeatureObj(f, tvNames, rawIssue, epicCountByKey))
                 uGroup.committedCount++
                 if (f.isBlocked) uGroup.blockedCount++
               }
@@ -829,7 +871,7 @@ module.exports = async function registerPmHubRoutes(router, context) {
         if (groupVersionKeys.length === 0) continue
 
         var isRequested = matchingTv.length > 0
-        var featureObj = buildFeatureObj(f, tvNames, rawIssue)
+        var featureObj = buildFeatureObj(f, tvNames, rawIssue, epicCountByKey)
 
         for (var gvi = 0; gvi < groupVersionKeys.length; gvi++) {
           var vKey = groupVersionKeys[gvi]
@@ -910,6 +952,8 @@ module.exports.PILLAR_CONFIG_FILE = PILLAR_CONFIG_FILE
 module.exports.backfillLeads = backfillLeads
 module.exports.computeVelocity = computeVelocity
 module.exports.buildFeatureObj = buildFeatureObj
+module.exports.resolveEpicCount = resolveEpicCount
+module.exports.loadEpicCountByKey = loadEpicCountByKey
 module.exports.extractTargetVersions = extractTargetVersions
 module.exports.filterCommittedFixVersions = filterCommittedFixVersions
 module.exports.computePmDoAligned = computePmDoAligned
