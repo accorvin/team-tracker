@@ -8,9 +8,9 @@
 |---|---|
 | **Stack** | Vue 3 SPA + Express backend, deployed on OpenShift via ArgoCD |
 | **Source repo** | `github.com/red-hat-data-services/rhai-org-pulse` |
-| **GitOps repo** | `github.com/red-hat-data-services/ambient-code-gitops` |
+| **GitOps repo** | `gitlab.cee.redhat.com/rhai-org-pulse/org-pulse-gitops` |
 | **Image registry** | `quay.io/org-pulse/` |
-| **ArgoCD namespace** | `ambient-code--argocd` |
+| **ArgoCD namespace** | `rhai-org-pulse--argocd` |
 
 ---
 
@@ -22,40 +22,17 @@
 |---|---|
 | **Cluster** | `prod-spoke-aws-us-west-2` |
 | **Cluster API** | `https://api.mpp-w2-prod.0jgd.p1.openshiftapps.com:6443` |
-| **OpenShift Console** | [console](https://console-openshift-console.apps.mpp-w2-prod.0jgd.p1.openshiftapps.com/k8s/ns/ambient-code--team-tracker/core~v1~Pod) |
-| **ArgoCD** | [argocd](https://ambient-code-argo.apps.int.spoke.prod.us-west-2.aws.paas.redhat.com) |
-| **Namespace** | `ambient-code--team-tracker` |
+| **OpenShift Console** | [console](https://console-openshift-console.apps.mpp-w2-prod.0jgd.p1.openshiftapps.com/k8s/ns/rhai-org-pulse--org-pulse/core~v1~Pod) |
+| **ArgoCD** | [argocd](https://org-pulse-argo.apps.int.spoke.prod.us-west-2.aws.paas.redhat.com) |
+| **Namespace** | `rhai-org-pulse--org-pulse` |
 | **UI URL** | `https://team-tracker.apps.int.spoke.prod.us-west-2.aws.paas.redhat.com` |
 | **API URL** | `https://api-team-tracker.apps.int.spoke.prod.us-west-2.aws.paas.redhat.com` |
 | **Source branch** | `main` |
 | **Kustomize path** | `deploy/openshift/overlays/ai-eng-prod` |
 | **Image tags** | Pinned to `:<git-sha>` |
-| **ArgoCD app manifest** | `ambient-code-gitops/clusters/prod-spoke-aws-us-west-2/apps/team-tracker.yaml` |
+| **ArgoCD app manifest** | `org-pulse-gitops/clusters/prod-spoke-aws-us-west-2/apps/team-tracker.yaml` |
 
-### Pre-production
-
-| | |
-|---|---|
-| **Cluster** | `preprod-spoke-aws-us-west-2` |
-| **Cluster API** | `https://api.mpp-w2-preprod.cfln.p1.openshiftapps.com:6443` |
-| **OpenShift Console** | [console](https://console-openshift-console.apps.mpp-w2-preprod.cfln.p1.openshiftapps.com/k8s/ns/ambient-code--team-tracker/core~v1~Pod) |
-| **ArgoCD** | [argocd](https://ambient-code-argo.apps.int.spoke.preprod.us-west-2.aws.paas.redhat.com) |
-| **Namespace** | `ambient-code--team-tracker` |
-| **UI URL** | `https://team-tracker.apps.int.spoke.preprod.us-west-2.aws.paas.redhat.com` |
-| **API URL** | `https://api-team-tracker.apps.int.spoke.preprod.us-west-2.aws.paas.redhat.com` |
-| **Source branch** | `preprod` |
-| **Kustomize path** | `deploy/openshift/overlays/ai-eng-preprod` |
-| **Image tags** | Pinned to `:<git-sha>` |
-| **ArgoCD app manifest** | `ambient-code-gitops/clusters/preprod-spoke-aws-us-west-2/apps/team-tracker.yaml` |
-
-> **Note:** There is no dev cluster deployment for team-tracker. Development is done locally.
-
-### Other Org Pulse Instances (same platform, different tenants)
-
-| Instance | Namespace | Cluster | Source Repo |
-|----------|-----------|---------|-------------|
-| **CCS Org Pulse** | `ambient-code--ccs-org-pulse` | prod | `gitlab.cee.redhat.com/docs-management-tooling/ccs-org-pulse.git` |
-| **UIE Org Pulse** | `ambient-code--uie-org-pulse` | prod | `github.com/red-hat-data-services/rhai-org-pulse.git` (overlay: `deploy/openshift/overlays/prod`) |
+> **Note:** There is currently no preprod or dev cluster deployment. Development is done locally.
 
 ---
 
@@ -112,32 +89,26 @@
 
 ### Rover Group
 
-Cluster and ArgoCD access is gated by the **ambient-code-support** Rover group:
+Cluster and ArgoCD access is gated by the **rhai-org-pulse-admins** Rover group:
 
-- **Rover URL**: https://rover.redhat.com/groups/group/ambient-code-support
-- **LDAP DN**: `cn=ambient-code-support,ou=adhoc,ou=managedGroups,dc=redhat,dc=com`
-- **Tenant config**: https://gitlab.cee.redhat.com/paas/gitops-tenant-management/-/tree/main/tenants/ambient-code
+- **Rover URL**: https://rover.redhat.com/groups/group/rhai-org-pulse-admins
+- **LDAP DN**: `cn=rhai-org-pulse-admins,ou=adhoc,ou=managedGroups,dc=redhat,dc=com`
+- **Tenant config**: https://gitlab.cee.redhat.com/paas/gitops-tenant-management/-/tree/main/tenants/rhai-org-pulse
 
 Membership in this group grants:
 
 | Access | Role | What it provides |
 |--------|------|------------------|
-| **OpenShift namespaces** | `namespace-editor` + `namespace-admin` | `oc` access to all `ambient-code--*` namespaces (view/edit pods, logs, secrets, exec) |
-| **ArgoCD** | `admin` + `user` | View, sync, and restart applications in the ArgoCD UI and CLI |
+| **OpenShift namespaces** | `namespace-editor` + `namespace-admin` | `oc` access to all `rhai-org-pulse--*` namespaces (view/edit pods, logs, secrets, exec) |
+| **ArgoCD** | `admin` | View, sync, and restart applications in the ArgoCD UI and CLI |
 
-This is configured via two MPP `TenantGroup` CRs (defined in `ambient-code-gitops/clusters/*/tenant/tenant.yaml`):
-
-- `ambient-code-editors` — maps the Rover group to `namespace-editor`
-- `ambient-code-egress-admins` — maps the Rover group to `namespace-admin` + `tenant-egress-admin`
-
-ArgoCD RBAC is configured in `ambient-code-gitops/argocd/argocd.yaml`:
+ArgoCD RBAC is configured in `org-pulse-gitops/argocd/argocd.yaml`:
 
 ```
-g, ambient-code-support, role:admin
-g, ambient-code-support, role:user
+g, rhai-org-pulse-admins, role:admin
 ```
 
-**To grant someone cluster access**, add them to the Rover group. No other configuration is needed — the TenantGroup and ArgoCD RBAC pick up group membership automatically via LDAP sync.
+**To grant someone cluster access**, add them to the Rover group. No other configuration is needed — the tenant config and ArgoCD RBAC pick up group membership automatically via LDAP sync.
 
 ## Auth Flow
 
@@ -178,20 +149,19 @@ ArgoCD watches the source repo with **automated sync policy**. The flow is:
 - `main` branch requires PRs with passing "Test & Build" status check
 - A GitHub App (`APP_ID`/`APP_PRIVATE_KEY`) has bypass for CI commits (version bumps, deploy tag updates)
 
-### Preprod vs Prod Image Strategy
+### Image Strategy
 
 | Environment | Image Tag | Update Mechanism |
 |-------------|-----------|------------------|
-| Preprod | `:<git-sha>` | Pinned — CI commits tag update to `preprod` branch |
 | Prod | `:<git-sha>` | Pinned — CI commits tag update to `main` |
 
 ### GitOps Patches Applied by ArgoCD
 
-The ArgoCD Application manifests in `ambient-code-gitops` apply additional patches at sync time:
+The ArgoCD Application manifests in `org-pulse-gitops` apply additional patches at sync time:
 
 - **PVC**: Storage class set to `aws-ebs` with `Delete` reclaim policy
 - **Backend Deployment**: Proxy env vars injected (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` pointing to `proxy.squi-001.prod.iad2.dc.redhat.com:3128`)
-- **Common label**: `paas.redhat.com/appcode: AMBC-001` on all resources
+- **Common label**: `paas.redhat.com/appcode: RHAI-015` on all resources
 
 ---
 
@@ -267,9 +237,16 @@ Most CronJob ticks complete in seconds (only handlers past their cadence run).
 
 ## Secrets
 
-Secrets are created manually in each namespace — they are **not** stored in git.
+Secrets are managed via the **Vault Secrets Operator (VSO)**. Each secret is defined as a `VaultStaticSecret` CR in the gitops repo (`org-pulse-gitops/vault/vault-secrets.yaml`), which syncs values from Red Hat corporate Vault (`vault.corp.redhat.com`) into Kubernetes secrets automatically.
+
+- **Vault mount**: `apps` (KV v2)
+- **Vault path prefix**: `rhai-org-pulse-admins/`
+- **Auth method**: AppRole via `VaultAuth` CR referencing `corporate-vault` `VaultConnection`
+- **Refresh interval**: 60 seconds
 
 ### team-tracker-secrets
+
+**Vault path**: `rhai-org-pulse-admins/org-pulse`
 
 | Key | Required | Description |
 |-----|----------|-------------|
@@ -292,13 +269,14 @@ Secrets are created manually in each namespace — they are **not** stored in gi
 
 ### Other Secrets
 
-| Secret Name | Keys | Purpose |
-|-------------|------|---------|
-| `ipa-credentials` | `IPA_BIND_DN`, `IPA_BIND_PASSWORD` | LDAP bind credentials for roster sync |
-| `proxy-auth-secret` | `secret` | Shared secret for CronJob-to-backend authentication. Generate with `openssl rand -hex 32` |
-| `frontend-proxy-cookie` | (single value) | OAuth proxy session secret. Generate with `openssl rand -base64 32` |
-| `google-sa-key` | `google-sa-key.json` | Google service account JSON key, volume-mounted to `/etc/secrets/google-sa-key.json` |
-| `aws-backup-credentials` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BACKUP_BUCKET` | AWS S3 backup credentials and bucket name |
+| Secret Name | Vault Path | Keys | Purpose |
+|-------------|-----------|------|---------|
+| `ipa-credentials` | `org-pulse-ipa-credentials` | `IPA_BIND_DN`, `IPA_BIND_PASSWORD` | LDAP bind credentials for roster sync |
+| `proxy-auth-secret` | `org-pulse-proxy-auth-secret` | `secret` | Shared secret for CronJob-to-backend authentication |
+| `frontend-proxy-cookie` | `org-pulse-frontend-proxy-cookie` | (single value) | OAuth proxy session secret |
+| `google-sa-key` | `org-pulse-google-sa` | `google-sa-key.json` | Google service account JSON key, volume-mounted to `/etc/secrets/google-sa-key.json` |
+| `aws-backup-credentials` | `org-pulse-aws-backup` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BACKUP_BUCKET` | AWS S3 backup credentials and bucket name |
+| `chatbot-secrets` | `org-pulse-chatbot-secrets` | LLM/Gate/Embedding endpoints and API keys | Chatbot service credentials |
 
 ### Secret Diagnostics
 
@@ -333,38 +311,38 @@ Defined in the core base deployment (`backend-deployment.yaml`):
 
 ```bash
 # Backend logs
-oc logs deployment/backend -n ambient-code--team-tracker -f
+oc logs deployment/backend -n rhai-org-pulse--org-pulse -f
 
 # Frontend (nginx) logs
-oc logs deployment/frontend -n ambient-code--team-tracker -c nginx -f
+oc logs deployment/frontend -n rhai-org-pulse--org-pulse -c nginx -f
 
 # OAuth proxy logs
-oc logs deployment/frontend -n ambient-code--team-tracker -c oauth-proxy -f
+oc logs deployment/frontend -n rhai-org-pulse--org-pulse -c oauth-proxy -f
 
 # CronJob logs (most recent)
-oc logs job/$(oc get jobs -n ambient-code--team-tracker --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}') -n ambient-code--team-tracker
+oc logs job/$(oc get jobs -n rhai-org-pulse--org-pulse --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}') -n rhai-org-pulse--org-pulse
 ```
 
 ### Restart Pods
 
 ```bash
-oc rollout restart deployment/backend -n ambient-code--team-tracker
-oc rollout restart deployment/frontend -n ambient-code--team-tracker
+oc rollout restart deployment/backend -n rhai-org-pulse--org-pulse
+oc rollout restart deployment/frontend -n rhai-org-pulse--org-pulse
 ```
 
 ### Check Pod Status
 
 ```bash
-oc get pods -n ambient-code--team-tracker
-oc describe pod <pod-name> -n ambient-code--team-tracker
+oc get pods -n rhai-org-pulse--org-pulse
+oc describe pod <pod-name> -n rhai-org-pulse--org-pulse
 ```
 
 ### Check ArgoCD Sync Status
 
 ```bash
-# From ambient-code-gitops
-oc get application team-tracker -n ambient-code--argocd -o jsonpath='{.status.sync.status}'
-oc get application team-tracker -n ambient-code--argocd -o jsonpath='{.status.health.status}'
+# From org-pulse-gitops
+oc get application team-tracker -n rhai-org-pulse--argocd -o jsonpath='{.status.sync.status}'
+oc get application team-tracker -n rhai-org-pulse--argocd -o jsonpath='{.status.health.status}'
 ```
 
 ### Manual Data Refresh
@@ -407,15 +385,14 @@ curl https://api-team-tracker.apps.int.spoke.prod.us-west-2.aws.paas.redhat.com/
 
 ### Rotate a Secret
 
+Secrets are synced from Vault. To rotate a value, update it in Vault — VSO will sync the change within 60 seconds.
+
 ```bash
-# Update a secret value (e.g., JIRA_TOKEN)
-oc patch secret team-tracker-secrets \
-  -n ambient-code--team-tracker \
-  --type merge \
-  -p '{"stringData":{"JIRA_TOKEN":"new-token-value"}}'
+# Update a secret value in Vault (e.g., JIRA_TOKEN in team-tracker-secrets)
+vault kv patch apps/rhai-org-pulse-admins/org-pulse JIRA_TOKEN="new-token-value"
 
 # Restart backend to pick up the change
-oc rollout restart deployment/backend -n ambient-code--team-tracker
+oc rollout restart deployment/backend -n rhai-org-pulse--org-pulse
 ```
 
 > **Warning:** Strip trailing newlines from token values. Use `tr -d '\n'` when reading from files.
@@ -460,7 +437,7 @@ This is required for the backend to reach external APIs (Jira, GitHub, GitLab, L
 | Resource | Location |
 |----------|----------|
 | Source code | `github.com/red-hat-data-services/rhai-org-pulse` |
-| GitOps config | `github.com/red-hat-data-services/ambient-code-gitops` |
+| GitOps config | `gitlab.cee.redhat.com/rhai-org-pulse/org-pulse-gitops` |
 | Core platform | `github.com/red-hat-data-services/org-pulse-core` |
 | Image registry | `quay.io/org-pulse/` |
 | Prod API docs | `https://api-team-tracker.apps.int.spoke.prod.us-west-2.aws.paas.redhat.com/api/docs/` |
