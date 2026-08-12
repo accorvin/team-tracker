@@ -129,10 +129,10 @@ make test-module MODULE=<name>  # Run integration tests for a module
 
 ## Deployment
 
-Deployed to OpenShift via ArgoCD. AI Eng images extend core images from `@org-pulse/core`. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the full deployment guide.
+Deployed to OpenShift via ArgoCD. AI Eng images extend core images from `@org-pulse/core`. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the full deployment guide and the [Runbook](https://github.com/red-hat-data-services/rhai-org-pulse/blob/main/docs/RUNBOOK.md) for production operations, troubleshooting, and environment details.
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow, project structure, and code style guidelines.
 
-Architecture and deployment details are in [`.claude/CLAUDE.md`](.claude/CLAUDE.md) — Claude Code reads this automatically.
+tArchitecture and deployment details are in [`.claude/CLAUDE.md`](.claude/CLAUDE.md) — Claude Code reads this automatically.
