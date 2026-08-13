@@ -462,7 +462,11 @@ module.exports = async function registerPlanningRoutes(router, context) {
    *     summary: Prioritized feature readiness lists split by readiness status
    *     tags: [releases-planning]
    *     security: [{ bearerAuth: [] }]
-   *     description: Loads data from all configured releases and merges into a single prioritized list.
+   *     description: >
+   *       Prioritized feature readiness for the shared Features pipeline
+   *       (RHAIENG, RHOAIENG, INFERENG, AIPCC, RHAISTRAT, RHAIRFE, RHELAI, RHAI).
+   *       Live Jira fetch excludes Cancelled only; this endpoint then hides
+   *       Closed/Done/Resolved for the active Features List planning view.
    *     responses:
    *       200:
    *         description: Feature readiness data with pendingReview and ready arrays

@@ -8,6 +8,7 @@ const {
   computeHygieneStatus,
   computeConfidence,
   collectFilterMeta,
+  isHiddenFromFeaturesList,
   buildCanonicalKeySet,
   mergeFeatureData
 } = require('../feature-readiness')
@@ -386,7 +387,7 @@ describe('buildFeatureReadiness', function() {
       var result = await buildFeatureReadiness(readFromStorage)
       expect(result.pendingReview).toEqual([])
       expect(result.ready).toEqual([])
-      expect(result.filterMeta).toEqual({ components: [], priorities: [], bigRocks: [], targetVersions: [], fixVersions: [], teams: [] })
+      expect(result.filterMeta).toEqual({ components: [], priorities: [], bigRocks: [], targetVersions: [], fixVersions: [], teams: [], projects: [] })
       expect(result.meta).toEqual({ total: 0, pendingReviewCount: 0, readyCount: 0, versions: [], lastSyncedAt: null, jiraAvailable: false })
     })
 
@@ -2093,6 +2094,31 @@ describe('buildFeatureReadiness', function() {
       )
 
       expect(allBigRocks.size).toBe(0)
+    })
+
+    it('collects project into allProjects when provided', function() {
+      var allProjects = new Set()
+      collectFilterMeta(
+        { project: 'RHAIENG', bigRock: '', priority: null, components: [], targetVersions: [], fixVersion: '', team: '' },
+        [], new Set(), new Set(), new Set(), new Set(), new Set(), allProjects
+      )
+      expect(allProjects.has('RHAIENG')).toBe(true)
+    })
+  })
+
+  describe('isHiddenFromFeaturesList', function() {
+    it('hides Closed, Done, Resolved, and Cancelled', function() {
+      expect(isHiddenFromFeaturesList('Closed')).toBe(true)
+      expect(isHiddenFromFeaturesList('Done')).toBe(true)
+      expect(isHiddenFromFeaturesList('Resolved')).toBe(true)
+      expect(isHiddenFromFeaturesList('Cancelled')).toBe(true)
+    })
+
+    it('keeps active planning statuses', function() {
+      expect(isHiddenFromFeaturesList('In Progress')).toBe(false)
+      expect(isHiddenFromFeaturesList('New')).toBe(false)
+      expect(isHiddenFromFeaturesList('Refinement')).toBe(false)
+      expect(isHiddenFromFeaturesList(null)).toBe(false)
     })
   })
 

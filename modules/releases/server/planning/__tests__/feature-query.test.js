@@ -25,10 +25,24 @@ function mockJiraClient(featureIssues, childIssues) {
 describe('feature-query', function() {
 
   describe('JQL', function() {
-    it('queries RHAISTRAT Features and Initiatives excluding closed statuses', function() {
-      expect(JQL).toContain('project = RHAISTRAT')
+    it('queries shared pipeline projects for Features and Initiatives', function() {
+      expect(JQL).toContain('project IN (')
+      expect(JQL).toContain('RHAIENG')
+      expect(JQL).toContain('RHOAIENG')
+      expect(JQL).toContain('INFERENG')
+      expect(JQL).toContain('AIPCC')
+      expect(JQL).toContain('RHAISTRAT')
+      expect(JQL).toContain('RHAIRFE')
+      expect(JQL).toContain('RHELAI')
+      expect(JQL).toContain('RHAI')
       expect(JQL).toContain('issuetype IN (Feature, Initiative)')
-      expect(JQL).toContain('status NOT IN (Closed, Done, Resolved, Cancelled)')
+    })
+
+    it('excludes Cancelled only at fetch (Closed/Done/Resolved stay for PM Hub / shared set)', function() {
+      expect(JQL).toContain('status NOT IN (Cancelled)')
+      expect(JQL).not.toContain('Closed')
+      expect(JQL).not.toContain('Done')
+      expect(JQL).not.toContain('Resolved')
     })
 
     it('does not include a created date filter', function() {
@@ -54,16 +68,29 @@ describe('feature-query', function() {
       expect(QUERY_FIELDS).toContain(CUSTOM_FIELDS.riceScore)
     })
 
+    it('includes project for multi-project Features List filtering', function() {
+      expect(QUERY_FIELDS).toContain('project')
+    })
+
     it('omits description to keep the Features List request path light', function() {
       expect(QUERY_FIELDS).not.toContain('description')
     })
   })
 
   describe('normalizeIssue', function() {
-    it('extracts key and summary', function() {
-      var result = normalizeIssue({ key: 'RHAISTRAT-1', fields: { summary: 'My Feature' } })
-      expect(result.key).toBe('RHAISTRAT-1')
+    it('extracts key, project, and summary', function() {
+      var result = normalizeIssue({
+        key: 'RHAIENG-1',
+        fields: { summary: 'My Feature', project: { key: 'RHAIENG' } }
+      })
+      expect(result.key).toBe('RHAIENG-1')
+      expect(result.project).toBe('RHAIENG')
       expect(result.summary).toBe('My Feature')
+    })
+
+    it('derives project from issue key when project field is missing', function() {
+      var result = normalizeIssue({ key: 'RHELAI-42', fields: { summary: 'RHEL AI feat' } })
+      expect(result.project).toBe('RHELAI')
     })
 
     it('extracts assignee displayName from object', function() {

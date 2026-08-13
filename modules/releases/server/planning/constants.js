@@ -3,6 +3,25 @@ const JIRA_BROWSE_URL = 'https://redhat.atlassian.net/browse'
 const CLOSED_STATUSES = ['Closed', 'Done', 'Resolved', 'Cancelled']
 const TERMINAL_STATUSES = ['Review', 'Pending Release']
 
+/**
+ * Shared Features pipeline population (Features List + PM Hub).
+ * Canonical Jira fetch: Feature/Initiative in these projects, status ≠ Cancelled.
+ * Features List additionally hides Closed/Done/Resolved at the API/view layer.
+ */
+const FEATURE_PIPELINE_PROJECTS = [
+  'RHAIENG',
+  'RHOAIENG',
+  'INFERENG',
+  'AIPCC',
+  'RHAISTRAT',
+  'RHAIRFE',
+  'RHELAI',
+  'RHAI'
+]
+
+/** Statuses Features List hides after the shared fetch (Cancelled already excluded upstream). */
+const FEATURES_LIST_HIDDEN_STATUSES = ['Closed', 'Done', 'Resolved']
+
 const PRIORITY_ORDER = { Blocker: 0, Critical: 1, Major: 2, Normal: 3, Minor: 4 }
 
 const JIRA_THROTTLE_MS = 1000
@@ -91,6 +110,8 @@ const CHANGELOG_FIELDS = 'summary'
 module.exports = {
   JIRA_BROWSE_URL,
   CLOSED_STATUSES,
+  FEATURE_PIPELINE_PROJECTS,
+  FEATURES_LIST_HIDDEN_STATUSES,
   TERMINAL_STATUSES,
   PRIORITY_ORDER,
   JIRA_THROTTLE_MS,

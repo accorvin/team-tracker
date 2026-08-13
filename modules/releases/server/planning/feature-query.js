@@ -1,10 +1,11 @@
 var { CUSTOM_FIELDS, serializeField, numericField } = require('../hygiene/jira-fetch')
 var { parseDescriptionSignals } = require('./health/description-scanner')
 var { fetchEpicsForFeatures } = require('../execution/jira-enrich')
+var { FEATURE_PIPELINE_PROJECTS } = require('./constants')
 
 var QUERY_FIELDS = [
   'summary', 'status', 'issuetype', 'assignee', 'fixVersions',
-  'components', 'labels', 'priority', 'created', 'updated',
+  'components', 'labels', 'priority', 'created', 'updated', 'project',
   CUSTOM_FIELDS.team,
   CUSTOM_FIELDS.targetVersion,
   CUSTOM_FIELDS.riceScore,
@@ -17,10 +18,18 @@ var QUERY_FIELDS = [
   CUSTOM_FIELDS.effort
 ].join(',')
 
-var JQL = 'project = RHAISTRAT AND issuetype IN (Feature, Initiative) AND status NOT IN (Closed, Done, Resolved, Cancelled)'
+/**
+ * Canonical shared-pipeline JQL: all FEATURE_PIPELINE_PROJECTS Features/Initiatives,
+ * excluding Cancelled only. Features List strips Closed/Done/Resolved after merge.
+ */
+var JQL = [
+  'project IN (' + FEATURE_PIPELINE_PROJECTS.join(', ') + ')',
+  'issuetype IN (Feature, Initiative)',
+  'status NOT IN (Cancelled)'
+].join(' AND ')
 
 /** Bound live Jira so /feature-readiness stays under the gateway timeout. */
-var FETCH_FEATURES_TIMEOUT_MS = 12000
+var FETCH_FEATURES_TIMEOUT_MS = 25000
 
 function extractTargetVersions(field) {
   if (field == null) return []
@@ -39,6 +48,20 @@ function extractTargetVersions(field) {
     names.push(name)
   }
   return names
+}
+
+function extractProject(issue, fields) {
+  var projectField = fields && fields.project
+  if (projectField) {
+    if (typeof projectField === 'object') {
+      return projectField.key || projectField.name || null
+    }
+    return String(projectField)
+  }
+  if (issue && issue.key && issue.key.indexOf('-') !== -1) {
+    return issue.key.split('-')[0]
+  }
+  return null
 }
 
 function normalizeIssue(issue) {
@@ -73,6 +96,7 @@ function normalizeIssue(issue) {
 
   return {
     key: issue.key,
+    project: extractProject(issue, fields),
     summary: fields.summary || '',
     status: status,
     issueType: issueType,
@@ -170,6 +194,7 @@ module.exports = {
   fetchFeaturesWithTimeout: fetchFeaturesWithTimeout,
   normalizeIssue: normalizeIssue,
   extractTargetVersions: extractTargetVersions,
+  extractProject: extractProject,
   enrichChildEpicCounts: enrichChildEpicCounts,
   JQL: JQL,
   QUERY_FIELDS: QUERY_FIELDS,

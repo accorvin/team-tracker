@@ -1,6 +1,6 @@
 var { getConfiguredReleases, loadBigRocks } = require('./config')
 var { loadIndex } = require('./cache-reader')
-var { CLOSED_STATUSES, EARLY_STATUSES } = require('./constants')
+var { EARLY_STATUSES, FEATURES_LIST_HIDDEN_STATUSES } = require('./constants')
 var { deriveHumanReviewStatus: sharedDeriveStatus } = require('../execution/ai-review-fields')
 var { computeFPDoRReadiness, isAiFirstFeature } = require('./fpdor')
 var { computePriorityScores } = require('./health/priority-scorer')
@@ -81,7 +81,7 @@ function computeConfidence(isReady, fixVersion) {
   return 'ready'
 }
 
-function collectFilterMeta(feature, allComponents, allPriorities, allBigRocks, allTargetVersions, allFixVersions, allTeams) {
+function collectFilterMeta(feature, allComponents, allPriorities, allBigRocks, allTargetVersions, allFixVersions, allTeams, allProjects) {
   if (Array.isArray(feature.components)) {
     for (var i = 0; i < feature.components.length; i++) {
       allComponents.push(feature.components[i])
@@ -99,6 +99,13 @@ function collectFilterMeta(feature, allComponents, allPriorities, allBigRocks, a
   }
   if (feature.fixVersion) allFixVersions.add(feature.fixVersion)
   if (feature.team) allTeams.add(feature.team)
+  if (feature.project && allProjects) allProjects.add(feature.project)
+}
+
+function isHiddenFromFeaturesList(status) {
+  if (!status) return false
+  // Active planning view: hide Closed/Done/Resolved; Cancelled if present from cache/exec.
+  return FEATURES_LIST_HIDDEN_STATUSES.indexOf(status) !== -1 || status === 'Cancelled'
 }
 
 function deriveHumanReviewStatusFromLabels(labels) {
@@ -364,6 +371,11 @@ function mergeFeatureData(key, jiraFeatures, aiReviewMap, candidateIndex, health
 
   var pmOwner = (health && health.pmOwner) || (jira && jira.pmOwner) || (exec && exec.pm) || null
 
+  var project = (jira && jira.project) || null
+  if (!project && key && key.indexOf('-') !== -1) {
+    project = key.split('-')[0]
+  }
+
   var team = teamIndex.get(key) || (jira && jira.team) || (exec && exec.team) || null
 
   var tier
@@ -464,6 +476,7 @@ function mergeFeatureData(key, jiraFeatures, aiReviewMap, candidateIndex, health
 
   return {
     key: key,
+    project: project,
     title: title,
     sourceRfe: sourceRfe,
     priority: priority,
@@ -525,6 +538,7 @@ async function buildFeatureReadiness(readFromStorage, jiraFeatures, listStorageF
   var allTargetVersions = new Set()
   var allFixVersions = new Set()
   var allTeams = new Set()
+  var allProjects = new Set()
 
   var bigRockPriorityMap = new Map()
   for (var bvi = 0; bvi < cacheData.configuredVersions.length; bvi++) {
@@ -543,7 +557,7 @@ async function buildFeatureReadiness(readFromStorage, jiraFeatures, listStorageF
   var allMerged = []
   canonicalKeys.forEach(function(key) {
     var merged = mergeFeatureData(key, jiraFeatures, execData.aiReviewMap, cacheData.candidateIndex, cacheData.healthIndex, cacheData.hygieneIndex, cacheData.teamIndex, execMap)
-    if (merged.status && CLOSED_STATUSES.indexOf(merged.status) !== -1) return
+    if (isHiddenFromFeaturesList(merged.status)) return
     allMerged.push(merged)
   })
 
@@ -566,6 +580,7 @@ async function buildFeatureReadiness(readFromStorage, jiraFeatures, listStorageF
 
     var feature = {
       key: merged.key,
+      project: merged.project,
       title: merged.title,
       sourceRfe: merged.sourceRfe,
       priority: merged.priority,
@@ -612,7 +627,7 @@ async function buildFeatureReadiness(readFromStorage, jiraFeatures, listStorageF
       pendingReview.push(feature)
     }
 
-    collectFilterMeta(feature, allComponents, allPriorities, allBigRocks, allTargetVersions, allFixVersions, allTeams)
+    collectFilterMeta(feature, allComponents, allPriorities, allBigRocks, allTargetVersions, allFixVersions, allTeams, allProjects)
   }
 
   function sortFeatures(a, b) {
@@ -638,7 +653,8 @@ async function buildFeatureReadiness(readFromStorage, jiraFeatures, listStorageF
     bigRocks: Array.from(allBigRocks).sort(),
     targetVersions: Array.from(allTargetVersions).sort(),
     fixVersions: Array.from(allFixVersions).sort(),
-    teams: Array.from(allTeams).sort()
+    teams: Array.from(allTeams).sort(),
+    projects: Array.from(allProjects).sort()
   }
 
   var meta = {
@@ -653,5 +669,18 @@ async function buildFeatureReadiness(readFromStorage, jiraFeatures, listStorageF
   return { pendingReview: pendingReview, ready: ready, filterMeta: filterMeta, meta: meta }
 }
 
-module.exports = { buildFeatureReadiness: buildFeatureReadiness, computeBlockers: computeBlockers, computeReadiness: computeReadiness, hasBlockingViolations: hasBlockingViolations, computeHygieneStatus: computeHygieneStatus, computeConfidence: computeConfidence, collectFilterMeta: collectFilterMeta, deriveHumanReviewStatusFromLabels: deriveHumanReviewStatusFromLabels, buildCanonicalKeySet: buildCanonicalKeySet, mergeFeatureData: mergeFeatureData, BLOCKING_HYGIENE_RULES: BLOCKING_HYGIENE_RULES }
+module.exports = {
+  buildFeatureReadiness: buildFeatureReadiness,
+  computeBlockers: computeBlockers,
+  computeReadiness: computeReadiness,
+  hasBlockingViolations: hasBlockingViolations,
+  computeHygieneStatus: computeHygieneStatus,
+  computeConfidence: computeConfidence,
+  collectFilterMeta: collectFilterMeta,
+  isHiddenFromFeaturesList: isHiddenFromFeaturesList,
+  deriveHumanReviewStatusFromLabels: deriveHumanReviewStatusFromLabels,
+  buildCanonicalKeySet: buildCanonicalKeySet,
+  mergeFeatureData: mergeFeatureData,
+  BLOCKING_HYGIENE_RULES: BLOCKING_HYGIENE_RULES
+}
 

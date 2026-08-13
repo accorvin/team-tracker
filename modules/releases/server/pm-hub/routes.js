@@ -13,10 +13,10 @@ const { filterCommittedFixVersions, parseReleaseName, compareReleasesTemporally 
 const { parseDescriptionSignals } = require('../planning/health/description-scanner')
 const { computeFPDoRReadiness, isAiFirstFeature } = require('../planning/fpdor')
 const { loadIndex } = require('../planning/cache-reader')
-const { CLOSED_STATUSES } = require('../planning/constants')
+const { CLOSED_STATUSES, FEATURE_PIPELINE_PROJECTS } = require('../planning/constants')
 
 const JIRA_SEARCH = JIRA_HOST + '/issues/?jql='
-const PM_HUB_PROJECTS = ['RHAIENG', 'RHOAIENG', 'INFERENG', 'AIPCC', 'RHAISTRAT', 'RHAIRFE']
+const PM_HUB_PROJECTS = FEATURE_PIPELINE_PROJECTS
 const PILLAR_CONFIG_FILE = 'releases/pm-hub/pillar-config.json'
 
 var DEFAULT_PILLAR_CONFIG = {
@@ -545,7 +545,7 @@ module.exports = async function registerPmHubRoutes(router, context) {
    *   get:
    *     tags: [Releases]
    *     summary: List Jira components across PM Hub projects
-   *     description: Returns components from RHAIENG, RHOAIENG, INFERENG, AIPCC, RHAISTRAT, RHAIRFE
+   *     description: Returns components from RHAIENG, RHOAIENG, INFERENG, AIPCC, RHAISTRAT, RHAIRFE, RHELAI, RHAI
    *     responses:
    *       200:
    *         description: Array of components with project keys
@@ -600,7 +600,7 @@ module.exports = async function registerPmHubRoutes(router, context) {
    *   get:
    *     tags: [Releases]
    *     summary: List Jira versions across PM Hub projects
-   *     description: Returns versions from RHAIENG, RHOAIENG, INFERENG, AIPCC, RHAISTRAT, RHAIRFE
+   *     description: Returns versions from RHAIENG, RHOAIENG, INFERENG, AIPCC, RHAISTRAT, RHAIRFE, RHELAI, RHAI
    *     responses:
    *       200:
    *         description: Array of versions with project keys
