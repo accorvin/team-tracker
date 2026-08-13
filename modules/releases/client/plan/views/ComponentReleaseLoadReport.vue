@@ -1129,7 +1129,7 @@ async function loadData(opts) {
   var effectiveComponents = getEffectiveComponents()
   if (effectiveComponents.length === 0 && selectedVersions.value.length === 0) return
   if (!silent) loadingData.value = true
-  dataError.value = null
+  if (!silent) dataError.value = null
   hasFetched.value = true
 
   try {
@@ -1154,7 +1154,7 @@ async function loadData(opts) {
     groups.value = data.groups || []
     fetchedAt.value = data.fetchedAt || null
   } catch (err) {
-    dataError.value = err.message
+    if (!silent) dataError.value = err.message
     if (!silent) {
       groups.value = []
       velocity.value = null
