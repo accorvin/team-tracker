@@ -61,28 +61,6 @@ async function loadRunHistory(options = {}) {
   }
 }
 
-async function refreshData() {
-  loading.value = true
-  error.value = null
-
-  try {
-    // Step 1: Trigger backend refresh to fetch fresh data from Prow CI
-    await apiRequest('/modules/system-health/odh-e2e-health/refresh', { method: 'POST' })
-
-    // Step 2: Load the fresh data that was just fetched
-    await Promise.all([
-      loadHealthData(true), // Force reload to bypass any caching
-      loadRunHistory({ page: 1, limit: 20 })
-    ])
-
-  } catch (e) {
-    error.value = e.message || 'Failed to refresh E2E health data'
-    console.error('Refresh failed:', e)
-  } finally {
-    loading.value = false
-  }
-}
-
 export function useOdhOperatorE2eHealth() {
   if (!hasFetched) {
     hasFetched = true
@@ -192,8 +170,7 @@ export function useOdhOperatorE2eHealth() {
 
     // Actions
     loadHealthData,
-    loadRunHistory,
-    refreshData
+    loadRunHistory
   }
 }
 
