@@ -13,6 +13,7 @@ const { filterCommittedFixVersions, parseReleaseName, compareReleasesTemporally 
 const { parseDescriptionSignals } = require('../planning/health/description-scanner')
 const { computeFPDoRReadiness, isAiFirstFeature } = require('../planning/fpdor')
 const { loadIndex } = require('../planning/cache-reader')
+const { CLOSED_STATUSES } = require('../planning/constants')
 
 const JIRA_SEARCH = JIRA_HOST + '/issues/?jql='
 const PM_HUB_PROJECTS = ['RHAIENG', 'RHOAIENG', 'INFERENG', 'AIPCC', 'RHAISTRAT', 'RHAIRFE']
@@ -631,6 +632,7 @@ module.exports = async function registerPmHubRoutes(router, context) {
    *     summary: Get component release load tracking data
    *     description: >
    *       Queries Jira for Features/Initiatives grouped by version then component.
+   *       Closed/Done/Resolved/Cancelled issues are excluded (same as Features List).
    *       F Requested = issues where Target Version (cf[10855]) matches a selected version.
    *       F Committed = issues where fixVersion matches a selected version AND a Target
    *       Version either matches that fixVersion or is later in the same release cycle
@@ -741,6 +743,10 @@ module.exports = async function registerPmHubRoutes(router, context) {
         'project IN (' + PM_HUB_PROJECTS.join(', ') + ')',
         'issuetype IN (' + DEFAULT_ISSUE_TYPES.join(', ') + ')'
       ]
+      // Requested/Committed exclude closed (same set as Features List). Velocity keeps Done.
+      var openParts = baseParts.concat([
+        'status NOT IN (' + CLOSED_STATUSES.join(', ') + ')'
+      ])
 
       var componentClause = ''
       if (componentNames.length > 0) {
@@ -756,35 +762,38 @@ module.exports = async function registerPmHubRoutes(router, context) {
 
       var fieldsWithTv = FIELDS_TO_FETCH + ',' + CUSTOM_FIELDS.targetVersion
 
-      // Query 1: F Requested — Target Version (cf[10855]) matches selected versions
-      var requestedIssues = []
+      // Parallelize live Jira + epic-index reads. Avoid expand=renderedFields —
+      // ADF in fields.description is enough for FPDoR description signals and
+      // rendered HTML roughly doubles payload (gateway ~30s timeout / 504).
+      var tvFetch = Promise.resolve([])
+      var fvFetch = Promise.resolve([])
       if (versionNames.length > 0) {
-        var tvJqlParts = baseParts.slice()
+        var tvJqlParts = openParts.slice()
         if (componentClause) tvJqlParts.push(componentClause)
         tvJqlParts.push('cf[10855] IN (' + escapedVer.join(', ') + ')')
-        var tvJql = tvJqlParts.join(' AND ')
-        requestedIssues = await jiraClient.fetchAllJqlResults(tvJql, fieldsWithTv, { expand: 'renderedFields' })
-      }
+        tvFetch = jiraClient.fetchAllJqlResults(tvJqlParts.join(' AND '), fieldsWithTv, {})
 
-      // Query 2: FV candidates — fixVersion matches selected versions.
-      // Committed bucketing applies a stricter TV/FV rule after fetch.
-      var committedIssues = []
-      if (versionNames.length > 0) {
-        var fvJqlParts = baseParts.slice()
+        var fvJqlParts = openParts.slice()
         if (componentClause) fvJqlParts.push(componentClause)
         fvJqlParts.push('fixVersion IN (' + escapedVer.join(', ') + ')')
-        var fvJql = fvJqlParts.join(' AND ')
-        committedIssues = await jiraClient.fetchAllJqlResults(fvJql, fieldsWithTv, { expand: 'renderedFields' })
+        // FV candidates; Committed bucketing applies a stricter TV/FV rule after fetch.
+        fvFetch = jiraClient.fetchAllJqlResults(fvJqlParts.join(' AND '), fieldsWithTv, {})
       } else if (componentNames.length > 0) {
-        var compOnlyParts = baseParts.slice()
+        var compOnlyParts = openParts.slice()
         compOnlyParts.push(componentClause)
-        var compJql = compOnlyParts.join(' AND ')
-        committedIssues = await jiraClient.fetchAllJqlResults(compJql, fieldsWithTv, { expand: 'renderedFields' })
+        fvFetch = jiraClient.fetchAllJqlResults(compOnlyParts.join(' AND '), fieldsWithTv, {})
       }
 
+      var parallel = await Promise.all([
+        tvFetch,
+        fvFetch,
+        loadEpicCountByKey(context.storage.readFromStorage)
+      ])
+      var requestedIssues = parallel[0]
+      var committedIssues = parallel[1]
+      var epicCountByKey = parallel[2]
+
       var versionGroups = {}
-      // Same Child epics source as Features List (jira-sync → execution index).
-      var epicCountByKey = await loadEpicCountByKey(context.storage.readFromStorage)
 
       function ensureGroup(vName, cName) {
         if (!versionGroups[vName]) {

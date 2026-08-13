@@ -156,6 +156,33 @@ describe('feature-query', function() {
       expect(result.targetVersions).toEqual(['rhoai-3.6'])
     })
 
+    it('keeps all Target Versions when Jira returns a multi-value field', function() {
+      var fields = {}
+      fields[CUSTOM_FIELDS.targetVersion] = [
+        { name: '3.6 GA RHOAI RELEASE' },
+        { name: '3.6 EA2 RHOAI RELEASE' },
+        { name: '3.6 EA2 RHOAI RELEASE' }
+      ]
+      var result = normalizeIssue({ key: 'RHAISTRAT-14m', fields: fields })
+      expect(result.targetVersions).toEqual([
+        '3.6 GA RHOAI RELEASE',
+        '3.6 EA2 RHOAI RELEASE'
+      ])
+    })
+
+    it('extracts Target Versions from value objects and plain strings', function() {
+      var fields = {}
+      fields[CUSTOM_FIELDS.targetVersion] = [
+        { value: '3.6 EA2 RHAII RELEASE' },
+        '3.6 EA1 RHOAI RELEASE'
+      ]
+      var result = normalizeIssue({ key: 'RHAISTRAT-14n', fields: fields })
+      expect(result.targetVersions).toEqual([
+        '3.6 EA2 RHAII RELEASE',
+        '3.6 EA1 RHOAI RELEASE'
+      ])
+    })
+
     it('returns empty targetVersions when custom field is null', function() {
       var result = normalizeIssue({ key: 'RHAISTRAT-15', fields: {} })
       expect(result.targetVersions).toEqual([])

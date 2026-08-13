@@ -1042,7 +1042,7 @@ test.describe('Releases CVE Sustaining Report @releases', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    var card = page.locator('text=RHOAI Sustaining (CVEs)');
+    var card = page.locator('text=RHAI Sustaining (CVEs)');
     await expect(card.first()).toBeVisible();
 
     expect(page.errors).toHaveLength(0);
@@ -1054,7 +1054,7 @@ test.describe('Releases CVE Sustaining Report @releases', () => {
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
     // Report heading
-    await expect(page.locator('text=RHOAI Sustaining (CVEs)').first()).toBeVisible();
+    await expect(page.locator('text=RHAI Sustaining (CVEs)').first()).toBeVisible();
 
     // Open CVEs banner
     await expect(page.locator('text=Open CVEs').first()).toBeVisible();
@@ -1064,7 +1064,7 @@ test.describe('Releases CVE Sustaining Report @releases', () => {
     await expect(page.locator('text=Due Date Passed').first()).toBeVisible();
 
     // Bar chart section
-    await expect(page.locator('text=RHOAI Open CVEs').first()).toBeVisible();
+    await expect(page.locator('text=RHAI Open CVEs').first()).toBeVisible();
 
     // Version matrix table
     await expect(page.locator('text=CVEs across all versions').first()).toBeVisible();
@@ -1075,7 +1075,7 @@ test.describe('Releases CVE Sustaining Report @releases', () => {
     // Time series charts
     await expect(page.locator('text=Created vs Resolved').first()).toBeVisible();
     await expect(page.locator('text=Unresolved').first()).toBeVisible();
-    await expect(page.locator('text=RHOAI False Positives').first()).toBeVisible();
+    await expect(page.locator('text=RHAI False Positives').first()).toBeVisible();
 
     expect(page.errors).toHaveLength(0);
   });

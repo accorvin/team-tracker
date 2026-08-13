@@ -22,6 +22,25 @@ var JQL = 'project = RHAISTRAT AND issuetype IN (Feature, Initiative) AND status
 /** Bound live Jira so /feature-readiness stays under the gateway timeout. */
 var FETCH_FEATURES_TIMEOUT_MS = 12000
 
+function extractTargetVersions(field) {
+  if (field == null) return []
+  var arr = Array.isArray(field) ? field : [field]
+  var names = []
+  var seen = {}
+  for (var i = 0; i < arr.length; i++) {
+    var entry = arr[i]
+    if (entry == null) continue
+    var name
+    if (typeof entry === 'string') name = entry.trim()
+    else if (typeof entry === 'object') name = (entry.name || entry.value || '').toString().trim()
+    else name = String(entry).trim()
+    if (!name || seen[name]) continue
+    seen[name] = true
+    names.push(name)
+  }
+  return names
+}
+
 function normalizeIssue(issue) {
   var fields = issue.fields || {}
   var assignee = fields.assignee
@@ -34,8 +53,9 @@ function normalizeIssue(issue) {
     ? fields.fixVersions.map(function(v) { return v.name || String(v) }).filter(Boolean)
     : []
   var labels = Array.isArray(fields.labels) ? fields.labels : []
-  var targetVersionRaw = serializeField(fields[CUSTOM_FIELDS.targetVersion])
-  var targetVersions = targetVersionRaw ? [targetVersionRaw] : []
+  // Keep every Target Version — serializeField only returns the first and drops
+  // EA2 membership when GA is listed first (Features List under-count vs PM Hub).
+  var targetVersions = extractTargetVersions(fields[CUSTOM_FIELDS.targetVersion])
   var status = fields.status
     ? (typeof fields.status === 'object' ? fields.status.name || null : fields.status)
     : null
@@ -149,6 +169,7 @@ module.exports = {
   fetchFeatures: fetchFeatures,
   fetchFeaturesWithTimeout: fetchFeaturesWithTimeout,
   normalizeIssue: normalizeIssue,
+  extractTargetVersions: extractTargetVersions,
   enrichChildEpicCounts: enrichChildEpicCounts,
   JQL: JQL,
   QUERY_FIELDS: QUERY_FIELDS,

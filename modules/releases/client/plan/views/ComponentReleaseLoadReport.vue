@@ -297,7 +297,7 @@
       correlated. Use REQ/COM (and other) filter chips in the bar above to filter
       the table.
     -->
-    <div v-if="groups.length > 0 && !loadingData" class="grid grid-cols-2 sm:grid-cols-6 gap-3">
+    <div v-if="hasFetched && !loadingData" class="grid grid-cols-2 sm:grid-cols-6 gap-3">
       <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
         <div class="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-xl" />
         <div class="flex items-center gap-2 mb-1.5">
@@ -1154,6 +1154,12 @@ async function loadData() {
     var response = await fetch(getApiBase() + API_BASE + '/component-release-load?' + params.toString())
     if (!response.ok) {
       var errData = await response.json().catch(function() { return {} })
+      if (response.status === 504) {
+        throw new Error(
+          'Request timed out (HTTP 504). Narrow the Release or Pillar filter and retry — ' +
+          'loading several releases with Pillar=All hits Jira too hard for the gateway limit.'
+        )
+      }
       throw new Error(errData.error || 'HTTP ' + response.status)
     }
     var data = await response.json()
