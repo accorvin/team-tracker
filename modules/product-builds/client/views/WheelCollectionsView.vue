@@ -162,7 +162,7 @@ watch(activeTab, (tab) => {
 // --- Artifacts tab ---
 const ITEMS_PER_PAGE = 10
 const AVAILABLE_ARCHS = ['aarch64', 'ppc64le', 's390x', 'x86_64']
-const AVAILABLE_ACCELS = ['cpu', 'cuda', 'gaudi', 'neuron', 'rocm', 'spyre', 'tpu']
+const AVAILABLE_ACCELS = ['cpu', 'cuda', 'gaudi', 'neuron', 'rocm', 'rubin', 'spyre', 'tpu']
 const DATE_RANGE_OPTIONS = [
   { value: '7d', label: 'Last 7 days' },
   { value: '30d', label: 'Last 30 days' },
