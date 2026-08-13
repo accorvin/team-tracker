@@ -10,6 +10,7 @@ const { setupErrorTracking, logCapturedErrors, mainContentIsVisible } = require(
  * - CHI column appears in artifacts table
  * - CHI badge renders in artifact detail view
  * - Artifacts without health_index don't show CHI
+ * - Tests column appears in artifacts table
  *
  * Tag: @product-builds
  * Usage: npx playwright test --grep @product-builds
@@ -63,6 +64,9 @@ test.describe('Product Builds Module @product-builds', () => {
 
       const chiHeader = page.locator('th').filter({ hasText: 'CHI' });
       await expect(chiHeader).toBeVisible();
+
+      const testsHeader = page.locator('th').filter({ hasText: 'Tests' });
+      await expect(testsHeader).toBeVisible();
     }
 
     const appErrors = page.errors.filter(e => !/status of (429|404|503)/.test(e.message));
