@@ -1154,6 +1154,12 @@ async function loadData() {
     var response = await fetch(getApiBase() + API_BASE + '/component-release-load?' + params.toString())
     if (!response.ok) {
       var errData = await response.json().catch(function() { return {} })
+      if (response.status === 504) {
+        throw new Error(
+          'Request timed out (HTTP 504). Narrow the Release or Pillar filter and retry — ' +
+          'loading several releases with Pillar=All hits Jira too hard for the gateway limit.'
+        )
+      }
       throw new Error(errData.error || 'HTTP ' + response.status)
     }
     var data = await response.json()
