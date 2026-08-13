@@ -353,15 +353,16 @@ async function fetchUnreleasedJiraFixVersions(config) {
         if (version.archived) continue
         if (version.released === true) continue
 
-        if (!releaseMap.has(name)) {
-          releaseMap.set(name, {
+        const key = name.toLowerCase()
+        if (!releaseMap.has(key)) {
+          releaseMap.set(key, {
             productName: 'Jira version catalog',
             releaseNumber: name,
             dueDate: toIsoDate(version.releaseDate),
             _projects: new Set()
           })
         }
-        const row = releaseMap.get(name)
+        const row = releaseMap.get(key)
         row._projects.add(projectKey)
         if (!row.dueDate && version.releaseDate) {
           row.dueDate = toIsoDate(version.releaseDate)

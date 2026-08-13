@@ -182,9 +182,9 @@ module.exports = async function registerExecutionRoutes(router, context) {
 
     const versionFilter = req.query.version;
     if (versionFilter) {
-      const normalizedFilter = stripZStream(versionFilter);
+      const normalizedFilter = stripZStream(versionFilter).toLowerCase();
       features = features.filter(f =>
-        f.fixVersions && f.fixVersions.some(v => stripZStream(v) === normalizedFilter)
+        f.fixVersions && f.fixVersions.some(v => stripZStream(v).toLowerCase() === normalizedFilter)
       );
     }
 
@@ -354,14 +354,15 @@ module.exports = async function registerExecutionRoutes(router, context) {
       return res.json({ versions: [] });
     }
 
-    const versions = new Set();
+    const versions = new Map();
     for (const f of index.features) {
       for (const v of (f.fixVersions || [])) {
-        versions.add(stripZStream(v));
+        const key = stripZStream(v).toLowerCase();
+        if (!versions.has(key)) versions.set(key, stripZStream(v));
       }
     }
 
-    res.json({ versions: [...versions].sort() });
+    res.json({ versions: [...versions.values()].sort() });
   });
 
   // POST /refresh — trigger manual data refresh (admin only)
