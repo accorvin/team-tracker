@@ -1120,14 +1120,15 @@ function startAutoRefresh() {
   autoRefreshTimer.value = setInterval(function() {
     if (!hasFetched.value || loadingData.value) return
     if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
-    loadData()
+    loadData({ silent: true })
   }, AUTO_REFRESH_MS)
 }
 
-async function loadData() {
+async function loadData(opts) {
+  var silent = opts && opts.silent
   var effectiveComponents = getEffectiveComponents()
   if (effectiveComponents.length === 0 && selectedVersions.value.length === 0) return
-  loadingData.value = true
+  if (!silent) loadingData.value = true
   dataError.value = null
   hasFetched.value = true
 
@@ -1154,10 +1155,13 @@ async function loadData() {
     fetchedAt.value = data.fetchedAt || null
   } catch (err) {
     dataError.value = err.message
-    groups.value = []
-    fetchedAt.value = null
+    if (!silent) {
+      groups.value = []
+      velocity.value = null
+      fetchedAt.value = null
+    }
   } finally {
-    loadingData.value = false
+    if (!silent) loadingData.value = false
     if (hasFetched.value && !autoRefreshTimer.value) startAutoRefresh()
   }
 }
