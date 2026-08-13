@@ -1190,11 +1190,16 @@ watch(
   { deep: true }
 )
 
-onMounted(function() {
+onMounted(async function() {
   restoreFilters()
-  fetchPillarConfig()
-  fetchComponents()
+  await Promise.all([fetchPillarConfig(), fetchComponents()])
   document.addEventListener('mousedown', handleClickOutside)
+  if (!hasFetched.value) {
+    var effectiveComponents = getEffectiveComponents()
+    if (effectiveComponents.length > 0 || selectedVersions.value.length > 0) {
+      loadData()
+    }
+  }
 })
 
 onBeforeUnmount(function() {
