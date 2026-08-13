@@ -23,7 +23,7 @@ import {
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Title)
 
 const nav = inject('moduleNav', null)
-const { healthData, runHistory, loading, error, loadHealthData, loadRunHistory, refreshData } = useOdhOperatorE2eHealth()
+const { healthData, runHistory, loading, error, loadHealthData, loadRunHistory } = useOdhOperatorE2eHealth()
 
 // Filters
 const suiteFilter = ref('all')
@@ -448,14 +448,7 @@ function formatPassRate(rate) {
 
 
 
-
-
 // Removed duplicate onMounted - now handled above with dark mode detection
-
-
-function handleRefresh() {
-  refreshData()
-}
 
 function handleRowClick(run) {
   // Navigate to internal test run detail view
@@ -493,14 +486,6 @@ function loadMoreRuns() {
           End-to-end test health monitoring for OpenDataHub and RHOAI
         </p>
       </div>
-      <button
-        @click="handleRefresh"
-        :disabled="loading"
-        class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-      >
-        <RefreshCw :class="['w-4 h-4 -ml-1 mr-2', { 'animate-spin': loading }]" />
-        Refresh
-      </button>
     </div>
 
     <!-- Loading State -->

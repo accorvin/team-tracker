@@ -85,7 +85,7 @@ function generateContextualFailingComponents(suites, componentStats = {}) {
  * @param {object} context
  */
 module.exports = function registerOpendatahubOperatorE2ERoutes(router, context) {
-  const { storage, requireAdmin, requireScope } = context;
+  const { storage } = context;
   const { readFromStorage } = storage;
 
   /**
@@ -360,63 +360,6 @@ module.exports = function registerOpendatahubOperatorE2ERoutes(router, context) 
     }
   });
 
-  /**
-   * @openapi
-   * /api/modules/system-health/odh-e2e-health/refresh:
-   *   post:
-   *     tags: [System Health]
-   *     summary: Trigger manual refresh of E2E health data
-   *     description: Manually refresh E2E test health data from Prow CI
-   *     responses:
-   *       200:
-   *         description: Refresh triggered successfully
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 status:
-   *                   type: string
-   *                 duration:
-   *                   type: number
-   *                 metrics:
-   *                   type: object
-   */
-  router.post('/refresh', requireAdmin, requireScope('system-health:write'), async (_req, res) => {
-    if (DEMO_MODE) {
-      return res.json({
-        success: true,
-        status: 'skipped',
-        message: 'Refresh disabled in demo mode',
-        trigger: 'manual'
-      });
-    }
-
-    try {
-      const { refreshE2EHealthData } = require('./scheduler');
-
-      console.log('Manual refresh triggered via API');
-
-      const result = await refreshE2EHealthData({
-        logger: console,
-        storage: context.storage
-      });
-
-      res.json({
-        success: true,
-        message: 'E2E health data refresh completed',
-        trigger: 'manual',
-        ...result
-      });
-
-    } catch (error) {
-      console.error('Error during manual refresh:', error);
-      res.status(500).json({
-        error: 'Failed to refresh E2E health data',
-        message: error.message
-      });
-    }
-  });
 
 
 };
