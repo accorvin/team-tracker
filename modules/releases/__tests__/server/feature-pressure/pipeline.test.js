@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const {
   normalizeIssue,
@@ -199,6 +199,10 @@ describe('jiraOffset', function () {
 })
 
 describe('lookbackCutoff', function () {
+  // Pin to noon UTC so offset shifts never cross a date boundary
+  beforeEach(function () { vi.useFakeTimers({ now: new Date('2026-08-13T12:00:00Z') }) })
+  afterEach(function () { vi.useRealTimers() })
+
   it('returns a YYYY-MM-DD dateStr and a numeric ms instant', function () {
     var c = lookbackCutoff(12, '+0000')
     expect(c.dateStr).toMatch(/^\d{4}-\d{2}-\d{2}$/)
@@ -261,6 +265,9 @@ describe('onOrAfter', function () {
 })
 
 describe('computeComponentPressure — timezone window boundary', function () {
+  beforeEach(function () { vi.useFakeTimers({ now: new Date('2026-08-13T12:00:00Z') }) })
+  afterEach(function () { vi.useRealTimers() })
+
   it('derives the account offset from data and counts by that offset boundary', function () {
     var offset = '-0400'
     var cutoff = lookbackCutoff(12, offset)

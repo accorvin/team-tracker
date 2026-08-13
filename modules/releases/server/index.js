@@ -18,7 +18,7 @@ const registerFeaturePressureRoutes = require('./feature-pressure/routes');
 const registerPmHubRoutes = require('./pm-hub/routes');
 const registerDraftPlanRoutes = require('./draft-plans/routes');
 const registerReleaseReadinessRoutes = require('./release-readiness/routes');
-const registerCveSustainingRoutes = require('./cve-sustaining/routes');
+const { registerCveSustainingRoutes, registerFixAvailabilityRoutes } = require('./cve-sustaining/routes');
 const registerAiAdoptionRoutes = require('./ai-adoption/routes');
 const { getAuditLog } = require('./planning/audit-log');
 
@@ -317,6 +317,11 @@ module.exports = async function registerRoutes(router, context) {
     requireAuth,
     requireScope,
     jira
+  });
+  registerFixAvailabilityRoutes(cveSustainingRouter, {
+    storage,
+    requireAuth,
+    requireScope
   });
   router.use('/cve-sustaining', cveSustainingRouter);
 

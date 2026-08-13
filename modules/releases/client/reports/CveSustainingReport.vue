@@ -99,19 +99,106 @@
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <a v-for="(q, idx) in slaQuarters" :key="q.label"
             :href="q.total_jql" target="_blank" rel="noopener noreferrer"
-            class="rounded-lg border p-4 text-center hover:shadow-md transition-shadow cursor-pointer block"
+            class="rounded-lg border hover:shadow-md transition-shadow cursor-pointer flex overflow-hidden"
             :class="slaCardClasses(q.pct)"
             :title="`${q.label}: ${q.metSla} / ${q.total} CVEs met SLA — click to view in Jira`">
-            <p class="text-3xl font-extrabold">{{ q.pct }}%</p>
-            <div v-if="idx === slaQuarters.length - 1 && slaQuarters.length >= 2" class="mt-0.5">
-              <span class="text-[10px] font-semibold" :class="slaDeltaClass">
-                {{ slaDelta > 0 ? '+' : '' }}{{ slaDelta }}pp {{ slaDelta >= 0 ? '&#9650;' : '&#9660;' }}
-              </span>
+            <div class="flex items-center justify-center px-3 bg-black/5 dark:bg-white/5 border-r border-current/10 min-w-[60px]">
+              <p class="text-xs font-bold uppercase tracking-wide opacity-70 text-center leading-tight">{{ q.label }}</p>
             </div>
-            <p class="text-[10px] font-semibold uppercase tracking-wide mt-1 opacity-80">{{ q.label }}</p>
-            <p class="text-xs mt-1 opacity-60">{{ q.metSla }} / {{ q.total }} met SLA</p>
+            <div class="flex-1 p-4 text-center">
+              <p class="text-3xl font-extrabold">{{ q.pct }}%</p>
+              <div v-if="idx === slaQuarters.length - 1 && slaQuarters.length >= 2" class="mt-0.5">
+                <span class="text-[10px] font-semibold" :class="slaDeltaClass">
+                  {{ slaDelta > 0 ? '+' : '' }}{{ slaDelta }}pp {{ slaDelta >= 0 ? '&#9650;' : '&#9660;' }}
+                </span>
+              </div>
+              <p class="text-xs mt-1 opacity-60">{{ q.metSla }} / {{ q.total }} met SLA</p>
+            </div>
           </a>
         </div>
+      </section>
+
+      <!-- Fix Availability at Release -->
+      <section v-if="fixAvail.metrics" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Summary Metrics</h3>
+          <select v-if="fixAvail.releases?.length > 1" v-model="fixAvailRelease"
+            class="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-500">
+            <option v-for="r in fixAvail.releases" :key="r" :value="r">{{ r }}</option>
+          </select>
+        </div>
+
+        <!--  Summary Metrics cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div v-for="card in summaryMetricCards" :key="card.label" class="border-l-4 border-l-red-500 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center gap-1.5 mb-2">
+              <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{ card.label }}</span>
+              <span class="relative group">
+                <HelpCircle :size="13" class="text-gray-400 dark:text-gray-500 cursor-help" />
+                <span class="absolute bottom-full left-0 mb-1.5 w-64 p-2 text-[10px] text-white bg-gray-900 dark:bg-gray-700 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                  {{ card.tooltip }}
+                </span>
+              </span>
+            </div>
+            <p class="text-3xl font-extrabold text-gray-900 dark:text-gray-100">{{ card.value }}</p>
+          </div>
+        </div>
+
+        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-5 mb-3">Fix Availability at Release</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="border-l-4 border-l-red-500 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center gap-1.5 mb-2">
+              <span class="text-xs font-medium text-gray-600 dark:text-gray-400">% CVEs with No Fix at Release</span>
+              <span class="relative group">
+                <HelpCircle :size="13" class="text-gray-400 dark:text-gray-500 cursor-help" />
+                <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 p-2 text-[10px] text-white bg-gray-900 dark:bg-gray-700 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                  Percentage of CVEs (discovered at or before release) where no fix existed at release date (FIX_DATE &gt; RELEASE_DATE, NO-RH-VEX, or NOT-FOUND in FIX_DATE field)
+                </span>
+              </span>
+            </div>
+            <p class="text-3xl font-extrabold text-gray-900 dark:text-gray-100">{{ fixAvail.metrics.pctNoFix }}%</p>
+            <div class="mt-2 h-1.5 rounded-full overflow-hidden flex bg-gray-200 dark:bg-gray-600">
+              <div class="bg-blue-500 rounded-full" :style="{ width: fixAvail.metrics.pctNoFix + '%' }"></div>
+              <div class="bg-red-400 flex-1"></div>
+            </div>
+          </div>
+          <div class="border-l-4 border-l-red-500 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center gap-1.5 mb-2">
+              <span class="text-xs font-medium text-gray-600 dark:text-gray-400">% CVEs with Fix at Release</span>
+              <span class="relative group">
+                <HelpCircle :size="13" class="text-gray-400 dark:text-gray-500 cursor-help" />
+                <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 p-2 text-[10px] text-white bg-gray-900 dark:bg-gray-700 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                  Percentage of CVEs (discovered at or before release) where a fix already existed at release date (FIX_DATE &le; RELEASE_DATE). A fix is available but may or may not be available through Red Hat.
+                </span>
+              </span>
+            </div>
+            <p class="text-3xl font-extrabold text-gray-900 dark:text-gray-100">{{ fixAvail.metrics.pctWithFix }}%</p>
+            <div class="mt-2 h-1.5 rounded-full overflow-hidden flex bg-gray-200 dark:bg-gray-600">
+              <div class="bg-blue-500 rounded-full" :style="{ width: fixAvail.metrics.pctWithFix + '%' }"></div>
+              <div class="bg-red-400 flex-1"></div>
+            </div>
+          </div>
+          <div class="border-l-4 border-l-red-500 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center gap-1.5 mb-2">
+              <span class="text-xs font-medium text-gray-600 dark:text-gray-400">% with RH Fix Version</span>
+              <span class="relative group">
+                <HelpCircle :size="13" class="text-gray-400 dark:text-gray-500 cursor-help" />
+                <span class="absolute bottom-full right-0 mb-1.5 w-72 p-2 text-[10px] text-white bg-gray-900 dark:bg-gray-700 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                  Of CVEs with fix at release, this percentage has the fix-version field populated in VEX data, indicating Red Hat tracked a specific package version containing the fix.
+                </span>
+              </span>
+            </div>
+            <p class="text-3xl font-extrabold text-gray-900 dark:text-gray-100">{{ fixAvail.metrics.pctFixVersion }}%</p>
+            <div class="mt-2 h-1.5 rounded-full overflow-hidden flex bg-gray-200 dark:bg-gray-600">
+              <div class="bg-blue-500 rounded-full" :style="{ width: fixAvail.metrics.pctFixVersion + '%' }"></div>
+              <div class="bg-red-400 flex-1"></div>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-3 text-right">
+          {{ fixAvail.metrics.totalCves.toLocaleString() }} CVEs evaluated &middot; Release {{ fixAvail.selected }}
+        </p>
       </section>
 
       <!-- 2. CVEs by Due Date -->
@@ -323,8 +410,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
-import { ArrowLeft, RefreshCw, Shield } from 'lucide-vue-next'
+import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue'
+import { ArrowLeft, RefreshCw, Shield, HelpCircle } from 'lucide-vue-next'
 import { Bar, Pie, Doughnut, Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -474,6 +561,40 @@ async function handleRefresh() {
 
 onMounted(() => {
   loadData()
+  loadFixAvailability()
+})
+
+// ─── Fix Availability at Release ──────────────────────────────────────────────
+
+const fixAvail = ref({ releases: [], selected: null, metrics: null })
+const fixAvailRelease = ref(null)
+
+async function loadFixAvailability(release) {
+  try {
+    const qs = release ? `?release=${encodeURIComponent(release)}` : ''
+    const res = await fetch(`/api/modules/releases/cve-sustaining/fix-availability${qs}`)
+    if (!res.ok) return
+    const payload = await res.json()
+    fixAvail.value = payload
+    if (!fixAvailRelease.value && payload.selected) fixAvailRelease.value = payload.selected
+  } catch { /* no data available */ }
+}
+
+watch(fixAvailRelease, (newVal, oldVal) => {
+  if (newVal && oldVal && newVal !== oldVal) loadFixAvailability(newVal)
+})
+
+const summaryMetricCards = computed(() => {
+  const m = fixAvail.value?.metrics
+  if (!m) return []
+  return [
+    { label: 'Total CVEs at Release', value: (m.totalCves || 0).toLocaleString(), tooltip: 'Total CVE rows discovered at or before the release date, matching any active filters.' },
+    { label: 'CVEs with Fix Available at Release', value: (m.cvesWithFixAtRelease || 0).toLocaleString(), tooltip: 'CVEs where a fix already existed at release date (FIX_DATE ≤ RELEASE_DATE). Fix may be upstream or in other ecosystems.' },
+    { label: 'Unique CVEs', value: (m.uniqueCves || 0).toLocaleString(), tooltip: 'Distinct CVE IDs discovered at or before release. A single CVE can appear in multiple containers/packages.' },
+    { label: 'Number of Containers with CVEs', value: (m.containersWithCves || 0).toLocaleString(), tooltip: 'Unique containers (by SHA) that have at least one CVE discovered at or before release.' },
+    { label: 'Avg CVEs per Container', value: (m.avgCvesPerContainer || 0).toLocaleString(), tooltip: 'Average number of CVEs per container (total CVEs / unique containers).' },
+    { label: 'Container Freshness Score', value: (m.freshnessScore || 0) + '%', tooltip: 'Percentage of containers built within 30 days of the release date. Higher is better — indicates containers are up to date at release.' }
+  ]
 })
 
 function formatDate(iso) {
