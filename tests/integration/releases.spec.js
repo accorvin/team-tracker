@@ -1075,7 +1075,7 @@ test.describe('Releases CVE Sustaining Report @releases', () => {
     // Time series charts
     await expect(page.locator('text=Created vs Resolved').first()).toBeVisible();
     await expect(page.locator('text=Unresolved').first()).toBeVisible();
-    await expect(page.locator('text=RHOAI False Positives').first()).toBeVisible();
+    await expect(page.locator('text=RHAI False Positives').first()).toBeVisible();
 
     expect(page.errors).toHaveLength(0);
   });
