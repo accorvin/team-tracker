@@ -130,7 +130,7 @@
 
         <!--  Summary Metrics cards -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div v-for="card in summaryMetricCards" :key="card.label" class="border-l-4 border-red-500 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div v-for="card in summaryMetricCards" :key="card.label" class="border-l-4 border-l-red-500 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div class="flex items-center gap-1.5 mb-2">
               <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{ card.label }}</span>
               <span class="relative group">
@@ -146,7 +146,7 @@
 
         <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-5 mb-3">Fix Availability at Release</h4>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div class="border-l-4 border-red-500 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div class="border-l-4 border-l-red-500 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div class="flex items-center gap-1.5 mb-2">
               <span class="text-xs font-medium text-gray-600 dark:text-gray-400">% CVEs with No Fix at Release</span>
               <span class="relative group">
@@ -162,7 +162,7 @@
               <div class="bg-red-400 flex-1"></div>
             </div>
           </div>
-          <div class="border-l-4 border-red-500 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div class="border-l-4 border-l-red-500 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div class="flex items-center gap-1.5 mb-2">
               <span class="text-xs font-medium text-gray-600 dark:text-gray-400">% CVEs with Fix at Release</span>
               <span class="relative group">
@@ -178,7 +178,7 @@
               <div class="bg-red-400 flex-1"></div>
             </div>
           </div>
-          <div class="border-l-4 border-red-500 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div class="border-l-4 border-l-red-500 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div class="flex items-center gap-1.5 mb-2">
               <span class="text-xs font-medium text-gray-600 dark:text-gray-400">% with RH Fix Version</span>
               <span class="relative group">
