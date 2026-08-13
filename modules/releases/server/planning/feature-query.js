@@ -1,7 +1,7 @@
 var { CUSTOM_FIELDS, serializeField, numericField } = require('../hygiene/jira-fetch')
 var { parseDescriptionSignals } = require('./health/description-scanner')
 var { fetchEpicsForFeatures } = require('../execution/jira-enrich')
-var { FEATURE_PIPELINE_PROJECTS } = require('./constants')
+var { FEATURES_LIST_PROJECTS, CLOSED_STATUSES } = require('./constants')
 
 var QUERY_FIELDS = [
   'summary', 'status', 'issuetype', 'assignee', 'fixVersions',
@@ -19,13 +19,15 @@ var QUERY_FIELDS = [
 ].join(',')
 
 /**
- * Canonical shared-pipeline JQL: all FEATURE_PIPELINE_PROJECTS Features/Initiatives,
- * excluding Cancelled only. Features List strips Closed/Done/Resolved after merge.
+ * Features List live JQL: RHAISTRAT + AIPCC Features/Initiatives, open only.
+ * Closed/Done/Resolved/Cancelled are excluded here so the request stays under
+ * the gateway timeout. Wider Cancelled-only multi-project fetch belongs in a
+ * background canonical cache (PM Hub), not this path.
  */
 var JQL = [
-  'project IN (' + FEATURE_PIPELINE_PROJECTS.join(', ') + ')',
+  'project IN (' + FEATURES_LIST_PROJECTS.join(', ') + ')',
   'issuetype IN (Feature, Initiative)',
-  'status NOT IN (Cancelled)'
+  'status NOT IN (' + CLOSED_STATUSES.join(', ') + ')'
 ].join(' AND ')
 
 /** Bound live Jira so /feature-readiness stays under the gateway timeout. */

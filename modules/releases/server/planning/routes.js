@@ -463,10 +463,9 @@ module.exports = async function registerPlanningRoutes(router, context) {
    *     tags: [releases-planning]
    *     security: [{ bearerAuth: [] }]
    *     description: >
-   *       Prioritized feature readiness built from the shared canonical Features
-   *       pipeline (RHAIENG, RHOAIENG, INFERENG, AIPCC, RHAISTRAT, RHAIRFE, RHELAI, RHAI).
-   *       Live Jira fetch excludes Cancelled only; buildCanonicalFeatures then
-   *       hides Closed/Done/Resolved for the active Features List planning view.
+   *       Prioritized feature readiness for Features List. Live Jira fetch is
+   *       open Features/Initiatives in RHAISTRAT and AIPCC only (timeout budget);
+   *       results are merged with caches and scored via buildCanonicalFeatures.
    *     responses:
    *       200:
    *         description: Feature readiness data with pendingReview and ready arrays
