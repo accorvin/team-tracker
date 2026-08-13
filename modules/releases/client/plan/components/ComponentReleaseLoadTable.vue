@@ -21,20 +21,10 @@ import {
 const props = defineProps({
   groups: { type: Array, default: () => [] },
   componentLeads: { type: Object, default: () => ({}) },
-  velocity: { type: Object, default: null },
   initialSort: { type: Object, default: () => ({ column: null, direction: 'asc' }) }
 })
 
 var emit = defineEmits(['sort-changed', 'select'])
-
-function getComponentVelocity(componentName) {
-  if (!props.velocity || !props.velocity.components) return null
-  var comps = props.velocity.components
-  for (var i = 0; i < comps.length; i++) {
-    if (comps[i].component === componentName) return comps[i]
-  }
-  return null
-}
 
 const JIRA_BASE = 'https://redhat.atlassian.net/browse'
 var MAX_VISIBLE_FAIL_CHIPS = 2
@@ -375,11 +365,6 @@ defineExpose({ expandAll, collapseAll })
                     ? 'bg-amber-100 dark:bg-amber-800/40 text-amber-700 dark:text-amber-300'
                     : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'"
                 >{{ comp.notAlignedCount }} not aligned</span>
-                <span
-                  v-if="getComponentVelocity(comp.component)"
-                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
-                  :title="getComponentVelocity(comp.component).isPartialYear ? 'Less than a year of data' : ''"
-                >{{ getComponentVelocity(comp.component).avgPerRelease }} avg/rel<span v-if="getComponentVelocity(comp.component).isPartialYear" class="ml-0.5 text-gray-400 dark:text-gray-500">*</span></span>
               </div>
               <div v-if="getLeads(comp.component)" class="flex items-center gap-5 mt-2 ml-[38px]">
                 <div v-if="getLeads(comp.component).pmLead" class="flex items-center gap-1.5">

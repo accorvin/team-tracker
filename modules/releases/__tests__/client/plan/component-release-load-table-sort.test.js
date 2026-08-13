@@ -55,7 +55,6 @@ function mountTable(props) {
         makeFeature({ key: 'X-2', priority: 'Major', assignee: 'Bob' })
       ]),
       componentLeads: {},
-      velocity: null,
       initialSort: { column: null, direction: 'asc' }
     }, props || {})
   })

@@ -258,13 +258,14 @@ test.describe('Releases PM Hub @releases', () => {
     expect(body.error).toContain('filter');
   });
 
-  test('component-release-load returns velocity with age and component fields', async ({ request }) => {
+  test('component-release-load hides velocity while Feature/Initiative load remains', async ({ request }) => {
     const componentsRes = await request.get('/api/modules/releases/pm-hub/jira/components');
     const componentsBody = await componentsRes.json();
     if (!componentsBody.components || componentsBody.components.length === 0) {
       test.skip();
       return;
     }
+    expect(componentsBody.projects).toEqual(expect.arrayContaining(['RHAISTRAT', 'AIPCC']));
     var compName = componentsBody.components[0].name;
     var res = await request.get('/api/modules/releases/pm-hub/component-release-load?components=' + encodeURIComponent(compName));
     if (!res.ok()) {
@@ -272,28 +273,11 @@ test.describe('Releases PM Hub @releases', () => {
       return;
     }
     var body = await res.json();
-    expect(body).toHaveProperty('velocity');
-    var vel = body.velocity;
-    expect(vel).toHaveProperty('avgPerRelease');
-    expect(vel).toHaveProperty('totalResolved');
-    expect(vel).toHaveProperty('hasPartialYear');
-    expect(vel).toHaveProperty('components');
-    expect(vel).toHaveProperty('jql');
-    expect(typeof vel.hasPartialYear).toBe('boolean');
-    if (vel.components.length > 0) {
-      var comp = vel.components[0];
-      expect(comp).toHaveProperty('component');
-      expect(comp).toHaveProperty('resolved');
-      expect(comp).toHaveProperty('releases');
-      expect(comp).toHaveProperty('avgPerRelease');
-      expect(comp).toHaveProperty('activeWeeks');
-      expect(comp).toHaveProperty('isPartialYear');
-      expect(typeof comp.isPartialYear).toBe('boolean');
-      expect(typeof comp.activeWeeks).toBe('number');
-    }
+    expect(body).toHaveProperty('groups');
+    expect(body.velocity).toBeNull();
   });
 
-  test('should show velocity summary card and per-component badges', async ({ page }) => {
+  test('should show Requested/Committed load KPIs without velocity card', async ({ page }) => {
     await page.goto('/#/releases/plan');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
@@ -315,16 +299,10 @@ test.describe('Releases PM Hub @releases', () => {
       await firstOption.click();
       await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-      // Verify the Avg Features Delivered summary card is visible
-      var avgCard = page.locator('text=Avg Features Delivered');
-      await expect(avgCard.first()).toBeVisible();
-
-      // Check for component rows with velocity badges (avg/rel text)
-      var velocityBadges = page.locator('text=avg/rel');
-      var badgeCount = await velocityBadges.count();
-      // Velocity badges appear on component rows when data is loaded
-      // May be 0 if the component has no resolved features in the last year
-      expect(badgeCount).toBeGreaterThanOrEqual(0);
+      await expect(page.locator('text=Requested').first()).toBeVisible();
+      await expect(page.locator('text=Committed').first()).toBeVisible();
+      await expect(page.locator('text=Avg Features Delivered')).toHaveCount(0);
+      await expect(page.locator('text=avg/rel')).toHaveCount(0);
     }
 
     expect(page.errors).toHaveLength(0);

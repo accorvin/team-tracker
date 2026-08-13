@@ -13,10 +13,11 @@ const { filterCommittedFixVersions, parseReleaseName, compareReleasesTemporally 
 const { parseDescriptionSignals } = require('../planning/health/description-scanner')
 const { computeFPDoRReadiness, isAiFirstFeature } = require('../planning/fpdor')
 const { loadIndex } = require('../planning/cache-reader')
-const { CLOSED_STATUSES, FEATURE_PIPELINE_PROJECTS } = require('../planning/constants')
+const { CLOSED_STATUSES, FEATURES_LIST_PROJECTS } = require('../planning/constants')
 
 const JIRA_SEARCH = JIRA_HOST + '/issues/?jql='
-const PM_HUB_PROJECTS = FEATURE_PIPELINE_PROJECTS
+/** Same Feature/Initiative population as Features List live fetch (RHAISTRAT + AIPCC). */
+const PM_HUB_PROJECTS = FEATURES_LIST_PROJECTS
 const PILLAR_CONFIG_FILE = 'releases/pm-hub/pillar-config.json'
 
 var DEFAULT_PILLAR_CONFIG = {
@@ -545,7 +546,7 @@ module.exports = async function registerPmHubRoutes(router, context) {
    *   get:
    *     tags: [Releases]
    *     summary: List Jira components across PM Hub projects
-   *     description: Returns components from RHAIENG, RHOAIENG, INFERENG, AIPCC, RHAISTRAT, RHAIRFE, RHELAI, RHAI
+   *     description: Returns components from RHAISTRAT and AIPCC (same population as Features List)
    *     responses:
    *       200:
    *         description: Array of components with project keys
@@ -600,7 +601,7 @@ module.exports = async function registerPmHubRoutes(router, context) {
    *   get:
    *     tags: [Releases]
    *     summary: List Jira versions across PM Hub projects
-   *     description: Returns versions from RHAIENG, RHOAIENG, INFERENG, AIPCC, RHAISTRAT, RHAIRFE, RHELAI, RHAI
+   *     description: Returns versions from RHAISTRAT and AIPCC (same population as Features List)
    *     responses:
    *       200:
    *         description: Array of versions with project keys
@@ -906,19 +907,9 @@ module.exports = async function registerPmHubRoutes(router, context) {
         }
       }
 
-      // Query 3: Velocity — resolved features in the last year with a fixVersion
-      var velocityIssues = []
-      if (componentClause) {
-        var velJqlParts = baseParts.slice()
-        velJqlParts.push(componentClause)
-        velJqlParts.push('statusCategory = Done')
-        velJqlParts.push('resolved >= -' + VELOCITY_LOOKBACK_WEEKS + 'w')
-        velJqlParts.push('fixVersion is not EMPTY')
-        var velJql = velJqlParts.join(' AND ')
-        velocityIssues = await jiraClient.fetchAllJqlResults(velJql, 'summary,status,fixVersions,components,resolutiondate', {})
-      }
-
-      var velocity = computeVelocity(velocityIssues, componentClause, null, componentNames)
+      // Velocity KPI hidden for now (Pillar=All never supplied components; metric needs redesign).
+      // Keep computeVelocity() for a future dedicated report — do not fetch Done history here.
+      var velocity = null
 
       var groups = Object.keys(versionGroups).sort().map(function(vKey) {
         var vg = versionGroups[vKey]
