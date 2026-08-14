@@ -429,13 +429,18 @@ Stores all in-app managed teams. Created when `teamDataSource` is set to `"in-ap
 
 ## Allocation Data — `data/allocation/`
 
+> **Provided by the `platform/allocation/` extension.** Allocation was removed
+> from `@org-pulse/core` in v2.0.61; this consumer re-homes it as a
+> self-contained platform extension (see `docs/PLATFORM.md` → Allocation). Core
+> itself writes no allocation data.
+
 Sprint allocation data is stored under `data/allocation/` with an `allocation/` storage prefix. Key files:
 
 - `allocation/sprints/{sprintId}.json` — Per-sprint issue classification data
 - `allocation/summaries/{teamKey}.json` — Aggregated team allocation summary
 - `allocation/org/{orgKey}.json` — Org-level allocation summary
 
-Sprint data files include a `strategyId` field that records which allocation strategy was used for classification. When the strategy changes (different `id` in `platform/allocation-strategy/manifest.json`), cached closed sprint data is invalidated and re-classified on next refresh.
+Sprint data files include a `strategyId` field that records which allocation strategy was used for classification. When the strategy changes (different `id` in `platform/allocation/manifest.json`'s `strategy` block), cached closed sprint data is invalidated and re-classified on next refresh.
 
 ```json
 {
@@ -454,7 +459,7 @@ Sprint data files include a `strategyId` field that records which allocation str
 }
 ```
 
-Bucket keys are dynamic — they come from the active allocation strategy's `categories[].key` values plus a built-in `uncategorized` key. When no allocation strategy is configured (`platform/allocation-strategy/` absent), allocation features are hidden and no data is written.
+Bucket keys are dynamic — they come from the active allocation strategy's `categories[].key` values plus a built-in `uncategorized` key. When the `platform/allocation/` extension is absent, allocation features are hidden and no data is written.
 
 ## Field Definitions — `data/team-data/field-definitions.json`
 
