@@ -382,7 +382,7 @@ function computeForecast(remaining, componentNames) {
   }
 }
 
-function computePredictedDate(releaseRemaining, otherWorkload, velocity) {
+function computePredictedDate(releaseRemaining, velocity) {
   if (releaseRemaining === 0) return null
   if (!velocity || velocity <= 0) return null
   const windowsNeeded = releaseRemaining / velocity
@@ -475,7 +475,7 @@ const componentList = computed(() => {
       const globalOtherWorkload = Math.max(0, globalTotalOpen - currentReleaseOpen)
 
       const forecast = computeForecast(remaining, [c.name])
-      const predictedDate = computePredictedDate(remaining, globalOtherWorkload, forecast.velocity)
+      const predictedDate = computePredictedDate(remaining, forecast.velocity)
 
       return {
         name: c.name,

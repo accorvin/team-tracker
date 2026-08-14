@@ -137,7 +137,7 @@
           </div>
           <p class="text-[9px] text-gray-400 dark:text-gray-500 mt-2">
             1,000 simulations, per-component critical path (slowest component determines release).
-            {{ groupForecast.componentCount }} component(s) simulated · {{ groupForecast.totalRemaining }} total workload (release + other open work).
+            {{ groupForecast.componentCount }} component(s) simulated · {{ groupForecast.totalRemaining }} weighted remaining items.
           </p>
         </div>
 
