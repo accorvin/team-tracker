@@ -618,6 +618,18 @@ test.describe('Releases FPDoR Readiness @releases', () => {
     await readinessHeader.first().click();
     await expect(readinessHeader.first()).toHaveAttribute('aria-sort', 'ascending');
 
+    // Score cycle: default desc → asc → clear (aria-sort none; row order still score-desc via default)
+    await scoreHeader.first().click();
+    await expect(scoreHeader.first()).toHaveAttribute('aria-sort', 'descending');
+    await scoreHeader.first().click();
+    await expect(scoreHeader.first()).toHaveAttribute('aria-sort', 'ascending');
+    await scoreHeader.first().click();
+    await expect(scoreHeader.first()).toHaveAttribute('aria-sort', 'none');
+
+    var alignHeader = page.locator('thead th', { hasText: 'TV/FV Align' });
+    await expect(alignHeader.first()).toBeVisible();
+    await expect(alignHeader.first()).toHaveClass(/cursor-pointer/);
+
     expect(page.errors).toHaveLength(0);
   });
 
@@ -653,6 +665,8 @@ test.describe('Releases FPDoR Readiness @releases', () => {
     await expect(page.getByRole('button', { name: /All products/i })).toBeVisible();
     await expect(page.getByText('Failed FPDoR', { exact: true }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /Any failed item/i })).toBeVisible();
+    await expect(page.getByText('TV/FV Align', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /All alignments/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Export CSV/i })).toBeVisible();
 
     expect(page.errors).toHaveLength(0);
@@ -671,6 +685,9 @@ test.describe('Releases FPDoR Readiness @releases', () => {
 
     var reportCard = page.locator('text=Component Release Load Tracking');
     await expect(reportCard.first()).toBeVisible();
+
+    await expect(page.getByText('Not Aligned', { exact: true }).first()).toBeVisible();
+    await expect(page.locator('thead th', { hasText: 'TV/FV Align' }).first()).toBeVisible();
 
     expect(page.errors).toHaveLength(0);
   });

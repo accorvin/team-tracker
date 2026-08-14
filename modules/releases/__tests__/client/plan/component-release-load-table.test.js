@@ -7,6 +7,11 @@
  * inlined from the component source.
  */
 import { describe, it, expect } from 'vitest'
+import {
+  isAlignedCategory,
+  worseAlignmentCategory,
+  ALIGNMENT_CATEGORY_PRIORITY
+} from '../../../client/plan/utils/tv-fv-alignment-display.js'
 
 // ---------------------------------------------------------------------------
 // Inline the pure functions from ComponentReleaseLoadTable.vue so we can
@@ -113,7 +118,10 @@ function buildComponentGroups(groups) {
             releaseType: feat.releaseType,
             priority: feat.priority,
             isBlocked: feat.isBlocked,
-            pmDoAligned: !!feat.pmDoAligned,
+            alignmentCategory: feat.alignmentCategory || null,
+            pmDoAligned: feat.alignmentCategory
+              ? isAlignedCategory(feat.alignmentCategory)
+              : !!feat.pmDoAligned,
             fpdor: feat.fpdor || null,
             confidence: feat.confidence || null,
             isAiFirst: !!feat.isAiFirst,
@@ -129,6 +137,13 @@ function buildComponentGroups(groups) {
         }
 
         var entry = cg.features[feat.key]
+        entry.alignmentCategory = worseAlignmentCategory(
+          entry.alignmentCategory,
+          feat.alignmentCategory || null
+        )
+        entry.pmDoAligned = entry.alignmentCategory
+          ? isAlignedCategory(entry.alignmentCategory)
+          : !!entry.pmDoAligned
         var product = extractProduct(version)
         if (entry.products.indexOf(product) === -1) {
           entry.products.push(product)
@@ -189,6 +204,7 @@ function makeFeature(overrides) {
     targetVersions: ['rhoai-3.5'],
     assignee: 'Alice',
     pmOwner: 'Bob',
+    alignmentCategory: 'aligned_on_time',
     pmDoAligned: true
   }, overrides)
 }
@@ -563,15 +579,46 @@ describe('buildComponentGroups', function () {
     var result = buildComponentGroups(groups)
     expect(result[0].features[0].fixVersions).toHaveLength(3)
   })
+
+  it('derives pmDoAligned from alignmentCategory (on-time and late count as aligned)', function () {
+    var feats = [
+      makeFeature({ key: 'A-1', alignmentCategory: 'aligned_on_time' }),
+      makeFeature({ key: 'A-2', alignmentCategory: 'aligned_late' }),
+      makeFeature({ key: 'A-3', alignmentCategory: 'tv_only' }),
+      makeFeature({ key: 'A-4', alignmentCategory: 'misaligned' })
+    ]
+    var result = buildComponentGroups([makeGroup('rhoai-3.5', 'Dash', feats)])
+    expect(result[0].notAlignedCount).toBe(2)
+    var byKey = {}
+    result[0].features.forEach(function(f) { byKey[f.key] = f })
+    expect(byKey['A-1'].pmDoAligned).toBe(true)
+    expect(byKey['A-2'].pmDoAligned).toBe(true)
+    expect(byKey['A-3'].pmDoAligned).toBe(false)
+    expect(byKey['A-4'].pmDoAligned).toBe(false)
+  })
+
+  it('keeps worst alignmentCategory when the same feature merges across groups', function () {
+    var early = makeFeature({ key: 'X-1', alignmentCategory: 'aligned_on_time' })
+    var worse = makeFeature({ key: 'X-1', alignmentCategory: 'misaligned' })
+    var groups = [
+      makeGroup('rhoai-3.5', 'Dash', [early]),
+      makeGroup('rhoai-3.6', 'Dash', [worse])
+    ]
+    var result = buildComponentGroups(groups)
+    expect(result[0].features[0].alignmentCategory).toBe('misaligned')
+    expect(result[0].features[0].pmDoAligned).toBe(false)
+    expect(result[0].notAlignedCount).toBe(1)
+  })
 })
 
 // ---------------------------------------------------------------------------
 // Sort logic — inlined from ComponentReleaseLoadTable.vue
 // ---------------------------------------------------------------------------
 
-var SORT_COLUMNS = ['key', 'summary', 'priority', 'releaseType', 'status', 'colorStatus', 'fixVersion', 'targetVersion', 'blocked', 'pmDoAligned', 'readiness', 'assignee', 'pmOwner', 'docs']
+var SORT_COLUMNS = ['key', 'summary', 'priority', 'releaseType', 'status', 'colorStatus', 'fixVersion', 'targetVersion', 'blocked', 'alignmentCategory', 'readiness', 'assignee', 'pmOwner', 'docs']
 var PRIORITY_ORDER = { 'Blocker': 0, 'Critical': 1, 'Major': 2, 'Normal': 3 }
 var COLOR_STATUS_ORDER = { 'red': 0, 'yellow': 1, 'green': 2 }
+var ALIGNMENT_SORT_ORDER = ALIGNMENT_CATEGORY_PRIORITY
 
 function getSortValue(feature, column) {
   if (column === 'key') return feature.key || ''
@@ -593,7 +640,10 @@ function getSortValue(feature, column) {
     return feature.targetVersions && feature.targetVersions.length > 0 ? feature.targetVersions[0] : ''
   }
   if (column === 'blocked') return feature.isBlocked ? 1 : 0
-  if (column === 'pmDoAligned') return feature.pmDoAligned ? 0 : 1
+  if (column === 'alignmentCategory') {
+    var ao = ALIGNMENT_SORT_ORDER[feature.alignmentCategory]
+    return ao !== undefined ? ao : 99
+  }
   if (column === 'readiness') {
     if (!feature.fpdor) return 99
     if (feature.fpdor.allApplicablePassed) return 0
@@ -936,7 +986,7 @@ describe('toggleSort', function () {
   })
 
   it('works for all valid sort columns', function () {
-    var columns = ['key', 'summary', 'priority', 'releaseType', 'status', 'colorStatus', 'fixVersion', 'targetVersion', 'blocked', 'pmDoAligned', 'readiness', 'assignee', 'pmOwner', 'docs']
+    var columns = ['key', 'summary', 'priority', 'releaseType', 'status', 'colorStatus', 'fixVersion', 'targetVersion', 'blocked', 'alignmentCategory', 'readiness', 'assignee', 'pmOwner', 'docs']
     for (var i = 0; i < columns.length; i++) {
       var result = toggleSort({ column: null, direction: 'asc' }, columns[i])
       expect(result.column).toBe(columns[i])
