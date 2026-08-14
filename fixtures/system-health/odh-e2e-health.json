@@ -47,6 +47,30 @@
   },
   "recentRuns": [
     {
+      "buildId": "2087458596924166144",
+      "jobName": "pull-ci-opendatahub-io-opendatahub-operator-main-opendatahub-operator-e2e",
+      "suite": "odh",
+      "status": "failed",
+      "timestamp": "2026-08-13T18:30:00.000Z",
+      "prNumber": 3952,
+      "prowUrl": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/opendatahub-io_opendatahub-operator/3952/pull-ci-opendatahub-io-opendatahub-operator-main-opendatahub-operator-e2e/2087458596924166144",
+      "artifactsUrl": "https://storage.googleapis.com/test-platform-results/pr-logs/pull/opendatahub-io_opendatahub-operator/3952/pull-ci-opendatahub-io-opendatahub-operator-main-opendatahub-operator-e2e/2087458596924166144/",
+      "failedComponents": ["operator", "csv"],
+      "runDuration": 1200
+    },
+    {
+      "buildId": "2088060780279762944",
+      "jobName": "pull-ci-opendatahub-io-opendatahub-operator-main-opendatahub-operator-e2e",
+      "suite": "odh",
+      "status": "failed",
+      "timestamp": "2026-08-14T00:58:46.000Z",
+      "prNumber": 3921,
+      "prowUrl": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/opendatahub-io_opendatahub-operator/3921/pull-ci-opendatahub-io-opendatahub-operator-main-opendatahub-operator-e2e/2088060780279762944",
+      "artifactsUrl": "https://storage.googleapis.com/test-platform-results/pr-logs/pull/opendatahub-io_opendatahub-operator/3921/pull-ci-opendatahub-io-opendatahub-operator-main-opendatahub-operator-e2e/2088060780279762944/",
+      "failedComponents": ["infrastructure", "rbac"],
+      "runDuration": 1658
+    },
+    {
       "buildId": "2086990502799872001",
       "jobName": "pull-ci-opendatahub-io-opendatahub-operator-main-opendatahub-operator-e2e",
       "suite": "odh",

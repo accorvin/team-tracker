@@ -592,7 +592,7 @@ test.describe('OpenDataHub E2E Health Features @system-health', () => {
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
     // Look for clickable run links or buttons
-    const runLinks = page.locator('a[href*="e2e-run-detail"], button[data-testid*="view-run"], [data-testid*="run"] button, table tbody tr a');
+    const runLinks = page.locator('table tbody tr[title*="Click to view details"], table tbody tr.cursor-pointer');
     const runLinksCount = await runLinks.count();
 
     if (runLinksCount > 0) {
@@ -613,7 +613,8 @@ test.describe('OpenDataHub E2E Health Features @system-health', () => {
       const hasContent = await pageHasContent(page);
       expect(hasContent).toBe(true);
     } else {
-      console.log('No run detail links found - test passed (acceptable for demo mode or empty state)');
+      // Skip test if no clickable run rows found (may occur in demo mode or when no data available)
+      console.log('No run detail links found - skipping navigation test');
     }
 
     expect(page.errors).toHaveLength(0);
@@ -655,6 +656,136 @@ test.describe('OpenDataHub E2E Health Features @system-health', () => {
       apiRequests.forEach(req => console.log(`  ${req.method} ${req.url}`));
     } else {
       console.log('No refresh button found - test passed (acceptable for demo mode)');
+    }
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should display test run detail view with enhanced failure information', async ({ page }) => {
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Look for a failed run to test detail view with stack traces
+    const runLinks = page.locator('table tbody tr[title*="Click to view details"], table tbody tr.cursor-pointer');
+    const runLinksCount = await runLinks.count();
+
+    if (runLinksCount === 0) {
+      // Skip test if no clickable run rows found (may occur in demo mode or when no data available)
+      console.log('No run detail links available - skipping enhanced failure test');
+      return;
+    }
+
+    // Click first available run link
+    await runLinks.first().click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Verify we're on the detail page
+    expect(page.url()).toMatch(/e2e-run-detail/);
+
+    // Look for failed test cases section
+    const failedTestsSection = page.locator('text=/Failed Tests:|failed tests/i');
+    const hasFailedTests = await failedTestsSection.count() > 0;
+
+    if (hasFailedTests) {
+      // Check for error messages in failed test cases
+      const errorMessages = page.locator('.text-red-700, .text-red-600, .text-red-300, .text-red-400').filter({
+        hasText: /.+/ // Any non-empty text
+      });
+      const hasErrorMessages = await errorMessages.count() > 0;
+      expect(hasErrorMessages).toBe(true);
+
+      // Look for stack trace collapsible sections - should be present since fixture has failed runs with failedComponents
+      const stackTraceElements = page.locator('details summary').filter({ hasText: /Stack Trace/i });
+      const stackTraceCount = await stackTraceElements.count();
+      expect(stackTraceCount).toBeGreaterThan(0); // Should have stack traces for failed test cases
+
+      // Test expanding a stack trace
+      await stackTraceElements.first().click();
+      await page.waitForTimeout(500);
+
+      // Check if the stack trace content is visible after expansion
+      const stackTraceContent = page.locator('pre').filter({ hasText: /.+/ });
+      const hasExpandedContent = await stackTraceContent.count() > 0;
+      expect(hasExpandedContent).toBe(true);
+    } else {
+      console.log('No failed tests found - checking for overall success message');
+      const successMessage = page.locator('text=/All Components Passed|All tests passed|No failures/i');
+      const hasSuccessMessage = await successMessage.count() > 0;
+      expect(hasSuccessMessage).toBe(true);
+    }
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should fetch detailed test run data via API with enhanced failure structure', async ({ page }) => {
+    // Monitor API calls for detail endpoints
+    const detailApiRequests = [];
+    page.on('request', request => {
+      if (request.url().includes('/api/modules/system-health/odh-e2e-health/runs/') && request.url().includes('/details')) {
+        detailApiRequests.push({
+          url: request.url(),
+          method: request.method()
+        });
+      }
+    });
+
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Try to navigate to a run detail page via clickable table rows
+    const runLinks = page.locator('table tbody tr[title*="Click to view details"], table tbody tr.cursor-pointer');
+    const runLinksCount = await runLinks.count();
+
+    if (runLinksCount > 0) {
+      await runLinks.first().click();
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+      // Check if detail API was called - at least one attempt should be made when navigating to detail view
+      console.log(`Detail API requests made: ${detailApiRequests.length}`);
+      detailApiRequests.forEach(req => console.log(`  ${req.method} ${req.url}`));
+
+      // Should attempt to fetch detail data when navigating to a run detail page
+      expect(detailApiRequests.length).toBeGreaterThan(0);
+    } else {
+      // Skip test if no clickable run rows found (may occur in demo mode or when no data available)
+      console.log('No run detail links available - skipping API test');
+    }
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should display back navigation from run detail view', async ({ page }) => {
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Find and click a run link to navigate to detail view
+    const runLinks = page.locator('table tbody tr[title*="Click to view details"], table tbody tr.cursor-pointer');
+    const runLinksCount = await runLinks.count();
+
+    if (runLinksCount > 0) {
+      await runLinks.first().click();
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+      // Look for back navigation button
+      const backButton = page.locator('button').filter({ hasText: /Back to|back|← /i });
+      await expect(backButton.first()).toBeVisible();
+
+      // Test back navigation
+      await backButton.first().click();
+      await page.waitForTimeout(1000);
+
+      // Should return to main E2E health view
+      expect(page.url()).toMatch(/system-health\/odh-e2e-health/);
+      expect(page.url()).not.toMatch(/e2e-run-detail/);
+    } else {
+      // Skip test if no clickable run rows found (may occur in demo mode or when no data available)
+      console.log('No run detail links available - skipping navigation test');
     }
 
     expect(page.errors).toHaveLength(0);
