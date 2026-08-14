@@ -374,6 +374,14 @@ const displayTestSuites = computed(() => {
                       <p class="text-xs text-red-700 dark:text-red-300">
                         {{ testCase.failure?.message || testCase.errorMessage }}
                       </p>
+                      <div v-if="testCase.failure?.stackTrace" class="mt-2 text-xs text-red-600 dark:text-red-400">
+                        <details class="cursor-pointer">
+                          <summary class="font-medium hover:text-red-800 dark:hover:text-red-300">
+                            Stack Trace
+                          </summary>
+                          <pre class="mt-1 text-xs bg-red-50 dark:bg-red-900/10 p-2 rounded border overflow-x-auto whitespace-pre-wrap">{{ testCase.failure.stackTrace }}</pre>
+                        </details>
+                      </div>
                     </div>
                   </div>
                   <div v-if="suite.failedTestCases.length > 3" class="text-xs text-gray-500 dark:text-gray-400">

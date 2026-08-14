@@ -224,6 +224,64 @@ module.exports = function registerOpendatahubOperatorE2ERoutes(router, context) 
    *                   type: object
    *                 testSuites:
    *                   type: array
+   *                   items:
+   *                     type: object
+   *                     properties:
+   *                       name:
+   *                         type: string
+   *                         description: Test suite name
+   *                       component:
+   *                         type: string
+   *                         description: Component being tested
+   *                       status:
+   *                         type: string
+   *                         enum: [passed, failed]
+   *                         description: Overall suite status
+   *                       total:
+   *                         type: number
+   *                         description: Total number of test cases
+   *                       passed:
+   *                         type: number
+   *                         description: Number of passed test cases
+   *                       failed:
+   *                         type: number
+   *                         description: Number of failed test cases
+   *                       duration:
+   *                         type: number
+   *                         description: Suite execution duration in seconds
+   *                       failedTestCases:
+   *                         type: array
+   *                         description: Details of failed test cases
+   *                         items:
+   *                           type: object
+   *                           properties:
+   *                             name:
+   *                               type: string
+   *                               description: Test case name
+   *                             classname:
+   *                               type: string
+   *                               description: Test class name
+   *                             status:
+   *                               type: string
+   *                               enum: [passed, failed, skipped]
+   *                               description: Test case status
+   *                             duration:
+   *                               type: number
+   *                               description: Test case duration in seconds
+   *                             failure:
+   *                               type: object
+   *                               description: Failure details (only present for failed tests)
+   *                               properties:
+   *                                 message:
+   *                                   type: string
+   *                                   description: Error message summary
+   *                                 stackTrace:
+   *                                   type: string
+   *                                   description: Detailed stack trace (truncated to 1000 chars)
+   *                             timestamp:
+   *                               type: string
+   *                               format: date-time
+   *                               description: Test case timestamp
    *       404:
    *         description: Test run not found
    */
@@ -410,7 +468,7 @@ async function parseTestSuiteDetails(runDetails, readFromStorage) {
 
     if (runDetails.status === 'failed' && runDetails.failedComponents && runDetails.failedComponents.length > 0) {
       for (const component of runDetails.failedComponents) {
-        const suite = generateMockTestSuite(component, runDetails.suite);
+        const suite = generateMockTestSuite(component, runDetails.suite, false, true);
         testSuites.push(suite);
       }
     } else if (runDetails.status === 'failed') {
@@ -454,9 +512,10 @@ function deterministicHash(input, seed = 0) {
  * @param {string} component - Component name
  * @param {string} suite - Test suite (odh/rhoai)
  * @param {boolean} shouldPass - Whether tests should pass
+ * @param {boolean} forceFailures - Force some test failures regardless of shouldPass
  * @returns {Object} Mock test suite data
  */
-function generateMockTestSuite(component, _suite, shouldPass = false) {
+function generateMockTestSuite(component, _suite, shouldPass = false, forceFailures = false) {
   const testCases = [];
   const numTests = 3 + (deterministicHash(component, 1) % 5); // 3-7 tests per component
 
@@ -464,7 +523,12 @@ function generateMockTestSuite(component, _suite, shouldPass = false) {
     const testName = `Test${component.charAt(0).toUpperCase()}${component.slice(1)}${String(i + 1).padStart(2, '0')}`;
     const duration = 10 + (deterministicHash(component, i + 2) % 180); // 10-190 seconds
 
-    const shouldFail = !shouldPass && (deterministicHash(component, i + 3) % 100) < 30; // 30% chance of individual test failure
+    let shouldFail = !shouldPass && (deterministicHash(component, i + 3) % 100) < 30; // 30% chance of individual test failure
+
+    // If forceFailures is true, ensure at least the first 1-2 tests fail for failed components
+    if (forceFailures && !shouldPass && i < 2) {
+      shouldFail = true;
+    }
 
     const testCase = {
       name: testName,
@@ -731,8 +795,10 @@ function extractTestCasesWithDetails(suite) {
         classname: testCase.classname || '',
         status: status,
         duration: parseFloat(testCase.time) || 0,
-        errorMessage: errorMessage,
-        errorDetails: errorDetails.substring(0, 500), // Limit error details length
+        failure: status === 'failed' ? {
+          message: errorMessage,
+          stackTrace: errorDetails.substring(0, 1000)
+        } : undefined,
         timestamp: testCase.timestamp || null
       });
     }
