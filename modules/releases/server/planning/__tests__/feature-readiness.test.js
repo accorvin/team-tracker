@@ -1614,15 +1614,75 @@ describe('buildFeatureReadiness', function() {
       expect(docsItem.pass).toBe(false)
     })
 
-    it('docs impact passes via rp-qg1-pass without fields', function() {
+    it('docs impact ignores unverified rp-qg1-pass without fields', function() {
       var result = computeReadiness(readyFeature({
         components: ['Platform', 'Serving', 'UXD'],
         docsRequired: null,
         labels: ['rp-qg1-pass']
       }))
       var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Docs impact' })
+      expect(docsItem.pass).toBe(false)
+    })
+
+    it('docs impact passes via bot-verified rp-qg1-pass without fields', function() {
+      var result = computeReadiness(readyFeature({
+        components: ['Platform', 'Serving', 'UXD'],
+        docsRequired: null,
+        labels: ['rp-qg1-pass'],
+        qg1PassVerified: true
+      }))
+      var docsItem = result.fpdor.items.find(function(i) { return i.name === 'Docs impact' })
       expect(docsItem.pass).toBe(true)
       expect(docsItem.detail).toContain('rp-qg1-pass')
+    })
+
+    it('mandatory shortcuts ignore hand-applied rp-qg1-pass', function() {
+      var result = computeReadiness(readyFeature({
+        targetVersions: [],
+        releaseType: null,
+        priority: null,
+        riceScore: null,
+        docsRequired: null,
+        labels: ['rp-qg1-pass']
+      }))
+      expect(result.isReady).toBe(false)
+      expect(result.fpdor.items.find(function(i) { return i.name === 'Target Version' }).pass).toBe(false)
+      expect(result.fpdor.items.find(function(i) { return i.name === 'RICE' }).pass).toBe(false)
+    })
+
+    it('mandatory shortcuts accept bot-verified rp-qg1-pass', function() {
+      var result = computeReadiness(readyFeature({
+        targetVersions: [],
+        releaseType: null,
+        priority: null,
+        riceScore: null,
+        docsRequired: null,
+        labels: ['rp-qg1-pass'],
+        qg1PassVerified: true
+      }))
+      expect(result.fpdor.items.find(function(i) { return i.name === 'Target Version' }).pass).toBe(true)
+      expect(result.fpdor.items.find(function(i) { return i.name === 'Release Type' }).pass).toBe(true)
+      expect(result.fpdor.items.find(function(i) { return i.name === 'Priority' }).pass).toBe(true)
+      expect(result.fpdor.items.find(function(i) { return i.name === 'RICE' }).pass).toBe(true)
+      expect(result.fpdor.items.find(function(i) { return i.name === 'Docs impact' }).pass).toBe(true)
+    })
+
+    it('AI First sign-off ignores unverified rp-qg1-pass', function() {
+      var result = computeReadiness(readyFeature({
+        labels: ['strat-creator-auto-created', 'rp-qg1-pass']
+      }))
+      var signOff = result.fpdor.items.find(function(i) { return i.name === 'Feature human sign-off' })
+      expect(signOff.pass).toBe(false)
+    })
+
+    it('AI First sign-off passes via bot-verified rp-qg1-pass', function() {
+      var result = computeReadiness(readyFeature({
+        labels: ['strat-creator-auto-created', 'rp-qg1-pass'],
+        qg1PassVerified: true
+      }))
+      var signOff = result.fpdor.items.find(function(i) { return i.name === 'Feature human sign-off' })
+      expect(signOff.pass).toBe(true)
+      expect(signOff.detail).toContain('rp-qg1-pass')
     })
 
     it('UXD is not-checked without UXD component or N/A note', function() {

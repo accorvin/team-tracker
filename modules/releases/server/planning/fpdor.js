@@ -57,8 +57,17 @@ function hasLabelPrefix(feature, prefix) {
   return false
 }
 
+/**
+ * Trust rp-qg1-pass only when bot-verified.
+ *
+ * A bare label can be hand-applied in Jira; Org Pulse must not treat that as
+ * evidence for FPDoR shortcuts. Set feature.qg1PassVerified=true only when a
+ * Quality Gate bot comment with QG1-FP backs the label (enrichment / future
+ * gate-artifact ingest). Until then, field and strat-creator checks decide.
+ */
 function hasRpQg1Pass(feature) {
-  return hasLabel(feature, 'rp-qg1-pass')
+  if (!hasLabel(feature, 'rp-qg1-pass')) return false
+  return feature.qg1PassVerified === true
 }
 
 function hasStratCreatorRubricPass(feature) {
@@ -424,7 +433,12 @@ function evalFeatureHumanSignOff(feature) {
   if (hasRpQg1Pass(feature)) {
     return passViaLabel('Feature human sign-off', 'rp-qg1-pass', 'criteria')
   }
-  return evalItem('Feature human sign-off', false, 'Missing strat-creator-human* (or rp-qg1-pass) label', 'criteria')
+  return evalItem(
+    'Feature human sign-off',
+    false,
+    'Missing strat-creator-human* (or bot-verified rp-qg1-pass) label',
+    'criteria'
+  )
 }
 
 function evalChildEpics(feature) {
