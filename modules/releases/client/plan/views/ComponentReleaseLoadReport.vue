@@ -336,7 +336,7 @@
           </span>
           <span class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Not Aligned</span>
         </div>
-        <div class="text-2xl font-bold ml-7" :class="totalNotAligned > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-gray-100'" title="PM/DO Aligned = No (TV and FV missing or mismatch)">{{ totalNotAligned }}</div>
+        <div class="text-2xl font-bold ml-7" :class="totalNotAligned > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-gray-100'" title="Not aligned = TV only, FV only, or misaligned (same categories as TV vs FV Delta). On time and Late count as aligned.">{{ totalNotAligned }}</div>
       </div>
       <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
         <div class="absolute top-0 left-0 w-1 h-full bg-gray-400 rounded-l-xl" />

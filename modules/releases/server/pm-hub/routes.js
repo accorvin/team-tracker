@@ -14,6 +14,11 @@ const { parseDescriptionSignals } = require('../planning/health/description-scan
 const { computeFPDoRReadiness, isAiFirstFeature } = require('../planning/fpdor')
 const { loadIndex } = require('../planning/cache-reader')
 const { CLOSED_STATUSES, FEATURES_LIST_PROJECTS } = require('../planning/constants')
+const {
+  classifyForRelease,
+  isAlignedCategory,
+  loadReleaseDatesMap
+} = require('../tv-fv-delta/alignment')
 
 const JIRA_SEARCH = JIRA_HOST + '/issues/?jql='
 /** Same Feature/Initiative population as Features List live fetch (RHAISTRAT + AIPCC). */
@@ -386,9 +391,9 @@ const FIELDS_TO_FETCH = [
 ].join(',')
 
 /**
- * PM/DO Aligned: Yes when some Fix Version strictly matches some Target Version.
- * Match = identical string, or same normalized product + major.minor + event (cmp === 0).
- * Missing TV or FV → not aligned. Early delivery (FV before TV) is NOT aligned.
+ * PM/DO Aligned (legacy binary): Yes when some Fix Version strictly matches some Target Version.
+ * Prefer alignmentCategory from attachAlignment() (TV/FV Delta 5-category rules) in PM Hub rows.
+ * Missing TV or FV → not aligned. Early delivery (FV before TV) is NOT aligned under this binary helper.
  */
 function versionsStrictMatch(a, b) {
   if (!a || !b) return false
@@ -411,6 +416,25 @@ function computePmDoAligned(fixVersions, targetVersions) {
     }
   }
   return false
+}
+
+/**
+ * Attach Delta 5-category alignment for a specific release bucket.
+ * Mutates and returns featureObj.
+ */
+function attachAlignment(featureObj, release, releaseDates) {
+  if (!featureObj) return featureObj
+  var cat = release
+    ? classifyForRelease(
+      featureObj.targetVersions,
+      featureObj.fixVersions,
+      release,
+      releaseDates || {}
+    )
+    : null
+  featureObj.alignmentCategory = cat
+  featureObj.pmDoAligned = isAlignedCategory(cat)
+  return featureObj
 }
 
 function computeConfidence(isReady, fixVersion) {
@@ -508,6 +532,7 @@ function buildFeatureObj(f, targetVersions, rawIssue, epicCountByKey) {
     components: f.components || [],
     fixVersions: fixVersions,
     targetVersions: tv,
+    alignmentCategory: null,
     pmDoAligned: computePmDoAligned(fixVersions, tv),
     assignee: f.assignee || null,
     pmOwner: f.pmOwner || null,
@@ -740,6 +765,8 @@ module.exports = async function registerPmHubRoutes(router, context) {
     }
 
     try {
+      var releaseDates = await loadReleaseDatesMap(context.storage)
+
       var baseParts = [
         'project IN (' + PM_HUB_PROJECTS.join(', ') + ')',
         'issuetype IN (' + DEFAULT_ISSUE_TYPES.join(', ') + ')'
@@ -847,7 +874,13 @@ module.exports = async function registerPmHubRoutes(router, context) {
               if (componentNames.length > 0 && componentNames.indexOf(ucName) === -1) continue
               var uGroup = ensureGroup(committedFvOnly[ufi], ucName)
               if (!uGroup.committedFeatures.some(function(e) { return e.key === f.key })) {
-                uGroup.committedFeatures.push(buildFeatureObj(f, tvNames, rawIssue, epicCountByKey))
+                uGroup.committedFeatures.push(
+                  attachAlignment(
+                    buildFeatureObj(f, tvNames, rawIssue, epicCountByKey),
+                    committedFvOnly[ufi],
+                    releaseDates
+                  )
+                )
                 uGroup.committedCount++
                 if (f.isBlocked) uGroup.blockedCount++
               }
@@ -881,10 +914,15 @@ module.exports = async function registerPmHubRoutes(router, context) {
         if (groupVersionKeys.length === 0) continue
 
         var isRequested = matchingTv.length > 0
-        var featureObj = buildFeatureObj(f, tvNames, rawIssue, epicCountByKey)
+        var featureBase = buildFeatureObj(f, tvNames, rawIssue, epicCountByKey)
 
         for (var gvi = 0; gvi < groupVersionKeys.length; gvi++) {
           var vKey = groupVersionKeys[gvi]
+          var featureObj = attachAlignment(
+            Object.assign({}, featureBase),
+            vKey,
+            releaseDates
+          )
           for (var ci = 0; ci < compList.length; ci++) {
             var cName = compList[ci]
             if (componentNames.length > 0 && componentNames.indexOf(cName) === -1) continue
@@ -958,3 +996,4 @@ module.exports.extractTargetVersions = extractTargetVersions
 module.exports.filterCommittedFixVersions = filterCommittedFixVersions
 module.exports.computePmDoAligned = computePmDoAligned
 module.exports.versionsStrictMatch = versionsStrictMatch
+module.exports.attachAlignment = attachAlignment

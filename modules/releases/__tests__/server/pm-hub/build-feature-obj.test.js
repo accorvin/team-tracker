@@ -207,3 +207,25 @@ describe('extractTargetVersions', function () {
     expect(extractTargetVersions(raw)).toEqual(['rhoai-3.5'])
   })
 })
+
+describe('attachAlignment', function () {
+  var attachAlignment = require('../../../server/pm-hub/routes').attachAlignment
+
+  it('marks early delivery as aligned_on_time for the TV release', function () {
+    var base = buildFeatureObj({
+      key: 'X-1',
+      fixVersions: ['rhoai-3.5'],
+      summary: 'Early'
+    }, ['rhoai-3.6'])
+    var row = attachAlignment(Object.assign({}, base), 'rhoai-3.6', {})
+    expect(row.alignmentCategory).toBe('aligned_on_time')
+    expect(row.pmDoAligned).toBe(true)
+  })
+
+  it('marks TV-only as not aligned', function () {
+    var base = buildFeatureObj({ key: 'X-2', fixVersions: [], summary: 'TV' }, ['rhoai-3.6'])
+    var row = attachAlignment(Object.assign({}, base), 'rhoai-3.6', {})
+    expect(row.alignmentCategory).toBe('tv_only')
+    expect(row.pmDoAligned).toBe(false)
+  })
+})
