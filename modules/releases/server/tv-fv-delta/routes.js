@@ -613,13 +613,18 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
     var allAliases = Array.from(new Set(tvAliases.concat(fvAliases)))
 
     // Key-based JQL: exact issue list guarantees table count == Jira link count.
+    // Cap at 300 keys to stay within CloudFront's ~8 KB URL limit (RHAISTRAT-XXXX
+    // keys are ~20 chars URL-encoded each; 300 keys ≈ 6 KB, safely under the ceiling).
+    // Fall back to alias JQL for very large releases (live filter, may drift slightly).
+    var KEY_JQL_LIMIT = 300
     var alignedKeys = items
       .filter(function(it) { return it.category === 'aligned_on_time' })
       .map(function(it) { return it.key })
-      .filter(Boolean)
-    var alignedOnTimeJql = alignedKeys.length > 0
+      .filter(function(k) { return k && /^[A-Z]+-\d+$/.test(k) })
+    var aliasFallbackJql = '"Target Version" in (' + tvAliases.map(quoteRelease).join(', ') + ') AND fixVersion in (' + fvAliases.map(quoteRelease).join(', ') + ')'
+    var alignedOnTimeJql = alignedKeys.length > 0 && alignedKeys.length <= KEY_JQL_LIMIT
       ? 'key in (' + alignedKeys.join(', ') + ')'
-      : '"Target Version" in (' + tvAliases.map(quoteRelease).join(', ') + ') AND fixVersion in (' + tvAliases.map(quoteRelease).join(', ') + ')'
+      : aliasFallbackJql
 
     executiveSummary.push({
       release: release,

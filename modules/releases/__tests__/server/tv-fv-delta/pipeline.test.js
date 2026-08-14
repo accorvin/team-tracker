@@ -1271,6 +1271,46 @@ describe('buildExport', () => {
     expect(jql).toContain('key in (X-1)');
     expect(jql).not.toContain(') OR (');
   });
+
+  it('aligned_on_time_jql falls back to alias JQL when key count exceeds 300', () => {
+    const releases = ['3.5 EA1 RHOAI RELEASE'];
+    const classifications = Array.from({ length: 301 }, function(_, i) {
+      return {
+        release: '3.5 EA1 RHOAI RELEASE', category: 'aligned_on_time', key: 'X-' + (i + 1),
+        url: '', summary: '', status: '', color_status: '', product_manager: '',
+        assignee: '', team: '', components: [], component: '',
+        target_version: '3.5 EA1 RHOAI RELEASE', fix_versions: '3.5 EA1 RHOAI RELEASE',
+      };
+    });
+    const result = buildExport(classifications, releases, '2026-01-01T00:00:00Z', [], 'RHAISTRAT');
+    const jql = decodeURIComponent(result.executive_summary[0].aligned_on_time_jql);
+    // Over limit → alias JQL (not key in)
+    expect(jql).not.toContain('key in (');
+    expect(jql).toContain('"Target Version" in');
+    expect(jql).toContain('fixVersion in');
+  });
+
+  it('aligned_on_time_jql fallback uses fvAliases (not tvAliases) in fixVersion clause', () => {
+    // When aligned_on_time count is 0, the fallback JQL should use TV aliases for
+    // "Target Version" and FV aliases for fixVersion — not TV aliases for both.
+    const releases = ['3.5 EA1 RHOAI RELEASE'];
+    const classifications = [
+      {
+        release: '3.5 EA1 RHOAI RELEASE', category: 'tv_only', key: 'X-1',
+        url: '', summary: '', status: '', color_status: '', product_manager: '',
+        assignee: '', team: '', components: [], component: '',
+        target_version: '3.5 EA1 RHOAI RELEASE',
+        fix_versions: 'rhoai-3.5.EA1',
+      },
+    ];
+    const result = buildExport(classifications, releases, '2026-01-01T00:00:00Z', [], 'RHAISTRAT');
+    const jql = decodeURIComponent(result.executive_summary[0].aligned_on_time_jql);
+    // Fallback (no aligned_on_time keys): TV clause uses TV alias, FV clause uses FV alias
+    expect(jql).toContain('"Target Version" in');
+    expect(jql).toContain('fixVersion in');
+    // FV alias (rhoai-3.5.EA1) must appear in fixVersion clause, not TV alias only
+    expect(jql).toContain('rhoai-3.5.EA1');
+  });
 });
 
 // ---------------------------------------------------------------------------
