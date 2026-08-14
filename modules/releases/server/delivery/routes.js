@@ -977,6 +977,22 @@ async function runFullAnalysis(storage, config) {
     }
   }
 
+  // Recalculate risk using weighted incomplete (childrenRemaining) after enrichment
+  const now2 = new Date()
+  for (const release of result.releases) {
+    const daysRemaining = safeDaysBetween(now2, release.dueDate)
+    let weightedIncomplete = 0
+    for (const issue of release.issues) {
+      if (issue.statusBucket !== 'done') {
+        weightedIncomplete += (issue.childrenRemaining || 1)
+      }
+    }
+    const aggRisk = releaseRiskFromIncompleteAndTime(daysRemaining, weightedIncomplete, config)
+    release.risk = aggRisk
+    release.riskScore = riskScoreFromLevel(aggRisk)
+    release.riskSummary = buildReleaseRiskSummary(release, aggRisk, release.riskDriver, daysRemaining)
+  }
+
   if (jiraWarning) result.warning = jiraWarning
 
   const d = result.fixVersionDiagnostics

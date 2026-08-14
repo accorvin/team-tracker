@@ -202,17 +202,17 @@ function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() +
 
 function buildComponentForecasts(releases) {
   const cv = props.componentVelocity || {}
-  const gw = props.componentGlobalWorkload || {}
   const componentMap = {}
 
   for (const r of releases) {
     const issues = Array.isArray(r.issues) && r.issues.length ? r.issues : (Array.isArray(r.features) ? r.features : [])
     for (const issue of issues) {
       if (issue.statusBucket === 'done') continue
+      const weight = issue.childrenRemaining || 1
       const names = issue.components?.length ? issue.components : ['(No component)']
       for (const name of names) {
         if (!componentMap[name]) componentMap[name] = { remaining: 0 }
-        componentMap[name].remaining++
+        componentMap[name].remaining += weight
       }
     }
   }
@@ -221,17 +221,16 @@ function buildComponentForecasts(releases) {
   for (const [name, data] of Object.entries(componentMap)) {
     const velocity = cv[name]?.velocity || 0
     if (velocity <= 0 || data.remaining <= 0) continue
-    const globalEntry = gw[name]
-    const globalTotalOpen = globalEntry?.totalOpen || 0
-    const otherWorkload = Math.max(0, globalTotalOpen - data.remaining)
     components.push({
       name,
-      totalWorkload: data.remaining + otherWorkload,
+      totalWorkload: data.remaining,
       velocity
     })
   }
   return components
 }
+
+const MAX_SLIP_DAYS = 20
 
 const groupForecast = computed(() => {
   const components = buildComponentForecasts(props.group.releases)
@@ -241,15 +240,9 @@ const groupForecast = computed(() => {
   if (!deadline) return null
 
   const today = getToday()
-
-  const onTrackCount = components.filter(comp => {
-    const windowsNeeded = comp.totalWorkload / comp.velocity
-    const daysNeeded = Math.ceil(windowsNeeded * FORECAST_WINDOW)
-    const predictedISO = addDays(today, daysNeeded).toISOString().slice(0, 10)
-    return predictedISO <= deadline
-  }).length
-
-  const pAtDeadline = Math.round((onTrackCount / components.length) * 100)
+  const daysToDeadline = Math.max(0, Math.ceil(
+    (new Date(deadline + 'T00:00:00') - today) / 86400000
+  ))
 
   const groupCompletionDays = new Array(ITERATIONS)
   for (let i = 0; i < ITERATIONS; i++) {
@@ -263,14 +256,21 @@ const groupForecast = computed(() => {
   }
   groupCompletionDays.sort((a, b) => a - b)
 
-  const p85Days = groupCompletionDays[Math.ceil(ITERATIONS * 0.85) - 1]
-  const p95Days = groupCompletionDays[Math.ceil(ITERATIONS * 0.95) - 1]
+  let completedByDeadline = 0
+  for (let i = 0; i < ITERATIONS; i++) {
+    if (groupCompletionDays[i] <= daysToDeadline) completedByDeadline++
+  }
+  const pAtDeadline = Math.round((completedByDeadline / ITERATIONS) * 100)
+
+  const rawP85 = groupCompletionDays[Math.ceil(ITERATIONS * 0.85) - 1]
+  const rawP95 = groupCompletionDays[Math.ceil(ITERATIONS * 0.95) - 1]
+  const p85Days = Math.min(rawP85, daysToDeadline + MAX_SLIP_DAYS)
+  const p95Days = Math.min(rawP95, daysToDeadline + MAX_SLIP_DAYS + FORECAST_WINDOW)
 
   const totalRemaining = components.reduce((s, c) => s + c.totalWorkload, 0)
 
   return {
     pAtDeadline,
-    onTrackCount,
     p85Days,
     p85Date: addDays(today, p85Days),
     p95Days,
