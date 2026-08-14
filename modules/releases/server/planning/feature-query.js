@@ -6,6 +6,7 @@ var { FEATURES_LIST_PROJECTS, CLOSED_STATUSES } = require('./constants')
 var QUERY_FIELDS = [
   'summary', 'status', 'issuetype', 'assignee', 'fixVersions',
   'components', 'labels', 'priority', 'created', 'updated', 'project',
+  'issuelinks',
   CUSTOM_FIELDS.team,
   CUSTOM_FIELDS.targetVersion,
   CUSTOM_FIELDS.riceScore,
@@ -65,6 +66,28 @@ function extractProject(issue, fields) {
   return null
 }
 
+function extractBlockedBy(issueLinks) {
+  var blockedBy = []
+  if (!Array.isArray(issueLinks)) return blockedBy
+  for (var i = 0; i < issueLinks.length; i++) {
+    var link = issueLinks[i]
+    if (!link || !link.inwardIssue) continue
+    var type = link.type || {}
+    if (type.name !== 'Blocks' && type.inward !== 'is blocked by') continue
+    var linkedFields = link.inwardIssue.fields || {}
+    var linkedStatus = linkedFields.status || {}
+    var linkedStatusCat = linkedStatus.statusCategory && linkedStatus.statusCategory.name
+    var linkedStatusName = linkedStatus.name || ''
+    if (linkedStatusCat === 'Done') continue
+    blockedBy.push({
+      key: link.inwardIssue.key,
+      summary: linkedFields.summary || '',
+      status: linkedStatusName
+    })
+  }
+  return blockedBy
+}
+
 function normalizeIssue(issue) {
   var fields = issue.fields || {}
   var assignee = fields.assignee
@@ -83,6 +106,9 @@ function normalizeIssue(issue) {
   var status = fields.status
     ? (typeof fields.status === 'object' ? fields.status.name || null : fields.status)
     : null
+  var statusCategory = fields.status && typeof fields.status === 'object' && fields.status.statusCategory
+    ? fields.status.statusCategory.name || null
+    : null
   var priority = fields.priority
     ? (typeof fields.priority === 'object' ? fields.priority.name || null : fields.priority)
     : null
@@ -95,11 +121,14 @@ function normalizeIssue(issue) {
     ? (typeof pmOwnerField === 'object' ? pmOwnerField.displayName || null : pmOwnerField)
     : null
 
+  var blockedBy = extractBlockedBy(fields.issuelinks)
+
   return {
     key: issue.key,
     project: extractProject(issue, fields),
     summary: fields.summary || '',
     status: status,
+    statusCategory: statusCategory,
     issueType: issueType,
     assignee: assignee,
     team: serializeField(fields[CUSTOM_FIELDS.team]),
@@ -116,6 +145,8 @@ function normalizeIssue(issue) {
     targetEnd: serializeField(fields[CUSTOM_FIELDS.targetEnd]),
     pmOwner: pmOwner,
     effort: numericField(fields[CUSTOM_FIELDS.effort]),
+    isBlocked: blockedBy.length > 0,
+    blockedBy: blockedBy,
     // null when description was not fetched — lets health/cache signals win in merge
     descriptionSignals: fields.description ? parseDescriptionSignals(fields.description) : null
     // Do not set epicCount here — live fetch does not discover child Epics.
@@ -196,6 +227,7 @@ module.exports = {
   normalizeIssue: normalizeIssue,
   extractTargetVersions: extractTargetVersions,
   extractProject: extractProject,
+  extractBlockedBy: extractBlockedBy,
   enrichChildEpicCounts: enrichChildEpicCounts,
   JQL: JQL,
   QUERY_FIELDS: QUERY_FIELDS,
