@@ -42,6 +42,18 @@ function canonicalToLoadRow(feature) {
     labels: feature.labels || [],
     riceScore: feature.riceScore != null ? feature.riceScore : null,
     linkedRfeKey: feature.sourceRfe || null,
+    bigRock: feature.bigRock || null,
+    team: feature.team || null,
+    size: feature.size || null,
+    effectivePriorityScore: feature.effectivePriorityScore != null
+      ? feature.effectivePriorityScore
+      : null,
+    priorityScoreBreakdown: feature.priorityScoreBreakdown || null,
+    recommendation: feature.recommendation || null,
+    scores: feature.scores || null,
+    reviewers: feature.reviewers || null,
+    humanReviewStatus: feature.humanReviewStatus || null,
+    needsAttention: !!feature.needsAttention,
     fpdor: feature.fpdor || null,
     isAiFirst: !!feature.isAiFirst,
     confidence: feature.confidence || null,

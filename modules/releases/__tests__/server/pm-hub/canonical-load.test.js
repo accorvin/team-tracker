@@ -32,7 +32,11 @@ describe('canonical-load', function() {
     var row = canonicalToLoadRow(feature({
       deliveryOwner: 'Alice',
       pmOwner: 'Bob',
-      colorStatus: 'Green'
+      colorStatus: 'Green',
+      bigRock: 'Outcome A',
+      team: 'Platform',
+      effectivePriorityScore: 72,
+      priorityScoreBreakdown: { rice: 10 }
     }))
     expect(row.key).toBe('RHAISTRAT-1')
     expect(row.summary).toBe('Test')
@@ -41,6 +45,10 @@ describe('canonical-load', function() {
     expect(row.colorStatus).toBe('Green')
     expect(row.fixVersions).toEqual(['rhoai-3.6'])
     expect(row.fpdor).toBeTruthy()
+    expect(row.bigRock).toBe('Outcome A')
+    expect(row.team).toBe('Platform')
+    expect(row.effectivePriorityScore).toBe(72)
+    expect(row.priorityScoreBreakdown).toEqual({ rice: 10 })
   })
 
   it('filters by component', function() {

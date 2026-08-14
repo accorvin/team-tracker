@@ -20,6 +20,7 @@ import {
   sortFeatures,
   nextSortState
 } from '../utils/feature-readiness-sort.js'
+import { toDrawerFeature } from '../utils/feature-readiness-drawer-model.js'
 
 const nav = inject('moduleNav')
 const jiraBaseUrl = 'https://issues.redhat.com/browse'
@@ -60,6 +61,9 @@ useRefreshPolling(refreshing, checkRefreshStatus, function() {
 })
 
 const selectedFeature = ref(null)
+const drawerFeature = computed(function() {
+  return toDrawerFeature(selectedFeature.value)
+})
 const selectedVersion = ref('')
 
 const filters = ref(Object.assign({}, DEFAULT_FILTERS, {
@@ -414,7 +418,7 @@ function formatSyncDate(dateStr) {
   </div>
 
   <FeatureReadinessDrawer
-    :feature="selectedFeature"
+    :feature="drawerFeature"
     :jiraBaseUrl="jiraBaseUrl"
     @close="selectedFeature = null"
     @navigate="navigateToFeature"

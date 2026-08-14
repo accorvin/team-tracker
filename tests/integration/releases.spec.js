@@ -688,6 +688,7 @@ test.describe('Releases FPDoR Readiness @releases', () => {
 
     await expect(page.getByText('Not Aligned', { exact: true }).first()).toBeVisible();
     await expect(page.locator('thead th', { hasText: 'TV/FV Align' }).first()).toBeVisible();
+    await expect(page.locator('thead th', { hasText: 'Readiness' }).first()).toBeVisible();
 
     expect(page.errors).toHaveLength(0);
   });

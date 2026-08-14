@@ -409,6 +409,7 @@ import { buildComponentLeadsMap } from '../../composables/componentLeads'
 import ComponentReleaseLoadTable from '../components/ComponentReleaseLoadTable.vue'
 import PillarConfigPanel from '../components/PillarConfigPanel.vue'
 import FeatureReadinessDrawer from '../components/FeatureReadinessDrawer.vue'
+import { toDrawerFeature } from '../utils/feature-readiness-drawer-model.js'
 
 const nav = inject('moduleNav', null)
 const jiraBaseUrl = 'https://issues.redhat.com/browse'
@@ -417,19 +418,6 @@ function navigateToFeature(key) {
   if (nav && typeof nav.navigateTo === 'function') {
     nav.navigateTo('feature-detail', { key, from: 'plan-pm-hub' })
   }
-}
-
-/** Normalize PM Hub row shape for FeatureReadinessDrawer. */
-function toDrawerFeature(feature) {
-  if (!feature) return null
-  var fixVersions = feature.fixVersions || []
-  return Object.assign({}, feature, {
-    title: feature.title || feature.summary || '',
-    fixVersion: feature.fixVersion || (fixVersions.length ? fixVersions[0] : null),
-    deliveryOwner: feature.deliveryOwner || feature.assignee || null,
-    sourceRfe: feature.sourceRfe || feature.linkedRfeKey || null,
-    dataSource: feature.dataSource || 'pm-hub'
-  })
 }
 
 const API_BASE = '/modules/releases/pm-hub'
