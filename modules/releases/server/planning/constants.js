@@ -4,25 +4,15 @@ const CLOSED_STATUSES = ['Closed', 'Done', 'Resolved', 'Cancelled']
 const TERMINAL_STATUSES = ['Review', 'Pending Release']
 
 /**
- * Shared Features pipeline population (Features List + PM Hub target set).
- * PM Hub metadata / future canonical cache use this full project list.
+ * Canonical Features/Initiatives population (Features List + PM Hub).
+ * Planning Features live in RHAISTRAT + AIPCC only — eng-project Features
+ * (RHAIENG, RHOAIENG, …) are out of scope. Child epics FPDoR uses quality-gate /
+ * epic-creator labels, not a multi-project Feature scrape.
  */
-const FEATURE_PIPELINE_PROJECTS = [
-  'RHAIENG',
-  'RHOAIENG',
-  'INFERENG',
-  'AIPCC',
-  'RHAISTRAT',
-  'RHAIRFE',
-  'RHELAI',
-  'RHAI'
-]
+const FEATURE_PIPELINE_PROJECTS = ['RHAISTRAT', 'AIPCC']
 
-/**
- * Features List live Jira fetch — narrowed for gateway timeout budget.
- * Open Features/Initiatives only in RHAISTRAT + AIPCC.
- */
-const FEATURES_LIST_PROJECTS = ['RHAISTRAT', 'AIPCC']
+/** Live Features List / PM Hub fetch — same population as FEATURE_PIPELINE_PROJECTS. */
+const FEATURES_LIST_PROJECTS = FEATURE_PIPELINE_PROJECTS
 
 /** Statuses Features List hides after merge (and excludes at live fetch). */
 const FEATURES_LIST_HIDDEN_STATUSES = ['Closed', 'Done', 'Resolved']

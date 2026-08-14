@@ -19,10 +19,9 @@ var QUERY_FIELDS = [
 ].join(',')
 
 /**
- * Features List live JQL: RHAISTRAT + AIPCC Features/Initiatives, open only.
- * Closed/Done/Resolved/Cancelled are excluded here so the request stays under
- * the gateway timeout. Wider Cancelled-only multi-project fetch belongs in a
- * background canonical cache (PM Hub), not this path.
+ * Features List / PM Hub live JQL: RHAISTRAT + AIPCC Features/Initiatives, open only.
+ * Closed/Done/Resolved/Cancelled are excluded so the request stays under the
+ * gateway timeout. Scoped closed history (if needed) is a separate, version-bounded query.
  */
 var JQL = [
   'project IN (' + FEATURES_LIST_PROJECTS.join(', ') + ')',
