@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
-import { createJiraClient } from '../../../server/allocation/jira-client.js';
+import { createJiraClient } from '../../server/jira-client.js';
 
 // Simulate the extraFields that the AI Eng strategy provides
 const AI_ENG_EXTRA_FIELDS = {

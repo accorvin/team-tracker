@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import CompletionSummary from '../../../client/components/allocation/CompletionSummary.vue'
+import CompletionSummary from '../../../client/allocation/CompletionSummary.vue'
 
 vi.mock('../../../client/composables/useAllocationStrategy', () => ({
   useAllocationStrategy: () => ({

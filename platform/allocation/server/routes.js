@@ -3,8 +3,8 @@
  * Mounted at /api/modules/team-tracker/allocation/ by the team-tracker server.
  */
 
-const { readTeams, extractBoardId } = require('../../../../shared/server/team-store');
-const { getOrgDisplayNames } = require('../../../../shared/server/roster-sync/config');
+const { readTeams, extractBoardId } = require('../../../shared/server/team-store');
+const { getOrgDisplayNames } = require('../../../shared/server/roster-sync/config');
 const { allocationKey } = require('./config');
 
 function isValidBoardId(id) { return /^(\d+|kanban-\d+)$/.test(id); }
@@ -17,10 +17,12 @@ module.exports = function registerAllocationRoutes(router, context) {
 
   const DEMO_MODE = process.env.DEMO_MODE === 'true';
 
-  // Read allocation strategy (loaded by server/platform-loader.js, passed via module context)
+  // Allocation strategy and Jira transport are self-loaded by this extension's
+  // server entry (./index.js) and threaded in via context — core no longer
+  // provides context.allocationStrategy or an env-authed shared jiraRequest.
   const strategy = context.allocationStrategy || null;
-
-  const { JIRA_HOST, jiraRequest } = require('../../../../shared/server/jira');
+  const jiraRequest = context.jiraRequest;
+  const JIRA_HOST = context.jiraHost;
 
   const { createJiraClient } = require('./jira-client');
   const extraFields = strategy?.getJiraFields ? strategy.getJiraFields() : null;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import AllocationBar from '../../../client/components/allocation/AllocationBar.vue'
+import AllocationBar from '../../../client/allocation/AllocationBar.vue'
 
 vi.mock('../../../client/composables/useAllocationStrategy', () => ({
   useAllocationStrategy: () => ({

@@ -37,7 +37,7 @@
 <script setup>
 import { computed } from 'vue'
 import AllocationBar from './AllocationBar.vue'
-import { useAllocationStrategy } from '../../composables/useAllocationStrategy'
+import { useAllocationStrategy } from '../composables/useAllocationStrategy'
 
 const { categories } = useAllocationStrategy()
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import BucketBreakdown from '../../../client/components/allocation/BucketBreakdown.vue'
-import IssueList from '../../../client/components/allocation/IssueList.vue'
+import BucketBreakdown from '../../../client/allocation/BucketBreakdown.vue'
+import IssueList from '../../../client/allocation/IssueList.vue'
 
 describe('BucketBreakdown', () => {
   const defaultProps = {

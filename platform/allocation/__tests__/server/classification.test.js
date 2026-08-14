@@ -8,10 +8,11 @@ import {
   getLatestSprintEndDate,
   determineStaleness,
   STALE_THRESHOLD_MS
-} from '../../../server/allocation/classification.js';
+} from '../../server/classification.js';
 
-// Classification tests now live in platform/allocation-strategy tests.
-// The classifyIssue function is no longer exported from classification.js.
+// classifyIssue is provided by this extension's strategy (../../classify.js) and
+// is covered by ../classify.test.js — it is not exported from classification.js,
+// which owns only the category-generic summarization/staleness logic.
 
 const TEST_CATEGORIES = [
   { key: 'tech-debt-quality', name: 'Tech Debt & Quality', color: 'amber', target: 40 },

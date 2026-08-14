@@ -1,7 +1,21 @@
 import { computed } from 'vue'
-import { loadAllocationStrategy } from '@/platform-loader'
+import manifest from '../../manifest.json'
 
-const strategy = loadAllocationStrategy()
+/**
+ * Allocation strategy metadata, self-loaded from this extension's manifest.
+ *
+ * Core removed `loadAllocationStrategy` / `context.allocationStrategy` in
+ * v2.0.61. The strategy now lives inside this extension: its metadata
+ * (id/name/description/categories) is declared under `manifest.strategy` and the
+ * classification logic in `../../classify.js` (server-side). Because the
+ * strategy ships with the extension, it is always "configured" when this
+ * composable is importable — no core loader required.
+ *
+ * The backend also exposes the same metadata via
+ * `GET /api/modules/team-tracker/allocation/strategy` (see allocation-api's
+ * `getAllocationStrategy`) for consumers that need a runtime source of truth.
+ */
+const strategy = manifest.strategy || null
 
 export function useAllocationStrategy() {
   return {
@@ -10,6 +24,9 @@ export function useAllocationStrategy() {
     name: computed(() => strategy?.name ?? null),
     description: computed(() => strategy?.description ?? null),
     categories: computed(() => strategy?.categories ?? []),
-    settingsComponent: computed(() => strategy?.settingsComponent ?? null)
+    // Settings are surfaced as a registered settings tab (see
+    // team-tracker-contributions.js), so no standalone settingsComponent is
+    // needed. Kept for backward-compatible shape.
+    settingsComponent: computed(() => null)
   }
 }

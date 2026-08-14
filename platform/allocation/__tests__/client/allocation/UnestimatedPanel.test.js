@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import UnestimatedPanel from '../../../client/components/allocation/UnestimatedPanel.vue'
-import IssueList from '../../../client/components/allocation/IssueList.vue'
+import UnestimatedPanel from '../../../client/allocation/UnestimatedPanel.vue'
+import IssueList from '../../../client/allocation/IssueList.vue'
 
 describe('UnestimatedPanel', () => {
   const mockUnestimatedIssues = [

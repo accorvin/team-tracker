@@ -31,7 +31,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useAllocationStrategy } from '../../composables/useAllocationStrategy'
+import { useAllocationStrategy } from '../composables/useAllocationStrategy'
 
 const { categories } = useAllocationStrategy()
 

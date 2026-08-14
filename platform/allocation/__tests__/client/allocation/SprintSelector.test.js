@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import SprintSelector from '../../../client/components/allocation/SprintSelector.vue'
+import SprintSelector from '../../../client/allocation/SprintSelector.vue'
 
 describe('SprintSelector', () => {
   const mockSprints = [

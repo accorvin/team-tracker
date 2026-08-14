@@ -1,13 +1,22 @@
 <template>
   <div>
-    <!-- Empty state: no boards with boardId -->
-    <div v-if="allocationBoards.length === 0" class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center">
+    <!-- Empty state: strategy is configured but this team has no allocation boards.
+         The tab is intentionally shown (not hidden) so managers get actionable
+         guidance on how to enable allocation tracking for their team. -->
+    <div v-if="allocationBoards.length === 0" class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center">
       <svg class="h-10 w-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
         <path stroke-linecap="round" stroke-linejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
       </svg>
-      <p class="text-gray-500 dark:text-gray-400 text-sm">
-        No Jira boards configured for allocation tracking. Add boards with Jira URLs in the team's board settings.
+      <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">
+        Allocation tracking isn't set up for this team yet
+      </h3>
+      <p class="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+        Add a Jira board (with its board URL) to this team's board settings to start
+        tracking how work is allocated across
+        <span class="font-medium">{{ strategyName || 'your categories' }}</span>.
+        Once a board is configured, an admin can run an allocation refresh from the
+        <span class="font-medium">{{ strategyName || 'Allocation' }}</span> settings tab to populate the data.
       </p>
     </div>
 
@@ -121,8 +130,8 @@
 <script setup>
 import { computed, ref, watch, onMounted } from 'vue'
 import { apiRequest } from '@shared/client/services/api'
-import { getBoardSprints, getSprintIssues } from '../services/allocation-api'
-import { useAllocationStrategy } from '../composables/useAllocationStrategy'
+import { getBoardSprints, getSprintIssues } from './services/allocation-api'
+import { useAllocationStrategy } from './composables/useAllocationStrategy'
 import SprintSelector from './allocation/SprintSelector.vue'
 import SprintStatusBadge from './allocation/SprintStatusBadge.vue'
 import AllocationBar from './allocation/AllocationBar.vue'
@@ -137,7 +146,7 @@ const props = defineProps({
   teamDetail: { type: Object, default: null }
 })
 
-const { categories: strategyCategories } = useAllocationStrategy()
+const { categories: strategyCategories, name: strategyName } = useAllocationStrategy()
 
 const BUCKET_CONFIGS = computed(() => [
   ...strategyCategories.value,

@@ -57,7 +57,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import {
   refreshAllocation,
   getRefreshStatus
-} from '../services/allocation-api.js'
+} from './services/allocation-api.js'
 
 // --- Data Refresh ---
 const isRefreshing = ref(false)

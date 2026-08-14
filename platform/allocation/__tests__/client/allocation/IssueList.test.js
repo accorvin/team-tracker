@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import IssueList from '../../../client/components/allocation/IssueList.vue'
+import IssueList from '../../../client/allocation/IssueList.vue'
 
 describe('IssueList', () => {
   const mockIssues = [

@@ -1,15 +1,15 @@
 <script setup>
 import { ref, computed, onMounted, watch, inject } from 'vue'
-import { useOrgRoster } from '../composables/useOrgRoster'
+import { useOrgList } from '../composables/useOrgList'
 import { useAllocationStrategy } from '../composables/useAllocationStrategy'
 import { getOrgAllocationSummary, getGlobalAllocationSummary } from '../services/allocation-api'
-import OrgSelector from '../components/OrgSelector.vue'
-import AllocationBar from '../components/allocation/AllocationBar.vue'
-import AllocationTeamCard from '../components/allocation/AllocationTeamCard.vue'
-import MetricToggle from '../components/allocation/MetricToggle.vue'
+import OrgSelector from '../allocation/OrgSelector.vue'
+import AllocationBar from '../allocation/AllocationBar.vue'
+import AllocationTeamCard from '../allocation/AllocationTeamCard.vue'
+import MetricToggle from '../allocation/MetricToggle.vue'
 
 const nav = inject('moduleNav')
-const { orgs, loadOrgs } = useOrgRoster()
+const { orgs, loadOrgs } = useOrgList()
 const { categories } = useAllocationStrategy()
 
 const selectedOrg = ref(null)

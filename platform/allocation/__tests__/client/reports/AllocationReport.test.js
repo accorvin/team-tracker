@@ -5,8 +5,8 @@ import AllocationReport from '../../../client/reports/AllocationReport.vue'
 
 const mockOrgs = ref([{ name: 'AI Platform' }, { name: 'Core' }])
 
-vi.mock('../../../client/composables/useOrgRoster', () => ({
-  useOrgRoster: () => ({
+vi.mock('../../../client/composables/useOrgList', () => ({
+  useOrgList: () => ({
     orgs: mockOrgs,
     loadOrgs: vi.fn(),
   })

@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   STORAGE_PREFIX,
   allocationKey
-} from '../../../server/allocation/config.js';
+} from '../../server/config.js';
 
 describe('STORAGE_PREFIX', () => {
   it('is allocation/', () => {

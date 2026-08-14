@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
-import { processBoard, processKanbanBoard, refreshTeam, performRefresh } from '../../../server/allocation/orchestration.js';
+import { processBoard, processKanbanBoard, refreshTeam, performRefresh } from '../../server/orchestration.js';
 
 const TEST_STRATEGY = {
   id: 'test-strategy',

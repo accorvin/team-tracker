@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import SprintStatusBadge from '../../../client/components/allocation/SprintStatusBadge.vue'
+import SprintStatusBadge from '../../../client/allocation/SprintStatusBadge.vue'
 
 describe('SprintStatusBadge', () => {
   it('renders green badge for active state', () => {

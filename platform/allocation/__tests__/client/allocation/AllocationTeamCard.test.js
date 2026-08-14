@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import AllocationTeamCard from '../../../client/components/allocation/AllocationTeamCard.vue'
+import AllocationTeamCard from '../../../client/allocation/AllocationTeamCard.vue'
 
 vi.mock('../../../client/composables/useAllocationStrategy', () => ({
   useAllocationStrategy: () => ({
