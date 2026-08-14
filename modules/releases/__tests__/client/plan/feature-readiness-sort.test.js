@@ -36,12 +36,19 @@ describe('feature-readiness-sort', function() {
     expect(SORTABLE_COLUMNS).toContain('score')
     expect(SORTABLE_COLUMNS).toContain('key')
     expect(SORTABLE_COLUMNS).toContain('readiness')
+    expect(SORTABLE_COLUMNS).toContain('alignment')
   })
 
   it('getSortValue returns numeric score and priority order', function() {
     expect(getSortValue(feature({ effectivePriorityScore: 72 }), 'score')).toBe(72)
     expect(getSortValue(feature({ priority: 'Blocker' }), 'priority')).toBe(0)
     expect(getSortValue(feature({ priority: 'Normal' }), 'priority')).toBe(3)
+  })
+
+  it('getSortValue ranks alignment categories best-to-worst', function() {
+    expect(getSortValue(feature({ alignmentCategory: 'aligned_on_time' }), 'alignment')).toBe(0)
+    expect(getSortValue(feature({ alignmentCategory: 'misaligned' }), 'alignment')).toBe(4)
+    expect(getSortValue(feature({ alignmentCategory: null }), 'alignment')).toBe(99)
   })
 
   it('getSortValue ranks readiness by fail severity (ready = 0)', function() {
@@ -84,6 +91,15 @@ describe('feature-readiness-sort', function() {
       feature({ key: 'High', effectivePriorityScore: 90 })
     ], { column: 'score', direction: 'desc' })
     expect(sorted[0].key).toBe('High')
+  })
+
+  it('sortFeatures sorts by alignment ascending (best first)', function() {
+    var sorted = sortFeatures([
+      feature({ key: 'Bad', alignmentCategory: 'misaligned' }),
+      feature({ key: 'Good', alignmentCategory: 'aligned_on_time' }),
+      feature({ key: 'Late', alignmentCategory: 'aligned_late' })
+    ], { column: 'alignment', direction: 'asc' })
+    expect(sorted.map(function(f) { return f.key })).toEqual(['Good', 'Late', 'Bad'])
   })
 
   it('nextSortState uses desc-first for score then asc then clear', function() {

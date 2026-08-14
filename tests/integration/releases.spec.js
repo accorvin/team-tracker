@@ -735,6 +735,18 @@ test.describe('Releases FPDoR Readiness @releases', () => {
     expect(typeof sample.readinessGates.fpDorTotal).toBe('number');
     expect(typeof sample.readinessGates.fpDorApplicable).toBe('number');
     expect(typeof sample.readinessGates.pastRefinement).toBe('boolean');
+
+    // TV/FV Align (same categories as Reports → TV vs FV Delta / PM Hub)
+    expect(sample).toHaveProperty('alignmentCategory');
+    if (sample.alignmentCategory != null) {
+      expect([
+        'aligned_on_time',
+        'aligned_late',
+        'misaligned',
+        'tv_only',
+        'fv_only'
+      ]).toContain(sample.alignmentCategory);
+    }
   });
 
   test('feature-readiness API returns priority score breakdown', async ({ request }) => {

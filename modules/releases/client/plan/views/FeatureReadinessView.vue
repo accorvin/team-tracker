@@ -70,7 +70,8 @@ const filters = ref(Object.assign({}, DEFAULT_FILTERS, {
   priority: [],
   team: [],
   product: [],
-  fpdorItems: []
+  fpdorItems: [],
+  alignment: []
 }))
 
 function restorePersistedFilters() {
@@ -84,7 +85,8 @@ function restorePersistedFilters() {
     priority: saved.filters.priority.slice(),
     team: saved.filters.team.slice(),
     product: saved.filters.product.slice(),
-    fpdorItems: saved.filters.fpdorItems.slice()
+    fpdorItems: saved.filters.fpdorItems.slice(),
+    alignment: (saved.filters.alignment || []).slice()
   })
   selectedVersion.value = saved.selectedVersion
 }
@@ -186,6 +188,7 @@ const headers = [
   { id: 'h-outcome',    label: 'Outcome',         scope: 'col', sortKey: 'outcome' },
   { id: 'h-target',     label: 'Target Version',  scope: 'col', sortKey: 'targetVersion', info: 'The release version that PM is targeting for this feature to be delivered in.' },
   { id: 'h-fixver',     label: 'Fix Version',     scope: 'col', sortKey: 'fixVersion', info: 'The release version that engineering has committed to delivering this feature in.' },
+  { id: 'h-align',      label: 'TV/FV Align',     scope: 'col', sortKey: 'alignment', info: 'Same categories as Reports → TV vs FV Delta (worst across Target/Fix Versions on the issue). On time and Late count as aligned.' },
   { id: 'h-comp',       label: 'Components',      scope: 'col', sortKey: 'components' },
   { id: 'h-team',       label: 'Team',            scope: 'col', sortKey: 'team' },
   { id: 'h-rubric',     label: 'Rubric',          scope: 'col', sortKey: 'rubric' },

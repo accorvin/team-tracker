@@ -126,4 +126,15 @@ describe('FeatureReadinessRow fail chips', function() {
     expect(legacy.text()).toContain('Legacy')
     expect(legacy.text()).not.toContain('AI First')
   })
+
+  it('renders TV/FV Align chip from alignmentCategory', function() {
+    var wrapper = mountRow({
+      key: 'RHAISTRAT-7',
+      title: 'Aligned feature',
+      alignmentCategory: 'aligned_on_time',
+      fpdor: { passedCount: 17, applicableCount: 17, items: [] }
+    })
+    expect(wrapper.text()).toContain('On time')
+    expect(wrapper.find('[title*="Fix Version matches Target Version"]').exists()).toBe(true)
+  })
 })

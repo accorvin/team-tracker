@@ -12,6 +12,11 @@ import {
   pathChipClass,
   pathChipTitle
 } from '../utils/fpdor-severity.js'
+import {
+  alignmentCategoryLabel,
+  alignmentCategoryHelp,
+  alignmentCategoryChipClass
+} from '../utils/tv-fv-alignment-display.js'
 
 var MAX_VISIBLE_FAIL_CHIPS = 3
 
@@ -217,6 +222,15 @@ var scoreBreakdown = computed(function() {
     <!-- Fix Version -->
     <td class="px-3 py-2.5 whitespace-nowrap">
       <span class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ feature.fixVersion || '—' }}</span>
+    </td>
+
+    <!-- TV/FV Align -->
+    <td class="px-3 py-2.5 text-center whitespace-nowrap">
+      <span
+        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold"
+        :class="alignmentCategoryChipClass(feature.alignmentCategory)"
+        :title="alignmentCategoryHelp(feature.alignmentCategory)"
+      >{{ alignmentCategoryLabel(feature.alignmentCategory) }}</span>
     </td>
 
     <!-- Components -->

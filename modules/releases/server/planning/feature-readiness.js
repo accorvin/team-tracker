@@ -4,6 +4,7 @@ var { EARLY_STATUSES, FEATURES_LIST_HIDDEN_STATUSES } = require('./constants')
 var { deriveHumanReviewStatus: sharedDeriveStatus } = require('../execution/ai-review-fields')
 var { computeFPDoRReadiness, isAiFirstFeature } = require('./fpdor')
 var { computePriorityScores } = require('./health/priority-scorer')
+var { classifyOverall, loadReleaseDatesMap } = require('../tv-fv-delta/alignment')
 
 var BLOCKING_HYGIENE_RULES = []
 
@@ -557,6 +558,7 @@ async function buildCanonicalFeatures(options) {
 
   var execData = await loadExecutionData(readFromStorage)
   var cacheData = await loadCacheIndexes(readFromStorage, listStorageFiles)
+  var releaseDates = await loadReleaseDatesMap({ readFromStorage: readFromStorage })
 
   var execMap = new Map()
   for (var emi = 0; emi < execData.execFeatures.length; emi++) {
@@ -616,6 +618,12 @@ async function buildCanonicalFeatures(options) {
     var readinessResult = computeReadiness(merged)
     var isReady = readinessResult.isReady
     var confidence = computeConfidence(isReady, merged.fixVersion)
+    var fixVersions = merged.fixVersions || (merged.fixVersion ? [merged.fixVersion] : [])
+    var alignmentCategory = classifyOverall(
+      merged.targetVersions || [],
+      fixVersions,
+      releaseDates
+    )
 
     features.push({
       key: merged.key,
@@ -644,7 +652,8 @@ async function buildCanonicalFeatures(options) {
       rockPriority: merged.rockPriority,
       targetVersions: merged.targetVersions,
       fixVersion: merged.fixVersion,
-      fixVersions: merged.fixVersions || (merged.fixVersion ? [merged.fixVersion] : []),
+      fixVersions: fixVersions,
+      alignmentCategory: alignmentCategory,
       priorityScore: effectivePriorityScore,
       priorityScoreBreakdown: priorityBreakdown,
       effectivePriorityScore: effectivePriorityScore,

@@ -27,6 +27,7 @@ export var SORTABLE_COLUMNS = [
   'outcome',
   'targetVersion',
   'fixVersion',
+  'alignment',
   'components',
   'team',
   'rubric',
@@ -64,6 +65,18 @@ export function getSortValue(feature, column) {
     return tvs.length > 0 ? String(tvs[0]).toLowerCase() : ''
   }
   if (column === 'fixVersion') return (feature.fixVersion || '').toLowerCase()
+  if (column === 'alignment') {
+    // Keep in sync with ALIGNMENT_CATEGORY_PRIORITY (best → worst for asc).
+    var order = {
+      aligned_on_time: 0,
+      aligned_late: 1,
+      fv_only: 2,
+      tv_only: 3,
+      misaligned: 4
+    }
+    var ao = order[feature.alignmentCategory]
+    return ao !== undefined ? ao : 99
+  }
   if (column === 'components') {
     var comps = feature.components || []
     return comps.length > 0 ? String(comps[0]).toLowerCase() : ''
