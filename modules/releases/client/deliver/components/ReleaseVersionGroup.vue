@@ -405,9 +405,6 @@ function formatDueDate(dateStr) {
 </script>
 
 <style scoped>
-.forecast-info-icon {
-  position: absolute;
-}
 .forecast-info-icon::after {
   content: attr(data-tip);
   position: absolute;
