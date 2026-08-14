@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, inject, watch } from 'vue'
+import { ref, reactive, computed, onMounted, inject, watch, h } from 'vue'
 import { useFeatureReadiness } from '../composables/useFeatureReadiness'
 import { useReleases } from '../composables/useReleasePlanning'
 import { useRefreshPolling } from '../composables/useRefreshPolling'
@@ -16,6 +16,10 @@ import {
   saveFeaturesListFilters,
   restoreFeaturesListFilters
 } from '../utils/features-list-filter-storage.js'
+import {
+  sortFeatures,
+  nextSortState
+} from '../utils/feature-readiness-sort.js'
 
 const nav = inject('moduleNav')
 const jiraBaseUrl = 'https://issues.redhat.com/browse'
@@ -103,14 +107,49 @@ function matchesFilters(feature) {
   return featureMatchesSharedFilters(feature, filters.value, selectedVersion.value, { applyReadiness: true })
 }
 
-const filteredFeatures = computed(() => {
-  var all = pendingReview.value.concat(ready.value)
-  return all.filter(matchesFilters).sort(function(a, b) {
-    if (b.effectivePriorityScore !== a.effectivePriorityScore) {
-      return b.effectivePriorityScore - a.effectivePriorityScore
+/** Default matches prior score-desc order; arrow visible so columns look sortable. */
+var sortState = reactive({ column: 'score', direction: 'desc' })
+
+function toggleSort(column) {
+  var next = nextSortState(sortState, column)
+  sortState.column = next.column
+  sortState.direction = next.direction
+}
+
+function sortIcon(column) {
+  if (sortState.column !== column) return 'none'
+  return sortState.direction
+}
+
+var SortArrow = {
+  props: { direction: { type: String, default: 'none' } },
+  setup: function(props) {
+    return function() {
+      if (props.direction === 'none') return null
+      return h('svg', {
+        class: [
+          'w-3 h-3 inline-block transition-transform shrink-0',
+          props.direction === 'desc' ? 'rotate-180' : ''
+        ],
+        fill: 'none',
+        viewBox: '0 0 24 24',
+        stroke: 'currentColor',
+        'stroke-width': '2.5',
+        'aria-hidden': 'true'
+      }, [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M5 15l7-7 7 7'
+        })
+      ])
     }
-    return b.rubricTotal - a.rubricTotal
-  })
+  }
+}
+
+const filteredFeatures = computed(function() {
+  var all = pendingReview.value.concat(ready.value).filter(matchesFilters)
+  return sortFeatures(all, sortState)
 })
 
 const readyCounts = computed(() => {
@@ -139,21 +178,21 @@ function exportCsv() {
 }
 
 const headers = [
-  { id: 'h-num',        label: '#',               scope: 'col' },
-  { id: 'h-score',      label: 'Score',           scope: 'col', hasScoreTooltip: true },
-  { id: 'h-readiness',  label: 'Readiness',       scope: 'col', hasTooltip: true },
-  { id: 'h-key',        label: 'Key',             scope: 'col' },
-  { id: 'h-title',      label: 'Title',           scope: 'col' },
-  { id: 'h-outcome',    label: 'Outcome',         scope: 'col' },
-  { id: 'h-target',     label: 'Target Version',  scope: 'col', info: 'The release version that PM is targeting for this feature to be delivered in.' },
-  { id: 'h-fixver',     label: 'Fix Version',     scope: 'col', info: 'The release version that engineering has committed to delivering this feature in.' },
-  { id: 'h-comp',       label: 'Components',      scope: 'col' },
-  { id: 'h-team',       label: 'Team',            scope: 'col' },
-  { id: 'h-rubric',     label: 'Rubric',          scope: 'col' },
-  { id: 'h-rec',        label: 'AI First Recommends',  scope: 'col', info: 'AI review verdict from the strat-creator (AI First) pipeline.' },
-  { id: 'h-status',     label: 'Status',          scope: 'col' },
-  { id: 'h-priority',   label: 'Priority',        scope: 'col' },
-  { id: 'h-attention',  label: '',                scope: 'col' },
+  { id: 'h-num',        label: '#',               scope: 'col', sortKey: 'rank' },
+  { id: 'h-score',      label: 'Score',           scope: 'col', sortKey: 'score', hasScoreTooltip: true },
+  { id: 'h-readiness',  label: 'Readiness',       scope: 'col', sortKey: 'readiness', hasTooltip: true },
+  { id: 'h-key',        label: 'Key',             scope: 'col', sortKey: 'key' },
+  { id: 'h-title',      label: 'Title',           scope: 'col', sortKey: 'title' },
+  { id: 'h-outcome',    label: 'Outcome',         scope: 'col', sortKey: 'outcome' },
+  { id: 'h-target',     label: 'Target Version',  scope: 'col', sortKey: 'targetVersion', info: 'The release version that PM is targeting for this feature to be delivered in.' },
+  { id: 'h-fixver',     label: 'Fix Version',     scope: 'col', sortKey: 'fixVersion', info: 'The release version that engineering has committed to delivering this feature in.' },
+  { id: 'h-comp',       label: 'Components',      scope: 'col', sortKey: 'components' },
+  { id: 'h-team',       label: 'Team',            scope: 'col', sortKey: 'team' },
+  { id: 'h-rubric',     label: 'Rubric',          scope: 'col', sortKey: 'rubric' },
+  { id: 'h-rec',        label: 'AI First Recommends',  scope: 'col', sortKey: 'recommendation', info: 'AI review verdict from the strat-creator (AI First) pipeline.' },
+  { id: 'h-status',     label: 'Status',          scope: 'col', sortKey: 'status' },
+  { id: 'h-priority',   label: 'Priority',        scope: 'col', sortKey: 'priority' },
+  { id: 'h-attention',  label: '',                scope: 'col', sortKey: 'attention', ariaLabel: 'Needs attention' },
 ]
 
 function formatSyncDate(dateStr) {
@@ -228,15 +267,24 @@ function formatSyncDate(dateStr) {
               :key="header.id"
               role="columnheader"
               :scope="header.scope"
+              :aria-sort="header.sortKey && sortState.column === header.sortKey
+                ? (sortState.direction === 'asc' ? 'ascending' : 'descending')
+                : (header.sortKey ? 'none' : undefined)"
+              :aria-label="header.ariaLabel || undefined"
               class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide leading-tight"
+              :class="header.sortKey ? 'cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200' : ''"
+              @click="header.sortKey && toggleSort(header.sortKey)"
             >
               <span v-if="header.hasTooltip" class="inline-flex items-center gap-1 group relative">
                 {{ header.label }}
+                <SortArrow :direction="sortIcon(header.sortKey)" />
                 <span
                   class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-300 text-[9px] font-bold leading-none cursor-help"
+                  @click.stop
                 >i</span>
                 <div
                   class="absolute z-50 top-full mt-1 left-0 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 text-xs text-left font-normal normal-case tracking-normal hidden group-hover:block"
+                  @click.stop
                 >
                   <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Readiness color</p>
                   <div class="space-y-1">
@@ -277,11 +325,14 @@ function formatSyncDate(dateStr) {
               </span>
               <span v-else-if="header.hasScoreTooltip" class="inline-flex items-center gap-1 group relative">
                 {{ header.label }}
+                <SortArrow :direction="sortIcon(header.sortKey)" />
                 <span
                   class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-300 text-[9px] font-bold leading-none cursor-help"
+                  @click.stop
                 >i</span>
                 <div
                   class="absolute z-50 top-full mt-1 left-0 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 text-xs text-left font-normal normal-case tracking-normal hidden group-hover:block"
+                  @click.stop
                 >
                   <p class="font-semibold text-gray-700 dark:text-gray-200 mb-2">Score Rubric</p>
                   <div class="space-y-2 text-gray-600 dark:text-gray-300">
@@ -298,14 +349,22 @@ function formatSyncDate(dateStr) {
               </span>
               <span v-else-if="header.info" class="inline-flex items-center gap-1 group relative">
                 {{ header.label }}
+                <SortArrow :direction="sortIcon(header.sortKey)" />
                 <span
                   class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-300 text-[9px] font-bold leading-none cursor-help"
+                  @click.stop
                 >i</span>
-                <span class="absolute z-50 top-full mt-1 left-0 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2.5 text-xs text-left font-normal normal-case tracking-normal hidden group-hover:block">
+                <span
+                  class="absolute z-50 top-full mt-1 left-0 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2.5 text-xs text-left font-normal normal-case tracking-normal hidden group-hover:block"
+                  @click.stop
+                >
                   {{ header.info }}
                 </span>
               </span>
-              <span v-else>{{ header.label }}</span>
+              <span v-else class="inline-flex items-center gap-1">
+                {{ header.label }}
+                <SortArrow v-if="header.sortKey" :direction="sortIcon(header.sortKey)" />
+              </span>
             </th>
           </tr>
         </thead>

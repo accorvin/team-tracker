@@ -609,9 +609,14 @@ test.describe('Releases FPDoR Readiness @releases', () => {
 
     var scoreHeader = page.locator('thead th', { hasText: 'Score' });
     await expect(scoreHeader.first()).toBeVisible();
+    await expect(scoreHeader.first()).toHaveAttribute('aria-sort', 'descending');
 
     var readinessHeader = page.locator('thead th', { hasText: 'Readiness' });
     await expect(readinessHeader.first()).toBeVisible();
+    await expect(readinessHeader.first()).toHaveClass(/cursor-pointer/);
+
+    await readinessHeader.first().click();
+    await expect(readinessHeader.first()).toHaveAttribute('aria-sort', 'ascending');
 
     expect(page.errors).toHaveLength(0);
   });
