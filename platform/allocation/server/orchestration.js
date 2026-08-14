@@ -84,7 +84,7 @@ async function processBoard({ board, teamId, allocationMode, strategy, hardRefre
       summary
     };
 
-    writeStorage(`sprints/${sprint.id}.json`, sprintData);
+    await writeStorage(`sprints/${sprint.id}.json`, sprintData);
 
     sprintResults.push({
       sprintId: sprint.id,
@@ -97,7 +97,7 @@ async function processBoard({ board, teamId, allocationMode, strategy, hardRefre
   }
 
   // Write sprint index for this board
-  writeStorage(`sprints/board-${board.boardId}.json`, {
+  await writeStorage(`sprints/board-${board.boardId}.json`, {
     boardId: board.boardId,
     boardName: board.name,
     teamId,
@@ -177,9 +177,9 @@ async function processKanbanBoard({ board, teamId, allocationMode, strategy, fet
     summary
   };
 
-  writeStorage(`sprints/${syntheticSprintId}.json`, sprintData);
+  await writeStorage(`sprints/${syntheticSprintId}.json`, sprintData);
 
-  writeStorage(`sprints/board-${board.boardId}.json`, {
+  await writeStorage(`sprints/board-${board.boardId}.json`, {
     boardId: board.boardId,
     boardName: board.name,
     teamId,
@@ -295,7 +295,7 @@ async function refreshTeam({ team, strategy, hardRefresh, fetchSprints, fetchSpr
     }
   }
 
-  writeStorage(`summaries/team-${teamId}.json`, summaryData);
+  await writeStorage(`summaries/team-${teamId}.json`, summaryData);
 
   return summaryData;
 }
@@ -350,13 +350,13 @@ async function performRefresh({ teams, strategy, hardRefresh, fetchSprints, fetc
         percentages: t.percentages
       }))
     };
-    writeStorage(`summaries/org-${orgKey}.json`, orgData);
+    await writeStorage(`summaries/org-${orgKey}.json`, orgData);
     orgSummaries.push(orgData);
   }
 
   // Build global summary
   const globalSummary = buildOrgSummary(teamResults, strategy.categories);
-  writeStorage('summaries/global.json', {
+  await writeStorage('summaries/global.json', {
     strategyId: strategy.id,
     lastUpdated: new Date().toISOString(),
     ...globalSummary,

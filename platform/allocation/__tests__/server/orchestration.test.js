@@ -90,7 +90,11 @@ describe('processBoard', () => {
       fetchSprints: vi.fn().mockResolvedValue([
         { id: 200, name: 'Sprint Old', state: 'closed', startDate: '2025-01-01', endDate: '2025-01-14', completeDate: '2025-01-15' }
       ]),
-      readStorage: vi.fn().mockImplementation(key => {
+      // Async mock (readStorage is allocRead, which is async). This must return
+      // a Promise so the cache check regresses if the `await` is dropped: an
+      // unawaited Promise is truthy but its `.strategyId` is undefined, so the
+      // cache would miss and fetchSprintIssues would be called.
+      readStorage: vi.fn().mockImplementation(async key => {
         if (key === 'sprints/200.json') return cachedData;
         return null;
       })
@@ -101,7 +105,7 @@ describe('processBoard', () => {
 
     expect(result.sprintResults).toHaveLength(1);
     expect(result.sprintResults[0].totalPoints).toBe(10);
-    // Should NOT have fetched sprint issues
+    // Should NOT have fetched sprint issues (cache hit)
     expect(deps.fetchSprintIssues).not.toHaveBeenCalled();
   });
 
