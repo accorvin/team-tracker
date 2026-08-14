@@ -1,19 +1,6 @@
 {
   "type": "module-views",
   "targetModule": "team-tracker",
-  "navItems": [
-    {
-      "id": "allocation",
-      "label": "Allocation",
-      "icon": "PieChart",
-      "order": 150
-    }
-  ],
-  "client": {
-    "views": {
-      "allocation": "./client/reports/AllocationReport.vue"
-    }
-  },
   "server": {
     "entry": "./server/index.js"
   },
