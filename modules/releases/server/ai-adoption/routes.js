@@ -31,7 +31,15 @@ function applyFilters(cached, { releaseGroup, component }) {
       for (const k of Object.keys(g.pipelines || {})) {
         pipelines[k] = filtered.reduce((s, c) => s + ((c.pipelines && c.pipelines[k]) || 0), 0);
       }
-      return { ...g, totalFeatures: total, aiTouchedFeatures: aiTouched, pipelines, components: filtered };
+      const firstPass = {};
+      for (const k of Object.keys(g.firstPass || {})) {
+        firstPass[k] = filtered.reduce((acc, c) => {
+          const fp = c.firstPass && c.firstPass[k];
+          if (fp) { acc.accepted += fp.accepted; acc.total += fp.total; }
+          return acc;
+        }, { accepted: 0, total: 0 });
+      }
+      return { ...g, totalFeatures: total, aiTouchedFeatures: aiTouched, pipelines, firstPass, components: filtered };
     });
   }
 
