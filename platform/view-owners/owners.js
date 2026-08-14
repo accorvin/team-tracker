@@ -78,6 +78,7 @@ export const viewOwners = {
   'system-health/quality-analysis':                'Dana Gutride',
 
   // team-tracker
+  'team-tracker/allocation':                       'Alex Corvin',
   'team-tracker/home':                             'Dipanshu Gupta',
   'team-tracker/jira-taxonomy':                    'Alex Corvin',
   'team-tracker/manage':                           'Alex Corvin',
