@@ -38,7 +38,7 @@ async function processBoard({ board, teamId, allocationMode, strategy, hardRefre
   for (const sprint of sprintsToProcess) {
     // Closed-sprint caching: skip Jira fetch if cached, strategy matches, and not hard refresh
     if (!hardRefresh && sprint.state === 'closed') {
-      const cached = readStorage(`sprints/${sprint.id}.json`);
+      const cached = await readStorage(`sprints/${sprint.id}.json`);
       if (cached && cached.strategyId === strategy.id) {
         console.log(`  [allocation] Using cached data for closed sprint: ${sprint.name}`);
         sprintResults.push({

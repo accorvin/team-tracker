@@ -160,14 +160,12 @@ platform secret group and `server/index.js` reads `JIRA_EMAIL`/`JIRA_TOKEN` from
 { "secrets": { "platform": ["jira"] } }
 ```
 
-### module-views contract note
+### Server-only manifest (no nav item)
 
-Core's `module-views` loader and `validate:platform` require every such
-extension to declare a non-empty `navItems` array and a matching `client.views`
-map, even though allocation surfaces its UI through the contribution seam. To
-satisfy that contract, the manifest declares one nav item (**Allocation**) whose
-view renders the Work Allocation report; the per-team tab, report card, and
-settings tab all continue to come from the seam.
+Core v2.0.62 allows server-only `module-views` extensions, so the manifest
+declares only `server.entry` (plus `secrets` and `strategy`) — no `navItems` or
+`client.views`. All UI surfaces through the contribution seam: the per-team
+allocation tab, the report card, and the settings tab.
 
 ### Adding or changing the strategy
 

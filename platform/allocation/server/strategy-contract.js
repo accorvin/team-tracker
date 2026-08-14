@@ -1,8 +1,8 @@
 /**
  * JSDoc type definitions for the allocation strategy contract.
  *
- * Strategies are platform extensions at platform/allocation-strategy/
- * that provide classification logic for the team-tracker allocation system.
+ * Strategies are bundled with the allocation extension (platform/allocation/)
+ * and provide classification logic for the team-tracker allocation system.
  */
 
 /**
