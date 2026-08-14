@@ -3,12 +3,14 @@ import { describe, it, expect } from 'vitest'
 const {
   computeReadiness,
   buildFeatureReadiness,
+  buildCanonicalFeatures,
   computeBlockers,
   hasBlockingViolations,
   computeHygieneStatus,
   computeConfidence,
   collectFilterMeta,
   isHiddenFromFeaturesList,
+  shouldIncludeInCanonical,
   buildCanonicalKeySet,
   mergeFeatureData
 } = require('../feature-readiness')
@@ -2122,6 +2124,27 @@ describe('buildFeatureReadiness', function() {
     })
   })
 
+  describe('shouldIncludeInCanonical', function() {
+    it('never includes Cancelled', function() {
+      expect(shouldIncludeInCanonical('Cancelled', false)).toBe(false)
+      expect(shouldIncludeInCanonical('Cancelled', true)).toBe(false)
+    })
+
+    it('excludes Closed/Done/Resolved when includeClosed is false', function() {
+      expect(shouldIncludeInCanonical('Closed', false)).toBe(false)
+      expect(shouldIncludeInCanonical('Done', false)).toBe(false)
+      expect(shouldIncludeInCanonical('Resolved', false)).toBe(false)
+      expect(shouldIncludeInCanonical('In Progress', false)).toBe(true)
+    })
+
+    it('keeps Closed/Done/Resolved when includeClosed is true', function() {
+      expect(shouldIncludeInCanonical('Closed', true)).toBe(true)
+      expect(shouldIncludeInCanonical('Done', true)).toBe(true)
+      expect(shouldIncludeInCanonical('Resolved', true)).toBe(true)
+      expect(shouldIncludeInCanonical('In Progress', true)).toBe(true)
+    })
+  })
+
 })
 
 // ---------------------------------------------------------------------------
@@ -3537,5 +3560,120 @@ describe('buildFeatureReadiness — single-pass merging', function() {
     expect(allKeys).toContain('RHAISTRAT-AI')
     expect(allKeys).toContain('RHAISTRAT-JIRA')
     expect(allKeys).toContain('RHAISTRAT-HEALTH')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// buildCanonicalFeatures (shared pipeline builder)
+// ---------------------------------------------------------------------------
+
+describe('buildCanonicalFeatures', function() {
+  function makeJiraMap(features) {
+    var map = new Map()
+    for (var i = 0; i < features.length; i++) {
+      map.set(features[i].key, features[i])
+    }
+    return map
+  }
+
+  function makeJiraFeature(key, overrides) {
+    return Object.assign({
+      key: key,
+      project: key.split('-')[0],
+      summary: 'Jira Feature ' + key,
+      status: 'In Progress',
+      issueType: 'Feature',
+      assignee: 'Alice',
+      team: 'Platform',
+      components: ['Dashboard'],
+      labels: [],
+      fixVersions: [],
+      targetVersions: ['rhoai-3.6'],
+      priority: 'Major',
+      riceScore: null
+    }, overrides)
+  }
+
+  it('includes RHAISTRAT and eng-project features with FPDoR fields', async function() {
+    var jiraFeatures = makeJiraMap([
+      makeJiraFeature('RHAISTRAT-100'),
+      makeJiraFeature('RHAIENG-200', { project: 'RHAIENG', summary: 'Eng Initiative' }),
+      makeJiraFeature('RHELAI-300', { project: 'RHELAI' })
+    ])
+    var readFromStorage = makeReadFromStorage({
+      ...convertToUnifiedFormat(makeFeaturesStore({})),
+      'releases/planning/config.json': CONFIG_3_6,
+      'releases/execution/index.json': { features: [], fetchedAt: null, schemaVersion: 'v2', featureCount: 0 }
+    })
+
+    var result = await buildCanonicalFeatures({
+      readFromStorage: readFromStorage,
+      jiraFeatures: jiraFeatures,
+      includeClosed: false
+    })
+
+    var keys = result.features.map(function(f) { return f.key }).sort()
+    expect(keys).toEqual(['RHAIENG-200', 'RHAISTRAT-100', 'RHELAI-300'])
+    result.features.forEach(function(f) {
+      expect(f.fpdor).toBeTruthy()
+      expect(f).toHaveProperty('confidence')
+      expect(f).toHaveProperty('isAiFirst')
+      expect(f).toHaveProperty('isReady')
+      expect(f.project).toBeTruthy()
+    })
+  })
+
+  it('excludes Closed by default but keeps them when includeClosed is true', async function() {
+    var jiraFeatures = makeJiraMap([
+      makeJiraFeature('RHAI-1', { project: 'RHAI', status: 'In Progress' }),
+      makeJiraFeature('RHAI-2', { project: 'RHAI', status: 'Closed' }),
+      makeJiraFeature('RHAI-3', { project: 'RHAI', status: 'Done' }),
+      makeJiraFeature('RHAI-4', { project: 'RHAI', status: 'Cancelled' })
+    ])
+    var readFromStorage = makeReadFromStorage({
+      ...convertToUnifiedFormat(makeFeaturesStore({})),
+      'releases/planning/config.json': CONFIG_3_6,
+      'releases/execution/index.json': { features: [], fetchedAt: null, schemaVersion: 'v2', featureCount: 0 }
+    })
+
+    var openOnly = await buildCanonicalFeatures({
+      readFromStorage: readFromStorage,
+      jiraFeatures: jiraFeatures,
+      includeClosed: false
+    })
+    expect(openOnly.features.map(function(f) { return f.key })).toEqual(['RHAI-1'])
+
+    var withClosed = await buildCanonicalFeatures({
+      readFromStorage: readFromStorage,
+      jiraFeatures: jiraFeatures,
+      includeClosed: true
+    })
+    var withClosedKeys = withClosed.features.map(function(f) { return f.key }).sort()
+    expect(withClosedKeys).toEqual(['RHAI-1', 'RHAI-2', 'RHAI-3'])
+    expect(withClosedKeys).not.toContain('RHAI-4')
+  })
+
+  it('Features List path strips isReady and matches open-only canonical set', async function() {
+    var jiraFeatures = makeJiraMap([
+      makeJiraFeature('INFERENG-9', { project: 'INFERENG' }),
+      makeJiraFeature('INFERENG-10', { project: 'INFERENG', status: 'Resolved' })
+    ])
+    var readFromStorage = makeReadFromStorage({
+      ...convertToUnifiedFormat(makeFeaturesStore({})),
+      'releases/planning/config.json': CONFIG_3_6,
+      'releases/execution/index.json': { features: [], fetchedAt: null, schemaVersion: 'v2', featureCount: 0 }
+    })
+
+    var canonical = await buildCanonicalFeatures({
+      readFromStorage: readFromStorage,
+      jiraFeatures: jiraFeatures,
+      includeClosed: false
+    })
+    var list = await buildFeatureReadiness(readFromStorage, jiraFeatures)
+    var listKeys = list.pendingReview.concat(list.ready).map(function(f) { return f.key })
+
+    expect(canonical.features.map(function(f) { return f.key })).toEqual(['INFERENG-9'])
+    expect(listKeys).toEqual(['INFERENG-9'])
+    expect(list.pendingReview.concat(list.ready)[0].isReady).toBeUndefined()
   })
 })

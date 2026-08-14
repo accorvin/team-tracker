@@ -297,7 +297,7 @@
       correlated. Use REQ/COM (and other) filter chips in the bar above to filter
       the table.
     -->
-    <div v-if="hasFetched && !loadingData" class="grid grid-cols-2 sm:grid-cols-6 gap-3">
+    <div v-if="hasFetched && !loadingData" class="grid grid-cols-2 sm:grid-cols-5 gap-3">
       <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
         <div class="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-xl" />
         <div class="flex items-center gap-2 mb-1.5">
@@ -337,16 +337,6 @@
           <span class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Not Aligned</span>
         </div>
         <div class="text-2xl font-bold ml-7" :class="totalNotAligned > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-gray-100'" title="PM/DO Aligned = No (TV and FV missing or mismatch)">{{ totalNotAligned }}</div>
-      </div>
-      <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
-        <div class="absolute top-0 left-0 w-1 h-full bg-violet-500 rounded-l-xl" />
-        <div class="flex items-center gap-2 mb-1.5">
-          <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-violet-100 dark:bg-violet-900/40">
-            <svg class="w-3 h-3 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-          </span>
-          <span class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Avg Features Delivered</span>
-        </div>
-        <div class="text-2xl font-bold text-violet-600 dark:text-violet-400 ml-7">{{ velocity ? velocity.avgPerRelease : '—' }}<span v-if="velocity && velocity.hasPartialYear" class="text-sm font-normal text-gray-400 dark:text-gray-500 ml-0.5" title="Includes components with less than a year of data">*</span></div>
       </div>
       <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
         <div class="absolute top-0 left-0 w-1 h-full bg-gray-400 rounded-l-xl" />
@@ -390,7 +380,6 @@
       ref="tableRef"
       :groups="clientFilteredGroups"
       :componentLeads="componentLeads"
-      :velocity="velocity"
       :initialSort="savedSort"
       @sort-changed="onSortChanged"
       @select="selectedFeature = $event"
@@ -1013,8 +1002,6 @@ var totalNotAligned = computed(function() {
   return count
 })
 
-var velocity = ref(null)
-
 var formattedFetchedAt = computed(function() {
   if (!fetchedAt.value) return null
   try {
@@ -1164,12 +1151,10 @@ async function loadData() {
     }
     var data = await response.json()
     groups.value = data.groups || []
-    velocity.value = data.velocity || null
     fetchedAt.value = data.fetchedAt || null
   } catch (err) {
     dataError.value = err.message
     groups.value = []
-    velocity.value = null
     fetchedAt.value = null
   } finally {
     loadingData.value = false

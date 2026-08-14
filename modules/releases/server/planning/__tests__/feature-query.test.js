@@ -25,24 +25,16 @@ function mockJiraClient(featureIssues, childIssues) {
 describe('feature-query', function() {
 
   describe('JQL', function() {
-    it('queries shared pipeline projects for Features and Initiatives', function() {
-      expect(JQL).toContain('project IN (')
-      expect(JQL).toContain('RHAIENG')
-      expect(JQL).toContain('RHOAIENG')
-      expect(JQL).toContain('INFERENG')
-      expect(JQL).toContain('AIPCC')
-      expect(JQL).toContain('RHAISTRAT')
-      expect(JQL).toContain('RHAIRFE')
-      expect(JQL).toContain('RHELAI')
-      expect(JQL).toContain('RHAI')
+    it('queries RHAISTRAT and AIPCC for Features and Initiatives', function() {
+      expect(JQL).toContain('project IN (RHAISTRAT, AIPCC)')
       expect(JQL).toContain('issuetype IN (Feature, Initiative)')
+      expect(JQL).not.toContain('RHAIENG')
+      expect(JQL).not.toContain('INFERENG')
+      expect(JQL).not.toContain('RHAIRFE')
     })
 
-    it('excludes Cancelled only at fetch (Closed/Done/Resolved stay for PM Hub / shared set)', function() {
-      expect(JQL).toContain('status NOT IN (Cancelled)')
-      expect(JQL).not.toContain('Closed')
-      expect(JQL).not.toContain('Done')
-      expect(JQL).not.toContain('Resolved')
+    it('excludes Closed, Done, Resolved, and Cancelled at live fetch (open only)', function() {
+      expect(JQL).toContain('status NOT IN (Closed, Done, Resolved, Cancelled)')
     })
 
     it('does not include a created date filter', function() {
