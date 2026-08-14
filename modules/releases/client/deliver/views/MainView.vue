@@ -338,7 +338,7 @@ function getMonteCarloInputs(release) {
   let notDoneCount = 0
   const componentNames = new Set()
   for (const issue of issues) {
-    if (issue.statusBucket !== 'done') notDoneCount++
+    if (issue.statusBucket !== 'done') notDoneCount += (issue.childrenRemaining || 1)
     const comps = issue.components?.length ? issue.components : ['(No component)']
     for (const c of comps) componentNames.add(c)
   }
