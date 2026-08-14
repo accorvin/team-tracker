@@ -8,6 +8,8 @@ const {
   applyEffortSignal,
   AI_PIPELINE_TAXONOMY,
   PIPELINE_KEYS,
+  FIRST_PASS_RULES,
+  FIRST_PASS_KEYS,
   RELEASE_GROUPS,
   PROJECTS
 } = require('../../../server/ai-adoption/pipeline');
@@ -95,6 +97,72 @@ describe('scanLabels', () => {
     expect(result.pipelines.stratCreator).toBe(1);
     expect(result.pipelines.rfeCreator).toBe(0);
   });
+
+  it('returns firstPass=1 for stratCreator with auto-created only', () => {
+    const result = scanLabels(['strat-creator-auto-created']);
+    expect(result.firstPass.stratCreator).toBe(1);
+  });
+
+  it('returns firstPass=0 for stratCreator with auto-created and auto-refined', () => {
+    const result = scanLabels(['strat-creator-auto-created', 'strat-creator-auto-refined']);
+    expect(result.firstPass.stratCreator).toBe(0);
+  });
+
+  it('returns firstPass=1 for qg1 with pass only', () => {
+    const result = scanLabels(['rp-qg1-auto-rice', 'rp-qg1-pass']);
+    expect(result.firstPass.qg1).toBe(1);
+  });
+
+  it('returns firstPass=0 for qg1 with pass and fail', () => {
+    const result = scanLabels(['rp-qg1-auto-rice', 'rp-qg1-pass', 'rp-qg1-fail']);
+    expect(result.firstPass.qg1).toBe(0);
+  });
+
+  it('returns firstPass=1 for rfeCreator accepted without autofix', () => {
+    const result = scanLabels(['rfe-creator-auto-created', 'rfe-creator-feasibility-pass']);
+    expect(result.firstPass.rfeCreator).toBe(1);
+  });
+
+  it('returns firstPass=0 for rfeCreator that needed autofix', () => {
+    const result = scanLabels(['rfe-creator-auto-created', 'rfe-creator-autofix-rubric-pass']);
+    expect(result.firstPass.rfeCreator).toBe(0);
+  });
+
+  it('returns firstPass=1 for testPlan created without revision', () => {
+    const result = scanLabels(['test-plan-auto-created', 'test-plan-rubric-pass']);
+    expect(result.firstPass.testPlan).toBe(1);
+  });
+
+  it('returns firstPass=0 for testPlan that was revised', () => {
+    const result = scanLabels(['test-plan-auto-created', 'test-plan-auto-revised']);
+    expect(result.firstPass.testPlan).toBe(0);
+  });
+
+  it('omits firstPass keys for pipelines not used by the issue', () => {
+    const result = scanLabels(['strat-creator-auto-created']);
+    expect(result.firstPass.stratCreator).toBe(1);
+    expect(result.firstPass.rfeCreator).toBeUndefined();
+    expect(result.firstPass.testPlan).toBeUndefined();
+    expect(result.firstPass.qg1).toBeUndefined();
+  });
+
+  it('returns empty firstPass for no pipeline labels', () => {
+    const result = scanLabels(['bugfix', 'team-green']);
+    expect(Object.keys(result.firstPass)).toHaveLength(0);
+  });
+
+  it('does not set firstPass for pipelines without revision signals', () => {
+    const result = scanLabels(['ai1st-doc-contributed', 'uxd-agentic', 'epic-creator-auto-decomposed']);
+    expect(result.firstPass.aiDoc).toBeUndefined();
+    expect(result.firstPass.uxdAgentic).toBeUndefined();
+    expect(result.firstPass.epicCreator).toBeUndefined();
+  });
+
+  it('skips firstPass when pipeline is used but created label is absent', () => {
+    const result = scanLabels(['rp-qg1-auto-rice']);
+    expect(result.pipelines.qg1).toBe(1);
+    expect(result.firstPass.qg1).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -123,6 +191,20 @@ describe('constants', () => {
   it('each pipeline has at least one prefix', () => {
     for (const key of PIPELINE_KEYS) {
       expect(AI_PIPELINE_TAXONOMY[key].prefixes.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('exports expected first-pass keys', () => {
+    expect(FIRST_PASS_KEYS).toEqual(
+      expect.arrayContaining(['stratCreator', 'rfeCreator', 'testPlan', 'qg1'])
+    );
+    expect(FIRST_PASS_KEYS).toHaveLength(4);
+  });
+
+  it('each first-pass rule has created and revised arrays', () => {
+    for (const key of FIRST_PASS_KEYS) {
+      expect(FIRST_PASS_RULES[key].created.length).toBeGreaterThan(0);
+      expect(FIRST_PASS_RULES[key].revised.length).toBeGreaterThan(0);
     }
   });
 });
@@ -373,6 +455,36 @@ describe('fetchAiAdoptionData', () => {
     expect(g.effortSignal).toBe('childSp');
     expect(g.aggregateEffort).toBe(10);
     expect(g.avgEffort).toBe(3.3);
+  });
+
+  it('accumulates firstPass counts at group and component level', async () => {
+    const issues = [
+      makeIssue('FP-1', ['strat-creator-auto-created', 'rfe-creator-auto-created'], ['TeamA']),
+      makeIssue('FP-2', ['strat-creator-auto-created', 'strat-creator-auto-refined'], ['TeamA']),
+      makeIssue('FP-3', ['rfe-creator-auto-created', 'rfe-creator-autofix-rubric-pass'], ['TeamB']),
+      makeIssue('FP-4', ['rp-qg1-auto-rice', 'rp-qg1-pass'], ['TeamB']),
+      makeIssue('FP-5', ['test-plan-auto-created', 'test-plan-auto-revised'], ['TeamA'])
+    ];
+
+    const jira = { fetchAllJqlResults: vi.fn(async () => issues) };
+    const results = await fetchAiAdoptionData(jira, { releaseGroup: '3.5 GA' });
+    const g = results[0];
+
+    expect(g.firstPass.stratCreator).toEqual({ accepted: 1, total: 2 });
+    expect(g.firstPass.rfeCreator).toEqual({ accepted: 1, total: 2 });
+    expect(g.firstPass.qg1).toEqual({ accepted: 1, total: 1 });
+    expect(g.firstPass.testPlan).toEqual({ accepted: 0, total: 1 });
+
+    const teamA = g.components.find(c => c.name === 'TeamA');
+    expect(teamA.firstPass.stratCreator).toEqual({ accepted: 1, total: 2 });
+    expect(teamA.firstPass.rfeCreator).toEqual({ accepted: 1, total: 1 });
+    expect(teamA.firstPass.testPlan).toEqual({ accepted: 0, total: 1 });
+    expect(teamA.firstPass.qg1).toEqual({ accepted: 0, total: 0 });
+
+    const teamB = g.components.find(c => c.name === 'TeamB');
+    expect(teamB.firstPass.rfeCreator).toEqual({ accepted: 0, total: 1 });
+    expect(teamB.firstPass.qg1).toEqual({ accepted: 1, total: 1 });
+    expect(teamB.firstPass.stratCreator).toEqual({ accepted: 0, total: 0 });
   });
 });
 

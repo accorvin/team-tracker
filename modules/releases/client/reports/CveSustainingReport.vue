@@ -15,6 +15,15 @@
           Last refreshed: {{ formatDate(data.lastRefreshed) }}
         </p>
       </div>
+      <a
+        href="https://drive.google.com/file/d/1af_JSj48byj_Quhw4bVJiO9eJ1pgdjY2/view?usp=drive_link"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border transition-colors bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-primary-200 dark:border-primary-700 hover:bg-primary-100 dark:hover:bg-primary-900/50"
+      >
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
+        Video Demo
+      </a>
       <button
         @click="handleRefresh"
         :disabled="refreshing"

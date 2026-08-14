@@ -77,15 +77,36 @@ const AI_PIPELINE_TAXONOMY = {
 
 const PIPELINE_KEYS = Object.keys(AI_PIPELINE_TAXONOMY);
 
+const FIRST_PASS_RULES = {
+  stratCreator: {
+    created: ['strat-creator-auto-created'],
+    revised: ['strat-creator-auto-refined']
+  },
+  rfeCreator: {
+    created: ['rfe-creator-auto-created'],
+    revised: ['rfe-creator-autofix-rubric-pass']
+  },
+  testPlan: {
+    created: ['test-plan-auto-created'],
+    revised: ['test-plan-auto-revised']
+  },
+  qg1: {
+    created: ['rp-qg1-pass'],
+    revised: ['rp-qg1-fail']
+  }
+};
+const FIRST_PASS_KEYS = Object.keys(FIRST_PASS_RULES);
+
 const EFFORT_FIELD = 'customfield_10430';
 const RICE_EFFORT_FIELD = 'customfield_10637';
 const STORY_POINTS_FIELD = 'customfield_10016';
 const CHILD_BATCH_SIZE = 40;
 
 /**
- * Scan a single issue's labels and return which pipelines are present.
+ * Scan a single issue's labels and return which pipelines are present,
+ * plus first-pass acceptance for pipelines that have revision signals.
  * @param {string[]} labels
- * @returns {{ touched: boolean, pipelines: Record<string, number> }}
+ * @returns {{ touched: boolean, pipelines: Record<string, number>, firstPass: Record<string, number|undefined> }}
  */
 function scanLabels(labels) {
   const pipelines = {};
@@ -102,7 +123,17 @@ function scanLabels(labels) {
     }
   }
 
-  return { touched, pipelines };
+  const firstPass = {};
+  for (const key of FIRST_PASS_KEYS) {
+    if (pipelines[key] !== 1) continue;
+    const rule = FIRST_PASS_RULES[key];
+    const hasCreated = labels.some(l => rule.created.some(p => l === p || l.startsWith(p + '-')));
+    if (!hasCreated) continue;
+    const hasRevised = labels.some(l => rule.revised.some(p => l === p || l.startsWith(p + '-')));
+    firstPass[key] = hasRevised ? 0 : 1;
+  }
+
+  return { touched, pipelines, firstPass };
 }
 
 /**
@@ -224,6 +255,8 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
     let filteredAiTouched = 0;
     const groupPipelines = {};
     for (const key of PIPELINE_KEYS) groupPipelines[key] = 0;
+    const groupFirstPass = {};
+    for (const key of FIRST_PASS_KEYS) groupFirstPass[key] = { accepted: 0, total: 0 };
     const groupEffort = {
       effortSum: 0, effortCount: 0,
       riceEffortSum: 0, riceEffortCount: 0,
@@ -235,7 +268,7 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
       const f = issue.fields || {};
       const labels = f.labels || [];
       const components = (f.components || []).map(c => c.name);
-      const { touched, pipelines } = scanLabels(labels);
+      const { touched, pipelines, firstPass } = scanLabels(labels);
 
       const effortVal = parseFloat(f[EFFORT_FIELD]) || 0;
       const hasEffort = effortVal > 0;
@@ -251,6 +284,12 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
       totalFeatures++;
       if (touched) aiTouchedFeatures++;
       for (const key of PIPELINE_KEYS) groupPipelines[key] += pipelines[key];
+      for (const key of FIRST_PASS_KEYS) {
+        if (firstPass[key] !== undefined) {
+          groupFirstPass[key].total++;
+          groupFirstPass[key].accepted += firstPass[key];
+        }
+      }
       if (hasEffort) { groupEffort.effortSum += effortVal; groupEffort.effortCount++; }
       if (hasRice) { groupEffort.riceEffortSum += riceVal; groupEffort.riceEffortCount++; }
       groupEffort.childIssueSum += Math.max(1, childCount);
@@ -268,17 +307,25 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
         if (!componentMap[compName]) {
           componentMap[compName] = {
             name: compName, total: 0, aiTouched: 0, pipelines: {},
+            firstPass: {},
             effortSum: 0, effortCount: 0,
             riceEffortSum: 0, riceEffortCount: 0,
             childIssueSum: 0,
             childSpSum: 0, childSpCount: 0
           };
           for (const key of PIPELINE_KEYS) componentMap[compName].pipelines[key] = 0;
+          for (const key of FIRST_PASS_KEYS) componentMap[compName].firstPass[key] = { accepted: 0, total: 0 };
         }
         componentMap[compName].total++;
         if (touched) componentMap[compName].aiTouched++;
         for (const key of PIPELINE_KEYS) {
           componentMap[compName].pipelines[key] += pipelines[key];
+        }
+        for (const key of FIRST_PASS_KEYS) {
+          if (firstPass[key] !== undefined) {
+            componentMap[compName].firstPass[key].total++;
+            componentMap[compName].firstPass[key].accepted += firstPass[key];
+          }
         }
         if (hasEffort) { componentMap[compName].effortSum += effortVal; componentMap[compName].effortCount++; }
         if (hasRice) { componentMap[compName].riceEffortSum += riceVal; componentMap[compName].riceEffortCount++; }
@@ -296,9 +343,17 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
     }).sort((a, b) => b.aiTouched - a.aiTouched);
 
     const filteredPipelines = {};
+    const filteredFirstPass = {};
     if (options.component) {
       for (const key of PIPELINE_KEYS) {
         filteredPipelines[key] = componentList.reduce((s, c) => s + (c.pipelines[key] || 0), 0);
+      }
+      for (const key of FIRST_PASS_KEYS) {
+        filteredFirstPass[key] = componentList.reduce((acc, c) => {
+          const fp = c.firstPass && c.firstPass[key];
+          if (fp) { acc.accepted += fp.accepted; acc.total += fp.total; }
+          return acc;
+        }, { accepted: 0, total: 0 });
       }
     }
 
@@ -309,6 +364,7 @@ async function fetchAiAdoptionData(jiraClient, options = {}) {
       totalFeatures: options.component ? filteredTotal : totalFeatures,
       aiTouchedFeatures: options.component ? filteredAiTouched : aiTouchedFeatures,
       pipelines: options.component ? filteredPipelines : groupPipelines,
+      firstPass: options.component ? filteredFirstPass : groupFirstPass,
       components: componentList,
       effortSignal: effortSource,
       aggregateEffort: groupResolved.aggregateEffort,
@@ -327,6 +383,8 @@ module.exports = {
   applyEffortSignal,
   AI_PIPELINE_TAXONOMY,
   PIPELINE_KEYS,
+  FIRST_PASS_RULES,
+  FIRST_PASS_KEYS,
   RELEASE_GROUPS,
   PROJECTS,
   EFFORT_FIELD,

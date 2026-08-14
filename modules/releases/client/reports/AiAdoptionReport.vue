@@ -377,6 +377,51 @@ const perComponentRows = computed(() => {
   return rows
 })
 
+const FIRST_PASS_TRACKED = ['stratCreator', 'rfeCreator', 'testPlan', 'qg1']
+const FIRST_PASS_COMING_SOON = ['aiDoc', 'uxdAgentic', 'epicCreator']
+
+const firstPassRates = computed(() => {
+  const groups = scorecardGroups.value
+  if (!groups.length) return []
+
+  const acc = {}
+  for (const k of FIRST_PASS_TRACKED) acc[k] = { accepted: 0, total: 0 }
+
+  for (const g of groups) {
+    const fp = g.firstPass || {}
+    for (const k of FIRST_PASS_TRACKED) {
+      if (fp[k]) {
+        acc[k].accepted += fp[k].accepted || 0
+        acc[k].total += fp[k].total || 0
+      }
+    }
+  }
+
+  const tracked = FIRST_PASS_TRACKED.map(key => ({
+    key,
+    name: PIPELINE_META[key].name,
+    short: PIPELINE_META[key].short,
+    accepted: acc[key].accepted,
+    total: acc[key].total,
+    pct: acc[key].total > 0
+      ? Math.round((acc[key].accepted / acc[key].total) * 100)
+      : 0,
+    comingSoon: false
+  })).sort((a, b) => b.pct - a.pct)
+
+  const comingSoon = FIRST_PASS_COMING_SOON.map(key => ({
+    key,
+    name: PIPELINE_META[key].name,
+    short: PIPELINE_META[key].short,
+    accepted: 0,
+    total: 0,
+    pct: 0,
+    comingSoon: true
+  }))
+
+  return [...tracked, ...comingSoon]
+})
+
 const throughputRows = computed(() => {
   const groups = scorecardGroups.value
   if (!groups.length) return []
@@ -623,11 +668,22 @@ const executiveSummary = computed(() => {
 <template>
   <div>
     <!-- Header -->
-    <div class="mb-6">
-      <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">AI Adoption Report</h2>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-        Projects: AIPCC, RHAIENG, RHOAIENG, INFERENG, RHAI, RHAISTRAT &middot; Issue type: Feature &middot; Source: Jira
-      </p>
+    <div class="flex items-start justify-between mb-6">
+      <div>
+        <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">AI Adoption Report</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          Projects: AIPCC, RHAIENG, RHOAIENG, INFERENG, RHAI, RHAISTRAT &middot; Issue type: Feature &middot; Source: Jira
+        </p>
+      </div>
+      <a
+        href="https://drive.google.com/file/d/1NGm-dMgBhxLGYnIicXRZ3p6TSFHQOTNg/view?usp=drive_link"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border transition-colors bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-primary-200 dark:border-primary-700 hover:bg-primary-100 dark:hover:bg-primary-900/50"
+      >
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
+        Video Demo
+      </a>
     </div>
 
     <!-- Loading -->
@@ -1040,6 +1096,46 @@ const executiveSummary = computed(() => {
         </div>
       </div>
 
+      <!-- First-Time Pass Rate -->
+      <div v-if="firstPassRates.length" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 shadow-sm">
+        <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-cyan-50 to-transparent dark:from-cyan-900/15 dark:to-transparent">
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-cyan-100 dark:bg-cyan-800/40 flex items-center justify-center shrink-0">
+              <svg class="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </span>
+            <div>
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">First-Time Pass Rate</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Percentage of features where AI-generated output was accepted without revision</p>
+            </div>
+          </div>
+        </div>
+        <div class="p-5 space-y-3">
+          <div v-for="item in firstPassRates" :key="item.key" class="rounded-lg border px-4 py-3 transition-colors" :class="item.comingSoon ? 'border-gray-100 dark:border-gray-700/40 bg-gray-50/50 dark:bg-gray-800/30 opacity-60' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'">
+            <div class="flex items-center justify-between gap-4">
+              <div class="flex items-center gap-3 min-w-0">
+                <span class="w-1.5 h-8 rounded-full shrink-0" :class="item.comingSoon ? 'bg-gray-300 dark:bg-gray-600' : item.pct >= 75 ? 'bg-emerald-500' : item.pct >= 50 ? 'bg-amber-500' : 'bg-red-500'"></span>
+                <div class="min-w-0">
+                  <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</span>
+                  <p v-if="!item.comingSoon && item.total > 0" class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{{ item.accepted }} of {{ item.total }} features accepted first time</p>
+                  <p v-else-if="!item.comingSoon" class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">No data yet</p>
+                </div>
+              </div>
+              <div v-if="item.comingSoon" class="shrink-0">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 uppercase tracking-wider">Coming Soon</span>
+              </div>
+              <div v-else class="flex items-center gap-4 shrink-0">
+                <div class="w-32 h-2 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+                  <div class="h-full rounded-full transition-all duration-500" :class="item.pct >= 75 ? 'bg-emerald-500' : item.pct >= 50 ? 'bg-amber-500' : 'bg-red-500'" :style="{ width: item.pct + '%' }"></div>
+                </div>
+                <span class="text-lg font-bold tabular-nums w-14 text-right" :class="item.pct >= 75 ? 'text-emerald-600 dark:text-emerald-400' : item.pct >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'">{{ item.total > 0 ? item.pct + '%' : '—' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="px-5 pb-4">
+          <p class="text-[10px] text-gray-400 dark:text-gray-500 leading-relaxed">Tracks pipelines with revision-signal labels. AI-First Documentation, UXD Agentic, and Epic Creator will be added when revision tracking is available.</p>
+        </div>
+      </div>
 
       <!-- Component Throughput table -->
       <div v-if="selectedComponent === 'all' && throughputRows.length > 1" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 overflow-x-auto shadow-sm">

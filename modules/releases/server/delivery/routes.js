@@ -17,9 +17,7 @@ const FIX_VERSION_FIELD_KEY = 'fixVersions'
 
 function getDefaultFixVersionJql(config) {
   if (config.targetVersionJqlFragment) return config.targetVersionJqlFragment
-  // Fallback: match any Target Version that looks like a version number (3.x, 4.x, etc.)
-  // This auto-discovers future versions without manual config updates
-  return 'cf[10855] is not EMPTY'
+  return 'fixVersion is not EMPTY'
 }
 
 function normalizeText(value) {
@@ -218,7 +216,6 @@ function safeDaysBetween(fromDate, toDate) {
  * Returns releases in the same format as Product Pages.
  */
 async function discoverReleasesFromJira(storage, config) {
-  // Query Jira using the configured Target Version JQL
   const jqlClause = getDefaultFixVersionJql(config)
   if (!jqlClause) return []
 
@@ -227,9 +224,9 @@ async function discoverReleasesFromJira(storage, config) {
     : `project in (${config.projectKeys.map(k => `"${k}"`).join(', ')}) AND `
   const jql = `${projectsFilter}issuetype = Feature AND ${jqlClause} ORDER BY updated DESC`
 
-  const issues = await fetchAllJqlResults(jiraRequest, jql, FIX_VERSION_FIELD_KEY, { maxResults: 100 })
+  const issues = await fetchAllJqlResults(jiraRequest, jql, `${FIX_VERSION_FIELD_KEY},customfield_10855`, { maxResults: 100 })
 
-  // Extract unique Target Version values
+  // Extract unique fix version values
   const releaseVersions = new Set()
   const featureCounts = new Map()
 
