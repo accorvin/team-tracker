@@ -1226,55 +1226,49 @@ describe('buildExport', () => {
     expect(result.releases['rhoai-3.5']).toBeDefined();
   });
 
-  it('aligned_on_time_jql includes earlier same-product releases in fixVersion clause (Case 2: ahead of schedule)', () => {
+  it('aligned_on_time_jql uses key-based JQL matching exactly the classified items (Case 2: ahead of schedule)', () => {
     const releases = ['3.6 EA1 RHOAI RELEASE', '3.5 GA RHOAI RELEASE', '3.5 EA2 RHOAI RELEASE'];
     const classifications = [
       { release: '3.6 EA1 RHOAI RELEASE', category: 'aligned_on_time', key: 'X-1', url: '', summary: '', status: '', color_status: '', product_manager: '', assignee: '', team: '', components: [], component: '', target_version: '', fix_versions: '' },
     ];
     const result = buildExport(classifications, releases, '2026-01-01T00:00:00Z', [], 'RHAISTRAT');
     const jql = decodeURIComponent(result.executive_summary[0].aligned_on_time_jql);
-    // Must include the earlier RHOAI releases as valid fix versions
-    expect(jql).toContain('"3.5 GA RHOAI RELEASE"');
-    expect(jql).toContain('"3.5 EA2 RHOAI RELEASE"');
-    // Must still require TV = the target release
-    expect(jql).toContain('"Target Version" in ("3.6 EA1 RHOAI RELEASE")');
+    // Key-based JQL: exact issue keys, guaranteed to match table count
+    expect(jql).toContain('key in (X-1)');
   });
 
-  it('aligned_on_time_jql includes later same-product releases in Target Version clause (Case 3: FV ahead)', () => {
+  it('aligned_on_time_jql uses key-based JQL matching exactly the classified items (Case 3: FV ahead)', () => {
     const releases = ['3.6 EA1 RHOAI RELEASE', '3.6 EA2 RHOAI RELEASE', '3.6 GA RHOAI RELEASE'];
     const classifications = [
       { release: '3.6 EA1 RHOAI RELEASE', category: 'aligned_on_time', key: 'X-1', url: '', summary: '', status: '', color_status: '', product_manager: '', assignee: '', team: '', components: [], component: '', target_version: '', fix_versions: '' },
     ];
     const result = buildExport(classifications, releases, '2026-01-01T00:00:00Z', [], 'RHAISTRAT');
     const jql = decodeURIComponent(result.executive_summary[0].aligned_on_time_jql);
-    // Case 3 clause: FV = EA1, TV = later release
-    expect(jql).toContain('fixVersion in ("3.6 EA1 RHOAI RELEASE")');
-    expect(jql).toContain('"3.6 EA2 RHOAI RELEASE"');
-    expect(jql).toContain('"3.6 GA RHOAI RELEASE"');
+    // Key-based JQL: exact issue keys, guaranteed to match table count
+    expect(jql).toContain('key in (X-1)');
   });
 
-  it('aligned_on_time_jql does not bleed cross-product releases into fixVersion or Target Version clauses', () => {
+  it('aligned_on_time_jql does not include cross-product releases', () => {
     const releases = ['3.6 EA1 RHOAI RELEASE', '3.6 EA1 RHAII RELEASE', '3.5 GA RHOAI RELEASE'];
     const classifications = [
       { release: '3.6 EA1 RHOAI RELEASE', category: 'aligned_on_time', key: 'X-1', url: '', summary: '', status: '', color_status: '', product_manager: '', assignee: '', team: '', components: [], component: '', target_version: '', fix_versions: '' },
     ];
     const result = buildExport(classifications, releases, '2026-01-01T00:00:00Z', [], 'RHAISTRAT');
     const jql = decodeURIComponent(result.executive_summary[0].aligned_on_time_jql);
-    // RHAII release must not appear — different product
+    // Key-based JQL: only the exact issue key, no release name strings
+    expect(jql).toContain('key in (X-1)');
     expect(jql).not.toContain('RHAII');
-    // Earlier RHOAI release must appear
-    expect(jql).toContain('"3.5 GA RHOAI RELEASE"');
   });
 
-  it('aligned_on_time_jql falls back to exact-match when release is unparseable (no earlier/later computed)', () => {
+  it('aligned_on_time_jql uses key-based JQL even when release is unparseable', () => {
     const releases = ['unparseable-version', 'rhoai-3.5'];
     const classifications = [
       { release: 'unparseable-version', category: 'aligned_on_time', key: 'X-1', url: '', summary: '', status: '', color_status: '', product_manager: '', assignee: '', team: '', components: [], component: '', target_version: '', fix_versions: '' },
     ];
     const result = buildExport(classifications, releases, '2026-01-01T00:00:00Z', [], 'RHAISTRAT');
     const jql = decodeURIComponent(result.executive_summary[0].aligned_on_time_jql);
-    // Just the release itself, no compound OR clause (compound uses ') OR (' pattern)
-    expect(jql).toContain('"unparseable-version"');
+    // Key-based JQL: exact issue keys regardless of release parseability
+    expect(jql).toContain('key in (X-1)');
     expect(jql).not.toContain(') OR (');
   });
 });
