@@ -480,6 +480,19 @@ function mergeFeatureData(key, jiraFeatures, aiReviewMap, candidateIndex, health
   var effort = (jira && jira.effort) || (exec && exec.effort) || null
   var tshirtSize = (health && health.tshirtSize) || (aiReview && aiReview.size) || null
   var descriptionSignals = (jira && jira.descriptionSignals) || (health && health.descriptionSignals) || null
+  var colorStatus = (jira && jira.colorStatus) || (health && health.colorStatus) || (exec && exec.colorStatus) || null
+  var statusSummary = (jira && jira.statusSummary) || (health && health.statusSummary) || (exec && exec.statusSummary) || null
+  var statusCategory = (jira && jira.statusCategory) || null
+  var isBlocked = !!(jira && jira.isBlocked)
+  var blockedBy = (jira && Array.isArray(jira.blockedBy)) ? jira.blockedBy : []
+  var fixVersions
+  if (jira && Array.isArray(jira.fixVersions) && jira.fixVersions.length > 0) {
+    fixVersions = jira.fixVersions.slice()
+  } else if (fixVersion) {
+    fixVersions = [fixVersion]
+  } else {
+    fixVersions = []
+  }
 
   if (!pmOwner && pm) pmOwner = pm
   if (!sourceRfe && exec && exec.linkedRfeKey) sourceRfe = exec.linkedRfeKey
@@ -492,6 +505,7 @@ function mergeFeatureData(key, jiraFeatures, aiReviewMap, candidateIndex, health
     sourceRfe: sourceRfe,
     priority: priority,
     status: status,
+    statusCategory: statusCategory,
     size: size,
     recommendation: recommendation,
     needsAttention: needsAttention,
@@ -512,6 +526,7 @@ function mergeFeatureData(key, jiraFeatures, aiReviewMap, candidateIndex, health
     rockPriority: rockPriority,
     targetVersions: targetVersions,
     fixVersion: fixVersion,
+    fixVersions: fixVersions,
     labels: labels,
     violations: violations,
     hygieneStatus: hygieneStatus,
@@ -526,6 +541,10 @@ function mergeFeatureData(key, jiraFeatures, aiReviewMap, candidateIndex, health
     effort: effort,
     tshirtSize: tshirtSize,
     descriptionSignals: descriptionSignals,
+    colorStatus: colorStatus,
+    statusSummary: statusSummary,
+    isBlocked: isBlocked,
+    blockedBy: blockedBy,
     phase: releaseType
   }
 }
@@ -625,6 +644,7 @@ async function buildCanonicalFeatures(options) {
       rockPriority: merged.rockPriority,
       targetVersions: merged.targetVersions,
       fixVersion: merged.fixVersion,
+      fixVersions: merged.fixVersions || (merged.fixVersion ? [merged.fixVersion] : []),
       priorityScore: effectivePriorityScore,
       priorityScoreBreakdown: priorityBreakdown,
       effectivePriorityScore: effectivePriorityScore,
@@ -639,6 +659,13 @@ async function buildCanonicalFeatures(options) {
       fpdor: readinessResult.fpdor,
       violations: merged.violations,
       hygieneStatus: merged.hygieneStatus,
+      releaseType: merged.releaseType || null,
+      docsRequired: merged.docsRequired || null,
+      colorStatus: merged.colorStatus || null,
+      statusSummary: merged.statusSummary || null,
+      statusCategory: merged.statusCategory || null,
+      isBlocked: !!merged.isBlocked,
+      blockedBy: merged.blockedBy || [],
       isReady: isReady
     })
   }
