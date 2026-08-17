@@ -98,14 +98,14 @@ module.exports = function registerRoutes(router, context) {
    *       - name: since
    *         in: query
    *         schema: { type: string }
-   *         description: ISO date cutoff for planned GA (default 2026-04-01)
+   *         description: ISO date cutoff for planned GA (default 2026-01-01)
    *     responses:
    *       200:
    *         description: Array of releases with on-time analysis
    */
   router.get('/reports/on-time-releases', requireScope('okr-hub:read'), async function(req, res) {
     try {
-      var since = req.query.since || '2026-04-01'
+      var since = req.query.since || '2026-01-01'
 
       var overrides = await storage.readFromStorage('okr-hub/on-time-overrides.json')
       var entries = (overrides && Array.isArray(overrides.releases)) ? overrides.releases : []
