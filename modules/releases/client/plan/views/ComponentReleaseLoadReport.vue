@@ -1157,7 +1157,6 @@ async function loadData(opts) {
     if (!silent) dataError.value = err.message
     if (!silent) {
       groups.value = []
-      velocity.value = null
       fetchedAt.value = null
     }
   } finally {
