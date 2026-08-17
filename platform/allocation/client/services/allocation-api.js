@@ -6,6 +6,18 @@ export async function getTeamAllocationSummary(teamId) {
   return apiRequest(`${BASE}/team/${encodeURIComponent(teamId)}/summary`)
 }
 
+export async function getTeamAllocationSettings(teamId) {
+  return apiRequest(`${BASE}/team/${encodeURIComponent(teamId)}/settings`)
+}
+
+export async function updateTeamAllocationSettings(teamId, allocationMode) {
+  return apiRequest(`${BASE}/team/${encodeURIComponent(teamId)}/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ allocationMode })
+  })
+}
+
 export async function getBoardSprints(boardId, sprintFilter) {
   const params = sprintFilter ? `?sprintFilter=${encodeURIComponent(sprintFilter)}` : ''
   return apiRequest(`${BASE}/board/${encodeURIComponent(boardId)}/sprints${params}`)

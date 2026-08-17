@@ -217,7 +217,12 @@ async function processKanbanBoard({ board, teamId, allocationMode, strategy, fet
  */
 async function refreshTeam({ team, strategy, hardRefresh, fetchSprints, fetchSprintIssues, fetchBoardConfiguration, fetchFilterJql, fetchIssuesByJql, fetchBoardType, readStorage, writeStorage }) {
   const teamId = team.id;
-  const allocationMode = team.metadata?.allocationMode || 'points';
+  // A team is "configured" only once a manager has explicitly chosen a basis.
+  // Until then we compute numbers using a story-points fallback. Configured-ness
+  // itself is NOT stored here — it's derived from live team metadata at read
+  // time (see the summary routes), so it can't go stale in this snapshot.
+  const configuredMode = team.metadata?.allocationMode;
+  const allocationMode = (configuredMode === 'points' || configuredMode === 'counts') ? configuredMode : 'points';
   const boards = (team.boards || []).filter(b => b.boardId);
 
   if (boards.length === 0) {
@@ -301,6 +306,109 @@ async function refreshTeam({ team, strategy, hardRefresh, fetchSprints, fetchSpr
 }
 
 /**
+ * Aggregate a set of team summaries into org + global rollups.
+ *
+ * Pure (no I/O) so it can be fed either freshly-computed team summaries (a full
+ * refresh) or the team summary files read from disk (a single-team refresh).
+ * This is the single source of the org/global aggregation math.
+ *
+ * @param {Array} teamSummaries - team summary objects (shape of summaries/team-*.json)
+ * @param {Object} strategy
+ * @returns {{ orgSummaries: Array<{orgKey: string, data: Object}>, globalData: Object }}
+ */
+function assembleRollups(teamSummaries, strategy) {
+  const now = new Date().toISOString();
+
+  const orgGroups = new Map();
+  for (const s of teamSummaries) {
+    const orgKey = s.orgKey || 'unknown';
+    if (!orgGroups.has(orgKey)) orgGroups.set(orgKey, []);
+    orgGroups.get(orgKey).push(s);
+  }
+
+  const orgSummaries = [];
+  for (const [orgKey, orgTeams] of orgGroups) {
+    const orgSummary = buildOrgSummary(orgTeams, strategy.categories);
+    orgSummaries.push({
+      orgKey,
+      data: {
+        orgKey,
+        strategyId: strategy.id,
+        lastUpdated: now,
+        ...orgSummary,
+        teams: orgTeams.map(t => ({
+          teamId: t.teamId,
+          teamName: t.teamName,
+          totalPoints: t.totalPoints,
+          totalCount: t.totalCount,
+          boardCount: t.boardCount,
+          percentages: t.percentages
+        }))
+      }
+    });
+  }
+
+  const globalSummary = buildOrgSummary(teamSummaries, strategy.categories);
+  const globalData = {
+    strategyId: strategy.id,
+    lastUpdated: now,
+    ...globalSummary,
+    teams: teamSummaries.map(t => ({
+      teamId: t.teamId,
+      teamName: t.teamName,
+      orgKey: t.orgKey,
+      totalPoints: t.totalPoints,
+      totalCount: t.totalCount,
+      boardCount: t.boardCount,
+      percentages: t.percentages
+    })),
+    orgs: orgSummaries.map(o => ({
+      orgKey: o.data.orgKey,
+      totalPoints: o.data.totalPoints,
+      totalCount: o.data.totalCount,
+      teamCount: o.data.teamCount,
+      boardCount: o.data.boardCount,
+      percentages: o.data.percentages
+    }))
+  };
+
+  return { orgSummaries, globalData };
+}
+
+/** Aggregate the given team summaries and persist org + global rollups. */
+async function writeRollups({ teamSummaries, strategy, writeStorage }) {
+  const { orgSummaries, globalData } = assembleRollups(teamSummaries, strategy);
+  for (const org of orgSummaries) {
+    await writeStorage(`summaries/org-${org.orgKey}.json`, org.data);
+  }
+  await writeStorage('summaries/global.json', globalData);
+  return { orgCount: orgSummaries.length };
+}
+
+/**
+ * Rebuild org + global rollups from the per-team summary files already on disk.
+ *
+ * Cheap (no Jira) — this decouples "fetch a team's data from Jira" from
+ * "aggregate the rollups", so a single-team refresh can update the org/global
+ * registries from the current on-disk team summaries without re-fetching every
+ * team and without clobbering the teams it didn't touch.
+ *
+ * @param {Object} opts
+ * @param {Object} opts.strategy
+ * @param {Array}  opts.teams - all teams (only `id` is used) whose summaries to aggregate
+ * @param {Function} opts.readStorage
+ * @param {Function} opts.writeStorage
+ */
+async function rebuildRollups({ strategy, teams, readStorage, writeStorage }) {
+  const teamSummaries = [];
+  for (const team of teams) {
+    const summary = await readStorage(`summaries/team-${team.id}.json`);
+    if (summary) teamSummaries.push(summary);
+  }
+  return writeRollups({ teamSummaries, strategy, writeStorage });
+}
+
+/**
  * Full refresh: read teams from team-store, process each, then build org and global summaries.
  */
 async function performRefresh({ teams, strategy, hardRefresh, fetchSprints, fetchSprintIssues, fetchBoardConfiguration, fetchFilterJql, fetchIssuesByJql, fetchBoardType, readStorage, writeStorage }) {
@@ -325,59 +433,8 @@ async function performRefresh({ teams, strategy, hardRefresh, fetchSprints, fetc
     }
   }
 
-  // Build org-level summaries
-  const orgGroups = new Map();
-  for (const result of teamResults) {
-    const orgKey = result.orgKey || 'unknown';
-    if (!orgGroups.has(orgKey)) orgGroups.set(orgKey, []);
-    orgGroups.get(orgKey).push(result);
-  }
-
-  const orgSummaries = [];
-  for (const [orgKey, orgTeams] of orgGroups) {
-    const orgSummary = buildOrgSummary(orgTeams, strategy.categories);
-    const orgData = {
-      orgKey,
-      strategyId: strategy.id,
-      lastUpdated: new Date().toISOString(),
-      ...orgSummary,
-      teams: orgTeams.map(t => ({
-        teamId: t.teamId,
-        teamName: t.teamName,
-        totalPoints: t.totalPoints,
-        totalCount: t.totalCount,
-        boardCount: t.boardCount,
-        percentages: t.percentages
-      }))
-    };
-    await writeStorage(`summaries/org-${orgKey}.json`, orgData);
-    orgSummaries.push(orgData);
-  }
-
-  // Build global summary
-  const globalSummary = buildOrgSummary(teamResults, strategy.categories);
-  await writeStorage('summaries/global.json', {
-    strategyId: strategy.id,
-    lastUpdated: new Date().toISOString(),
-    ...globalSummary,
-    teams: teamResults.map(t => ({
-      teamId: t.teamId,
-      teamName: t.teamName,
-      orgKey: t.orgKey,
-      totalPoints: t.totalPoints,
-      totalCount: t.totalCount,
-      boardCount: t.boardCount,
-      percentages: t.percentages
-    })),
-    orgs: orgSummaries.map(o => ({
-      orgKey: o.orgKey,
-      totalPoints: o.totalPoints,
-      totalCount: o.totalCount,
-      teamCount: o.teamCount,
-      boardCount: o.boardCount,
-      percentages: o.percentages
-    }))
-  });
+  // Aggregate org + global rollups from the teams processed this run.
+  const { orgCount } = await writeRollups({ teamSummaries: teamResults, strategy, writeStorage });
 
   const refreshElapsed = ((Date.now() - refreshStart) / 1000).toFixed(1);
   console.log(`[allocation] Refresh complete: ${teamResults.length}/${teams.length} teams succeeded (${refreshElapsed}s)`);
@@ -386,8 +443,8 @@ async function performRefresh({ teams, strategy, hardRefresh, fetchSprints, fetc
     success: true,
     teamCount: teamResults.length,
     failedTeamCount: teams.length - teamResults.length,
-    orgCount: orgGroups.size
+    orgCount
   };
 }
 
-module.exports = { processBoard, processKanbanBoard, refreshTeam, performRefresh };
+module.exports = { processBoard, processKanbanBoard, refreshTeam, performRefresh, assembleRollups, rebuildRollups };
