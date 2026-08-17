@@ -1,9 +1,6 @@
 const { createJiraClient } = require('../../../shared/server/jira')
 const { createGoogleSheetsClient } = require('../../../shared/server/google-sheets')
 
-var versionsCache = null
-var versionsCacheAt = 0
-var VERSIONS_CACHE_TTL = 10 * 60 * 1000
 
 var techVisCache = null
 var techVisCacheAt = 0
@@ -34,7 +31,6 @@ module.exports = function registerRoutes(router, context) {
     host: process.env.JIRA_HOST
   })
 
-  var JIRA_PROJECTS = ['RHAISTRAT', 'RHOAIENG']
 
   /**
    * @openapi
@@ -114,109 +110,34 @@ module.exports = function registerRoutes(router, context) {
       var since = req.query.since || '2026-04-01'
 
       var overrides = await storage.readFromStorage('okr-hub/on-time-overrides.json')
-      var overrideMap = {}
-      var removedIds = {}
-      var customReleases = []
-      if (overrides && Array.isArray(overrides.releases)) {
-        for (var oi = 0; oi < overrides.releases.length; oi++) {
-          var ov = overrides.releases[oi]
-          if (ov.removed) { removedIds[ov.id] = true; continue }
-          if (ov.custom) { customReleases.push(ov); continue }
-          overrideMap[ov.id] = ov
-        }
-      }
-
-      var registry = await storage.readFromStorage('releases/registry.json')
-      var registryReleases = (registry && Array.isArray(registry.releases)) ? registry.releases : []
-
-      var candidates = []
-      for (var i = 0; i < registryReleases.length; i++) {
-        var rel = registryReleases[i]
-        if (removedIds[rel.id]) continue
-        var ga = rel.milestones && rel.milestones.ga
-        if (!ga || ga < since) continue
-        if (isEaRelease(rel.id)) continue
-        if (overrideMap[rel.id]) {
-          var ovr = overrideMap[rel.id]
-          rel = Object.assign({}, rel, { milestones: Object.assign({}, rel.milestones, { ga: ovr.plannedGa || rel.milestones.ga }) })
-          rel._overrideActualGa = ovr.actualGa || null
-          rel._overrideDisplayName = ovr.displayName || null
-        }
-        candidates.push(rel)
-      }
-
-      var jiraVersions = await fetchJiraVersions(jira)
-
-      var jiraVersionMap = {}
-      for (var vi = 0; vi < jiraVersions.length; vi++) {
-        var v = jiraVersions[vi]
-        jiraVersionMap[v.name.toLowerCase()] = v
-      }
+      var entries = (overrides && Array.isArray(overrides.releases)) ? overrides.releases : []
 
       var results = []
-      for (var ri = 0; ri < candidates.length; ri++) {
-        var release = candidates[ri]
-        var plannedGa = release.milestones.ga
-        var actualGa = release._overrideActualGa || null
-        var released = !!actualGa
+      for (var i = 0; i < entries.length; i++) {
+        var entry = entries[i]
+        if (entry.removed) continue
+        if (!entry.plannedGa || entry.plannedGa < since) continue
 
-        if (!actualGa) {
-          var fvList = release.fixVersions || []
-          for (var fvi = 0; fvi < fvList.length; fvi++) {
-            var match = jiraVersionMap[fvList[fvi].toLowerCase()]
-            if (match && match.released && match.releaseDate) {
-              actualGa = match.releaseDate
-              released = true
-              break
-            }
-          }
-        }
-
+        var released = !!entry.actualGa
         var onTime = null
         var daysLate = null
-        if (released && actualGa) {
-          var planned = new Date(plannedGa + 'T00:00:00Z')
-          var actual = new Date(actualGa + 'T00:00:00Z')
+        if (released && entry.actualGa) {
+          var planned = new Date(entry.plannedGa + 'T00:00:00Z')
+          var actual = new Date(entry.actualGa + 'T00:00:00Z')
           var diffMs = actual.getTime() - planned.getTime()
           daysLate = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
           onTime = daysLate <= 0
         }
 
         results.push({
-          id: release.id,
-          displayName: release._overrideDisplayName || release.displayName,
-          plannedGa: plannedGa,
-          actualGa: actualGa,
+          id: entry.id,
+          displayName: entry.displayName,
+          plannedGa: entry.plannedGa,
+          actualGa: entry.actualGa || null,
           released: released,
           onTime: onTime,
           daysLate: daysLate,
-          custom: false
-        })
-      }
-
-      for (var ci = 0; ci < customReleases.length; ci++) {
-        var cr = customReleases[ci]
-        if (removedIds[cr.id]) continue
-        if (!cr.plannedGa || cr.plannedGa < since) continue
-        var crReleased = !!cr.actualGa
-        var crOnTime = null
-        var crDaysLate = null
-        if (crReleased && cr.actualGa) {
-          var crPlanned = new Date(cr.plannedGa + 'T00:00:00Z')
-          var crActual = new Date(cr.actualGa + 'T00:00:00Z')
-          var crDiffMs = crActual.getTime() - crPlanned.getTime()
-          crDaysLate = Math.ceil(crDiffMs / (1000 * 60 * 60 * 24))
-          crOnTime = crDaysLate <= 0
-        }
-        results.push({
-          id: cr.id,
-          displayName: cr.displayName,
-          plannedGa: cr.plannedGa,
-          actualGa: cr.actualGa || null,
-          released: crReleased,
-          onTime: crOnTime,
-          daysLate: crDaysLate,
-          custom: true
+          custom: !!entry.custom
         })
       }
 
@@ -299,35 +220,6 @@ module.exports = function registerRoutes(router, context) {
       res.status(500).json({ error: err.message })
     }
   })
-
-  async function fetchJiraVersions(jiraClient) {
-    var now = Date.now()
-    if (versionsCache && (now - versionsCacheAt) < VERSIONS_CACHE_TTL) {
-      return versionsCache
-    }
-
-    var allVersions = []
-    for (var pi = 0; pi < JIRA_PROJECTS.length; pi++) {
-      var project = JIRA_PROJECTS[pi]
-      try {
-        var data = await jiraClient.jiraRequest('/rest/api/3/project/' + project + '/versions')
-        for (var dvi = 0; dvi < data.length; dvi++) {
-          allVersions.push({
-            name: data[dvi].name,
-            releaseDate: data[dvi].releaseDate || null,
-            released: data[dvi].released || false,
-            project: project
-          })
-        }
-      } catch (err) {
-        console.warn('[okr-hub] Failed to fetch versions for ' + project + ':', err.message)
-      }
-    }
-
-    versionsCache = allVersions
-    versionsCacheAt = now
-    return allVersions
-  }
 
   /**
    * @openapi
@@ -897,10 +789,6 @@ module.exports = function registerRoutes(router, context) {
   })
 }
 
-function isEaRelease(id) {
-  var lower = (id || '').toLowerCase()
-  return lower.includes('.ea') || lower.includes('-ea')
-}
 
 function findColumnIndex(headers, candidates) {
   for (var hi = 0; hi < headers.length; hi++) {
