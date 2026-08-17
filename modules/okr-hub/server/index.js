@@ -1,7 +1,6 @@
 const { createJiraClient } = require('../../../shared/server/jira')
 const { createGoogleSheetsClient } = require('../../../shared/server/google-sheets')
 
-
 var techVisCache = null
 var techVisCacheAt = 0
 var TECH_VIS_CACHE_TTL = 15 * 60 * 1000
@@ -30,7 +29,6 @@ module.exports = function registerRoutes(router, context) {
     token: (secrets && secrets.JIRA_TOKEN) || '',
     host: process.env.JIRA_HOST
   })
-
 
   /**
    * @openapi
@@ -788,7 +786,6 @@ module.exports = function registerRoutes(router, context) {
     return { status: 'ok' }
   })
 }
-
 
 function findColumnIndex(headers, candidates) {
   for (var hi = 0; hi < headers.length; hi++) {
