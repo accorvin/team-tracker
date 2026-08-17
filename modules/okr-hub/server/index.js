@@ -52,6 +52,50 @@ module.exports = function registerRoutes(router, context) {
 
   /**
    * @openapi
+   * /api/modules/okr-hub/editable-status:
+   *   get:
+   *     tags: [OKR Hub]
+   *     summary: Get saved editable OKR quarter status data
+   *     responses:
+   *       200:
+   *         description: Saved editable status entries keyed by objectiveId and quarter
+   */
+  router.get('/editable-status', requireScope('okr-hub:read'), async function(req, res) {
+    var saved = await storage.readFromStorage('okr-hub/editable-status.json')
+    res.json(saved || { entries: {} })
+  })
+
+  /**
+   * @openapi
+   * /api/modules/okr-hub/editable-status:
+   *   put:
+   *     tags: [OKR Hub]
+   *     summary: Save editable OKR quarter status data
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { type: object }
+   *     responses:
+   *       200:
+   *         description: Saved
+   */
+  router.put('/editable-status', requireScope('okr-hub:write'), async function(req, res) {
+    try {
+      var body = req.body
+      if (!body || typeof body.entries !== 'object') {
+        return res.status(400).json({ error: 'Invalid payload: requires entries object' })
+      }
+      await storage.writeToStorage('okr-hub/editable-status.json', body)
+      res.json({ ok: true })
+    } catch (err) {
+      console.error('[okr-hub] editable-status save error:', err)
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  /**
+   * @openapi
    * /api/modules/okr-hub/reports/on-time-releases:
    *   get:
    *     tags: [OKR Hub]
