@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
-import { processBoard, processKanbanBoard, refreshTeam, performRefresh } from '../../server/orchestration.js';
+import { processBoard, processKanbanBoard, refreshTeam, performRefresh, rebuildRollups } from '../../server/orchestration.js';
 
 const TEST_STRATEGY = {
   id: 'test-strategy',
@@ -517,5 +517,72 @@ describe('performRefresh', () => {
     expect(result.success).toBe(true);
     expect(result.teamCount).toBe(0);
     expect(result.orgCount).toBe(0);
+  });
+});
+
+describe('rebuildRollups', () => {
+  function teamSummary(id, name, orgKey, overrides = {}) {
+    return {
+      teamId: id, teamName: name, orgKey,
+      totalPoints: 10, totalCount: 2, boardCount: 1,
+      buckets: {}, percentages: {}, calculationMode: 'points',
+      ...overrides
+    };
+  }
+
+  function statefulStore(initial) {
+    const store = { ...initial };
+    return {
+      store,
+      readStorage: vi.fn(async key => store[key] ?? null),
+      writeStorage: vi.fn(async (key, data) => { store[key] = data; })
+    };
+  }
+
+  it('rebuilds org + global from ALL on-disk team summaries (no clobber)', async () => {
+    const { readStorage, writeStorage, store } = statefulStore({
+      'summaries/team-team_1.json': teamSummary('team_1', 'Alpha', 'org1'),
+      'summaries/team-team_2.json': teamSummary('team_2', 'Beta', 'org1'),
+      'summaries/team-team_3.json': teamSummary('team_3', 'Gamma', 'org2')
+    });
+    const teams = [{ id: 'team_1' }, { id: 'team_2' }, { id: 'team_3' }];
+
+    const result = await rebuildRollups({ strategy: TEST_STRATEGY, teams, readStorage, writeStorage });
+
+    expect(result.orgCount).toBe(2);
+    expect(store['summaries/global.json'].teams).toHaveLength(3);
+    expect(store['summaries/org-org1.json'].teams).toHaveLength(2);
+    expect(store['summaries/org-org2.json'].teams).toHaveLength(1);
+    // Configured-ness is intentionally NOT baked into the rollup (it's derived
+    // from live team metadata at read time).
+    expect(store['summaries/global.json'].teams[0]).not.toHaveProperty('allocationConfigured');
+  });
+
+  it('re-running for one team keeps the others in the global rollup', async () => {
+    // Simulate: three teams already summarized; team_2 gets re-fetched (its
+    // summary updated), then rollups rebuilt. Global must still list all three.
+    const { readStorage, writeStorage, store } = statefulStore({
+      'summaries/team-team_1.json': teamSummary('team_1', 'Alpha', 'org1'),
+      'summaries/team-team_2.json': teamSummary('team_2', 'Beta', 'org1', { totalPoints: 99 }),
+      'summaries/team-team_3.json': teamSummary('team_3', 'Gamma', 'org2')
+    });
+    const allTeams = [{ id: 'team_1' }, { id: 'team_2' }, { id: 'team_3' }];
+
+    await rebuildRollups({ strategy: TEST_STRATEGY, teams: allTeams, readStorage, writeStorage });
+
+    const globalTeams = store['summaries/global.json'].teams.map(t => t.teamId).sort();
+    expect(globalTeams).toEqual(['team_1', 'team_2', 'team_3']);
+    expect(store['summaries/global.json'].teams.find(t => t.teamId === 'team_2').totalPoints).toBe(99);
+  });
+
+  it('skips teams that have no summary on disk', async () => {
+    const { readStorage, writeStorage, store } = statefulStore({
+      'summaries/team-team_1.json': teamSummary('team_1', 'Alpha', 'org1')
+    });
+    const teams = [{ id: 'team_1' }, { id: 'team_missing' }];
+
+    await rebuildRollups({ strategy: TEST_STRATEGY, teams, readStorage, writeStorage });
+
+    expect(store['summaries/global.json'].teams).toHaveLength(1);
   });
 });

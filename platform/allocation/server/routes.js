@@ -3,16 +3,19 @@
  * Mounted at /api/modules/team-tracker/allocation/ by the team-tracker server.
  */
 
-const { readTeams, extractBoardId } = require('../../../shared/server/team-store');
+const { readTeams, extractBoardId, updateTeamFields } = require('../../../shared/server/team-store');
 const { getOrgDisplayNames } = require('../../../shared/server/roster-sync/config');
+const permissions = require('../../../shared/server/permissions');
 const { allocationKey } = require('./config');
 
 function isValidBoardId(id) { return /^(\d+|kanban-\d+)$/.test(id); }
 function isValidSprintId(id) { return /^(\d+|kanban-\d+)$/.test(id); }
+function isValidTeamId(id) { return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id); }
 const REFRESH_COOLDOWN_MS = 60_000;
+const ALLOCATION_MODES = ['points', 'counts'];
 
 module.exports = function registerAllocationRoutes(router, context) {
-  const { storage, requireAdmin, requireScope } = context;
+  const { storage, requireScope } = context;
   const { readFromStorage, writeToStorage } = storage;
 
   const DEMO_MODE = process.env.DEMO_MODE === 'true';
@@ -28,11 +31,51 @@ module.exports = function registerAllocationRoutes(router, context) {
   const extraFields = strategy?.getJiraFields ? strategy.getJiraFields() : null;
   const jiraClient = createJiraClient({ jiraRequest, jiraHost: JIRA_HOST, extraFields });
 
-  const { performRefresh } = require('./orchestration');
+  const { performRefresh, refreshTeam, rebuildRollups } = require('./orchestration');
+
+  // Shared fetchers passed to the orchestration layer.
+  const jiraFetchers = {
+    fetchSprints: jiraClient.fetchSprints,
+    fetchSprintIssues: jiraClient.fetchSprintIssues,
+    fetchBoardConfiguration: jiraClient.fetchBoardConfiguration,
+    fetchFilterJql: jiraClient.fetchFilterJql,
+    fetchIssuesByJql: jiraClient.fetchIssuesByJql,
+    fetchBoardType: jiraClient.fetchBoardType
+  };
 
   // Storage helpers -- all allocation data under allocation/ prefix
   async function allocRead(key) { return await readFromStorage(allocationKey(key)); }
   async function allocWrite(key, data) { await writeToStorage(allocationKey(key), data); }
+
+  // Tag each team in a rollup with whether it has configured an allocation
+  // basis, derived from LIVE team metadata (not the summary snapshot) so the
+  // count is always current and reflects setting changes immediately.
+  async function enrichConfigured(teamsArr) {
+    if (!Array.isArray(teamsArr) || teamsArr.length === 0) return teamsArr;
+    const teamData = await readTeams(storage);
+    const teamsById = teamData.teams || {};
+    return teamsArr.map(t => {
+      const mode = teamsById[t.teamId]?.metadata?.allocationMode;
+      return { ...t, allocationConfigured: mode === 'points' || mode === 'counts' };
+    });
+  }
+
+  // Mirrors team-tracker's requireTeamPurview: admins, team-admins, and managers
+  // with a report on the team may edit team settings. Kept self-contained here
+  // (the extension can't import team-tracker internals) using shared/permissions.
+  async function hasTeamPurview(req, teamId) {
+    if (req.isAdmin || req.isTeamAdmin) return true;
+    if (!req.userUid) return false;
+    const registry = await readFromStorage('team-data/registry.json');
+    if (!registry || !registry.people) return false;
+    const managerMap = permissions.buildManagerMap(registry);
+    const managed = permissions.getManagedUids(req.userUid, managerMap);
+    for (const uid of managed) {
+      const person = registry.people[uid];
+      if (person && Array.isArray(person.teamIds) && person.teamIds.includes(teamId)) return true;
+    }
+    return false;
+  }
 
   // Strategy metadata endpoint
 
@@ -76,13 +119,17 @@ module.exports = function registerAllocationRoutes(router, context) {
    *   post:
    *     tags: ['Allocation']
    *     summary: Trigger allocation data refresh from Jira
-   *     security: [{ admin: [] }]
+   *     description: >
+   *       A team-scoped refresh (teamId provided) may be triggered by any
+   *       authenticated user and only updates that team's board/sprint data and
+   *       team summary. A full refresh (no teamId) rebuilds org/global summaries
+   *       and requires admin.
    *     parameters:
    *       - in: query
    *         name: teamId
    *         schema:
    *           type: string
-   *         description: Refresh a single team (optional)
+   *         description: Refresh a single team (optional). Omit for a full, admin-only refresh.
    *     requestBody:
    *       content:
    *         application/json:
@@ -96,8 +143,23 @@ module.exports = function registerAllocationRoutes(router, context) {
    *     responses:
    *       200:
    *         description: Refresh status
+   *       403:
+   *         description: Admin required for a full refresh
    */
-  router.post('/allocation/refresh', requireAdmin, requireScope('metrics:write'), async function(req, res) {
+  router.post('/allocation/refresh', requireScope('metrics:write'), async function(req, res) {
+    const teamId = req.query.teamId || req.body.teamId;
+    const hardRefresh = req.body.hardRefresh || false;
+
+    if (teamId && !isValidTeamId(teamId)) {
+      return res.status(400).json({ error: 'Invalid request parameter' });
+    }
+
+    // Full (unscoped) refresh rebuilds org/global summaries and stays admin-only.
+    // Team-scoped refreshes are self-service for any authenticated user.
+    if (!teamId && !req.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required for a full refresh. Pass a teamId to refresh a single team.' });
+    }
+
     if (DEMO_MODE) {
       return res.json({ status: 'skipped', message: 'Refresh disabled in demo mode' });
     }
@@ -117,12 +179,9 @@ module.exports = function registerAllocationRoutes(router, context) {
       }
     }
 
-    const teamId = req.query.teamId || req.body.teamId;
-    const hardRefresh = req.body.hardRefresh || false;
-
     refreshState.running = true;
     refreshState.startedAt = new Date().toISOString();
-    res.json({ status: 'started' });
+    res.json({ status: 'started', scope: teamId ? 'team' : 'full' });
 
     setImmediate(async function() {
       try {
@@ -151,30 +210,30 @@ module.exports = function registerAllocationRoutes(router, context) {
         // Filter to teams with at least one board with a boardId
         teams = teams.filter(t => (t.boards || []).some(b => b.boardId));
 
-        console.log(`\n[allocation] Starting refresh: ${teams.length} teams with allocation boards`);
-
-        const result = await performRefresh({
-          teams,
-          strategy,
-          hardRefresh,
-          fetchSprints: jiraClient.fetchSprints,
-          fetchSprintIssues: jiraClient.fetchSprintIssues,
-          fetchBoardConfiguration: jiraClient.fetchBoardConfiguration,
-          fetchFilterJql: jiraClient.fetchFilterJql,
-          fetchIssuesByJql: jiraClient.fetchIssuesByJql,
-          fetchBoardType: jiraClient.fetchBoardType,
-          readStorage: allocRead,
-          writeStorage: allocWrite
-        });
+        let message;
+        if (teamId) {
+          // Team-scoped: fetch only this team's Jira data + write its team summary…
+          console.log(`\n[allocation] Starting team-scoped refresh for ${teamId}`);
+          for (const team of teams) {
+            await refreshTeam({ team, strategy, hardRefresh, ...jiraFetchers, readStorage: allocRead, writeStorage: allocWrite });
+          }
+          // …then rebuild org/global rollups from ALL teams' on-disk summaries.
+          // This is cheap (no Jira) and keeps other teams intact — no clobber.
+          const allTeams = Object.values(teamData.teams || {});
+          await rebuildRollups({ strategy, teams: allTeams, readStorage: allocRead, writeStorage: allocWrite });
+          message = teams.length ? `Refreshed team ${teamId}` : `Team ${teamId} has no allocation boards`;
+        } else {
+          console.log(`\n[allocation] Starting full refresh: ${teams.length} teams with allocation boards`);
+          const result = await performRefresh({
+            teams, strategy, hardRefresh, ...jiraFetchers, readStorage: allocRead, writeStorage: allocWrite
+          });
+          message = `Processed ${result.teamCount} teams`;
+        }
 
         const completedAt = new Date().toISOString();
-        refreshState.lastResult = {
-          status: 'success',
-          message: `Processed ${result.teamCount} teams`,
-          completedAt
-        };
+        refreshState.lastResult = { status: 'success', message, completedAt };
         refreshState.completedAt = completedAt;
-        console.log(`[allocation] Refresh complete: ${result.teamCount} teams processed`);
+        console.log(`[allocation] Refresh complete: ${message}`);
       } catch (error) {
         console.error('[allocation] Background refresh error:', error);
         const completedAt = new Date().toISOString();
@@ -302,6 +361,9 @@ module.exports = function registerAllocationRoutes(router, context) {
   router.get('/allocation/team/:teamId/summary', requireScope('metrics:read'), async function(req, res) {
     try {
       const { teamId } = req.params;
+      if (!isValidTeamId(teamId)) {
+        return res.status(400).json({ error: 'Invalid request parameter' });
+      }
       const data = await allocRead(`summaries/team-${teamId}.json`);
       if (!data) {
         return res.json({ lastUpdated: null, totalPoints: 0, boardCount: 0, buckets: {} });
@@ -309,6 +371,100 @@ module.exports = function registerAllocationRoutes(router, context) {
       res.json(data);
     } catch (error) {
       console.error('[allocation] Read team summary error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/modules/team-tracker/allocation/team/{teamId}/settings:
+   *   get:
+   *     tags: ['Allocation']
+   *     summary: Get a team's allocation settings and the caller's edit permission
+   *     parameters:
+   *       - in: path
+   *         name: teamId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: "{ allocationMode: 'points'|'counts'|null, configured: boolean, canEdit: boolean }"
+   */
+  router.get('/allocation/team/:teamId/settings', requireScope('metrics:read'), async function(req, res) {
+    try {
+      const { teamId } = req.params;
+      if (!isValidTeamId(teamId)) {
+        return res.status(400).json({ error: 'Invalid request parameter' });
+      }
+      const teamData = await readTeams(storage);
+      const team = teamData.teams && teamData.teams[teamId];
+      if (!team) return res.status(404).json({ error: 'Team not found' });
+      const mode = team.metadata?.allocationMode;
+      const configured = mode === 'points' || mode === 'counts';
+      const canEdit = await hasTeamPurview(req, teamId);
+      // allocationMode is null until a manager explicitly configures a basis.
+      res.json({ allocationMode: configured ? mode : null, configured, canEdit });
+    } catch (error) {
+      console.error('[allocation] Read team settings error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/modules/team-tracker/allocation/team/{teamId}/settings:
+   *   put:
+   *     tags: ['Allocation']
+   *     summary: Update a team's allocation calculation basis
+   *     description: Requires team purview (admin, team-admin, or a manager with a report on the team).
+   *     parameters:
+   *       - in: path
+   *         name: teamId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               allocationMode:
+   *                 type: string
+   *                 enum: [points, counts]
+   *     responses:
+   *       200:
+   *         description: Updated settings
+   *       400:
+   *         description: Invalid allocationMode
+   *       403:
+   *         description: Not authorized for this team
+   *       404:
+   *         description: Team not found
+   */
+  router.put('/allocation/team/:teamId/settings', requireScope('metrics:write'), async function(req, res) {
+    try {
+      const { teamId } = req.params;
+      const { allocationMode } = req.body || {};
+      if (!isValidTeamId(teamId)) {
+        return res.status(400).json({ error: 'Invalid request parameter' });
+      }
+      if (!ALLOCATION_MODES.includes(allocationMode)) {
+        return res.status(400).json({ error: `allocationMode must be one of: ${ALLOCATION_MODES.join(', ')}` });
+      }
+      if (DEMO_MODE) {
+        return res.status(403).json({ error: 'Settings are read-only in demo mode' });
+      }
+      if (!(await hasTeamPurview(req, teamId))) {
+        return res.status(403).json({ error: 'Not authorized for this team' });
+      }
+      const result = await updateTeamFields(storage, teamId, { allocationMode }, req.auditActor);
+      if (!result) return res.status(404).json({ error: 'Team not found' });
+      res.json({ allocationMode });
+    } catch (error) {
+      console.error('[allocation] Update team settings error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -345,6 +501,7 @@ module.exports = function registerAllocationRoutes(router, context) {
       if (!data) {
         return res.json({ lastUpdated: null, totalPoints: 0, teamCount: 0, boardCount: 0, buckets: {} });
       }
+      data.teams = await enrichConfigured(data.teams);
       res.json(data);
     } catch (error) {
       console.error('[allocation] Read org summary error:', error);
@@ -368,6 +525,7 @@ module.exports = function registerAllocationRoutes(router, context) {
       if (!data) {
         return res.json({ lastUpdated: null, totalPoints: 0, teamCount: 0, boardCount: 0, buckets: {} });
       }
+      data.teams = await enrichConfigured(data.teams);
       res.json(data);
     } catch (error) {
       console.error('[allocation] Read global summary error:', error);
@@ -410,14 +568,17 @@ module.exports = function registerAllocationRoutes(router, context) {
       if (sprintFilter) {
         const filterKey = sprintFilter.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         const filtered = await allocRead(`sprints/board-${boardId}-${filterKey}.json`);
-        if (filtered) return res.json(filtered);
+        if (filtered) return res.json({ synced: true, ...filtered });
       }
 
       const data = await allocRead(`sprints/board-${boardId}.json`);
       if (!data) {
-        return res.json({ sprints: [] });
+        // No index file for this board yet — it has never been synced from Jira.
+        // `synced: false` lets the client distinguish this from a synced board
+        // that genuinely has no sprints.
+        return res.json({ synced: false, sprints: [] });
       }
-      res.json(data);
+      res.json({ synced: true, ...data });
     } catch (error) {
       console.error('[allocation] Read sprints error:', error);
       res.status(500).json({ error: 'Internal server error' });

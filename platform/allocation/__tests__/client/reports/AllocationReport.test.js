@@ -24,6 +24,20 @@ vi.mock('../../../client/composables/useAllocationStrategy', () => ({
   })
 }))
 
+const mockIsAdmin = ref(false)
+vi.mock('@shared/client/composables/useAuth', () => ({
+  useAuth: () => ({ isAdmin: mockIsAdmin })
+}))
+
+const mockTriggerRefresh = vi.fn()
+vi.mock('../../../client/composables/useAllocationRefresh', () => ({
+  useAllocationRefresh: () => ({
+    refreshing: ref(false),
+    message: ref(''),
+    triggerRefresh: mockTriggerRefresh
+  })
+}))
+
 const mockSummary = {
   totalPoints: 100,
   totalCount: 20,
@@ -51,6 +65,26 @@ const mockSummary = {
         'learning-enablement': { points: 10, count: 2 },
         'uncategorized': { points: 0, count: 0 },
       },
+    },
+    {
+      teamId: 't2',
+      teamName: 'Data Science',
+      totalPoints: 30,
+      totalCount: 6,
+      boardCount: 1,
+      percentages: { 'tech-debt-quality': 40, 'new-features': 40, 'learning-enablement': 20 },
+      buckets: {},
+      allocationConfigured: false,
+    },
+    {
+      teamId: 't3',
+      teamName: 'Platform Infra',
+      totalPoints: 20,
+      totalCount: 4,
+      boardCount: 2,
+      percentages: { 'tech-debt-quality': 40, 'new-features': 40, 'learning-enablement': 20 },
+      buckets: {},
+      allocationConfigured: true,
     }
   ]
 }
@@ -63,6 +97,7 @@ vi.mock('../../../client/services/allocation-api', () => ({
 describe('AllocationReport', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockIsAdmin.value = false
   })
 
   function createWrapper() {
@@ -78,7 +113,7 @@ describe('AllocationReport', () => {
         },
         stubs: {
           AllocationBar: { template: '<div data-testid="allocation-bar">Bar</div>', props: ['buckets', 'totalPoints', 'totalCount', 'metricMode'] },
-          AllocationTeamCard: { template: '<div data-testid="allocation-team-card" @click="$emit(\'click\')">{{ teamName }}</div>', props: ['teamName', 'totalPoints', 'totalCount', 'boardCount', 'percentages', 'buckets', 'metricMode'], emits: ['click'] },
+          AllocationTeamCard: { template: '<div data-testid="allocation-team-card" @click="$emit(\'click\')"><span v-if="!configured" data-testid="allocation-unconfigured-badge">Not configured</span>{{ teamName }}</div>', props: ['teamName', 'totalPoints', 'totalCount', 'boardCount', 'percentages', 'buckets', 'metricMode', 'configured'], emits: ['click'] },
           MetricToggle: { template: '<div data-testid="metric-toggle">Toggle</div>', props: ['modelValue'], emits: ['update:modelValue'] },
           OrgSelector: { template: '<div data-testid="org-selector">Orgs</div>', props: ['orgs', 'modelValue'], emits: ['select'] },
         }
@@ -103,8 +138,48 @@ describe('AllocationReport', () => {
     const wrapper = createWrapper()
     await flushPromises()
     const cards = wrapper.findAll('[data-testid="allocation-team-card"]')
+    expect(cards.length).toBe(3)
+    expect(cards.map(c => c.text()).join(' ')).toContain('Model Serving')
+  })
+
+  it('blatantly calls out teams that have not configured allocation', async () => {
+    const wrapper = createWrapper()
+    await flushPromises()
+    const callout = wrapper.find('[data-testid="allocation-unconfigured-callout"]')
+    expect(callout.exists()).toBe(true)
+    expect(callout.text()).toContain('1 of 3 teams')
+    // The unconfigured team card carries a "Not configured" badge.
+    expect(wrapper.find('[data-testid="allocation-unconfigured-badge"]').exists()).toBe(true)
+  })
+
+  it('sorts unconfigured teams first', async () => {
+    const wrapper = createWrapper()
+    await flushPromises()
+    const cards = wrapper.findAll('[data-testid="allocation-team-card"]')
+    expect(cards[0].text()).toContain('Data Science') // the unconfigured one
+  })
+
+  it('renders a team search box', async () => {
+    const wrapper = createWrapper()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="team-search"]').exists()).toBe(true)
+  })
+
+  it('filters team cards by search query (case-insensitive)', async () => {
+    const wrapper = createWrapper()
+    await flushPromises()
+    await wrapper.find('[data-testid="team-search"]').setValue('data')
+    const cards = wrapper.findAll('[data-testid="allocation-team-card"]')
     expect(cards.length).toBe(1)
-    expect(cards[0].text()).toContain('Model Serving')
+    expect(cards[0].text()).toContain('Data Science')
+  })
+
+  it('shows a no-match message when the search matches nothing', async () => {
+    const wrapper = createWrapper()
+    await flushPromises()
+    await wrapper.find('[data-testid="team-search"]').setValue('zzz')
+    expect(wrapper.findAll('[data-testid="allocation-team-card"]').length).toBe(0)
+    expect(wrapper.text()).toContain('No teams match "zzz"')
   })
 
   it('renders stat cards including estimated/unestimated', async () => {
@@ -125,5 +200,32 @@ describe('AllocationReport', () => {
     const wrapper = createWrapper()
     await flushPromises()
     expect(wrapper.find('[data-testid="org-selector"]').exists()).toBe(true)
+  })
+
+  it('shows the refresh panel with a full-refresh button for admins when there is no data', async () => {
+    const { getGlobalAllocationSummary } = await import('../../../client/services/allocation-api')
+    getGlobalAllocationSummary.mockResolvedValueOnce({ totalPoints: 0, totalCount: 0, teams: [], boardCount: 0 })
+    mockIsAdmin.value = true
+
+    const wrapper = createWrapper()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="allocation-refresh-panel"]').exists()).toBe(true)
+    const btn = wrapper.get('[data-testid="allocation-refresh-button"]')
+    await btn.trigger('click')
+    expect(mockTriggerRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows guidance without a refresh button for non-admins when there is no data', async () => {
+    const { getGlobalAllocationSummary } = await import('../../../client/services/allocation-api')
+    getGlobalAllocationSummary.mockResolvedValueOnce({ totalPoints: 0, totalCount: 0, teams: [], boardCount: 0 })
+    mockIsAdmin.value = false
+
+    const wrapper = createWrapper()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="allocation-refresh-panel"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="allocation-refresh-button"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('ask an admin')
   })
 })
