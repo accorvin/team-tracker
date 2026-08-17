@@ -2,10 +2,8 @@
  * PM Hub "Committed" classification.
  *
  * Requested = Target Version intersects selected release scope (handled by caller).
- * Committed = Fix Version intersects selected release scope AND some Target Version
- *   either matches that Fix Version, or is later in the same release cycle
- *   (early delivery). Same cycle = same product + major.minor; milestone order
- *   EA1 < EA2 < GA via tv-fv-delta parse/compare helpers.
+ * Committed = Fix Version intersects selected release scope (FV only — no TV gate).
+ * TV/FV relationship is surfaced separately via alignmentCategory (Delta 5-category).
  */
 
 const {
@@ -15,6 +13,7 @@ const {
 
 /**
  * True when both names parse to the same product + major.minor.
+ * Kept for alignment / cycle helpers; not used to gate Committed.
  */
 function sameReleaseCycle(a, b) {
   var pa = parseReleaseName(a)
@@ -24,51 +23,20 @@ function sameReleaseCycle(a, b) {
 }
 
 /**
- * Whether a Target Version supports treating `fv` as Committed.
- * Match (same version) or early delivery (TV later in same cycle).
- */
-function tvSupportsCommittedFixVersion(fv, tvNames) {
-  if (!fv || !Array.isArray(tvNames) || tvNames.length === 0) return false
-
-  for (var i = 0; i < tvNames.length; i++) {
-    var tv = tvNames[i]
-    if (!tv) continue
-
-    // Exact string match (covers unparseable but identical labels)
-    if (tv === fv) return true
-
-    if (!sameReleaseCycle(fv, tv)) continue
-
-    // compareReleasesTemporally: negative = FV earlier than TV, 0 = same
-    var cmp = compareReleasesTemporally(fv, tv)
-    if (cmp !== null && cmp <= 0) return true
-  }
-
-  return false
-}
-
-/**
- * Filter selected-scope Fix Versions down to those that qualify as Committed
- * given the issue's Target Versions.
+ * Filter Fix Versions that intersect the selected release scope.
+ * Committed is FV-in-scope only; `tvNames` is ignored (kept for call-site compat).
  *
  * @param {string[]} matchingFv - Fix Versions that intersect the selected scope
- * @param {string[]} tvNames - All Target Versions on the issue
- * @returns {string[]} subset of matchingFv that are Committed
+ * @param {string[]} [_tvNames] - unused (TV does not gate Committed)
+ * @returns {string[]} matchingFv (or empty)
  */
-function filterCommittedFixVersions(matchingFv, tvNames) {
+function filterCommittedFixVersions(matchingFv, _tvNames) {
   if (!Array.isArray(matchingFv) || matchingFv.length === 0) return []
-  var out = []
-  for (var i = 0; i < matchingFv.length; i++) {
-    if (tvSupportsCommittedFixVersion(matchingFv[i], tvNames)) {
-      out.push(matchingFv[i])
-    }
-  }
-  return out
+  return matchingFv.slice()
 }
 
 module.exports = {
   sameReleaseCycle,
-  tvSupportsCommittedFixVersion,
   filterCommittedFixVersions,
   parseReleaseName,
   compareReleasesTemporally

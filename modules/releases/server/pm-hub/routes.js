@@ -639,9 +639,8 @@ module.exports = async function registerPmHubRoutes(router, context) {
    *       (buildCanonicalFeatures over RHAISTRAT + AIPCC, open only — same as
    *       Features List). Groups by version then component.
    *       F Requested = Target Version matches a selected version.
-   *       F Committed = fixVersion matches a selected version AND a Target
-   *       Version either matches that fixVersion or is later in the same release cycle
-   *       (early delivery; same product + major.minor, EA1 < EA2 < GA).
+   *       F Committed = Fix Version matches a selected version (FV only;
+   *       Target Version does not gate Committed — see TV/FV Align for TV/FV relationship).
    *       TV/FV Align uses the Delta 5-category classifier.
    *     parameters:
    *       - in: query

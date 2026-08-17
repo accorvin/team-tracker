@@ -293,7 +293,7 @@
     <!--
       Summary cards are display-only KPIs. Click-to-filter was removed because
       toggling Requested/Committed via tiles made independent Requested (TV in
-      scope) and Committed (FV in scope + TV match/early delivery) counts appear
+      scope) and Committed (Fix Version in selected release scope) counts appear
       correlated. Use REQ/COM (and other) filter chips in the bar above to filter
       the table.
     -->
@@ -677,7 +677,7 @@ var filteredPmOwners = computed(function() {
  * Apply client-side filters to groups.
  * @param {boolean} includeTypeFilter - when true, apply REQ/COM (filterType) for the table.
  *   KPI summary tiles intentionally omit type filter so Requested (TV in scope)
- *   and Committed (FV in scope + TV match/early delivery) remain independent
+ *   and Committed (Fix Version in selected release scope) remain independent
  *   headline counts.
  */
 function filterGroups(includeTypeFilter) {

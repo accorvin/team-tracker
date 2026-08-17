@@ -79,7 +79,7 @@ describe('canonical-load', function() {
     expect(comp.requestedFeatures.find(function(f) { return f.key === 'A-2' }).alignmentCategory).toBe('tv_only')
   })
 
-  it('marks early delivery committed as aligned_on_time for TV release', function() {
+  it('marks early delivery as aligned_on_time for TV release', function() {
     var built = buildComponentReleaseLoadGroups([
       feature({
         key: 'EARLY-1',
@@ -97,5 +97,24 @@ describe('canonical-load', function() {
     var row = tvGroup.components[0].requestedFeatures[0]
     expect(row.alignmentCategory).toBe('aligned_on_time')
     expect(row.pmDoAligned).toBe(true)
+  })
+
+  it('counts FV-only (no TV) as committed when Fix Version is in scope', function() {
+    var built = buildComponentReleaseLoadGroups([
+      feature({
+        key: 'FV-ONLY-1',
+        targetVersions: [],
+        fixVersions: ['rhoai-3.6'],
+        fixVersion: 'rhoai-3.6'
+      })
+    ], {
+      components: ['Dashboard'],
+      versions: ['rhoai-3.6'],
+      releaseDates: {}
+    })
+    var comp = built.groups[0].components[0]
+    expect(comp.requestedCount).toBe(0)
+    expect(comp.committedCount).toBe(1)
+    expect(comp.committedFeatures[0].key).toBe('FV-ONLY-1')
   })
 })
