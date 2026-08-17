@@ -97,7 +97,7 @@
                       />
                     </div>
                     <textarea
-                      ref="editableTextareas"
+                      data-editable-status
                       :value="obj.quarters[q] ? obj.quarters[q].summary : ''"
                       @input="updateEditableQuarter(obj.id, q, $event.target.value); autoResize($event.target)"
                       @focus="editableFocus[obj.id + '-' + q] = true"
@@ -235,21 +235,18 @@ function updateEditableStatus(objId, q, statusKey) {
   saveEditableData()
 }
 
-var LINE_HEIGHT_PX = 18
-var PADDING_PX = 16
-
 function autoResize(el) {
   if (!el.value) {
     el.style.height = ''
     return
   }
-  var lines = el.value.split('\n').length
-  el.style.height = (lines * LINE_HEIGHT_PX + PADDING_PX) + 'px'
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
 }
 
 function resizeAllTextareas() {
   nextTick(function() {
-    var areas = document.querySelectorAll('textarea[placeholder="Enter status..."]')
+    var areas = document.querySelectorAll('[data-editable-status]')
     for (var i = 0; i < areas.length; i++) {
       autoResize(areas[i])
     }
