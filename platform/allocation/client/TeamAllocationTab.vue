@@ -46,9 +46,10 @@
     />
 
     <template v-else>
-      <!-- Board selector (only if multiple boards) -->
-      <div v-if="allocationBoards.length > 1" class="mb-4">
+      <!-- Board selector + sprint-filter indicator -->
+      <div v-if="selectedBoard" class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1">
         <select
+          v-if="allocationBoards.length > 1"
           v-model="selectedBoardId"
           class="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
         >
@@ -56,6 +57,26 @@
             {{ board.name || `Board ${board.boardId}` }}
           </option>
         </select>
+
+        <!-- Sprint filter is configured per board; surface it right by the board
+             toggle so misconfigured boards (foreign sprints) are easy to fix. -->
+        <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400" data-testid="sprint-filter-indicator">
+          <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L14 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 018 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+          </svg>
+          <span>Sprints:
+            <span class="font-medium text-gray-700 dark:text-gray-300">{{ effectiveSprintFilter ? `names containing “${effectiveSprintFilter}”` : 'all sprints' }}</span>
+          </span>
+          <button
+            v-if="canEditSettings"
+            type="button"
+            data-testid="sprint-filter-edit"
+            class="font-medium text-primary-600 dark:text-primary-400 hover:underline focus:outline-none focus:underline"
+            @click="showSettingsModal = true"
+          >
+            Edit
+          </button>
+        </div>
       </div>
 
       <!-- Loading state -->
@@ -238,6 +259,8 @@
       v-if="showSettingsModal"
       :teamId="teamId"
       :currentMode="teamAllocationMode"
+      :board="settingsBoard"
+      :boards="rawBoards"
       @close="showSettingsModal = false"
       @saved="handleSettingsSaved"
     />
@@ -298,6 +321,10 @@ const teamAllocationMode = ref(
 const canEditSettings = ref(false)
 const showSettingsModal = ref(false)
 const settingsLoaded = ref(false)
+// Local override of the selected board's sprint filter after a save, so the
+// indicator + modal reflect the new value without waiting for the parent to
+// re-fetch teamDetail. Reset when the selected board changes.
+const sprintFilterOverride = ref(null)
 
 const isConfigured = computed(() =>
   teamAllocationMode.value === 'points' || teamAllocationMode.value === 'counts'
@@ -313,6 +340,20 @@ const allocationBoards = computed(() => {
 
 const selectedBoard = computed(() =>
   allocationBoards.value.find(b => b.boardId === selectedBoardId.value) || null
+)
+
+// Full, unfiltered boards list (incl. non-board URLs) — passed to the settings
+// modal so it can reconstruct the boards PATCH payload without dropping entries.
+const rawBoards = computed(() => props.teamDetail?.boards || props.team?.metadata?.boards || [])
+
+const effectiveSprintFilter = computed(() =>
+  sprintFilterOverride.value != null ? sprintFilterOverride.value : (selectedBoard.value?.sprintFilter || '')
+)
+
+// The board handed to the settings modal, carrying the effective (possibly
+// just-saved) sprint filter.
+const settingsBoard = computed(() =>
+  selectedBoard.value ? { ...selectedBoard.value, sprintFilter: effectiveSprintFilter.value } : null
 )
 
 const selectedSprint = computed(() =>
@@ -528,12 +569,17 @@ async function loadSettings() {
   }
 }
 
-function handleSettingsSaved(newMode) {
-  teamAllocationMode.value = newMode
-  metricMode.value = newMode
+function handleSettingsSaved({ allocationMode, sprintFilter } = {}) {
+  if (allocationMode === 'points' || allocationMode === 'counts') {
+    teamAllocationMode.value = allocationMode
+    metricMode.value = allocationMode
+  }
+  // Track the new sprint filter locally so the indicator + modal reflect it
+  // without waiting for the parent to re-fetch teamDetail.
+  if (sprintFilter !== undefined) sprintFilterOverride.value = sprintFilter
   showSettingsModal.value = false
   // The modal already re-ran this team's allocation; reload sprint data so the
-  // "last synced" stamp and any recomputed figures reflect the refresh.
+  // "last synced" stamp and re-filtered sprints reflect the refresh.
   loadSprints()
 }
 
@@ -547,6 +593,7 @@ watch(selectedBoardId, () => {
   selectedSprintId.value = null
   boardSynced.value = true
   boardLastUpdated.value = null
+  sprintFilterOverride.value = null
   loadSprints()
 })
 

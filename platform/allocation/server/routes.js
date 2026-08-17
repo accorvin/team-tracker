@@ -587,6 +587,60 @@ module.exports = function registerAllocationRoutes(router, context) {
 
   /**
    * @openapi
+   * /api/modules/team-tracker/allocation/board/{boardId}/all-sprints:
+   *   get:
+   *     tags: ['Allocation']
+   *     summary: Live-fetch a board's full (unfiltered) sprint list from Jira
+   *     description: >
+   *       Used to preview which sprints a name filter would include. Returns the
+   *       complete sprint list straight from Jira (not the filtered, stored
+   *       index), most recent first.
+   *     parameters:
+   *       - in: path
+   *         name: boardId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: All sprints for the board
+   *       400:
+   *         description: Invalid board id
+   *       502:
+   *         description: Could not reach Jira
+   */
+  router.get('/allocation/board/:boardId/all-sprints', requireScope('metrics:read'), async function(req, res) {
+    const { boardId } = req.params;
+    if (!isValidBoardId(boardId)) {
+      return res.status(400).json({ error: 'Invalid request parameter' });
+    }
+    // Kanban boards have no sprints; nothing to preview.
+    if (String(boardId).startsWith('kanban-')) {
+      return res.json({ sprints: [], boardType: 'kanban' });
+    }
+    if (DEMO_MODE) {
+      return res.json({ sprints: [] });
+    }
+    try {
+      // Kanban boards reject the sprint API, so detect type first.
+      let boardType = 'scrum';
+      try { boardType = await jiraClient.fetchBoardType(boardId); } catch { /* default scrum */ }
+      if (boardType === 'kanban') {
+        return res.json({ sprints: [], boardType: 'kanban' });
+      }
+      const sprints = await jiraClient.fetchSprints(boardId);
+      const sorted = sprints
+        .map(s => ({ id: s.id, name: s.name, state: s.state, startDate: s.startDate, endDate: s.endDate }))
+        .sort((a, b) => new Date(b.startDate || 0) - new Date(a.startDate || 0));
+      res.json({ sprints: sorted });
+    } catch (error) {
+      console.error('[allocation] Fetch all sprints error:', error.message);
+      res.status(502).json({ error: 'Could not load sprints from Jira' });
+    }
+  });
+
+  /**
+   * @openapi
    * /api/modules/team-tracker/allocation/sprints/{sprintId}/issues:
    *   get:
    *     tags: ['Allocation']
