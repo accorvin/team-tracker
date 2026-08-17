@@ -469,6 +469,7 @@ var hasFetched = ref(false)
 var tableRef = ref(null)
 var fetchedAt = ref(null)
 var autoRefreshTimer = ref(null)
+var activeLoadController = null
 var selectedFeature = ref(null)
 var drawerFeature = computed(function() {
   return toDrawerFeature(selectedFeature.value)
@@ -1128,6 +1129,11 @@ async function loadData(opts) {
   var silent = opts && opts.silent
   var effectiveComponents = getEffectiveComponents()
   if (effectiveComponents.length === 0 && selectedVersions.value.length === 0) return
+
+  if (activeLoadController) activeLoadController.abort()
+  var controller = new AbortController()
+  activeLoadController = controller
+
   if (!silent) loadingData.value = true
   if (!silent) dataError.value = null
   hasFetched.value = true
@@ -1139,7 +1145,7 @@ async function loadData(opts) {
       var jiraVersions = resolveJiraVersions(selectedVersions.value)
       params.set('versions', jiraVersions.join(','))
     }
-    var response = await fetch(getApiBase() + API_BASE + '/component-release-load?' + params.toString())
+    var response = await fetch(getApiBase() + API_BASE + '/component-release-load?' + params.toString(), { signal: controller.signal })
     if (!response.ok) {
       var errData = await response.json().catch(function() { return {} })
       if (response.status === 504) {
@@ -1154,14 +1160,17 @@ async function loadData(opts) {
     groups.value = data.groups || []
     fetchedAt.value = data.fetchedAt || null
   } catch (err) {
+    if (err.name === 'AbortError') return
     if (!silent) dataError.value = err.message
     if (!silent) {
       groups.value = []
       fetchedAt.value = null
     }
   } finally {
-    if (!silent) loadingData.value = false
-    if (hasFetched.value && !autoRefreshTimer.value) startAutoRefresh()
+    if (activeLoadController === controller) {
+      if (!silent) loadingData.value = false
+      if (hasFetched.value && !autoRefreshTimer.value) startAutoRefresh()
+    }
   }
 }
 
@@ -1175,6 +1184,7 @@ watch(selectedPillars, function() {
 watch([selectedComponents, selectedVersions, selectedPillars], function() {
   var effectiveComponents = getEffectiveComponents()
   if (effectiveComponents.length === 0 && selectedVersions.value.length === 0) {
+    if (activeLoadController) activeLoadController.abort()
     groups.value = []
     hasFetched.value = false
     return
@@ -1204,5 +1214,6 @@ onMounted(async function() {
 onBeforeUnmount(function() {
   document.removeEventListener('mousedown', handleClickOutside)
   stopAutoRefresh()
+  if (activeLoadController) activeLoadController.abort()
 })
 </script>
