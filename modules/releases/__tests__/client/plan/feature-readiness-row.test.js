@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import FeatureReadinessRow from '../../../client/plan/components/FeatureReadinessRow.vue'
 
 function mountRow(feature) {
@@ -132,9 +133,25 @@ describe('FeatureReadinessRow fail chips', function() {
       key: 'RHAISTRAT-7',
       title: 'Aligned feature',
       alignmentCategory: 'aligned_on_time',
+      targetVersions: ['3.6 EA2 RHOAI RELEASE'],
+      fixVersions: ['3.6 EA2 RHOAI RELEASE'],
       fpdor: { passedCount: 17, applicableCount: 17, items: [] }
     })
     expect(wrapper.text()).toContain('On time')
-    expect(wrapper.find('[title*="Fix Version matches Target Version"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="TV/FV alignment: On time"]').exists()).toBe(true)
+  })
+
+  it('opens Align popup with requested vs committed summary', async function() {
+    var wrapper = mountRow({
+      key: 'RHAISTRAT-8',
+      title: 'Slipped feature',
+      alignmentCategory: 'aligned_late',
+      targetVersions: ['3.6 EA1 RHOAI RELEASE'],
+      fixVersions: ['3.6 EA2 RHOAI RELEASE'],
+      fpdor: { passedCount: 17, applicableCount: 17, items: [] }
+    })
+    await wrapper.find('[aria-label="TV/FV alignment: Late"]').trigger('click')
+    await nextTick()
+    expect(wrapper.text()).toContain('Requested for EA1, committed for EA2.')
   })
 })

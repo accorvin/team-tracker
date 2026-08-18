@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import RubricScoreBadge from '@shared/client/components/RubricScoreBadge.vue'
 import FPDoRPopover from './FPDoRPopover.vue'
+import AlignmentPopover from './AlignmentPopover.vue'
 import { failedFpdorNames } from '../utils/feature-readiness-export.js'
 import {
   fpdorItemSeverity,
@@ -12,11 +13,6 @@ import {
   pathChipClass,
   pathChipTitle
 } from '../utils/fpdor-severity.js'
-import {
-  alignmentCategoryLabel,
-  alignmentCategoryHelp,
-  alignmentCategoryChipClass
-} from '../utils/tv-fv-alignment-display.js'
 
 var MAX_VISIBLE_FAIL_CHIPS = 3
 
@@ -226,11 +222,7 @@ var scoreBreakdown = computed(function() {
 
     <!-- TV/FV Align -->
     <td class="px-3 py-2.5 text-center whitespace-nowrap">
-      <span
-        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold"
-        :class="alignmentCategoryChipClass(feature.alignmentCategory)"
-        :title="alignmentCategoryHelp(feature.alignmentCategory)"
-      >{{ alignmentCategoryLabel(feature.alignmentCategory) }}</span>
+      <AlignmentPopover :feature="feature" />
     </td>
 
     <!-- Components -->

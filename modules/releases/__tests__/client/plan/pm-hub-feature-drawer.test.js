@@ -99,6 +99,7 @@ describe('PM Hub feature slide tray', function() {
     expect(wrapper.text()).toContain('RICE')
     expect(wrapper.text()).toContain('TV only')
     expect(wrapper.text()).toContain('TV/FV Align')
+    expect(wrapper.find('[aria-label="TV/FV alignment: TV only"]').exists()).toBe(true)
     // No empty AI review chrome for PM Hub rows without review meta
     expect(wrapper.text()).not.toContain('Awaiting Sign-off')
     expect(wrapper.text()).toContain('Jira')
@@ -117,5 +118,25 @@ describe('PM Hub feature slide tray', function() {
     expect(link.exists()).toBe(true)
     await link.trigger('click')
     expect(wrapper.emitted('select')).toBeFalsy()
+  })
+
+  it('does not emit select when Align popup is opened', async function() {
+    var groups = sampleGroups()
+    groups[0].components[0].requestedFeatures[0].alignmentCategory = 'tv_only'
+    var wrapper = mount(ComponentReleaseLoadTable, {
+      props: { groups: groups },
+      global: { stubs: { FPDoRPopover: true } }
+    })
+
+    await wrapper.find('tr.cursor-pointer').trigger('click')
+    await nextTick()
+
+    var align = wrapper.find('[aria-label="TV/FV alignment: TV only"]')
+    expect(align.exists()).toBe(true)
+    await align.trigger('click')
+    await nextTick()
+
+    expect(wrapper.emitted('select')).toBeFalsy()
+    expect(wrapper.text()).toContain('Requested for EA2, not committed.')
   })
 })

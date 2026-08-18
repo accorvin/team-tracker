@@ -21,6 +21,7 @@ const {
   buildComponentReleaseLoadGroups,
   attachAlignment: attachAlignmentFromCanonical
 } = require('./canonical-load')
+const { fetchDeliveredInVersion } = require('./delivered-in-version')
 
 const JIRA_SEARCH = JIRA_HOST + '/issues/?jql='
 /** Same Feature/Initiative population as Features List live fetch (RHAISTRAT + AIPCC). */
@@ -642,6 +643,10 @@ module.exports = async function registerPmHubRoutes(router, context) {
    *       F Committed = Fix Version matches a selected version (FV only;
    *       Target Version does not gate Committed — see TV/FV Align for TV/FV relationship).
    *       TV/FV Align uses the Delta 5-category classifier.
+   *       delivered is a fail-soft Closed/Done/Resolved list for selected Fix
+   *       Versions (not merged into planning load). Empty when no versions are
+   *       selected; timedOut true if that extra Jira search exceeds its own
+   *       short timeout.
    *     parameters:
    *       - in: query
    *         name: components
@@ -747,6 +752,13 @@ module.exports = async function registerPmHubRoutes(router, context) {
       var storage = context.storage
       var releaseDates = await loadReleaseDatesMap(storage)
 
+      // Closed-in-version is a separate, version-required query. Do not fold it
+      // into the open Features pipeline (gateway timeout). Fail soft.
+      var deliveredPromise = fetchDeliveredInVersion(jiraClient, {
+        versions: versionNames,
+        components: componentNames
+      })
+
       // Same live population as Features List (RHAISTRAT + AIPCC, open only).
       var jiraFeatures = null
       try {
@@ -768,10 +780,13 @@ module.exports = async function registerPmHubRoutes(router, context) {
         releaseDates: releaseDates
       })
 
+      var delivered = await deliveredPromise
+
       // Velocity KPI hidden for now — keep computeVelocity() for a future report.
       res.json({
         groups: built.groups,
         velocity: null,
+        delivered: delivered,
         fetchedAt: new Date().toISOString(),
         filters: { components: componentNames, versions: versionNames },
         source: jiraFeatures ? 'canonical-live' : 'canonical-cache'
