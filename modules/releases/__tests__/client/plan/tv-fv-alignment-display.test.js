@@ -8,6 +8,7 @@ import {
   alignmentCategoryLabel,
   alignmentCategoryHelp,
   alignmentCategoryChipClass,
+  buildAlignmentDetail,
   ALIGNMENT_CATEGORY_LABELS,
   ALIGNMENT_CATEGORY_HELP
 } from '../../../client/plan/utils/tv-fv-alignment-display.js'
@@ -54,5 +55,69 @@ describe('tv-fv-alignment-display', function() {
     expect(alignmentCategoryChipClass('misaligned')).toContain('red')
     expect(alignmentCategoryChipClass('tv_only')).toContain('blue')
     expect(alignmentCategoryChipClass('fv_only')).toContain('violet')
+  })
+
+  it('summarizes requested EA1 vs committed EA2', function() {
+    var detail = buildAlignmentDetail({
+      alignmentCategory: 'aligned_late',
+      targetVersions: ['3.6 EA1 RHOAI RELEASE'],
+      fixVersions: ['3.6 EA2 RHOAI RELEASE']
+    })
+    expect(detail.summary).toBe('Requested for EA1, committed for EA2.')
+    expect(detail.categoryLabel).toBe('Late')
+  })
+
+  it('summarizes matching requested and committed milestones', function() {
+    var detail = buildAlignmentDetail({
+      alignmentCategory: 'aligned_on_time',
+      targetVersions: ['3.6 EA2 RHOAI RELEASE'],
+      fixVersions: ['3.6 EA2 RHOAI RELEASE']
+    })
+    expect(detail.summary).toBe('Requested and committed for EA2.')
+  })
+
+  it('summarizes Target Version only', function() {
+    var detail = buildAlignmentDetail({
+      alignmentCategory: 'tv_only',
+      targetVersions: ['3.6 EA2 RHOAI RELEASE'],
+      fixVersions: []
+    })
+    expect(detail.summary).toBe('Requested for EA2, not committed.')
+  })
+
+  it('summarizes Fix Version only', function() {
+    var detail = buildAlignmentDetail({
+      alignmentCategory: 'fv_only',
+      targetVersions: [],
+      fixVersions: ['3.6 EA2 RHOAI RELEASE']
+    })
+    expect(detail.summary).toBe('Committed for EA2, no Target Version.')
+  })
+
+  it('includes product names when TV and FV point at different products', function() {
+    var detail = buildAlignmentDetail({
+      alignmentCategory: 'misaligned',
+      targetVersions: ['3.6 EA1 RHOAI RELEASE'],
+      fixVersions: ['3.6 EA1 RHAII RELEASE']
+    })
+    expect(detail.summary).toBe('Requested for RHOAI EA1, committed for RHAII EA1.')
+  })
+
+  it('parses compact release names the same way as Jira names', function() {
+    var detail = buildAlignmentDetail({
+      alignmentCategory: 'aligned_late',
+      targetVersions: ['rhoai-3.6.EA1'],
+      fixVersions: ['rhoai-3.6.EA2']
+    })
+    expect(detail.summary).toBe('Requested for EA1, committed for EA2.')
+  })
+
+  it('falls back to fixVersion when fixVersions is empty', function() {
+    var detail = buildAlignmentDetail({
+      alignmentCategory: 'fv_only',
+      targetVersions: [],
+      fixVersion: '3.6 EA2 RHOAI RELEASE'
+    })
+    expect(detail.summary).toBe('Committed for EA2, no Target Version.')
   })
 })

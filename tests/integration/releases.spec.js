@@ -231,6 +231,7 @@ test.describe('Releases PM Hub @releases', () => {
     const releaseFilter = page.locator('text=Release');
     await expect(componentFilter.first()).toBeVisible();
     await expect(releaseFilter.first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Hide Closed' })).toHaveCount(0);
 
     expect(page.errors).toHaveLength(0);
   });
@@ -275,6 +276,11 @@ test.describe('Releases PM Hub @releases', () => {
     var body = await res.json();
     expect(body).toHaveProperty('groups');
     expect(body.velocity).toBeNull();
+    expect(body).toHaveProperty('delivered');
+    expect(body.delivered).toHaveProperty('issues');
+    expect(Array.isArray(body.delivered.issues)).toBe(true);
+    expect(body.delivered).toHaveProperty('timedOut');
+    expect(body.delivered.skipped).toBe('no-versions');
   });
 
   test('should show Requested/Committed load KPIs without velocity card', async ({ page }) => {
@@ -301,6 +307,9 @@ test.describe('Releases PM Hub @releases', () => {
 
       await expect(page.locator('text=Requested').first()).toBeVisible();
       await expect(page.locator('text=Committed').first()).toBeVisible();
+      await expect(page.locator('text=Delivered').first()).toBeVisible();
+      await expect(page.getByText('On time', { exact: true }).first()).toBeVisible();
+      await expect(page.locator('text=Selected scope').first()).toBeVisible();
       await expect(page.locator('text=Avg Features Delivered')).toHaveCount(0);
       await expect(page.locator('text=avg/rel')).toHaveCount(0);
     }

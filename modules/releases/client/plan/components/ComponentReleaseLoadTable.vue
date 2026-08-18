@@ -2,6 +2,7 @@
 import { reactive, computed } from 'vue'
 import { getComponentLeads } from '../../composables/componentLeads'
 import FPDoRPopover from './FPDoRPopover.vue'
+import AlignmentPopover from './AlignmentPopover.vue'
 import { failedFpdorNames } from '../utils/feature-readiness-export.js'
 import {
   fpdorItemSeverity,
@@ -18,9 +19,6 @@ import {
   docsRequiredChipClass
 } from '../utils/docs-required-display.js'
 import {
-  alignmentCategoryLabel,
-  alignmentCategoryHelp,
-  alignmentCategoryChipClass,
   worseAlignmentCategory,
   isAlignedCategory
 } from '../utils/tv-fv-alignment-display.js'
@@ -564,11 +562,7 @@ defineExpose({ expandAll, collapseAll })
                 </svg>
               </td>
               <td class="px-3 py-2.5 text-center">
-                <span
-                  class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold"
-                  :class="alignmentCategoryChipClass(feature.alignmentCategory)"
-                  :title="alignmentCategoryHelp(feature.alignmentCategory)"
-                >{{ alignmentCategoryLabel(feature.alignmentCategory) }}</span>
+                <AlignmentPopover :feature="feature" />
               </td>
               <td class="px-3 py-2.5">
                 <div v-if="feature.fpdor" class="flex flex-wrap items-center gap-1 max-w-[14rem]">

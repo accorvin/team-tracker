@@ -8,11 +8,7 @@ import {
   pathChipClass,
   pathChipTitle
 } from '../utils/fpdor-severity.js'
-import {
-  alignmentCategoryLabel,
-  alignmentCategoryHelp,
-  alignmentCategoryChipClass
-} from '../utils/tv-fv-alignment-display.js'
+import AlignmentPopover from './AlignmentPopover.vue'
 
 const props = defineProps({
   feature: { type: Object, default: null },
@@ -328,12 +324,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               :class="pathChipClass(feature)"
               :title="pathChipTitle(feature)"
             >{{ pathLabel(feature) }}</span>
-            <span
-              v-if="feature.alignmentCategory"
-              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
-              :class="alignmentCategoryChipClass(feature.alignmentCategory)"
-              :title="alignmentCategoryHelp(feature.alignmentCategory)"
-            >{{ alignmentCategoryLabel(feature.alignmentCategory) }}</span>
+            <AlignmentPopover :feature="feature" />
 
             <!-- Health pipeline badges -->
             <template v-if="isHealthPipeline">
@@ -620,13 +611,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
               <dt class="text-gray-400 dark:text-gray-500">TV/FV Align</dt>
               <dd>
-                <span
-                  v-if="feature.alignmentCategory"
-                  class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold"
-                  :class="alignmentCategoryChipClass(feature.alignmentCategory)"
-                  :title="alignmentCategoryHelp(feature.alignmentCategory)"
-                >{{ alignmentCategoryLabel(feature.alignmentCategory) }}</span>
-                <span v-else class="text-gray-400 dark:text-gray-600">—</span>
+                <AlignmentPopover :feature="feature" />
               </dd>
 
               <dt class="text-gray-400 dark:text-gray-500 self-start">Components</dt>
