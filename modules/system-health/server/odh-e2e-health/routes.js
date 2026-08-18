@@ -5,6 +5,13 @@ const {
   mapSuiteToComponent
 } = require('./component-mapper');
 
+const {
+  STORAGE_KEY: BLOCKER_JIRAS_STORAGE_KEY,
+  JQL: BLOCKER_JIRAS_JQL,
+  buildJqlDeepLink: buildBlockerJqlDeepLink,
+  TEMPLATE_ISSUE_KEY: BLOCKER_TEMPLATE_ISSUE_KEY
+} = require('./blocker-jiras');
+
 /**
  * Generate contextual failing components based on current system state
  * @param {Object} suites - Suite health data
@@ -193,6 +200,109 @@ module.exports = function registerOpendatahubOperatorE2ERoutes(router, context) 
       console.error('Error fetching opendatahub-operator E2E health:', error);
       res.status(500).json({
         error: 'Failed to fetch E2E health data',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/modules/system-health/odh-e2e-health/blocker-jiras:
+   *   get:
+   *     tags: [System Health]
+   *     summary: List auto-filed opendatahub-operator E2E blocker JIRAs
+   *     description: >
+   *       Returns the currently-open Jira blocker bugs auto-filed by the
+   *       opendatahub-operator e2e-failure-triage automation (identified by the
+   *       label odh-operator-auto-e2e-blocker). Served from a snapshot refreshed
+   *       on a schedule.
+   *     responses:
+   *       200:
+   *         description: Open blocker JIRAs snapshot
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 lastSyncedAt:
+   *                   type: string
+   *                   format: date-time
+   *                   nullable: true
+   *                 available:
+   *                   type: boolean
+   *                   description: False when Jira credentials are missing or a fetch failed
+   *                 reason:
+   *                   type: string
+   *                   nullable: true
+   *                 count:
+   *                   type: integer
+   *                 jql:
+   *                   type: string
+   *                 jqlUrl:
+   *                   type: string
+   *                   description: Deep link to view these issues in Jira
+   *                 templateIssue:
+   *                   type: string
+   *                 issues:
+   *                   type: array
+   *                   items:
+   *                     type: object
+   *                     properties:
+   *                       key:
+   *                         type: string
+   *                       summary:
+   *                         type: string
+   *                       status:
+   *                         type: string
+   *                       priority:
+   *                         type: string
+   *                         nullable: true
+   *                       component:
+   *                         type: string
+   *                         nullable: true
+   *                       affectsVersions:
+   *                         type: array
+   *                         items:
+   *                           type: string
+   *                       assignee:
+   *                         type: string
+   *                         nullable: true
+   *                       created:
+   *                         type: string
+   *                         format: date-time
+   *                         nullable: true
+   *                       updated:
+   *                         type: string
+   *                         format: date-time
+   *                         nullable: true
+   *                       url:
+   *                         type: string
+   *                         nullable: true
+   */
+  router.get('/blocker-jiras', async (_req, res) => {
+    try {
+      const data = await readFromStorage(BLOCKER_JIRAS_STORAGE_KEY);
+
+      if (!data) {
+        // No snapshot yet (refresh hasn't run). Return an explicit empty payload
+        // rather than 404 so the UI can render its empty/pending state.
+        return res.json({
+          lastSyncedAt: null,
+          available: false,
+          reason: 'no_data',
+          count: 0,
+          jql: BLOCKER_JIRAS_JQL,
+          jqlUrl: buildBlockerJqlDeepLink(process.env.JIRA_HOST || 'https://redhat.atlassian.net'),
+          templateIssue: BLOCKER_TEMPLATE_ISSUE_KEY,
+          issues: []
+        });
+      }
+
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching E2E blocker JIRAs:', error);
+      res.status(500).json({
+        error: 'Failed to fetch E2E blocker JIRAs',
         message: error.message
       });
     }

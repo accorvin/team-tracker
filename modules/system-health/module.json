@@ -22,7 +22,7 @@
     "entry": "./server/index.js"
   },
   "secrets": {
-    "platform": ["github", "gitlab"]
+    "platform": ["github", "gitlab", "jira"]
   },
   "export": {
     "files": [
