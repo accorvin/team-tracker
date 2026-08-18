@@ -81,7 +81,7 @@ describe('feature-readiness-export helpers', function() {
     it('applies readiness when enabled', function() {
       var filters = {
         outcome: [], targetVersion: [], fixVersion: [], component: [],
-        priority: [], team: [], product: [], fpdorItems: [], readiness: 'not-ready'
+        priority: [], team: [], product: [], fpdorItems: [], alignment: [], readiness: 'not-ready'
       }
       expect(featureMatchesSharedFilters(base, filters, '', { applyReadiness: true })).toBe(false)
       expect(featureMatchesSharedFilters(
@@ -95,7 +95,7 @@ describe('feature-readiness-export helpers', function() {
     it('skips readiness when disabled for counts', function() {
       var filters = {
         outcome: [], targetVersion: [], fixVersion: [], component: [],
-        priority: [], team: [], product: [], fpdorItems: [], readiness: 'not-ready'
+        priority: [], team: [], product: [], fpdorItems: [], alignment: [], readiness: 'not-ready'
       }
       expect(featureMatchesSharedFilters(base, filters, '', { applyReadiness: false })).toBe(true)
     })
@@ -103,11 +103,38 @@ describe('feature-readiness-export helpers', function() {
     it('applies product and fpdor filters', function() {
       var filters = {
         outcome: [], targetVersion: [], fixVersion: [], component: [],
-        priority: [], team: [], product: ['RHOAI'], fpdorItems: ['Acceptance Criteria'], readiness: null
+        priority: [], team: [], product: ['RHOAI'], fpdorItems: ['Acceptance Criteria'],
+        alignment: [], readiness: null
       }
       expect(featureMatchesSharedFilters(base, filters, '', { applyReadiness: true })).toBe(true)
       filters.product = ['RHAIIS']
       expect(featureMatchesSharedFilters(base, filters, '', { applyReadiness: true })).toBe(false)
+    })
+
+    it('applies alignment filter', function() {
+      var filters = {
+        outcome: [], targetVersion: [], fixVersion: [], component: [],
+        priority: [], team: [], product: [], fpdorItems: [],
+        alignment: ['misaligned'], readiness: null
+      }
+      expect(featureMatchesSharedFilters(
+        Object.assign({}, base, { alignmentCategory: 'misaligned' }),
+        filters,
+        '',
+        { applyReadiness: true }
+      )).toBe(true)
+      expect(featureMatchesSharedFilters(
+        Object.assign({}, base, { alignmentCategory: 'aligned_on_time' }),
+        filters,
+        '',
+        { applyReadiness: true }
+      )).toBe(false)
+      expect(featureMatchesSharedFilters(
+        Object.assign({}, base, { alignmentCategory: null }),
+        filters,
+        '',
+        { applyReadiness: true }
+      )).toBe(false)
     })
   })
 })

@@ -41,6 +41,24 @@ describe('features-list-filter-storage', function() {
     expect(restored.filters.fpdorItems).toEqual(['Child epics'])
     expect(restored.filters.readiness).toBe('not-ready')
     expect(restored.filters.fixVersion).toEqual([])
+    expect(restored.filters.alignment).toEqual([])
+  })
+
+  it('round-trips alignment filter', function() {
+    saveFeaturesListFilters({
+      outcome: [],
+      targetVersion: [],
+      fixVersion: [],
+      component: [],
+      priority: [],
+      team: [],
+      product: [],
+      fpdorItems: [],
+      alignment: ['misaligned', 'tv_only'],
+      readiness: null
+    }, '')
+    var restored = restoreFeaturesListFilters()
+    expect(restored.filters.alignment).toEqual(['misaligned', 'tv_only'])
   })
 
   it('ignores non-array filter values', function() {

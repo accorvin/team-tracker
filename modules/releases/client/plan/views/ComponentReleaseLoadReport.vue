@@ -293,7 +293,7 @@
     <!--
       Summary cards are display-only KPIs. Click-to-filter was removed because
       toggling Requested/Committed via tiles made independent Requested (TV in
-      scope) and Committed (FV in scope + TV match/early delivery) counts appear
+      scope) and Committed (Fix Version in selected release scope) counts appear
       correlated. Use REQ/COM (and other) filter chips in the bar above to filter
       the table.
     -->
@@ -336,7 +336,7 @@
           </span>
           <span class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Not Aligned</span>
         </div>
-        <div class="text-2xl font-bold ml-7" :class="totalNotAligned > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-gray-100'" title="PM/DO Aligned = No (TV and FV missing or mismatch)">{{ totalNotAligned }}</div>
+        <div class="text-2xl font-bold ml-7" :class="totalNotAligned > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-gray-100'" title="Not aligned = TV only, FV only, or misaligned (same categories as TV vs FV Delta). On time and Late count as aligned.">{{ totalNotAligned }}</div>
       </div>
       <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3.5">
         <div class="absolute top-0 left-0 w-1 h-full bg-gray-400 rounded-l-xl" />
@@ -409,6 +409,7 @@ import { buildComponentLeadsMap } from '../../composables/componentLeads'
 import ComponentReleaseLoadTable from '../components/ComponentReleaseLoadTable.vue'
 import PillarConfigPanel from '../components/PillarConfigPanel.vue'
 import FeatureReadinessDrawer from '../components/FeatureReadinessDrawer.vue'
+import { toDrawerFeature } from '../utils/feature-readiness-drawer-model.js'
 
 const nav = inject('moduleNav', null)
 const jiraBaseUrl = 'https://issues.redhat.com/browse'
@@ -417,19 +418,6 @@ function navigateToFeature(key) {
   if (nav && typeof nav.navigateTo === 'function') {
     nav.navigateTo('feature-detail', { key, from: 'plan-pm-hub' })
   }
-}
-
-/** Normalize PM Hub row shape for FeatureReadinessDrawer. */
-function toDrawerFeature(feature) {
-  if (!feature) return null
-  var fixVersions = feature.fixVersions || []
-  return Object.assign({}, feature, {
-    title: feature.title || feature.summary || '',
-    fixVersion: feature.fixVersion || (fixVersions.length ? fixVersions[0] : null),
-    deliveryOwner: feature.deliveryOwner || feature.assignee || null,
-    sourceRfe: feature.sourceRfe || feature.linkedRfeKey || null,
-    dataSource: feature.dataSource || 'pm-hub'
-  })
 }
 
 const API_BASE = '/modules/releases/pm-hub'
@@ -689,7 +677,7 @@ var filteredPmOwners = computed(function() {
  * Apply client-side filters to groups.
  * @param {boolean} includeTypeFilter - when true, apply REQ/COM (filterType) for the table.
  *   KPI summary tiles intentionally omit type filter so Requested (TV in scope)
- *   and Committed (FV in scope + TV match/early delivery) remain independent
+ *   and Committed (Fix Version in selected release scope) remain independent
  *   headline counts.
  */
 function filterGroups(includeTypeFilter) {

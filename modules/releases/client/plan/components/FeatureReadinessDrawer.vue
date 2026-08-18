@@ -8,6 +8,11 @@ import {
   pathChipClass,
   pathChipTitle
 } from '../utils/fpdor-severity.js'
+import {
+  alignmentCategoryLabel,
+  alignmentCategoryHelp,
+  alignmentCategoryChipClass
+} from '../utils/tv-fv-alignment-display.js'
 
 const props = defineProps({
   feature: { type: Object, default: null },
@@ -48,7 +53,7 @@ const fixVersionDisplay = computed(function() {
 const dataSourceLabel = computed(function() {
   var src = props.feature && props.feature.dataSource
   if (src === 'health-pipeline') return 'Health Pipeline'
-  if (src === 'pm-hub' || src === 'jira') return 'Jira'
+  if (src === 'pm-hub' || src === 'jira' || src === 'canonical') return 'Jira'
   return 'Strategy Creator'
 })
 
@@ -323,6 +328,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               :class="pathChipClass(feature)"
               :title="pathChipTitle(feature)"
             >{{ pathLabel(feature) }}</span>
+            <span
+              v-if="feature.alignmentCategory"
+              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+              :class="alignmentCategoryChipClass(feature.alignmentCategory)"
+              :title="alignmentCategoryHelp(feature.alignmentCategory)"
+            >{{ alignmentCategoryLabel(feature.alignmentCategory) }}</span>
 
             <!-- Health pipeline badges -->
             <template v-if="isHealthPipeline">
@@ -606,6 +617,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
               <dt class="text-gray-400 dark:text-gray-500">Fix Version</dt>
               <dd class="font-mono text-gray-700 dark:text-gray-300">{{ fixVersionDisplay || '—' }}</dd>
+
+              <dt class="text-gray-400 dark:text-gray-500">TV/FV Align</dt>
+              <dd>
+                <span
+                  v-if="feature.alignmentCategory"
+                  class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                  :class="alignmentCategoryChipClass(feature.alignmentCategory)"
+                  :title="alignmentCategoryHelp(feature.alignmentCategory)"
+                >{{ alignmentCategoryLabel(feature.alignmentCategory) }}</span>
+                <span v-else class="text-gray-400 dark:text-gray-600">—</span>
+              </dd>
 
               <dt class="text-gray-400 dark:text-gray-500 self-start">Components</dt>
               <dd>

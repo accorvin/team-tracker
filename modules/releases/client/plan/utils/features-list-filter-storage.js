@@ -14,6 +14,7 @@ export var DEFAULT_FILTERS = {
   team: [],
   product: [],
   fpdorItems: [],
+  alignment: [],
   readiness: null
 }
 
@@ -40,6 +41,7 @@ export function saveFeaturesListFilters(filters, selectedVersion) {
         team: asStringArray(filters && filters.team),
         product: asStringArray(filters && filters.product),
         fpdorItems: asStringArray(filters && filters.fpdorItems),
+        alignment: asStringArray(filters && filters.alignment),
         readiness: filters && filters.readiness != null ? String(filters.readiness) : null
       },
       selectedVersion: typeof selectedVersion === 'string' ? selectedVersion : ''
@@ -70,6 +72,7 @@ export function restoreFeaturesListFilters() {
         team: asStringArray(saved.team),
         product: asStringArray(saved.product),
         fpdorItems: asStringArray(saved.fpdorItems),
+        alignment: asStringArray(saved.alignment),
         readiness: saved.readiness != null && saved.readiness !== '' ? String(saved.readiness) : null
       },
       selectedVersion: typeof state.selectedVersion === 'string' ? state.selectedVersion : ''

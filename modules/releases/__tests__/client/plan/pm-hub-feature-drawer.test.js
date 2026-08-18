@@ -76,6 +76,7 @@ describe('PM Hub feature slide tray', function() {
     var drawerFeature = Object.assign({}, feature, {
       fixVersion: null,
       deliveryOwner: feature.assignee,
+      alignmentCategory: 'tv_only',
       dataSource: 'pm-hub'
     })
 
@@ -96,6 +97,8 @@ describe('PM Hub feature slide tray', function() {
     expect(wrapper.text()).toContain('FPDoR Readiness')
     expect(wrapper.text()).toContain('Target Version')
     expect(wrapper.text()).toContain('RICE')
+    expect(wrapper.text()).toContain('TV only')
+    expect(wrapper.text()).toContain('TV/FV Align')
     // No empty AI review chrome for PM Hub rows without review meta
     expect(wrapper.text()).not.toContain('Awaiting Sign-off')
     expect(wrapper.text()).toContain('Jira')

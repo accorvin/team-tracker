@@ -1,5 +1,6 @@
 import { escapeCsv, triggerDownload } from './health-export.js'
 import { pathLabel } from './fpdor-severity.js'
+import { alignmentCategoryLabel } from './tv-fv-alignment-display.js'
 
 var FPDOR_CONFLUENCE_URL = 'https://redhat.atlassian.net/wiki/spaces/RHAI/pages/442958832/Planning+Phase+-+Definition+of+Ready+Definition+of+Done'
 
@@ -81,6 +82,7 @@ function exportFeatureReadinessCsv(features) {
       getter: function(f) { return (f.targetVersions || []).join('; ') }
     },
     { label: 'Fix Version', getter: function(f) { return f.fixVersion || '' } },
+    { label: 'TV/FV Align', getter: function(f) { return alignmentCategoryLabel(f.alignmentCategory) } },
     { label: 'Release Type', getter: function(f) { return f.releaseType || '' } },
     {
       label: 'Components',
@@ -125,6 +127,10 @@ function featureMatchesSharedFilters(feature, filterState, selectedVersion, opti
   if (f.team && f.team.length && f.team.indexOf(feature.team) === -1) return false
   if (f.product && f.product.length && !featureMatchesProduct(feature, f.product)) return false
   if (f.fpdorItems && f.fpdorItems.length && !featureFailsSelectedFpdorItems(feature, f.fpdorItems)) return false
+  if (f.alignment && f.alignment.length) {
+    var cat = feature.alignmentCategory || null
+    if (!cat || f.alignment.indexOf(cat) === -1) return false
+  }
   if (applyReadiness) {
     if (f.readiness === 'ready' && feature.confidence === 'not-ready') return false
     if (f.readiness === 'not-ready' && feature.confidence !== 'not-ready') return false

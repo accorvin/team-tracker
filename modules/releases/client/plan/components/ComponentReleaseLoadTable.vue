@@ -17,6 +17,13 @@ import {
   docsRequiredTitle,
   docsRequiredChipClass
 } from '../utils/docs-required-display.js'
+import {
+  alignmentCategoryLabel,
+  alignmentCategoryHelp,
+  alignmentCategoryChipClass,
+  worseAlignmentCategory,
+  isAlignedCategory
+} from '../utils/tv-fv-alignment-display.js'
 
 const props = defineProps({
   groups: { type: Array, default: () => [] },
@@ -38,10 +45,17 @@ var expandedComponents = reactive({})
 
 // ═══ SORT STATE ═══
 
-var SORT_COLUMNS = ['key', 'summary', 'priority', 'releaseType', 'status', 'colorStatus', 'fixVersion', 'targetVersion', 'blocked', 'pmDoAligned', 'readiness', 'assignee', 'pmOwner', 'docs']
+var SORT_COLUMNS = ['key', 'summary', 'priority', 'releaseType', 'status', 'colorStatus', 'fixVersion', 'targetVersion', 'blocked', 'alignmentCategory', 'readiness', 'assignee', 'pmOwner', 'docs']
 
 var PRIORITY_ORDER = { 'Blocker': 0, 'Critical': 1, 'Major': 2, 'Normal': 3 }
 var COLOR_STATUS_ORDER = { 'red': 0, 'yellow': 1, 'green': 2 }
+var ALIGNMENT_SORT_ORDER = {
+  aligned_on_time: 0,
+  aligned_late: 1,
+  fv_only: 2,
+  tv_only: 3,
+  misaligned: 4
+}
 
 var sortState = reactive({
   column: SORT_COLUMNS.indexOf(props.initialSort.column) !== -1 ? props.initialSort.column : null,
@@ -84,7 +98,10 @@ function getSortValue(feature, column) {
     return feature.targetVersions && feature.targetVersions.length > 0 ? feature.targetVersions[0] : ''
   }
   if (column === 'blocked') return feature.isBlocked ? 1 : 0
-  if (column === 'pmDoAligned') return feature.pmDoAligned ? 0 : 1
+  if (column === 'alignmentCategory') {
+    var ao = ALIGNMENT_SORT_ORDER[feature.alignmentCategory]
+    return ao !== undefined ? ao : 99
+  }
   if (column === 'readiness') {
     if (!feature.fpdor) return 99
     if (feature.fpdor.allApplicablePassed) return 0
@@ -235,7 +252,10 @@ var componentGroups = computed(function() {
             priority: feat.priority,
             isBlocked: feat.isBlocked,
             blockedBy: feat.blockedBy || [],
-            pmDoAligned: !!feat.pmDoAligned,
+            alignmentCategory: feat.alignmentCategory || null,
+            pmDoAligned: feat.alignmentCategory
+              ? isAlignedCategory(feat.alignmentCategory)
+              : !!feat.pmDoAligned,
             fpdor: feat.fpdor || null,
             confidence: feat.confidence || null,
             isAiFirst: !!feat.isAiFirst,
@@ -256,6 +276,13 @@ var componentGroups = computed(function() {
         }
 
         var entry = cg.features[feat.key]
+        entry.alignmentCategory = worseAlignmentCategory(
+          entry.alignmentCategory,
+          feat.alignmentCategory || null
+        )
+        entry.pmDoAligned = entry.alignmentCategory
+          ? isAlignedCategory(entry.alignmentCategory)
+          : !!entry.pmDoAligned
         var product = extractProduct(version)
         if (entry.products.indexOf(product) === -1) {
           entry.products.push(product)
@@ -421,8 +448,8 @@ defineExpose({ expandAll, collapseAll })
             <th class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSort('blocked')">
               <span class="inline-flex items-center gap-1 justify-center">Blocked<SortArrow :direction="sortIcon('blocked')" /></span>
             </th>
-            <th class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSort('pmDoAligned')" title="Yes when Target Version and Fix Version match">
-              <span class="inline-flex items-center gap-1 justify-center">PM/DO Aligned<SortArrow :direction="sortIcon('pmDoAligned')" /></span>
+            <th class="px-3 py-2 text-center text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSort('alignmentCategory')" title="TV vs FV Delta category for this release (same rules as Reports → TV vs FV Delta)">
+              <span class="inline-flex items-center gap-1 justify-center">TV/FV Align<SortArrow :direction="sortIcon('alignmentCategory')" /></span>
             </th>
             <th class="px-3 py-2 text-left text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[10rem] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="toggleSort('readiness')">
               <span class="inline-flex items-center gap-1">Readiness<SortArrow :direction="sortIcon('readiness')" /></span>
@@ -539,13 +566,9 @@ defineExpose({ expandAll, collapseAll })
               <td class="px-3 py-2.5 text-center">
                 <span
                   class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold"
-                  :class="feature.pmDoAligned
-                    ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-                    : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'"
-                  :title="feature.pmDoAligned
-                    ? 'Target Version and Fix Version match'
-                    : 'Target Version and Fix Version missing or do not match'"
-                >{{ feature.pmDoAligned ? 'Yes' : 'No' }}</span>
+                  :class="alignmentCategoryChipClass(feature.alignmentCategory)"
+                  :title="alignmentCategoryHelp(feature.alignmentCategory)"
+                >{{ alignmentCategoryLabel(feature.alignmentCategory) }}</span>
               </td>
               <td class="px-3 py-2.5">
                 <div v-if="feature.fpdor" class="flex flex-wrap items-center gap-1 max-w-[14rem]">

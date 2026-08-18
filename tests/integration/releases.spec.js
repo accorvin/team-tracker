@@ -646,11 +646,28 @@ test.describe('Releases FPDoR Readiness @releases', () => {
     var headerCount = await headerRow.count();
     expect(headerCount).toBeGreaterThan(5);
 
+    // Use hasText (not getByRole name) — Score/Readiness/Align headers embed tooltip copy in the accessible name.
     var scoreHeader = page.locator('thead th', { hasText: 'Score' });
     await expect(scoreHeader.first()).toBeVisible();
+    await expect(scoreHeader.first()).toHaveAttribute('aria-sort', 'descending');
 
     var readinessHeader = page.locator('thead th', { hasText: 'Readiness' });
     await expect(readinessHeader.first()).toBeVisible();
+    await expect(readinessHeader.first()).toHaveClass(/cursor-pointer/);
+
+    await readinessHeader.first().click();
+    await expect(readinessHeader.first()).toHaveAttribute('aria-sort', 'ascending');
+
+    await scoreHeader.first().click();
+    await expect(scoreHeader.first()).toHaveAttribute('aria-sort', 'descending');
+    await scoreHeader.first().click();
+    await expect(scoreHeader.first()).toHaveAttribute('aria-sort', 'ascending');
+    await scoreHeader.first().click();
+    await expect(scoreHeader.first()).toHaveAttribute('aria-sort', 'none');
+
+    var alignHeader = page.locator('thead th', { hasText: 'TV/FV Align' });
+    await expect(alignHeader.first()).toBeVisible();
+    await expect(alignHeader.first()).toHaveClass(/cursor-pointer/);
 
     expect(page.errors).toHaveLength(0);
   });
@@ -687,6 +704,7 @@ test.describe('Releases FPDoR Readiness @releases', () => {
     await expect(page.getByRole('button', { name: /All products/i })).toBeVisible();
     await expect(page.getByText('Failed FPDoR', { exact: true }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /Any failed item/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /All alignments/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Export CSV/i })).toBeVisible();
 
     expect(page.errors).toHaveLength(0);
@@ -769,6 +787,18 @@ test.describe('Releases FPDoR Readiness @releases', () => {
     expect(typeof sample.readinessGates.fpDorTotal).toBe('number');
     expect(typeof sample.readinessGates.fpDorApplicable).toBe('number');
     expect(typeof sample.readinessGates.pastRefinement).toBe('boolean');
+
+    // TV/FV Align (same categories as Reports → TV vs FV Delta / PM Hub)
+    expect(sample).toHaveProperty('alignmentCategory');
+    if (sample.alignmentCategory != null) {
+      expect([
+        'aligned_on_time',
+        'aligned_late',
+        'misaligned',
+        'tv_only',
+        'fv_only'
+      ]).toContain(sample.alignmentCategory);
+    }
   });
 
   test('feature-readiness API returns priority score breakdown', async ({ request }) => {
