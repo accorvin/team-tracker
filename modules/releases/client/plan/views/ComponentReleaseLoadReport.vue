@@ -1120,15 +1120,16 @@ function startAutoRefresh() {
   autoRefreshTimer.value = setInterval(function() {
     if (!hasFetched.value || loadingData.value) return
     if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
-    loadData()
+    loadData({ silent: true })
   }, AUTO_REFRESH_MS)
 }
 
-async function loadData() {
+async function loadData(opts) {
+  var silent = opts && opts.silent
   var effectiveComponents = getEffectiveComponents()
   if (effectiveComponents.length === 0 && selectedVersions.value.length === 0) return
-  loadingData.value = true
-  dataError.value = null
+  if (!silent) loadingData.value = true
+  if (!silent) dataError.value = null
   hasFetched.value = true
 
   try {
@@ -1153,11 +1154,13 @@ async function loadData() {
     groups.value = data.groups || []
     fetchedAt.value = data.fetchedAt || null
   } catch (err) {
-    dataError.value = err.message
-    groups.value = []
-    fetchedAt.value = null
+    if (!silent) dataError.value = err.message
+    if (!silent) {
+      groups.value = []
+      fetchedAt.value = null
+    }
   } finally {
-    loadingData.value = false
+    if (!silent) loadingData.value = false
     if (hasFetched.value && !autoRefreshTimer.value) startAutoRefresh()
   }
 }
@@ -1186,11 +1189,16 @@ watch(
   { deep: true }
 )
 
-onMounted(function() {
+onMounted(async function() {
   restoreFilters()
-  fetchPillarConfig()
-  fetchComponents()
+  await Promise.all([fetchPillarConfig(), fetchComponents()])
   document.addEventListener('mousedown', handleClickOutside)
+  if (!hasFetched.value) {
+    var effectiveComponents = getEffectiveComponents()
+    if (effectiveComponents.length > 0 || selectedVersions.value.length > 0) {
+      loadData()
+    }
+  }
 })
 
 onBeforeUnmount(function() {

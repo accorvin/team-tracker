@@ -308,6 +308,45 @@ test.describe('Releases PM Hub @releases', () => {
     expect(page.errors).toHaveLength(0);
   });
 
+  test('auto-loads data on mount when version filter is saved in localStorage', async ({ page }) => {
+    // Seed a version filter. Version labels map directly to PORTFOLIO_VERSIONS so the
+    // watcher fires as soon as selectedVersions is restored — no component list needed.
+    await page.addInitScript(`
+      localStorage.setItem('pm-hub-filters', JSON.stringify({
+        components: [],
+        pillars: [],
+        versions: ['3.5']
+      }));
+    `);
+
+    // Track whether the component-release-load API is called automatically on mount.
+    var loadRequests = [];
+    page.on('request', function(req) {
+      if (req.url().includes('/pm-hub/component-release-load')) loadRequests.push(req.url());
+    });
+
+    await page.goto('/#/releases/plan');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await page.locator('button', { hasText: 'PM Hub' }).click();
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    var reportCard = page.locator('.cursor-pointer', { hasText: 'Component Release Load Tracking' });
+    await reportCard.first().click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // The API must have been called — savedVersions triggers loadData() automatically on mount.
+    expect(loadRequests.length).toBeGreaterThan(0);
+
+    // The "select filters" empty prompt must NOT be visible (hasFetched=true).
+    var emptyPrompt = page.locator('text=Select components and/or releases to view data.');
+    await expect(emptyPrompt).not.toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
   test('pillar-config endpoint returns valid config', async ({ request }) => {
     const res = await request.get('/api/modules/releases/pm-hub/pillar-config');
     expect(res.ok()).toBe(true);
