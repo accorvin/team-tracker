@@ -12,6 +12,7 @@ import {
   worseAlignmentCategory,
   ALIGNMENT_CATEGORY_PRIORITY
 } from '../../../client/plan/utils/tv-fv-alignment-display.js'
+import { countAlignment } from '../../../client/plan/utils/alignment-rollup.js'
 
 // ---------------------------------------------------------------------------
 // Inline the pure functions from ComponentReleaseLoadTable.vue so we can
@@ -164,12 +165,10 @@ function buildComponentGroups(groups) {
     var reqCount = 0
     var comCount = 0
     var blkCount = 0
-    var notAlignedCount = 0
     for (var fli = 0; fli < featureList.length; fli++) {
       if (featureList[fli].isRequested) reqCount++
       if (featureList[fli].isCommitted) comCount++
       if (featureList[fli].isBlocked) blkCount++
-      if (!featureList[fli].pmDoAligned) notAlignedCount++
     }
 
     result.push({
@@ -178,7 +177,7 @@ function buildComponentGroups(groups) {
       requestedCount: reqCount,
       committedCount: comCount,
       blockedCount: blkCount,
-      notAlignedCount: notAlignedCount
+      alignmentCounts: countAlignment(featureList)
     })
   }
 
@@ -588,7 +587,11 @@ describe('buildComponentGroups', function () {
       makeFeature({ key: 'A-4', alignmentCategory: 'misaligned' })
     ]
     var result = buildComponentGroups([makeGroup('rhoai-3.5', 'Dash', feats)])
-    expect(result[0].notAlignedCount).toBe(2)
+    expect(result[0].alignmentCounts.aligned_on_time).toBe(1)
+    expect(result[0].alignmentCounts.aligned_late).toBe(1)
+    expect(result[0].alignmentCounts.tv_only).toBe(1)
+    expect(result[0].alignmentCounts.misaligned).toBe(1)
+    expect(result[0].alignmentCounts.fv_only).toBe(0)
     var byKey = {}
     result[0].features.forEach(function(f) { byKey[f.key] = f })
     expect(byKey['A-1'].pmDoAligned).toBe(true)
@@ -607,7 +610,38 @@ describe('buildComponentGroups', function () {
     var result = buildComponentGroups(groups)
     expect(result[0].features[0].alignmentCategory).toBe('misaligned')
     expect(result[0].features[0].pmDoAligned).toBe(false)
-    expect(result[0].notAlignedCount).toBe(1)
+    expect(result[0].alignmentCounts.misaligned).toBe(1)
+    expect(result[0].alignmentCounts.aligned_on_time).toBe(0)
+  })
+
+  it('counts alignment per component list; a shared key appears in both headers', function () {
+    var shared = makeFeature({ key: 'SHARED-1', alignmentCategory: 'tv_only' })
+    var dashOnly = makeFeature({ key: 'DASH-1', alignmentCategory: 'aligned_on_time' })
+    var evalOnly = makeFeature({ key: 'EVAL-1', alignmentCategory: 'misaligned' })
+    var groups = [{
+      version: 'rhoai-3.5',
+      components: [
+        {
+          component: 'Dashboard',
+          requestedFeatures: [shared, dashOnly],
+          committedFeatures: []
+        },
+        {
+          component: 'Evaluations',
+          requestedFeatures: [shared, evalOnly],
+          committedFeatures: []
+        }
+      ]
+    }]
+    var result = buildComponentGroups(groups)
+    var byName = {}
+    result.forEach(function(row) { byName[row.component] = row })
+    expect(byName.Dashboard.alignmentCounts.tv_only).toBe(1)
+    expect(byName.Dashboard.alignmentCounts.aligned_on_time).toBe(1)
+    expect(byName.Dashboard.alignmentCounts.misaligned).toBe(0)
+    expect(byName.Evaluations.alignmentCounts.tv_only).toBe(1)
+    expect(byName.Evaluations.alignmentCounts.misaligned).toBe(1)
+    expect(byName.Evaluations.alignmentCounts.aligned_on_time).toBe(0)
   })
 })
 

@@ -815,7 +815,7 @@ function filterGroups(opts) {
         requestedCount: newReq.length,
         committedCount: newCom.length,
         blockedCount: filtered.filter(function(ff) { return ff.isBlocked }).length,
-        notAlignedCount: filtered.filter(function(ff) { return !ff.pmDoAligned }).length
+        alignmentCounts: countAlignment(filtered)
       })
     }).filter(function(comp) {
       return (comp.requestedFeatures.length + comp.committedFeatures.length) > 0
