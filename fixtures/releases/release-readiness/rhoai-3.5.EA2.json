@@ -16,7 +16,8 @@
     ],
     "test_timeline": [
       { "epic_key": "RHOAIENG-70001", "name": "Nightly", "done": 12, "total": 12, "pct": 100, "rag": "GREEN" },
-      { "epic_key": "RHOAIENG-70002", "name": "RC1", "done": 8, "total": 12, "pct": 67, "rag": "AMBER" }
+      { "epic_key": "RHOAIENG-70002", "name": "RC1", "done": 8, "total": 12, "pct": 67, "rag": "AMBER" },
+      { "epic_key": "RHOAIENG-70003", "name": "RC2", "done": 2, "total": 2, "pct": 100, "rag": "GREEN" }
     ]
   },
   "component_readiness": {
@@ -77,15 +78,22 @@
           {
             "epic_key": "RHOAIENG-70001",
             "tasks": [
-              { "key": "RHOAIENG-70101", "summary": "Nightly smoke tests", "status": "Done", "status_category": "Done" },
-              { "key": "RHOAIENG-70102", "summary": "Nightly regression suite", "status": "In Progress", "status_category": "In Progress" }
+              { "key": "RHOAIENG-70101", "summary": "Nightly smoke tests", "status": "Done", "status_category": "Done", "resolution": "Done" },
+              { "key": "RHOAIENG-70102", "summary": "Nightly regression suite", "status": "In Progress", "status_category": "In Progress", "resolution": null }
             ]
           },
           {
             "epic_key": "RHOAIENG-70002",
             "tasks": [
-              { "key": "RHOAIENG-70201", "summary": "RC1 validation", "status": "To Do", "status_category": "To Do" },
-              { "key": "RHOAIENG-70202", "summary": "RC1 sign-off tests", "status": "Done", "status_category": "Done" }
+              { "key": "RHOAIENG-70201", "summary": "RC1 validation", "status": "To Do", "status_category": "To Do", "resolution": null },
+              { "key": "RHOAIENG-70202", "summary": "RC1 sign-off tests", "status": "Done", "status_category": "Done", "resolution": "Won't Do" }
+            ]
+          },
+          {
+            "epic_key": "RHOAIENG-70003",
+            "tasks": [
+              { "key": "RHOAIENG-70301", "summary": "RC2 validation", "status": "Closed", "status_category": "Done", "resolution": "Won't Do" },
+              { "key": "RHOAIENG-70302", "summary": "RC2 sign-off tests", "status": "Closed", "status_category": "Done", "resolution": "Obsolete" }
             ]
           }
         ]
