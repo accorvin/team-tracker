@@ -20,8 +20,8 @@ const FEATURE_COLS = [
 const COLUMN_HELP = {
   release: 'Jira Target Version / Fix Version name for this product release.',
   total: 'All features that have this release on Target Version (TV) or Fix Version (FV). Cycle/milestone rollups count each issue once across products.',
-  aligned_on_time: 'Aligned on time: Fix Version matches Target Version, or ships earlier than planned.',
-  aligned_late: 'Aligned late: Fix Version is later than Target Version, but planning freeze for that Target Version has already passed — accepted slip.',
+  aligned_on_time: 'Aligned on time: Target Version and Fix Version are the same milestone, or Fix Version is an earlier one. Not a calendar on-schedule flag.',
+  aligned_late: 'Aligned late: Fix Version is a later milestone than Target Version, and that Target Version planning freeze has already passed. Accepted slip — not overdue.',
   tv_only: 'TV-only: Target Version is set for this release, but Fix Version is empty.',
   fv_only: 'FV-only: Fix Version is set for this release, but Target Version is empty.',
   misaligned: 'Misaligned: Fix Version slips past Target Version before planning freeze, or TV/FV point at different products (for example RHOAI vs RHAII).',

@@ -309,6 +309,7 @@ test.describe('Releases PM Hub @releases', () => {
       await expect(page.locator('text=Committed').first()).toBeVisible();
       await expect(page.locator('text=Delivered').first()).toBeVisible();
       await expect(page.getByText('On time', { exact: true }).first()).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Align legend' }).first()).toBeVisible();
       await expect(page.locator('text=Selected scope').first()).toBeVisible();
       await expect(page.locator('text=Avg Features Delivered')).toHaveCount(0);
       await expect(page.locator('text=avg/rel')).toHaveCount(0);

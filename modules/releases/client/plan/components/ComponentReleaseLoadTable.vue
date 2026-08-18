@@ -3,6 +3,7 @@ import { reactive, computed } from 'vue'
 import { getComponentLeads } from '../../composables/componentLeads'
 import FPDoRPopover from './FPDoRPopover.vue'
 import AlignmentPopover from './AlignmentPopover.vue'
+import AlignmentLegendPopover from './AlignmentLegendPopover.vue'
 import { failedFpdorNames } from '../utils/feature-readiness-export.js'
 import {
   fpdorItemSeverity,
@@ -352,7 +353,12 @@ defineExpose({ expandAll, collapseAll })
 </script>
 
 <template>
-  <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+  <div class="rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+    <div class="flex items-center justify-between gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
+      <span class="text-xs font-semibold text-gray-700 dark:text-gray-200">Component load</span>
+      <AlignmentLegendPopover variant="button" align="right" />
+    </div>
+    <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)]">
     <table class="w-full text-sm border-collapse min-w-[1400px]">
       <tbody>
         <template v-for="comp in componentGroups" :key="comp.component">
@@ -631,5 +637,6 @@ defineExpose({ expandAll, collapseAll })
         </tr>
       </tbody>
     </table>
+    </div>
   </div>
 </template>
