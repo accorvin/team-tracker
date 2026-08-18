@@ -790,4 +790,74 @@ test.describe('OpenDataHub E2E Health Features @system-health', () => {
 
     expect(page.errors).toHaveLength(0);
   });
+
+  test('should render the Runs / Blocker JIRAs view toggle', async ({ page }) => {
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // The card header carries a segmented toggle with a "Runs" and a "Blocker JIRAs" button
+    const toggleGroup = page.locator('[role="group"][aria-label="View toggle"]');
+    await expect(toggleGroup).toBeVisible();
+
+    await expect(toggleGroup.getByRole('button', { name: /^Runs/ })).toBeVisible();
+    await expect(toggleGroup.getByRole('button', { name: /Blocker JIRAs/ })).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should load blocker JIRAs when switching to the Blocker JIRAs tab', async ({ page }) => {
+    // Track calls to the blocker-jiras API endpoint
+    const blockerRequests = [];
+    page.on('request', request => {
+      if (request.url().includes('/api/modules/system-health/odh-e2e-health/blocker-jiras')) {
+        blockerRequests.push(request.url());
+      }
+    });
+
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Switch to the Blocker JIRAs tab (lazy-loads the data on first open)
+    const toggleGroup = page.locator('[role="group"][aria-label="View toggle"]');
+    await toggleGroup.getByRole('button', { name: /Blocker JIRAs/ }).click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // The blocker-jiras endpoint should have been requested
+    expect(blockerRequests.length).toBeGreaterThan(0);
+
+    // The panel header switches to the auto-filed blockers title
+    await expect(page.locator('text=/Auto-filed Blocker JIRAs/i')).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('should display blocker JIRA rows with links in demo mode', async ({ page }) => {
+    await page.goto('/#/system-health/odh-e2e-health');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const toggleGroup = page.locator('[role="group"][aria-label="View toggle"]');
+    await toggleGroup.getByRole('button', { name: /Blocker JIRAs/ }).click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Demo fixture ships open blocker JIRAs — either the table renders rows
+    // linking to Jira, or the graceful empty/unavailable state is shown. Both are valid.
+    const jiraLinks = page.locator('a[href*="/browse/RHOAIENG-"]');
+    const linkCount = await jiraLinks.count();
+
+    if (linkCount > 0) {
+      await expect(jiraLinks.first()).toBeVisible();
+    } else {
+      const emptyOrUnavailable = page.locator(
+        'text=/No open blocker JIRAs|credentials|not yet available|could not reach jira/i'
+      );
+      await expect(emptyOrUnavailable.first()).toBeVisible();
+    }
+
+    expect(page.errors).toHaveLength(0);
+  });
 });

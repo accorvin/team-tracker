@@ -5,6 +5,7 @@ const registerQualityRoutes = require('./quality/routes');
 const qualityScheduler = require('./quality/scheduler');
 const aicpE2ERoutes = require('./odh-e2e-health/routes');
 const aicpE2EScheduler = require('./odh-e2e-health/scheduler');
+const blockerJiras = require('./odh-e2e-health/blocker-jiras');
 
 module.exports = function registerRoutes(router, context) {
   const { storage, requireAuth, requireAdmin, requireScope } = context;
@@ -81,6 +82,20 @@ module.exports = function registerRoutes(router, context) {
       }
     });
 
+    context.registerRefresh('odh-e2e-blocker-jiras', {
+      order: 91,
+      timeout: 120000, // 2 minutes
+      cadence: '1h',
+      description: 'Fetches auto-filed opendatahub-operator E2E blocker JIRAs from Jira.',
+      handler: async function () {
+        return blockerJiras.refreshBlockerJiras({
+          logger: console,
+          config: context.secrets,
+          storage: storage
+        });
+      }
+    });
+
   }
 
   if (context.registerDiagnostics) {
@@ -90,6 +105,7 @@ module.exports = function registerRoutes(router, context) {
       const qualityData = await storage.readFromStorage('system-health/quality/reports.json');
       const qualityLastFetch = await storage.readFromStorage('system-health/quality/last-fetch.json');
       const odhE2EData = await storage.readFromStorage('system-health/odh-e2e-health.json');
+      const blockerJiraData = await storage.readFromStorage('system-health/odh-e2e-blocker-jiras.json');
 
       return {
         disconnected: {
@@ -123,6 +139,12 @@ module.exports = function registerRoutes(router, context) {
           } : null,
           componentStats: odhE2EData ? Object.keys(odhE2EData.componentStats || {}).length : 0,
           historicalTrends: odhE2EData?.historical_trends ? odhE2EData.historical_trends.daily_status?.length || 0 : 0
+        },
+        blockerJiras: {
+          available: !!(blockerJiraData && blockerJiraData.available),
+          reason: blockerJiraData ? (blockerJiraData.reason || null) : null,
+          count: blockerJiraData ? (blockerJiraData.count || 0) : 0,
+          fetchedAt: blockerJiraData ? blockerJiraData.lastSyncedAt : null
         }
       };
     });

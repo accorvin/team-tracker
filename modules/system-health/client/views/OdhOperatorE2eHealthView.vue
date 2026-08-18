@@ -1,6 +1,7 @@
 <script setup>
 import { computed, inject, ref, onMounted, onUnmounted } from 'vue'
 import { useOdhOperatorE2eHealth } from '../composables/useOdhOperatorE2eHealth.js'
+import BlockerJiraTable from '../components/BlockerJiraTable.vue'
 import { Line } from 'vue-chartjs'
 import {
   RefreshCw,
@@ -23,11 +24,33 @@ import {
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Title)
 
 const nav = inject('moduleNav', null)
-const { healthData, runHistory, loading, error, loadHealthData, loadRunHistory } = useOdhOperatorE2eHealth()
+const {
+  healthData,
+  runHistory,
+  loading,
+  error,
+  loadHealthData,
+  loadRunHistory,
+  blockerJiras,
+  blockerJirasLoading,
+  blockerJirasError,
+  loadBlockerJiras
+} = useOdhOperatorE2eHealth()
 
 // Filters
 const suiteFilter = ref('all')
 const statusFilter = ref('all')
+
+// Runs / Blocker JIRAs toggle
+const activeTab = ref('runs')
+
+function switchTab(tab) {
+  activeTab.value = tab
+  if (tab === 'jiras') {
+    // Lazy-load on first open (no-op if already fetched)
+    loadBlockerJiras()
+  }
+}
 
 
 // Enhanced 14-day window calculation with temporal status information
@@ -692,12 +715,51 @@ function loadMoreRuns() {
       <!-- Run History Filters -->
       <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
         <div class="px-4 py-5 sm:p-6">
+          <!-- Runs / Blocker JIRAs toggle -->
+          <div class="inline-flex rounded-md border border-gray-300 dark:border-gray-600 p-0.5 mb-5" role="group" aria-label="View toggle">
+            <button
+              type="button"
+              @click="switchTab('runs')"
+              :class="[
+                'px-3 py-1.5 text-sm font-medium rounded transition-colors',
+                activeTab === 'runs'
+                  ? 'bg-primary-600 text-white'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              ]"
+            >
+              Runs
+            </button>
+            <button
+              type="button"
+              @click="switchTab('jiras')"
+              :class="[
+                'px-3 py-1.5 text-sm font-medium rounded transition-colors',
+                activeTab === 'jiras'
+                  ? 'bg-primary-600 text-white'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              ]"
+            >
+              Blocker JIRAs
+              <span
+                v-if="blockerJiras?.count"
+                class="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-semibold"
+                :class="activeTab === 'jiras' ? 'bg-white/20 text-white' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'"
+              >{{ blockerJiras.count }}</span>
+            </button>
+          </div>
+
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Recent E2E Runs</h3>
-              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">History of recent test executions</p>
+              <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                {{ activeTab === 'runs' ? 'Recent E2E Runs' : 'Auto-filed Blocker JIRAs' }}
+              </h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ activeTab === 'runs'
+                  ? 'History of recent test executions'
+                  : 'Open Jira blockers auto-filed for failing E2E components' }}
+              </p>
             </div>
-            <div class="mt-4 sm:mt-0 flex space-x-3">
+            <div v-if="activeTab === 'runs'" class="mt-4 sm:mt-0 flex space-x-3">
               <select
                 v-model="suiteFilter"
                 class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-700 dark:text-white"
@@ -715,11 +777,22 @@ function loadMoreRuns() {
                 </option>
               </select>
             </div>
+            <div v-else-if="blockerJiras?.jqlUrl" class="mt-4 sm:mt-0">
+              <a
+                :href="blockerJiras.jqlUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                View all in Jira
+                <ExternalLink class="inline ml-1.5 h-3.5 w-3.5" />
+              </a>
+            </div>
           </div>
 
 
           <!-- Run History Table -->
-          <div class="mt-6 -mx-4 sm:mx-0">
+          <div v-if="activeTab === 'runs'" class="mt-6 -mx-4 sm:mx-0">
             <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
               <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-600">
                 <thead class="bg-gray-50 dark:bg-gray-700">
@@ -800,6 +873,19 @@ function loadMoreRuns() {
                 Load More Runs
               </button>
             </div>
+          </div>
+
+          <!-- Blocker JIRAs Table -->
+          <div v-else class="mt-6">
+            <BlockerJiraTable
+              :issues="blockerJiras?.issues || []"
+              :loading="blockerJirasLoading"
+              :available="blockerJiras?.available === true"
+              :reason="blockerJiras?.reason || null"
+              :error="blockerJirasError"
+              :jql-url="blockerJiras?.jqlUrl || ''"
+              :last-synced-at="blockerJiras?.lastSyncedAt || null"
+            />
           </div>
         </div>
       </div>

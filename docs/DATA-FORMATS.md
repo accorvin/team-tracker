@@ -1887,6 +1887,56 @@ E2E (end-to-end) test health data for the opendatahub-operator repository. Conta
 - Component statistics use 30-day accumulated data for accurate failure rates
 - Daily status thresholds: 100% = healthy, ≥70% = stable, ≥50% = degraded, ≥20% = failing, <20% = broken
 
+## System Health — E2E Blocker JIRAs (`data/system-health/odh-e2e-blocker-jiras.json`)
+
+Snapshot of the currently-open Jira blocker bugs auto-filed by the
+opendatahub-operator `e2e-failure-triage` automation. The automation labels every
+bug it creates with `odh-operator-auto-e2e-blocker` (in project `RHOAIENG`) and
+links it to the template issue `RHOAIENG-79740`. The `odh-e2e-blocker-jiras`
+refresh handler queries Jira for open (`resolution = Unresolved`) issues carrying
+that label and writes a full snapshot.
+
+```json
+{
+  "lastSyncedAt": "2026-08-11T10:00:00.000Z",
+  "available": true,
+  "count": 3,
+  "jql": "project = RHOAIENG AND labels = \"odh-operator-auto-e2e-blocker\" AND resolution = Unresolved ORDER BY created DESC",
+  "jqlUrl": "https://redhat.atlassian.net/issues/?jql=...",
+  "templateIssue": "RHOAIENG-79740",
+  "issues": [
+    {
+      "key": "RHOAIENG-81234",
+      "summary": "[Auto] E2E blocker: dashboard tests failing",
+      "status": "New",
+      "priority": "Blocker",
+      "component": "Dashboard",
+      "affectsVersions": ["2.20 GA RHOAI RELEASE"],
+      "assignee": null,
+      "created": "2026-08-10T14:22:00.000Z",
+      "updated": "2026-08-11T08:15:00.000Z",
+      "url": "https://redhat.atlassian.net/browse/RHOAIENG-81234"
+    }
+  ]
+}
+```
+
+**Top-level fields:**
+- `lastSyncedAt`: ISO timestamp of the last successful fetch (may be preserved from a prior run on a failed refresh)
+- `available`: `false` when Jira credentials are missing or a fetch failed; `true` otherwise
+- `reason`: present when `available` is false (`missing-credentials`, `fetch-error`, or `no_data`)
+- `count`: number of open blocker issues
+- `jql` / `jqlUrl`: the JQL used and a deep link to view the issues in Jira
+- `templateIssue`: the clone template key (`RHOAIENG-79740`)
+- `issues`: array of open blocker issues (see per-issue fields below)
+
+**Per-issue fields:** `key`, `summary`, `status`, `priority`, `component` (comma-joined), `affectsVersions` (array), `assignee` (display name or null), `created`, `updated`, `url`.
+
+**Notes:**
+- Refreshed hourly by the `odh-e2e-blocker-jiras` handler. Requires the `jira` platform secret group (`JIRA_EMAIL` / `JIRA_TOKEN`).
+- **Snapshot semantics:** each successful run fully overwrites the file with the current open set — no merge/accumulate — so JIRAs resolved/closed since the last run are evicted automatically.
+- On a transient fetch failure the previous `issues` are preserved and `available` is set to `false` (the dashboard keeps showing last-known-good data). Missing credentials writes an empty list.
+
 ## System Health — Quality Reports (`data/system-health/quality/reports.json`)
 
 Quality analysis reports tracking repository testing, CI/CD, and code quality practices across 8 dimensions. Reports are pushed from the quality-repo-analysis CI pipeline via the bulk API, or pulled from GitLab CI artifacts.

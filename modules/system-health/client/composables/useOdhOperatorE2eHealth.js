@@ -7,6 +7,12 @@ const loading = ref(false)
 const error = ref(null)
 let hasFetched = false
 
+// Auto-filed E2E blocker JIRAs (loaded lazily when the JIRAs tab is opened)
+const blockerJiras = ref(null)
+const blockerJirasLoading = ref(false)
+const blockerJirasError = ref(null)
+let hasFetchedBlockerJiras = false
+
 async function loadHealthData(force = false) {
   loading.value = true
   error.value = null
@@ -58,6 +64,27 @@ async function loadRunHistory(options = {}) {
     if (!append) {
       loading.value = false
     }
+  }
+}
+
+async function loadBlockerJiras(force = false) {
+  // Fetch once per session unless forced (lazy — triggered on tab open).
+  if (hasFetchedBlockerJiras && !force) return
+
+  hasFetchedBlockerJiras = true
+  blockerJirasLoading.value = true
+  blockerJirasError.value = null
+  try {
+    const cacheBuster = force ? `?_cb=${Date.now()}` : ''
+    const data = await apiRequest(`/modules/system-health/odh-e2e-health/blocker-jiras${cacheBuster}`)
+    blockerJiras.value = data
+  } catch (e) {
+    blockerJirasError.value = e.message || 'Failed to load E2E blocker JIRAs'
+    blockerJiras.value = null
+    // Allow retry after a failure
+    hasFetchedBlockerJiras = false
+  } finally {
+    blockerJirasLoading.value = false
   }
 }
 
@@ -161,6 +188,11 @@ export function useOdhOperatorE2eHealth() {
     loading,
     error,
 
+    // Blocker JIRAs
+    blockerJiras,
+    blockerJirasLoading,
+    blockerJirasError,
+
     // Computed insights
     currentlyBlockingComponents,
     suiteHealthSummary,
@@ -170,7 +202,8 @@ export function useOdhOperatorE2eHealth() {
 
     // Actions
     loadHealthData,
-    loadRunHistory
+    loadRunHistory,
+    loadBlockerJiras
   }
 }
 
