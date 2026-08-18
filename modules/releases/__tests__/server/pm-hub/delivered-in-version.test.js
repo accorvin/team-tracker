@@ -101,6 +101,22 @@ describe('fetchDeliveredInVersion', function() {
     expect(client.fetchAllJqlResults.mock.calls[0][0]).toContain('status IN (' + DELIVERED_STATUSES.join(', ') + ')')
   })
 
+  it('clears the timeout timer when Jira returns first', async function() {
+    vi.useFakeTimers()
+    try {
+      var client = {
+        fetchAllJqlResults: vi.fn().mockResolvedValue([])
+      }
+      await fetchDeliveredInVersion(client, {
+        versions: ['3.6 EA2 RHOAI RELEASE'],
+        timeoutMs: 8000
+      })
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('fails soft when Jira throws', async function() {
     var client = {
       fetchAllJqlResults: vi.fn().mockRejectedValue(new Error('Jira down'))

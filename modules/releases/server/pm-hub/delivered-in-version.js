@@ -88,8 +88,9 @@ async function fetchDeliveredInVersion(jiraClient, options) {
 
   var jql = buildDeliveredJql(versions, components)
   var timedOut = false
+  var timer = null
   var timeout = new Promise(function(resolve) {
-    setTimeout(function() {
+    timer = setTimeout(function() {
       timedOut = true
       resolve(null)
     }, timeoutMs)
@@ -108,6 +109,8 @@ async function fetchDeliveredInVersion(jiraClient, options) {
   } catch (err) {
     console.warn('[releases/pm-hub] Delivered-in-version fetch failed:', err && err.message)
     return emptyResult({ error: 'fetch-failed' })
+  } finally {
+    if (timer) clearTimeout(timer)
   }
 }
 
