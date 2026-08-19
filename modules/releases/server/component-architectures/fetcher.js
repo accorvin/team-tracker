@@ -16,7 +16,7 @@ function stripRhelSuffix(name) {
   return name.replace(/-rhel\d+$/, '')
 }
 
-async function discoverReleaseBranches(octokit, { maxBranches = 3 } = {}) {
+async function discoverReleaseBranches(octokit) {
   const branches = await octokit.paginate(octokit.rest.repos.listBranches, {
     owner: OWNER,
     repo: REPO,
@@ -38,34 +38,42 @@ async function discoverReleaseBranches(octokit, { maxBranches = 3 } = {}) {
     return 0
   })
 
-  return rhoaiBranches.slice(0, maxBranches)
+  return rhoaiBranches
 }
 
 async function fetchBranchReport(octokit, branch) {
-  const { data } = await octokit.rest.repos.getContent({
-    owner: OWNER,
-    repo: REPO,
-    path: REPORT_PATH,
-    ref: branch
-  })
+  try {
+    const { data } = await octokit.rest.repos.getContent({
+      owner: OWNER,
+      repo: REPO,
+      path: REPORT_PATH,
+      ref: branch
+    })
 
-  const content = Buffer.from(data.content, 'base64').toString('utf8')
-  const report = yaml.load(content)
+    const content = Buffer.from(data.content, 'base64').toString('utf8')
+    const report = yaml.load(content)
 
-  report.components = (report.components || []).map(comp => {
-    if (comp.imageName) {
-      return comp
+    report.components = (report.components || []).map(comp => {
+      if (comp.imageName) {
+        return comp
+      }
+      const originalName = comp.name
+      return {
+        ...comp,
+        name: stripRhelSuffix(originalName),
+        imageName: originalName,
+        image: `quay.io/rhoai/${originalName}`
+      }
+    })
+
+    report.reportAvailable = true
+    return report
+  } catch (err) {
+    if (err.status === 404) {
+      return { reportAvailable: false, components: [], summary: null }
     }
-    const originalName = comp.name
-    return {
-      ...comp,
-      name: stripRhelSuffix(originalName),
-      imageName: originalName,
-      image: `quay.io/rhoai/${originalName}`
-    }
-  })
-
-  return report
+    throw err
+  }
 }
 
 function registerComponentArchitecturesFetcher(router, context) {
@@ -84,7 +92,7 @@ function registerComponentArchitecturesFetcher(router, context) {
 
     const octokit = new Octokit({ auth: token, request: { timeout: 30000 } })
 
-    const branches = await discoverReleaseBranches(octokit, { maxBranches: 3 })
+    const branches = await discoverReleaseBranches(octokit)
     if (!branches.length) {
       return { status: 'error', message: 'No rhoai-* release branches found' }
     }
@@ -97,12 +105,9 @@ function registerComponentArchitecturesFetcher(router, context) {
         branchData[branch] = await fetchBranchReport(octokit, branch)
       } catch (err) {
         console.warn(`[component-architectures] No report on ${branch}: ${err.message}`)
+        branchData[branch] = { reportAvailable: false, components: [], summary: null }
       }
       if (i < branches.length - 1) await delay(200)
-    }
-
-    if (!Object.keys(branchData).length) {
-      return { status: 'error', message: 'No multi-arch-report.yaml found on any release branch' }
     }
 
     const fetchedAt = new Date().toISOString()
