@@ -1,6 +1,6 @@
 'use strict'
 
-const { registerComponentArchitecturesFetcher, STORAGE_KEY } = require('./fetcher')
+const { registerComponentArchitecturesFetcher, STORAGE_KEY, REGISTRY_KEY, branchesFromRegistry } = require('./fetcher')
 
 /**
  * @param {import('express').Router} router
@@ -32,11 +32,30 @@ function registerComponentArchitecturesRoutes(router, context) {
   router.get('/', requireAuth, requireScope('releases:read'), async function (req, res) {
     try {
       const data = await readFromStorage(STORAGE_KEY)
+
+      const registry = await readFromStorage(REGISTRY_KEY)
+      const registryBranches = branchesFromRegistry(registry)
+
       if (!data) {
-        return res.status(404).json({ error: 'No cached data. Trigger a refresh first.' })
+        const shell = {
+          fetchedAt: null,
+          source: { owner: 'red-hat-data-services', repo: 'konflux-central' },
+          branches: {}
+        }
+        for (const branch of registryBranches) {
+          shell.branches[branch] = { reportAvailable: false, components: [], summary: null }
+        }
+        return res.json(shell)
       }
 
-      if (req.query.branch && data.branches) {
+      if (!data.branches) data.branches = {}
+      for (const branch of registryBranches) {
+        if (!data.branches[branch]) {
+          data.branches[branch] = { reportAvailable: false, components: [], summary: null }
+        }
+      }
+
+      if (req.query.branch) {
         const branch = data.branches[req.query.branch]
         if (!branch) {
           return res.status(404).json({ error: `Branch ${req.query.branch} not found` })

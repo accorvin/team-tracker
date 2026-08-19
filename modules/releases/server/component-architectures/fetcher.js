@@ -179,6 +179,7 @@ function registerComponentArchitecturesFetcher(router, context) {
 module.exports = {
   registerComponentArchitecturesFetcher,
   STORAGE_KEY,
+  REGISTRY_KEY,
   registryIdToBranch,
   branchesFromRegistry,
   fetchBranchReport,
