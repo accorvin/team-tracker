@@ -175,7 +175,6 @@ var subLaneOffset = 80
 var infraSpace = 60
 var lineHeight = 16
 var boxPad = 4
-var _labelGap = 8
 var MILESTONE_DOT_RADIUS = 4
 var MILESTONE_DOT_BORDER = 2
 var TODAY_DOT_RADIUS = 8
@@ -304,10 +303,6 @@ var chartHeight = computed(function () {
 
 function fmtDate(dateStr) {
   return formatShort(dateStr, { year: true })
-}
-
-function shouldDrawStem() {
-  return true
 }
 
 // Pure stacking logic — extracted for testability.
@@ -1178,7 +1173,7 @@ var timelinePlugin = {
     // Stems are straight vertical — OK if they connect to front card's box.
     for (var ssj = 0; ssj < nodeLayouts.length; ssj++) {
       var ssLay = nodeLayouts[ssj]
-      if (!ssLay || !shouldDrawStem(ssLay)) continue
+      if (!ssLay) continue
       var ssPrimary = ssLay.nd.isPast ? pastColor : futureColor
       var stemX = ssLay.x
       ctx.beginPath()
@@ -1406,7 +1401,7 @@ var timelinePlugin = {
       <div
         class="relative"
         :style="{ height: chartHeight + 'px', cursor: isZoomed ? 'grab' : 'default' }"
-        @wheel.prevent="onWheel"
+        @wheel="onWheel"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"

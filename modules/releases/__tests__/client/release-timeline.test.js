@@ -7,6 +7,12 @@ vi.mock('@shared/client/services/api.js', () => ({
 
 import ReleaseTimeline from '../../client/components/ReleaseTimeline.vue'
 
+// Timezone-safe date formatting: uses local components, not toISOString (which is UTC).
+function localIso(y, m, d) {
+  var dt = new Date(y, m, d)
+  return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0')
+}
+
 function makeRelease(id, opts = {}) {
   return {
     id,
@@ -927,8 +933,8 @@ describe('ReleaseTimeline', () => {
     for (var si = 0; si < spacings.length; si++) {
       var off = spacings[si].offset
       var d1 = '2026-10-15'
-      var d2 = new Date(2026, 9, 15 + off).toISOString().slice(0, 10)
-      var d3 = new Date(2026, 9, 15 + off * 2).toISOString().slice(0, 10)
+      var d2 = localIso(2026, 9, 15 + off)
+      var d3 = localIso(2026, 9, 15 + off * 2)
       var releases = [
         makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
           ga: d1 }),
@@ -1058,8 +1064,8 @@ describe('ReleaseTimeline', () => {
           vi.useFakeTimers()
           vi.setSystemTime(new Date('2026-08-14T12:00:00'))
           var d1 = '2026-10-15'
-          var d2 = new Date(2026, 9, 15 + scenario.offset).toISOString().slice(0, 10)
-          var d3 = new Date(2026, 9, 15 + scenario.offset * 2).toISOString().slice(0, 10)
+          var d2 = localIso(2026, 9, 15 + scenario.offset)
+          var d3 = localIso(2026, 9, 15 + scenario.offset * 2)
           var releases = [
             makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
               ga: d1 }),
@@ -1085,8 +1091,8 @@ describe('ReleaseTimeline', () => {
       (function (scenario) {
         it('same-cycle nodes share cycle key at ' + scenario.name + ' spacing', () => {
           var d1 = '2026-10-15'
-          var d2 = new Date(2026, 9, 15 + scenario.offset).toISOString().slice(0, 10)
-          var d3 = new Date(2026, 9, 15 + scenario.offset * 2).toISOString().slice(0, 10)
+          var d2 = localIso(2026, 9, 15 + scenario.offset)
+          var d3 = localIso(2026, 9, 15 + scenario.offset * 2)
           var releases = [
             makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
               ga: d1 }),
@@ -1113,7 +1119,7 @@ describe('ReleaseTimeline', () => {
           vi.useFakeTimers()
           vi.setSystemTime(new Date('2026-08-14T12:00:00'))
           var d1 = '2026-10-15'
-          var d2 = new Date(2026, 9, 15 + scenario.offset).toISOString().slice(0, 10)
+          var d2 = localIso(2026, 9, 15 + scenario.offset)
           var releases = [
             makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
               ga: d1 }),
@@ -1141,15 +1147,14 @@ describe('ReleaseTimeline', () => {
         it('above-axis assignment is stable at ' + scenario.name + ' spacing', () => {
           vi.useFakeTimers()
           vi.setSystemTime(new Date('2026-08-14T12:00:00'))
-          var d1 = '2026-10-15'
-          var d2 = new Date(2026, 9, 15 + scenario.offset).toISOString().slice(0, 10)
+          var d2 = localIso(2026, 9, 15 + scenario.offset)
           var releases = [
             makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
               ga: '2026-08-19' }),
             makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
-              codeFreeze: d1, ga: d2 }),
+              codeFreeze: '2026-10-10', ga: d2 }),
             makeRelease('rhoai-3.6.EA2', { displayName: 'rhoai-3.6.EA2', shortname: 'rhoai',
-              ga: new Date(2026, 9, 15 + scenario.offset * 2).toISOString().slice(0, 10) })
+              ga: localIso(2026, 9, 15 + scenario.offset * 2) })
           ]
           var wrapper = mount(ReleaseTimeline, { props: { releases } })
           var sides = wrapper.vm.cycleSides
@@ -1171,11 +1176,11 @@ describe('ReleaseTimeline', () => {
         var releases = [
           makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
             codeFreeze: '2026-10-01',
-            ga: new Date(2026, 9, 14 + off).toISOString().slice(0, 10) }),
+            ga: localIso(2026, 9, 14 + off) }),
           makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
             ga: '2026-10-15' }),
           makeRelease('rhoai-3.6.EA2', { displayName: 'rhoai-3.6.EA2', shortname: 'rhoai',
-            ga: new Date(2026, 9, 15 + off).toISOString().slice(0, 10) })
+            ga: localIso(2026, 9, 15 + off) })
         ]
         var wrapper = mount(ReleaseTimeline, { props: { releases } })
         var nodes = wrapper.vm.allNodes
@@ -1346,34 +1351,6 @@ describe('ReleaseTimeline', () => {
       var cycle0 = nodes[0].groupLabel.match(/^(\d+\.\d+)/)[1]
       var cycle1 = nodes[1].groupLabel.match(/^(\d+\.\d+)/)[1]
       expect(cycle0).toBe(cycle1)
-    })
-
-    it('shouldDrawStem returns true for all nodes (every dot gets a stem)', () => {
-      var releases = [
-        makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
-          codeFreeze: '2026-10-14', ga: '2026-10-15' }),
-        makeRelease('rhoai-3.6.EA2', { displayName: 'rhoai-3.6.EA2', shortname: 'rhoai',
-          ga: '2026-10-16' })
-      ]
-      var wrapper = mount(ReleaseTimeline, { props: { releases } })
-      var fn = wrapper.vm.shouldDrawStem
-      expect(fn({ stackLevel: 0 })).toBe(true)
-      expect(fn({ stackLevel: 1 })).toBe(true)
-      expect(fn({ stackLevel: 2 })).toBe(true)
-      expect(fn({ stackLevel: 5 })).toBe(true)
-    })
-
-    it('shouldDrawStem returns true regardless of past/future or stackLevel', () => {
-      var releases = [
-        makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
-          ga: '2026-10-15' })
-      ]
-      var wrapper = mount(ReleaseTimeline, { props: { releases } })
-      var fn = wrapper.vm.shouldDrawStem
-      expect(fn({ stackLevel: 0, isPast: false })).toBe(true)
-      expect(fn({ stackLevel: 0, isPast: true })).toBe(true)
-      expect(fn({ stackLevel: 1, isPast: false })).toBe(true)
-      expect(fn({ stackLevel: 3, isPast: true })).toBe(true)
     })
 
     it('all nodes are included in dot rendering (every card gets a dot)', () => {
@@ -1665,7 +1642,7 @@ describe('ReleaseTimeline', () => {
           makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
             ga: '2026-10-15' }),
           makeRelease('rhoai-3.6.EA2', { displayName: 'rhoai-3.6.EA2', shortname: 'rhoai',
-            ga: new Date(2026, 9, 15 + off).toISOString().slice(0, 10) })
+            ga: localIso(2026, 9, 15 + off) })
         ]
         var wrapper = mount(ReleaseTimeline, { props: { releases } })
         var nodes = wrapper.vm.allNodes
@@ -1691,9 +1668,9 @@ describe('ReleaseTimeline', () => {
             ga: '2026-08-19' }),
           makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
             codeFreeze: '2026-10-14',
-            ga: new Date(2026, 9, 14 + off).toISOString().slice(0, 10) }),
+            ga: localIso(2026, 9, 14 + off) }),
           makeRelease('rhoai-3.6.EA2', { displayName: 'rhoai-3.6.EA2', shortname: 'rhoai',
-            ga: new Date(2026, 9, 14 + off * 2).toISOString().slice(0, 10) })
+            ga: localIso(2026, 9, 14 + off * 2) })
         ]
         var wrapper = mount(ReleaseTimeline, { props: { releases } })
         var m = wrapper.vm.layoutMetrics
@@ -1737,15 +1714,6 @@ describe('ReleaseTimeline', () => {
       }
     }
     var TODAY = new Date('2026-08-14').getTime()
-
-    it('shouldDrawStem returns true for all nodes regardless of state', () => {
-      var vm = getVm()
-      var fn = vm.shouldDrawStem
-      expect(fn({ stackLevel: 0, isPast: false })).toBe(true)
-      expect(fn({ stackLevel: 1, isPast: true })).toBe(true)
-      expect(fn({ stackLevel: 3 })).toBe(true)
-      expect(fn({})).toBe(true)
-    })
 
     it('dots render at layout.x (real date position), not stemTargetX', () => {
       var vm = getVm()
