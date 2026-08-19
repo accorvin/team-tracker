@@ -1419,3 +1419,163 @@ test.describe('Program Hygiene Report @releases', () => {
     expect(page.errors).toHaveLength(0);
   });
 });
+
+/**
+ * Feature Status tab (Execute view)
+ *
+ * The Feature Status kanban board uses the shared release selector (product
+ * family + version + phase) and the shared report filter modal (team,
+ * component, label, assignee, type, priority) — the same controls as the
+ * Program Level Release Report. These tests verify those controls render and
+ * open correctly.
+ */
+// The Feature Status view degrades gracefully from two benign, environment-
+// specific responses in demo mode: curated field-options sets have no demo
+// fixtures (404) and /hygiene/config requires planning-manager access (403).
+// Both are handled in-app, so ignore benign resource-load failures here while
+// still catching real JS exceptions and other unexpected console errors.
+function unexpectedHygieneErrors(page) {
+  return (page.errors || []).filter(
+    e => !(e.type === 'console.error' && /Failed to load resource.*\b40[134]\b/.test(e.message))
+  );
+}
+
+async function dismissHygieneWelcome(page) {
+  const modal = page.locator('[data-testid="hygiene-welcome-modal"]').first();
+  if (await modal.isVisible().catch(() => false)) {
+    await modal.locator('button', { hasText: 'Got it' }).first().click().catch(() => {});
+    await modal.waitFor({ state: 'hidden' }).catch(() => {});
+  }
+}
+
+test.describe('Feature Status filtering @releases', () => {
+  test.beforeEach(async ({ page }) => {
+    setupErrorTracking(page);
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    logCapturedErrors(page, testInfo);
+  });
+
+  test('tab loads with the condensed toolbar controls', async ({ page }) => {
+    await page.goto('/#/releases/execute?tab=feature-status');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+    await dismissHygieneWelcome(page);
+
+    // Purpose subtitle keeps the page's intent discoverable
+    await expect(page.locator('text=Tracks hygiene-rule compliance').first()).toBeVisible();
+
+    // Compact toolbar: release selector + always-present "Hygiene rules" entry point
+    await expect(page.locator('[data-testid="hygiene-release-selector"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid="hygiene-rules-button"]').first()).toBeVisible();
+
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+  });
+
+  test('release selector modal opens with family, version, and phase', async ({ page }) => {
+    await page.goto('/#/releases/execute?tab=feature-status');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+    await dismissHygieneWelcome(page);
+
+    await page.locator('[data-testid="hygiene-release-selector"]').first().click();
+    await page.waitForTimeout(300);
+
+    await expect(page.locator('text=Product Family').first()).toBeVisible();
+    await expect(page.locator('text=Version').first()).toBeVisible();
+    await expect(page.locator('text=Phase').first()).toBeVisible();
+
+    await expect(page.locator('button', { hasText: 'Cancel' }).first()).toBeVisible();
+    await expect(page.locator('button', { hasText: 'Apply' }).first()).toBeVisible();
+
+    // Close via Escape
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+  });
+
+  test('hygiene rules modal is reachable from the toolbar', async ({ page }) => {
+    await page.goto('/#/releases/execute?tab=feature-status');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Dismiss the first-visit welcome modal, then reopen it via the toolbar button
+    await dismissHygieneWelcome(page);
+
+    await page.locator('[data-testid="hygiene-rules-button"]').first().click();
+    await page.waitForTimeout(300);
+
+    // Welcome/rules modal exposes a Hygiene Rules tab for discoverability
+    await expect(page.locator('text=Hygiene Rules').first()).toBeVisible();
+
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+  });
+
+  test('field filter modal opens with the expected filter fields', async ({ page }) => {
+    await page.goto('/#/releases/execute?tab=feature-status');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+    await dismissHygieneWelcome(page);
+
+    // The Filters control only shows once a release is selected. In demo mode a
+    // default selection is auto-applied, so it should normally be present.
+    const filtersButton = page.locator('[data-testid="hygiene-filters-button"]').first();
+    const hasSelection = await filtersButton.isVisible().catch(() => false);
+
+    if (hasSelection) {
+      await filtersButton.click();
+      await page.waitForTimeout(300);
+
+      // Modal heading and the six filter fields in the left pane
+      await expect(page.locator('h3', { hasText: 'Filters' }).first()).toBeVisible();
+      await expect(page.locator('text=Team').first()).toBeVisible();
+      await expect(page.locator('text=Component').first()).toBeVisible();
+      await expect(page.locator('text=Assignee').first()).toBeVisible();
+      await expect(page.locator('button', { hasText: 'Saved Presets' }).first()).toBeVisible();
+
+      // Close the modal
+      await page.locator('button', { hasText: 'Done' }).first().click();
+      await page.waitForTimeout(300);
+    }
+
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+  });
+
+  test('clicking a feature card opens the summary drawer', async ({ page }) => {
+    await page.goto('/#/releases/execute?tab=feature-status');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+    await dismissHygieneWelcome(page);
+
+    // Requires loaded features; skip gracefully if the board is empty in this env
+    const card = page.locator('[data-testid="hygiene-feature-card"]').first();
+    const hasCard = await card.isVisible().catch(() => false);
+
+    if (hasCard) {
+      await card.click();
+      await page.waitForTimeout(400);
+
+      const drawer = page.locator('[data-testid="feature-drawer"]');
+      await expect(drawer).toBeVisible();
+
+      // Key sections
+      await expect(drawer.locator('text=Status Summary').first()).toBeVisible();
+      await expect(drawer.locator('text=Hygiene Violations').first()).toBeVisible();
+
+      // Both navigation affordances
+      await expect(drawer.getByRole('button', { name: 'View full details' })).toBeVisible();
+      const jiraLink = drawer.getByRole('link', { name: /Open in Jira/ });
+      await expect(jiraLink).toBeVisible();
+      await expect(jiraLink).toHaveAttribute('href', /redhat\.atlassian\.net\/browse\//);
+
+      // Close the drawer
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      await expect(drawer).toHaveCount(0);
+    }
+
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+  });
+});

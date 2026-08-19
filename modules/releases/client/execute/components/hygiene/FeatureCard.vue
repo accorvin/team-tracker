@@ -64,6 +64,7 @@ function closeTooltip() {
 
 <template>
   <div
+    data-testid="hygiene-feature-card"
     class="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
     @click="$emit('click')"
   >
