@@ -1,8 +1,6 @@
 'use strict'
 
-const { registerComponentArchitecturesFetcher, STORAGE_KEY, branchesFromRegistry } = require('./fetcher')
-
-const REGISTRY_KEY = 'releases/registry.json'
+const { registerComponentArchitecturesFetcher, STORAGE_KEY, REGISTRY_KEY, branchesFromRegistry } = require('./fetcher')
 
 /**
  * @param {import('express').Router} router
