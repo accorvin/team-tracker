@@ -308,7 +308,7 @@ test.describe('Releases PM Hub @releases', () => {
       await expect(page.locator('text=Requested').first()).toBeVisible();
       await expect(page.locator('text=Committed').first()).toBeVisible();
       await expect(page.locator('text=Delivered').first()).toBeVisible();
-      await expect(page.getByText('On time', { exact: true }).first()).toBeVisible();
+      await expect(page.getByText('Early or as requested', { exact: true }).first()).toBeVisible();
       await expect(page.getByRole('button', { name: 'Align legend' }).first()).toBeVisible();
       await expect(page.locator('text=Selected scope').first()).toBeVisible();
       await expect(page.locator('text=Avg Features Delivered')).toHaveCount(0);
@@ -804,6 +804,7 @@ test.describe('Releases FPDoR Readiness @releases', () => {
       expect([
         'aligned_on_time',
         'aligned_late',
+        'after_requested',
         'misaligned',
         'tv_only',
         'fv_only'

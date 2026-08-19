@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest'
 import {
   uniqueFeaturesFromGroups,
   countAlignment,
+  countAlignmentForGroups,
   buildAlignmentRollup,
   countDeliveredInVisibleVersions
 } from '../../../client/plan/utils/alignment-rollup.js'
@@ -70,6 +71,7 @@ describe('countAlignment', function() {
     expect(counts.total).toBe(5)
     expect(counts.aligned_on_time).toBe(1)
     expect(counts.aligned_late).toBe(1)
+    expect(counts.after_requested).toBe(0)
     expect(counts.tv_only).toBe(1)
     expect(counts.fv_only).toBe(1)
     expect(counts.misaligned).toBe(1)
@@ -115,5 +117,70 @@ describe('countDeliveredInVisibleVersions', function() {
       '3.6 EA2 RHOAI RELEASE',
       '3.6 EA2 RHAII RELEASE'
     ])).toBe(2)
+  })
+})
+
+describe('countAlignmentForGroups', function() {
+  it('uses unfrozen groups only when any selected release is still open', function() {
+    var groups = [
+      {
+        version: '3.6 EA1 RHOAI RELEASE',
+        planningFrozen: true,
+        components: [{
+          component: 'Dashboard',
+          requestedFeatures: [feature({ key: 'MOVED', alignmentCategory: 'after_requested' })],
+          committedFeatures: []
+        }]
+      },
+      {
+        version: '3.6 EA2 RHOAI RELEASE',
+        planningFrozen: false,
+        components: [{
+          component: 'Dashboard',
+          requestedFeatures: [],
+          committedFeatures: [feature({ key: 'MOVED', alignmentCategory: 'after_requested' })]
+        }]
+      }
+    ]
+    var counts = countAlignmentForGroups(groups)
+    expect(counts.total).toBe(1)
+    expect(counts.after_requested).toBe(1)
+    expect(counts.alignment_pct).toBe(0)
+  })
+
+  it('discounts After requested leavers from a frozen requested release', function() {
+    var groups = [{
+      version: '3.6 EA1 RHOAI RELEASE',
+      planningFrozen: true,
+      components: [{
+        component: 'Dashboard',
+        requestedFeatures: [
+          feature({ key: 'STAY', alignmentCategory: 'aligned_on_time' }),
+          feature({ key: 'LEFT', alignmentCategory: 'after_requested' })
+        ],
+        committedFeatures: [feature({ key: 'STAY', alignmentCategory: 'aligned_on_time' })]
+      }]
+    }]
+    var counts = countAlignmentForGroups(groups)
+    expect(counts.total).toBe(1)
+    expect(counts.aligned_on_time).toBe(1)
+    expect(counts.after_requested).toBe(0)
+    expect(counts.alignment_pct).toBe(100)
+  })
+
+  it('counts green After requested on a frozen committed release', function() {
+    var groups = [{
+      version: '3.6 EA2 RHOAI RELEASE',
+      planningFrozen: true,
+      components: [{
+        component: 'Dashboard',
+        requestedFeatures: [],
+        committedFeatures: [feature({ key: 'ARRIVED', alignmentCategory: 'aligned_late' })]
+      }]
+    }]
+    var counts = countAlignmentForGroups(groups)
+    expect(counts.total).toBe(1)
+    expect(counts.aligned_late).toBe(1)
+    expect(counts.alignment_pct).toBe(100)
   })
 })

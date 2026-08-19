@@ -20,16 +20,17 @@ const FEATURE_COLS = [
 const COLUMN_HELP = {
   release: 'Jira Target Version / Fix Version name for this product release.',
   total: 'All features that have this release on Target Version (TV) or Fix Version (FV). Cycle/milestone rollups count each issue once across products.',
-  aligned_on_time: 'Aligned on time: Fix Version matches Target Version, or ships earlier than planned.',
-  aligned_late: 'Aligned late: Fix Version is later than Target Version, but planning freeze for that Target Version has already passed — accepted slip.',
+  aligned_on_time: 'Early or as requested: Fix Version is the same milestone as Target Version, or an earlier one. Not a calendar on-schedule flag.',
+  aligned_late: 'After requested (green): Fix Version is a later milestone than Target Version, and the committed version freeze has passed. Counts in Align %.',
+  after_requested: 'After requested (yellow): Fix Version is a later milestone than Target Version, and the committed version freeze has not passed. Does not count in Align % yet.',
   tv_only: 'TV-only: Target Version is set for this release, but Fix Version is empty.',
   fv_only: 'FV-only: Fix Version is set for this release, but Target Version is empty.',
-  misaligned: 'Misaligned: Fix Version slips past Target Version before planning freeze, or TV/FV point at different products (for example RHOAI vs RHAII).',
-  alignment_pct: 'Alignment % = (Aligned on time + Aligned late) ÷ Total features.',
+  misaligned: 'Different products: Target Version and Fix Version are different products, or the version names cannot be compared.',
+  alignment_pct: 'Alignment % = (Early or as requested + green After requested) ÷ Total features.',
   target: 'Suggested alignment goal based on how many days remain until planning freeze.',
   ga_date: 'Release / GA date from Product Pages for this version.',
   days_to_ga: 'Days remaining until the Product Pages release / GA date.',
-  planning_freeze: 'Planning freeze date from Product Pages. After this date, late FV slips count as Aligned late instead of Misaligned.',
+  planning_freeze: 'Planning freeze date from Product Pages. After requested turns green after the committed (Fix Version) freeze, not the requested freeze.',
   days_to_freeze: 'Days remaining until planning freeze.',
 }
 
@@ -138,6 +139,7 @@ const sectionJiraLinks = computed(() => {
     fv_only: buildKeysJqlUrl(rd.fv_only),
     aligned_on_time: buildKeysJqlUrl(rd.aligned_on_time),
     aligned_late: buildKeysJqlUrl(rd.aligned_late),
+    after_requested: buildKeysJqlUrl(rd.after_requested),
     misaligned: buildKeysJqlUrl(rd.misaligned),
   }
 })
@@ -155,7 +157,7 @@ const filteredSummary = computed(() => {
   for (const name of chosenVersionNames.value) {
     if (!existingReleases.has(name)) {
       rows.push({
-        release: name, total: 0, aligned_on_time: 0, aligned_late: 0, tv_only: 0, fv_only: 0, misaligned: 0,
+        release: name, total: 0, aligned_on_time: 0, aligned_late: 0, after_requested: 0, tv_only: 0, fv_only: 0, misaligned: 0,
         alignment_pct: 0, _pending: true,
       })
     }
@@ -330,10 +332,10 @@ onBeforeUnmount(() => {
                   <span class="inline-flex items-center gap-1 justify-end">Total<span class="normal-case text-[10px] text-gray-400" aria-hidden="true">ⓘ</span><svg v-if="summarySortIcon('total') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('total') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
                 </th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" :title="COLUMN_HELP.aligned_on_time" @click="toggleSummarySort('aligned_on_time')">
-                  <span class="inline-flex items-center gap-1 justify-end">Aligned On Time<span class="normal-case text-[10px] text-gray-400" aria-hidden="true">ⓘ</span><svg v-if="summarySortIcon('aligned_on_time') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('aligned_on_time') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
+                  <span class="inline-flex items-center gap-1 justify-end">Early or as requested<span class="normal-case text-[10px] text-gray-400" aria-hidden="true">ⓘ</span><svg v-if="summarySortIcon('aligned_on_time') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('aligned_on_time') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
                 </th>
-                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" :title="COLUMN_HELP.aligned_late" @click="toggleSummarySort('aligned_late')">
-                  <span class="inline-flex items-center gap-1 justify-end">Aligned Late<span class="normal-case text-[10px] text-gray-400" aria-hidden="true">ⓘ</span><svg v-if="summarySortIcon('aligned_late') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('aligned_late') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" :title="COLUMN_HELP.after_requested + ' ' + COLUMN_HELP.aligned_late" @click="toggleSummarySort('after_requested')">
+                  <span class="inline-flex items-center gap-1 justify-end">After requested<span class="normal-case text-[10px] text-gray-400" aria-hidden="true">ⓘ</span><svg v-if="summarySortIcon('after_requested') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('after_requested') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
                 </th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" :title="COLUMN_HELP.tv_only" @click="toggleSummarySort('tv_only')">
                   <span class="inline-flex items-center gap-1 justify-end">TV-Only<span class="normal-case text-[10px] text-gray-400" aria-hidden="true">ⓘ</span><svg v-if="summarySortIcon('tv_only') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('tv_only') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
@@ -342,7 +344,7 @@ onBeforeUnmount(() => {
                   <span class="inline-flex items-center gap-1 justify-end">FV-Only<span class="normal-case text-[10px] text-gray-400" aria-hidden="true">ⓘ</span><svg v-if="summarySortIcon('fv_only') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('fv_only') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
                 </th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" :title="COLUMN_HELP.misaligned" @click="toggleSummarySort('misaligned')">
-                  <span class="inline-flex items-center gap-1 justify-end">Misaligned<span class="normal-case text-[10px] text-gray-400" aria-hidden="true">ⓘ</span><svg v-if="summarySortIcon('misaligned') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('misaligned') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
+                  <span class="inline-flex items-center gap-1 justify-end">Different products<span class="normal-case text-[10px] text-gray-400" aria-hidden="true">ⓘ</span><svg v-if="summarySortIcon('misaligned') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('misaligned') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
                 </th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors" :title="COLUMN_HELP.alignment_pct" @click="toggleSummarySort('alignment_pct')">
                   <span class="inline-flex items-center gap-1 justify-end">Alignment %<span class="normal-case text-[10px] text-gray-400" aria-hidden="true">ⓘ</span><svg v-if="summarySortIcon('alignment_pct') !== 'none'" class="w-3 h-3 inline-block transition-transform" :class="{ 'rotate-180': summarySortIcon('alignment_pct') === 'desc' }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></span>
@@ -373,7 +375,11 @@ onBeforeUnmount(() => {
                   </td>
                   <td class="px-4 py-2.5 text-right text-xs font-semibold text-gray-700 dark:text-gray-200">{{ cycle.totals.total }}</td>
                   <td class="px-4 py-2.5 text-right text-xs font-semibold text-green-700 dark:text-green-400">{{ cycle.totals.aligned_on_time }}</td>
-                  <td class="px-4 py-2.5 text-right text-xs font-semibold text-amber-600 dark:text-amber-400">{{ cycle.totals.aligned_late }}</td>
+                  <td class="px-4 py-2.5 text-right text-xs font-semibold whitespace-nowrap">
+                    <span class="text-amber-600 dark:text-amber-400">{{ cycle.totals.after_requested || 0 }}</span>
+                    <span class="text-gray-400 dark:text-gray-500 mx-0.5">/</span>
+                    <span class="text-emerald-600 dark:text-emerald-400">{{ cycle.totals.aligned_late }}</span>
+                  </td>
                   <td class="px-4 py-2.5 text-right text-xs font-semibold text-yellow-700 dark:text-yellow-400">{{ cycle.totals.tv_only }}</td>
                   <td class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400">{{ cycle.totals.fv_only }}</td>
                   <td class="px-4 py-2.5 text-right text-xs font-semibold text-red-700 dark:text-red-400">{{ cycle.totals.misaligned }}</td>
@@ -401,7 +407,11 @@ onBeforeUnmount(() => {
                     </td>
                     <td class="px-4 py-2 text-right text-xs font-medium text-gray-600 dark:text-gray-300">{{ ms.totals.total }}</td>
                     <td class="px-4 py-2 text-right text-xs font-medium text-green-700 dark:text-green-400">{{ ms.totals.aligned_on_time }}</td>
-                    <td class="px-4 py-2 text-right text-xs font-medium text-amber-600 dark:text-amber-400">{{ ms.totals.aligned_late }}</td>
+                    <td class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap">
+                      <span class="text-amber-600 dark:text-amber-400">{{ ms.totals.after_requested || 0 }}</span>
+                      <span class="text-gray-400 dark:text-gray-500 mx-0.5">/</span>
+                      <span class="text-emerald-600 dark:text-emerald-400">{{ ms.totals.aligned_late }}</span>
+                    </td>
                     <td class="px-4 py-2 text-right text-xs font-medium text-yellow-700 dark:text-yellow-400">{{ ms.totals.tv_only }}</td>
                     <td class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">{{ ms.totals.fv_only }}</td>
                     <td class="px-4 py-2 text-right text-xs font-medium text-red-700 dark:text-red-400">{{ ms.totals.misaligned }}</td>
@@ -447,7 +457,11 @@ onBeforeUnmount(() => {
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
-                      <span v-if="!row._pending" class="text-xs font-medium text-amber-600 dark:text-amber-400" :title="COLUMN_HELP.aligned_late">{{ row.aligned_late || 0 }}</span>
+                      <span v-if="!row._pending" class="text-xs font-medium whitespace-nowrap" :title="COLUMN_HELP.after_requested + ' ' + COLUMN_HELP.aligned_late">
+                        <span class="text-amber-600 dark:text-amber-400">{{ row.after_requested || 0 }}</span>
+                        <span class="text-gray-400 dark:text-gray-500 mx-0.5">/</span>
+                        <span class="text-emerald-600 dark:text-emerald-400">{{ row.aligned_late || 0 }}</span>
+                      </span>
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
@@ -459,7 +473,7 @@ onBeforeUnmount(() => {
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
-                      <span v-if="!row._pending" class="text-xs font-medium text-red-600 dark:text-red-400">{{ row.misaligned != null ? row.misaligned : (row.mismatched || 0) }}</span>
+                      <span v-if="!row._pending" class="text-xs font-medium text-orange-600 dark:text-orange-400">{{ row.misaligned != null ? row.misaligned : (row.mismatched || 0) }}</span>
                       <span v-else class="text-gray-400">&mdash;</span>
                     </td>
                     <td class="px-4 py-2 text-right">
@@ -730,7 +744,7 @@ onBeforeUnmount(() => {
             <span class="flex items-center gap-2 min-w-0">
               <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform shrink-0">&#9654;</span>
               <span class="text-sm font-semibold text-green-700 dark:text-green-400 truncate" :title="COLUMN_HELP.aligned_on_time">
-                Aligned On Time — shipping on or ahead of plan ({{ releaseData.aligned_on_time.length }})
+                Aligned — Early or as requested ({{ releaseData.aligned_on_time.length }})
               </span>
             </span>
             <a
@@ -751,13 +765,40 @@ onBeforeUnmount(() => {
           />
         </details>
 
-        <!-- Aligned (late) -->
-        <details v-if="releaseData.aligned_late.length" class="group bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-800 overflow-hidden mb-4">
+        <!-- After requested (yellow, before committed freeze) -->
+        <details v-if="(releaseData.after_requested || []).length" class="group bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-800 overflow-hidden mb-4">
           <summary class="list-none px-4 py-3 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/10 flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
             <span class="flex items-center gap-2 min-w-0">
               <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform shrink-0">&#9654;</span>
-              <span class="text-sm font-semibold text-amber-600 dark:text-amber-400 truncate" :title="COLUMN_HELP.aligned_late">
-                Aligned Late — slipped after planning freeze ({{ releaseData.aligned_late.length }})
+              <span class="text-sm font-semibold text-amber-600 dark:text-amber-400 truncate" :title="COLUMN_HELP.after_requested">
+                After requested — committed freeze not yet passed ({{ releaseData.after_requested.length }})
+              </span>
+            </span>
+            <a
+              v-if="sectionJiraLinks.after_requested"
+              :href="sectionJiraLinks.after_requested"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="shrink-0 whitespace-nowrap text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              @click.stop
+            >
+              View in Jira &rarr;
+            </a>
+          </summary>
+          <FeatureTable
+            :features="releaseData.after_requested"
+            :columns="FEATURE_COLS"
+            highlight-version-delta
+          />
+        </details>
+
+        <!-- After requested (green, after committed freeze) -->
+        <details v-if="releaseData.aligned_late.length" class="group bg-white dark:bg-gray-800 rounded-lg border border-emerald-200 dark:border-emerald-800 overflow-hidden mb-4">
+          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/10 flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform shrink-0">&#9654;</span>
+              <span class="text-sm font-semibold text-emerald-600 dark:text-emerald-400 truncate" :title="COLUMN_HELP.aligned_late">
+                After requested — committed freeze has passed ({{ releaseData.aligned_late.length }})
               </span>
             </span>
             <a
@@ -777,13 +818,13 @@ onBeforeUnmount(() => {
           />
         </details>
 
-        <!-- Misaligned -->
-        <details v-if="releaseData.misaligned.length" class="group bg-white dark:bg-gray-800 rounded-lg border border-red-200 dark:border-red-800 overflow-hidden mb-4">
-          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+        <!-- Different products -->
+        <details v-if="releaseData.misaligned.length" class="group bg-white dark:bg-gray-800 rounded-lg border border-orange-200 dark:border-orange-800 overflow-hidden mb-4">
+          <summary class="list-none px-4 py-3 cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-900/10 flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
             <span class="flex items-center gap-2 min-w-0">
               <span class="text-xs text-gray-400 group-open:rotate-90 transition-transform shrink-0">&#9654;</span>
-              <span class="text-sm font-semibold text-red-700 dark:text-red-400 truncate" :title="COLUMN_HELP.misaligned">
-                Misaligned — slip before freeze, or different products ({{ releaseData.misaligned.length }})
+              <span class="text-sm font-semibold text-orange-700 dark:text-orange-400 truncate" :title="COLUMN_HELP.misaligned">
+                Different products ({{ releaseData.misaligned.length }})
               </span>
             </span>
             <a
@@ -819,11 +860,11 @@ onBeforeUnmount(() => {
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">PM</th>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">ENG</th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" :title="COLUMN_HELP.total">Total</th>
-                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" :title="COLUMN_HELP.aligned_on_time">Aligned On Time</th>
-                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" :title="COLUMN_HELP.aligned_late">Aligned Late</th>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" :title="COLUMN_HELP.aligned_on_time">Early or as requested</th>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" :title="COLUMN_HELP.after_requested + ' ' + COLUMN_HELP.aligned_late">After requested</th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" :title="COLUMN_HELP.tv_only">TV-Only</th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" :title="COLUMN_HELP.fv_only">FV-Only</th>
-                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" :title="COLUMN_HELP.misaligned">Misaligned</th>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" :title="COLUMN_HELP.misaligned">Different products</th>
                 <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" :title="COLUMN_HELP.alignment_pct">Alignment %</th>
               </tr>
             </thead>
@@ -844,10 +885,12 @@ onBeforeUnmount(() => {
                   <ClickableCount :count="comp.total" :jql="comp.total_jql" label="Total features" />
                 </td>
                 <td class="px-4 py-2 text-right">
-                  <ClickableCount :count="comp.aligned_on_time" :jql="comp.aligned_on_time_jql" color="green" label="Aligned on time" />
+                  <ClickableCount :count="comp.aligned_on_time" :jql="comp.aligned_on_time_jql" color="green" label="Early or as requested" />
                 </td>
-                <td class="px-4 py-2 text-right">
-                  <ClickableCount :count="comp.aligned_late" :jql="comp.aligned_late_jql" color="amber" label="Aligned late" />
+                <td class="px-4 py-2 text-right whitespace-nowrap">
+                  <span class="text-xs font-medium text-amber-600 dark:text-amber-400">{{ comp.after_requested || 0 }}</span>
+                  <span class="text-gray-400 dark:text-gray-500 mx-0.5">/</span>
+                  <span class="text-xs font-medium text-emerald-600 dark:text-emerald-400">{{ comp.aligned_late || 0 }}</span>
                 </td>
                 <td class="px-4 py-2 text-right">
                   <ClickableCount :count="comp.tv_only" :jql="comp.tv_only_jql" color="yellow" label="TV-only" />
@@ -856,7 +899,7 @@ onBeforeUnmount(() => {
                   <ClickableCount :count="comp.fv_only" :jql="comp.fv_only_jql" color="muted" label="FV-only" />
                 </td>
                 <td class="px-4 py-2 text-right">
-                  <ClickableCount :count="comp.misaligned" :jql="comp.misaligned_jql" color="red" label="Misaligned" />
+                  <ClickableCount :count="comp.misaligned" :jql="comp.misaligned_jql" color="red" label="Different products" />
                 </td>
                 <td class="px-4 py-2 text-right">
                   <span

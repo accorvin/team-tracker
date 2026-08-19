@@ -205,11 +205,12 @@ describe('TvFvDeltaView executive summary sorting', function () {
     var wrapper = await mountView()
     var table = findSummaryTable(wrapper)
     var headers = table.findAll('thead th')
-    // Should have: Release, Total, Aligned On Time, Aligned Late, TV-Only, FV-Only, Misaligned, Alignment %, Align Target, GA Date, Days to GA, Planning Freeze, Days to Freeze
+    // Should have: Release, Total, Early or as requested, After requested, TV-Only, FV-Only, Different products, Alignment %, Align Target, GA Date, Days to GA, Planning Freeze, Days to Freeze
     expect(headers.length).toBe(13)
     var headerText = headers.map(function (th) { return th.text().replace(/ⓘ/g, '').trim() })
-    expect(headerText).toContain('Aligned On Time')
-    expect(headerText).toContain('Aligned Late')
+    expect(headerText).toContain('Early or as requested')
+    expect(headerText).toContain('After requested')
+    expect(headerText).toContain('Different products')
     expect(headerText).toContain('Align Target')
   })
 
@@ -316,7 +317,7 @@ describe('TvFvDeltaView milestone vs product selection', function () {
     expect(wrapper.text()).toContain('Showing features for')
     expect(wrapper.text()).toContain('3.6 GA Release')
     expect(wrapper.text()).toMatch(/all products \(2\)/)
-    expect(wrapper.text()).toContain('Aligned On Time')
+    expect(wrapper.text()).toContain('Early or as requested')
     expect(wrapper.text()).toContain('(2)')
     expect(wrapper.text()).toContain('TV-Only — Target Version set, no Fix Version (1)')
   })
@@ -358,7 +359,7 @@ describe('TvFvDeltaView milestone vs product selection', function () {
     expect(wrapper.text()).toContain('Showing features for')
     expect(wrapper.text()).toContain('3.6 GA RHOAI RELEASE')
     expect(wrapper.text()).not.toMatch(/all products \(2\)/)
-    expect(wrapper.text()).toContain('Aligned On Time')
+    expect(wrapper.text()).toContain('Early or as requested')
     expect(wrapper.text()).toContain('(1)')
   })
 })
@@ -368,7 +369,7 @@ describe('TvFvDeltaView category section Jira links', function () {
     mockApiRequest.mockReset()
   })
 
-  it('shows View in Jira on Misaligned when the section has features', async function () {
+  it('shows View in Jira on Different products when the section has features', async function () {
     var wrapper = await mountView({
       releases: {
         '3.6 GA RHOAI RELEASE': {
@@ -393,7 +394,7 @@ describe('TvFvDeltaView category section Jira links', function () {
     })
 
     var misaligned = wrapper.findAll('details').find(function (d) {
-      return d.text().includes('Misaligned —')
+      return d.text().includes('Different products')
     })
     expect(misaligned).toBeTruthy()
     var jiraLink = misaligned.findAll('a').find(function (a) {
@@ -441,7 +442,7 @@ describe('TvFvDeltaView component breakdown PM/ENG columns', function () {
     var table = details.find('table')
     var headers = table.findAll('thead th').map(function (th) { return th.text().trim() })
     expect(headers).toEqual([
-      'Component', 'PM', 'ENG', 'Total', 'Aligned On Time', 'Aligned Late', 'TV-Only', 'FV-Only', 'Misaligned', 'Alignment %',
+      'Component', 'PM', 'ENG', 'Total', 'Early or as requested', 'After requested', 'TV-Only', 'FV-Only', 'Different products', 'Alignment %',
     ])
 
     var servingRow = table.findAll('tbody tr').find(function (r) {

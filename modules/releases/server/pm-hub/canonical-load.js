@@ -6,7 +6,8 @@
 const { filterCommittedFixVersions } = require('./committed-definition')
 const {
   classifyForRelease,
-  isAlignedCategory
+  isAlignedCategory,
+  isReleaseFrozen
 } = require('../tv-fv-delta/alignment')
 
 /**
@@ -212,6 +213,7 @@ function buildComponentReleaseLoadGroups(canonicalFeatures, filters) {
     }
     return {
       version: vg.version,
+      planningFrozen: isReleaseFrozen(vg.version, releaseDates),
       components: compGroups,
       requestedCount: totalRequested,
       committedCount: totalCommitted,

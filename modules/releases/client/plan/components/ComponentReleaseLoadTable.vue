@@ -23,9 +23,10 @@ import {
   worseAlignmentCategory,
   isAlignedCategory,
   alignmentCategoryLabel,
-  alignmentCategoryChipClass
+  alignmentCategoryChipClass,
+  ALIGNMENT_DISPLAY_KEYS
 } from '../utils/tv-fv-alignment-display.js'
-import { ALIGNMENT_COUNT_KEYS, countAlignment } from '../utils/alignment-rollup.js'
+import { countAlignment, afterRequestedSplit } from '../utils/alignment-rollup.js'
 
 const props = defineProps({
   groups: { type: Array, default: () => [] },
@@ -56,7 +57,8 @@ var ALIGNMENT_SORT_ORDER = {
   aligned_late: 1,
   fv_only: 2,
   tv_only: 3,
-  misaligned: 4
+  after_requested: 4,
+  misaligned: 5
 }
 
 var sortState = reactive({
@@ -391,15 +393,29 @@ defineExpose({ expandAll, collapseAll })
                     ? 'bg-red-100 dark:bg-red-800/40 text-red-700 dark:text-red-300'
                     : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'"
                 >{{ comp.blockedCount }} blocked</span>
-                <span
-                  v-for="cat in ALIGNMENT_COUNT_KEYS"
-                  :key="cat"
-                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                  :class="comp.alignmentCounts[cat] > 0
-                    ? alignmentCategoryChipClass(cat)
-                    : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'"
-                  :title="'Unique features in this component only. Hub tiles above count each issue once across all components.'"
-                >{{ comp.alignmentCounts[cat] }} {{ alignmentCategoryLabel(cat) }}</span>
+                <template v-for="cat in ALIGNMENT_DISPLAY_KEYS" :key="cat">
+                  <span
+                    v-if="cat !== 'after_requested'"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                    :class="comp.alignmentCounts[cat] > 0
+                      ? alignmentCategoryChipClass(cat)
+                      : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'"
+                    :title="'Unique features in this component only. Hub tiles above count each issue once across all components.'"
+                  >{{ comp.alignmentCounts[cat] || 0 }} {{ alignmentCategoryLabel(cat) }}</span>
+                  <span
+                    v-else
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                    :class="afterRequestedSplit(comp.alignmentCounts).total > 0
+                      ? 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200'
+                      : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'"
+                    title="After requested: yellow until the committed version freeze, then green. Unique features in this component only."
+                  >
+                    <span class="tabular-nums" :class="afterRequestedSplit(comp.alignmentCounts).yellow > 0 ? 'text-amber-700 dark:text-amber-300' : ''">{{ afterRequestedSplit(comp.alignmentCounts).yellow }}</span>
+                    <span>/</span>
+                    <span class="tabular-nums" :class="afterRequestedSplit(comp.alignmentCounts).green > 0 ? 'text-emerald-700 dark:text-emerald-300' : ''">{{ afterRequestedSplit(comp.alignmentCounts).green }}</span>
+                    After requested
+                  </span>
+                </template>
               </div>
               <div v-if="getLeads(comp.component)" class="flex items-center gap-5 mt-2 ml-[38px]">
                 <div v-if="getLeads(comp.component).pmLead" class="flex items-center gap-1.5">

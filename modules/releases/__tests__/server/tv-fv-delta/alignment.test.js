@@ -35,14 +35,15 @@ describe('tv-fv-delta/alignment (PM Hub shared)', function() {
     expect(isAlignedCategory(cat)).toBe(false)
   })
 
-  it('classifies unfrozen slip as misaligned', function() {
+  it('classifies unfrozen later Fix Version as after_requested', function() {
     var cat = classifyForRelease(['rhoai-3.5'], ['rhoai-3.6'], 'rhoai-3.5', {})
-    expect(cat).toBe('misaligned')
+    expect(cat).toBe('after_requested')
+    expect(isAlignedCategory(cat)).toBe(false)
   })
 
-  it('classifies frozen slip as aligned_late', function() {
+  it('classifies later Fix Version as aligned_late after committed freeze', function() {
     var releaseDates = {
-      'rhoai 3 5': { planningFreezeDate: '2020-01-01', dueDate: '2020-02-01' }
+      'rhoai 3 6': { planningFreezeDate: '2020-01-01', dueDate: '2020-02-01' }
     }
     var cat = classifyForRelease(['rhoai-3.5'], ['rhoai-3.6'], 'rhoai-3.5', releaseDates)
     expect(cat).toBe('aligned_late')
@@ -54,7 +55,11 @@ describe('tv-fv-delta/alignment (PM Hub shared)', function() {
   })
 
   it('labels and worstCategory helpers work', function() {
-    expect(categoryLabel('aligned_on_time')).toBe('On time')
+    expect(categoryLabel('aligned_on_time')).toBe('Early or as requested')
+    expect(categoryLabel('aligned_late')).toBe('After requested')
+    expect(categoryLabel('after_requested')).toBe('After requested')
+    expect(categoryLabel('misaligned')).toBe('Different products')
     expect(worstCategory(['aligned_on_time', 'misaligned', 'tv_only'])).toBe('misaligned')
+    expect(worstCategory(['aligned_late', 'after_requested'])).toBe('after_requested')
   })
 })

@@ -242,9 +242,9 @@
             v-for="cat in alignmentChipKeys"
             :key="cat"
             type="button"
-            @click="toggleFilter('filterAlignment', cat)"
+            @click="toggleAlignmentDisplayKey(cat)"
             class="px-2.5 py-1 text-[11px] font-medium transition-colors"
-            :class="filterAlignment.includes(cat) ? alignmentCategoryChipClass(cat) : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'"
+            :class="displayKeySelected(cat, filterAlignment) ? alignmentCategoryChipClass(cat) : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'"
           >{{ alignmentCategoryLabel(cat) }}</button>
         </div>
 
@@ -351,26 +351,56 @@
         <AlignmentLegendPopover variant="button" />
       </div>
       <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
-        <button
-          v-for="cat in alignmentChipKeys"
-          :key="cat"
-          type="button"
-          class="px-3 py-2 rounded-xl border text-left transition-colors"
-          :class="filterAlignment.length === 1 && filterAlignment[0] === cat
-            ? 'border-primary-400 ring-1 ring-primary-400 bg-white dark:bg-gray-800'
-            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'"
-          :title="'Filter the table to ' + alignmentCategoryLabel(cat) + '. Requested and Committed tiles stay unfiltered.'"
-          @click="setAlignmentFilter(cat)"
-        >
-          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold" :class="alignmentCategoryChipClass(cat)">{{ alignmentCategoryLabel(cat) }}</span>
-          <div class="mt-1 text-lg font-bold tabular-nums text-gray-900 dark:text-gray-100">{{ alignmentCounts[cat] }}</div>
-        </button>
+        <template v-for="cat in alignmentChipKeys" :key="cat">
+          <button
+            v-if="cat !== 'after_requested'"
+            type="button"
+            class="px-3 py-2 rounded-xl border text-left transition-colors"
+            :class="isDisplayFilterActive(cat)
+              ? 'border-primary-400 ring-1 ring-primary-400 bg-white dark:bg-gray-800'
+              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'"
+            :title="'Filter the table to ' + alignmentCategoryLabel(cat) + '. Requested and Committed tiles stay unfiltered.'"
+            @click="setAlignmentDisplayFilter(cat)"
+          >
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold" :class="alignmentCategoryChipClass(cat)">{{ alignmentCategoryLabel(cat) }}</span>
+            <div class="mt-1 text-lg font-bold tabular-nums text-gray-900 dark:text-gray-100">{{ alignmentCounts[cat] }}</div>
+          </button>
+          <div
+            v-else
+            class="px-3 py-2 rounded-xl border text-left transition-colors"
+            :class="isDisplayFilterActive('after_requested')
+              ? 'border-primary-400 ring-1 ring-primary-400 bg-white dark:bg-gray-800'
+              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'"
+            role="button"
+            tabindex="0"
+            title="Fix Version later than Target Version. Yellow until the committed freeze, then green. Click the tile for both; click a number for that color only."
+            @click="setAlignmentDisplayFilter('after_requested')"
+            @keydown.enter.prevent="setAlignmentDisplayFilter('after_requested')"
+          >
+            <span class="inline-flex items-center gap-1">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold" :class="alignmentCategoryChipClass('after_requested')">After requested</span>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold" :class="alignmentCategoryChipClass('aligned_late')">After requested</span>
+            </span>
+            <div class="mt-1 flex items-baseline gap-3">
+              <span
+                class="text-lg font-bold tabular-nums text-amber-700 dark:text-amber-400 cursor-pointer"
+                title="Before committed freeze"
+                @click.stop="setAlignmentFilterExact('after_requested')"
+              >{{ afterRequestedCounts.yellow }}</span>
+              <span
+                class="text-lg font-bold tabular-nums text-emerald-700 dark:text-emerald-400 cursor-pointer"
+                title="After committed freeze"
+                @click.stop="setAlignmentFilterExact('aligned_late')"
+              >{{ afterRequestedCounts.green }}</span>
+            </div>
+          </div>
+        </template>
         <div class="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           <span class="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Align %</span>
           <div
             class="mt-1 text-lg font-bold tabular-nums"
             :class="alignmentPctClass"
-            title="(On time + Late) / unique keys with Target Version or Fix Version in this filtered view. Not the Requested count."
+            title="(Early or as requested + green After requested) / unique keys with Target Version or Fix Version. Follows selected releases that are still before freeze. Yellow After requested does not count as aligned."
           >{{ alignmentCounts.alignment_pct }}%</div>
         </div>
       </div>
@@ -380,7 +410,7 @@
         @select-scope="onSelectScope"
         @select-milestone="onSelectMilestone"
         @select-product="onSelectProduct"
-        @select-category="setAlignmentFilter"
+        @select-category="setAlignmentFilterExact"
       />
     </div>
 
@@ -447,16 +477,21 @@ import PillarConfigPanel from '../components/PillarConfigPanel.vue'
 import FeatureReadinessDrawer from '../components/FeatureReadinessDrawer.vue'
 import { toDrawerFeature } from '../utils/feature-readiness-drawer-model.js'
 import {
-  ALIGNMENT_CATEGORY_LABELS,
+  ALIGNMENT_DISPLAY_KEYS,
   alignmentCategoryLabel,
-  alignmentCategoryChipClass
+  alignmentCategoryChipClass,
+  categoriesForDisplayKey,
+  displayKeySelected,
+  toggleDisplayKeyInSelection,
+  categorySetsEqual
 } from '../utils/tv-fv-alignment-display.js'
 import {
-  uniqueFeaturesFromGroups,
   countAlignment,
+  countAlignmentForGroups,
   buildAlignmentRollup,
   countDeliveredInVisibleVersions,
-  visibleVersionNames
+  visibleVersionNames,
+  afterRequestedSplit
 } from '../utils/alignment-rollup.js'
 
 const nav = inject('moduleNav', null)
@@ -1020,10 +1055,14 @@ var blockedPercent = computed(function() {
   return Math.round((totalBlocked.value / total) * 100)
 })
 
-var alignmentChipKeys = Object.keys(ALIGNMENT_CATEGORY_LABELS)
+var alignmentChipKeys = ALIGNMENT_DISPLAY_KEYS
 
 var alignmentCounts = computed(function() {
-  return countAlignment(uniqueFeaturesFromGroups(summaryFilteredGroups.value))
+  return countAlignmentForGroups(summaryFilteredGroups.value)
+})
+
+var afterRequestedCounts = computed(function() {
+  return afterRequestedSplit(alignmentCounts.value)
 })
 
 var alignmentRollup = computed(function() {
@@ -1060,7 +1099,24 @@ var deliveredTitle = computed(function() {
   return 'Closed, Done, or Resolved with Fix Version in the versions still visible after filters. Not included in Requested, Committed, or Align %.'
 })
 
-function setAlignmentFilter(category) {
+function toggleAlignmentDisplayKey(displayKey) {
+  filterAlignment.value = toggleDisplayKeyInSelection(displayKey, filterAlignment.value)
+}
+
+function isDisplayFilterActive(displayKey) {
+  return categorySetsEqual(filterAlignment.value, categoriesForDisplayKey(displayKey))
+}
+
+function setAlignmentDisplayFilter(displayKey) {
+  var cats = categoriesForDisplayKey(displayKey)
+  if (categorySetsEqual(filterAlignment.value, cats)) {
+    filterAlignment.value = []
+    return
+  }
+  filterAlignment.value = cats.slice()
+}
+
+function setAlignmentFilterExact(category) {
   if (filterAlignment.value.length === 1 && filterAlignment.value[0] === category) {
     filterAlignment.value = []
     return

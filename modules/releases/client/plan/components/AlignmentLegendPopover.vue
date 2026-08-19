@@ -76,10 +76,17 @@ var notes = ALIGNMENT_LEGEND_NOTES
       <div class="px-3 py-2 text-gray-700 dark:text-gray-300 space-y-3">
         <ul class="space-y-2">
           <li v-for="entry in entries" :key="entry.key" class="flex items-start gap-2">
-            <span
-              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold mt-0.5 shrink-0"
-              :class="entry.chipClass"
-            >{{ entry.label }}</span>
+            <span class="inline-flex items-center gap-0.5 mt-0.5 shrink-0">
+              <span
+                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                :class="entry.chipClass"
+              >{{ entry.label }}</span>
+              <span
+                v-if="entry.secondaryChipClass"
+                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                :class="entry.secondaryChipClass"
+              >{{ entry.label }}</span>
+            </span>
             <span>{{ entry.help }}</span>
           </li>
         </ul>

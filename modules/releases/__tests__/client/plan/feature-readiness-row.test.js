@@ -137,8 +137,8 @@ describe('FeatureReadinessRow fail chips', function() {
       fixVersions: ['3.6 EA2 RHOAI RELEASE'],
       fpdor: { passedCount: 17, applicableCount: 17, items: [] }
     })
-    expect(wrapper.text()).toContain('On time')
-    expect(wrapper.find('[aria-label="TV/FV alignment: On time"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Early or as requested')
+    expect(wrapper.find('[aria-label="TV/FV alignment: Early or as requested"]').exists()).toBe(true)
   })
 
   it('opens Align popup with requested vs committed summary', async function() {
@@ -150,7 +150,7 @@ describe('FeatureReadinessRow fail chips', function() {
       fixVersions: ['3.6 EA2 RHOAI RELEASE'],
       fpdor: { passedCount: 17, applicableCount: 17, items: [] }
     })
-    await wrapper.find('[aria-label="TV/FV alignment: Late"]').trigger('click')
+    await wrapper.find('[aria-label="TV/FV alignment: After requested"]').trigger('click')
     await nextTick()
     expect(wrapper.text()).toContain('Requested for EA1, committed for EA2.')
   })

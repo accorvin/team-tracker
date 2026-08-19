@@ -47,7 +47,7 @@ describe('feature-readiness-sort', function() {
 
   it('getSortValue ranks alignment categories best-to-worst', function() {
     expect(getSortValue(feature({ alignmentCategory: 'aligned_on_time' }), 'alignment')).toBe(0)
-    expect(getSortValue(feature({ alignmentCategory: 'misaligned' }), 'alignment')).toBe(4)
+    expect(getSortValue(feature({ alignmentCategory: 'misaligned' }), 'alignment')).toBe(5)
     expect(getSortValue(feature({ alignmentCategory: null }), 'alignment')).toBe(99)
   })
 

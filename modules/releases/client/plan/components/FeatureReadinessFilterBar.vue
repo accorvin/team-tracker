@@ -2,8 +2,10 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { FPDOR_ITEM_NAMES, KNOWN_PRODUCTS } from '../utils/feature-readiness-export.js'
 import {
-  ALIGNMENT_CATEGORY_LABELS,
-  alignmentCategoryLabel
+  ALIGNMENT_DISPLAY_KEYS,
+  alignmentCategoryLabel,
+  displayKeySelected,
+  toggleDisplayKeyInSelection
 } from '../utils/tv-fv-alignment-display.js'
 
 const props = defineProps({
@@ -142,7 +144,17 @@ function multiLabel(selected, allLabel) {
 function alignmentMultiLabel(selected) {
   if (!selected || selected.length === 0) return 'All alignments'
   if (selected.length === 1) return alignmentCategoryLabel(selected[0])
+  if (displayKeySelected('after_requested', selected) && selected.length === 2) {
+    return 'After requested'
+  }
   return selected.length + ' selected'
+}
+
+function toggleAlignmentDisplay(displayKey) {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    alignment: toggleDisplayKeyInSelection(displayKey, props.modelValue.alignment)
+  })
 }
 
 const outcomes = computed(() => props.filterMeta.bigRocks || [])
@@ -153,7 +165,7 @@ const priorities = computed(() => props.filterMeta.priorities || [])
 const teams = computed(() => props.filterMeta.teams || [])
 const products = KNOWN_PRODUCTS
 const fpdorItems = FPDOR_ITEM_NAMES
-const alignmentOptions = Object.keys(ALIGNMENT_CATEGORY_LABELS)
+const alignmentOptions = ALIGNMENT_DISPLAY_KEYS
 
 const btnClass = 'flex items-center gap-1.5 cursor-pointer text-xs rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400'
 const btnActiveClass = 'flex items-center gap-1.5 cursor-pointer text-xs rounded-md border border-primary-400 dark:border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400'
@@ -239,8 +251,8 @@ const optionClass = 'flex items-center gap-2 px-3 py-1.5 text-xs text-gray-900 d
         </button>
         <div v-if="alignmentOpen" role="group" :class="dropdownClass" @keydown.escape="alignmentOpen = false">
           <label v-for="cat in alignmentOptions" :key="cat" :class="optionClass">
-            <input type="checkbox" :checked="(modelValue.alignment || []).includes(cat)" @change="toggleValue('alignment', cat)" class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500" />
-            <span class="truncate">{{ alignmentCategoryLabel(cat) }}</span>
+            <input type="checkbox" :checked="displayKeySelected(cat, modelValue.alignment)" @change="toggleAlignmentDisplay(cat)" class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500" />
+            <span class="truncate">{{ cat === 'after_requested' ? 'After requested' : alignmentCategoryLabel(cat) }}</span>
           </label>
         </div>
       </div>

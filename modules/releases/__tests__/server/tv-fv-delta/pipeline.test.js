@@ -272,11 +272,13 @@ describe('normalizeLegacyTvFvCache', () => {
     expect(normalized).not.toBe(legacy);
     expect(normalized.executive_summary[0].aligned_on_time).toBe(49);
     expect(normalized.executive_summary[0].aligned_late).toBe(0);
+    expect(normalized.executive_summary[0].after_requested).toBe(0);
     expect(normalized.executive_summary[0].misaligned).toBe(10);
     expect(normalized.executive_summary[0].aligned_on_time_jql).toBe('https://example/aligned');
     expect(normalized.executive_summary[0].alignment_pct).toBe(35);
     expect(normalized.releases['3.6 EA1 RHOAI RELEASE'].aligned_on_time).toEqual([{ key: 'A-1' }]);
     expect(normalized.releases['3.6 EA1 RHOAI RELEASE'].aligned_late).toEqual([]);
+    expect(normalized.releases['3.6 EA1 RHOAI RELEASE'].after_requested).toEqual([]);
     expect(normalized.releases['3.6 EA1 RHOAI RELEASE'].misaligned).toEqual([{ key: 'M-1' }]);
     expect(normalized.component_breakdown[0].aligned_on_time).toBe(4);
     expect(normalized.component_breakdown[0].misaligned).toBe(1);
@@ -287,10 +289,10 @@ describe('normalizeLegacyTvFvCache', () => {
     const current = {
       metadata: { generated_at: '2026-07-27T00:00:00.000Z' },
       executive_summary: [{
-        release: 'x', total: 2, aligned_on_time: 1, aligned_late: 0, tv_only: 0, fv_only: 0, misaligned: 1, alignment_pct: 50,
+        release: 'x', total: 2, aligned_on_time: 1, aligned_late: 0, after_requested: 0, tv_only: 0, fv_only: 0, misaligned: 1, alignment_pct: 50,
       }],
       releases: {
-        x: { aligned_on_time: [], aligned_late: [], tv_only: [], fv_only: [], misaligned: [] },
+        x: { aligned_on_time: [], aligned_late: [], after_requested: [], tv_only: [], fv_only: [], misaligned: [] },
       },
     };
     expect(normalizeLegacyTvFvCache(current)).toBe(current);
@@ -572,26 +574,37 @@ describe('classifyFeatures', () => {
     expect(result[0].category).toBe('aligned_on_time');
   });
 
-  // Example C: TV=rhoai-3.5, FV=rhoai-3.6, 3.5 frozen → aligned_late
-  it('Example C: FV after frozen TV → aligned_late', () => {
+  // Example C: TV=rhoai-3.5, FV=rhoai-3.6, TV frozen but FV not in dates → after_requested
+  it('Example C: FV after TV, TV frozen, FV not frozen → after_requested', () => {
     const feats = [makeFeat('rhoai-3.5', 'rhoai-3.6')];
     const releaseDates = {
       'rhoai-3.5': { planningFreezeDate: '2026-06-01' },
     };
     const result = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result).toHaveLength(1);
+    expect(result[0].category).toBe('after_requested');
+  });
+
+  it('Example C2: FV after TV, committed freeze passed → aligned_late', () => {
+    const feats = [makeFeat('rhoai-3.5', 'rhoai-3.6')];
+    const releaseDates = {
+      'rhoai-3.5': { planningFreezeDate: '2026-06-01' },
+      'rhoai-3.6': { planningFreezeDate: '2026-06-15' },
+    };
+    const result = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
+    expect(result).toHaveLength(1);
     expect(result[0].category).toBe('aligned_late');
   });
 
-  // Example D: TV=rhoai-3.5, FV=rhoai-3.6, 3.5 NOT frozen → misaligned
-  it('Example D: FV after unfrozen TV → misaligned', () => {
+  // Example D: TV=rhoai-3.5, FV=rhoai-3.6, neither freeze passed → after_requested
+  it('Example D: FV after unfrozen TV → after_requested', () => {
     const feats = [makeFeat('rhoai-3.5', 'rhoai-3.6')];
     const releaseDates = {
       'rhoai-3.5': { planningFreezeDate: '2026-09-01' }, // future
     };
     const result = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result).toHaveLength(1);
-    expect(result[0].category).toBe('misaligned');
+    expect(result[0].category).toBe('after_requested');
   });
 
   // Example E: TV=[rhoai-3.5, rhoai-3.6], FV=rhoai-3.6 → aligned_on_time (FV matches TV)
@@ -602,8 +615,8 @@ describe('classifyFeatures', () => {
     expect(result[0].category).toBe('aligned_on_time');
   });
 
-  // Example F: TV=[rhoai-3.5, rhoai-3.6], FV=rhoai-3.7, 3.5 frozen, 3.6 NOT frozen → misaligned
-  it('Example F: FV after mixed freeze state TVs, any unfrozen → misaligned', () => {
+  // Example F: TV=[rhoai-3.5, rhoai-3.6], FV=rhoai-3.7, 3.7 not frozen → after_requested
+  it('Example F: FV after mixed freeze state TVs, FV not frozen → after_requested', () => {
     const feats = [makeFeat('rhoai-3.5, rhoai-3.6', 'rhoai-3.7')];
     const releaseDates = {
       'rhoai-3.5': { planningFreezeDate: '2026-06-01' },
@@ -612,15 +625,16 @@ describe('classifyFeatures', () => {
     // Classify against rhoai-3.5 (a TV that the feature targets)
     const result2 = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result2).toHaveLength(1);
-    expect(result2[0].category).toBe('misaligned'); // 3.5 frozen but FV after 3.6 which isn't
+    expect(result2[0].category).toBe('after_requested');
   });
 
-  // Example G: TV=[rhoai-3.5, rhoai-3.6], FV=rhoai-3.7, both frozen → aligned_late
-  it('Example G: FV after all frozen TVs → aligned_late', () => {
+  // Example G: TV=[rhoai-3.5, rhoai-3.6], FV=rhoai-3.7, FV freeze passed → aligned_late
+  it('Example G: FV after TVs, committed freeze passed → aligned_late', () => {
     const feats = [makeFeat('rhoai-3.5, rhoai-3.6', 'rhoai-3.7')];
     const releaseDates = {
       'rhoai-3.5': { planningFreezeDate: '2026-06-01' },
       'rhoai-3.6': { planningFreezeDate: '2026-06-15' },
+      'rhoai-3.7': { planningFreezeDate: '2026-06-20' },
     };
     const result = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result).toHaveLength(1);
@@ -649,19 +663,19 @@ describe('classifyFeatures', () => {
     expect(result[0].category).toBe('misaligned');
   });
 
-  // Example J: TV=rhoai-3.5, FV=rhoai-3.6, no dates → misaligned (conservative)
-  it('Example J: FV after TV, no dates → misaligned (conservative)', () => {
+  // Example J: TV=rhoai-3.5, FV=rhoai-3.6, no dates → after_requested (FV freeze unknown)
+  it('Example J: FV after TV, no dates → after_requested', () => {
     const feats = [makeFeat('rhoai-3.5', 'rhoai-3.6')];
     const result = classifyFeatures(feats, ['rhoai-3.5'], {});
     expect(result).toHaveLength(1);
-    expect(result[0].category).toBe('misaligned');
+    expect(result[0].category).toBe('after_requested');
   });
 
-  // Example K: TV=rhoai-3.5, FV=rhoai-3.6, no freeze but GA past → aligned_late
-  it('Example K: FV after TV, no freeze but GA in past → aligned_late', () => {
+  // Example K: TV=rhoai-3.5, FV=rhoai-3.6, FV GA in past → aligned_late
+  it('Example K: FV after TV, committed GA in past → aligned_late', () => {
     const feats = [makeFeat('rhoai-3.5', 'rhoai-3.6')];
     const releaseDates = {
-      'rhoai-3.5': { dueDate: '2026-06-01' }, // GA in past
+      'rhoai-3.6': { dueDate: '2026-06-01' },
     };
     const result = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result).toHaveLength(1);
@@ -673,10 +687,11 @@ describe('classifyFeatures', () => {
     const feats = [makeFeat('rhoai-3.5, rhelai-3.2', 'rhoai-3.6')];
     const releaseDates = {
       'rhoai-3.5': { planningFreezeDate: '2026-06-01' },
+      'rhoai-3.6': { planningFreezeDate: '2026-06-15' },
     };
     const result = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result).toHaveLength(1);
-    expect(result[0].category).toBe('aligned_late'); // rhoai-3.5 frozen
+    expect(result[0].category).toBe('aligned_late');
   });
 
   // Example M: TV=rhelai-3.2, FV=rhoai-3.6 → misaligned (all TVs different product)
@@ -759,17 +774,28 @@ describe('classifyFeatures', () => {
   });
 
   // EA milestone: TV=EA1, FV=EA2 (same release family) → FV after TV
-  it('EA1 TV, EA2 FV same family, EA1 not frozen → misaligned', () => {
+  it('EA1 TV, EA2 FV same family, EA1 not frozen → after_requested', () => {
     const feats = [makeFeat('rhoai-3.6.EA1', 'rhoai-3.6.EA2')];
     const result = classifyFeatures(feats, ['rhoai-3.6.EA1'], {});
     expect(result).toHaveLength(1);
-    expect(result[0].category).toBe('misaligned');
+    expect(result[0].category).toBe('after_requested');
   });
 
-  it('EA1 TV, EA2 FV same family, EA1 frozen → aligned_late', () => {
+  it('EA1 TV, EA2 FV same family, EA1 frozen EA2 not → after_requested', () => {
     const feats = [makeFeat('rhoai-3.6.EA1', 'rhoai-3.6.EA2')];
     const releaseDates = {
       'rhoai-3.6.EA1': { planningFreezeDate: '2026-06-01' },
+    };
+    const result = classifyFeatures(feats, ['rhoai-3.6.EA1'], releaseDates);
+    expect(result).toHaveLength(1);
+    expect(result[0].category).toBe('after_requested');
+  });
+
+  it('EA1 TV, EA2 FV same family, EA2 freeze passed → aligned_late', () => {
+    const feats = [makeFeat('rhoai-3.6.EA1', 'rhoai-3.6.EA2')];
+    const releaseDates = {
+      'rhoai-3.6.EA1': { planningFreezeDate: '2026-06-01' },
+      'rhoai-3.6.EA2': { planningFreezeDate: '2026-06-15' },
     };
     const result = classifyFeatures(feats, ['rhoai-3.6.EA1'], releaseDates);
     expect(result).toHaveLength(1);
@@ -777,21 +803,21 @@ describe('classifyFeatures', () => {
   });
 
   // EA to GA: TV=EA1, FV=GA (same product/version) → FV after EA1
-  it('EA1 TV, GA FV (same minor version), EA1 not frozen → misaligned', () => {
+  it('EA1 TV, GA FV (same minor version), EA1 not frozen → after_requested', () => {
     const feats = [makeFeat('rhoai-3.6.EA1', 'rhoai-3.6')];
     const result = classifyFeatures(feats, ['rhoai-3.6.EA1'], {});
     expect(result).toHaveLength(1);
-    expect(result[0].category).toBe('misaligned');
+    expect(result[0].category).toBe('after_requested');
   });
 
-  it('EA1 TV, GA FV (same minor version), EA1 frozen → aligned_late', () => {
+  it('EA1 TV, GA FV (same minor version), EA1 frozen GA not → after_requested', () => {
     const feats = [makeFeat('rhoai-3.6.EA1', 'rhoai-3.6')];
     const releaseDates = {
       'rhoai-3.6.EA1': { planningFreezeDate: '2026-06-01' },
     };
     const result = classifyFeatures(feats, ['rhoai-3.6.EA1'], releaseDates);
     expect(result).toHaveLength(1);
-    expect(result[0].category).toBe('aligned_late');
+    expect(result[0].category).toBe('after_requested');
   });
 
   // GA to EA: TV=GA, FV=EA1 (same product/version) → FV before TV (ahead)
@@ -837,41 +863,41 @@ describe('classifyFeatures', () => {
   it('cross-product multi-TV: ignores cross-product TVs, checks same-product TV freeze', () => {
     // TV=[rhoai-3.5, rhelai-3.2], FV=rhoai-3.6
     // Only compare against rhoai-3.5 (same product as FV)
-    // rhoai-3.5 NOT frozen → misaligned
+    // FV freeze unknown → after_requested
     const feats = [makeFeat('rhoai-3.5, rhelai-3.2', 'rhoai-3.6')];
     const result = classifyFeatures(feats, ['rhoai-3.5'], {});
     expect(result).toHaveLength(1);
-    expect(result[0].category).toBe('misaligned');
+    expect(result[0].category).toBe('after_requested');
   });
 
   // Planning freeze boundary: freeze date = today (edge)
-  it('planning freeze exactly today → frozen (boundary)', () => {
+  it('planning freeze exactly today on committed version → aligned_late', () => {
     const today = new Date().toISOString().slice(0, 10);
     const feats = [makeFeat('rhoai-3.5', 'rhoai-3.6')];
     const releaseDates = {
-      'rhoai-3.5': { planningFreezeDate: today },
+      'rhoai-3.6': { planningFreezeDate: today },
     };
     const result = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result).toHaveLength(1);
     expect(result[0].category).toBe('aligned_late');
   });
 
-  // GA date fallback with future GA → not frozen (conservative)
-  it('no planning freeze, GA in future → not frozen → misaligned', () => {
+  // GA date fallback with future GA → not frozen
+  it('no planning freeze, committed GA in future → after_requested', () => {
     const feats = [makeFeat('rhoai-3.5', 'rhoai-3.6')];
     const releaseDates = {
-      'rhoai-3.5': { dueDate: '2027-06-01' }, // far future
+      'rhoai-3.6': { dueDate: '2027-06-01' },
     };
     const result = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result).toHaveLength(1);
-    expect(result[0].category).toBe('misaligned');
+    expect(result[0].category).toBe('after_requested');
   });
 
   // Both planning freeze and GA: planning freeze takes precedence
-  it('planning freeze in past overrides GA in future', () => {
+  it('committed freeze in past overrides committed GA in future', () => {
     const feats = [makeFeat('rhoai-3.5', 'rhoai-3.6')];
     const releaseDates = {
-      'rhoai-3.5': { planningFreezeDate: '2026-06-01', dueDate: '2027-12-01' },
+      'rhoai-3.6': { planningFreezeDate: '2026-06-01', dueDate: '2027-12-01' },
     };
     const result = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result).toHaveLength(1);
@@ -883,8 +909,7 @@ describe('classifyFeatures', () => {
     const feats = [makeFeat('rhoai-2.5', 'rhoai-3.5')];
     const result = classifyFeatures(feats, ['rhoai-2.5'], {});
     expect(result).toHaveLength(1);
-    // No freeze dates → misaligned (conservative)
-    expect(result[0].category).toBe('misaligned');
+    expect(result[0].category).toBe('after_requested');
   });
 
   it('FV with lower major version than TV → FV before TV (ahead)', () => {
@@ -901,23 +926,24 @@ describe('classifyFeatures', () => {
       'rhoai-3.4': { planningFreezeDate: '2026-01-01' },
       'rhoai-3.5': { planningFreezeDate: '2026-03-01' },
       'rhoai-3.6': { planningFreezeDate: '2026-06-01' },
+      'rhoai-3.7': { planningFreezeDate: '2026-06-20' },
     };
     const result = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result).toHaveLength(1);
     expect(result[0].category).toBe('aligned_late');
   });
 
-  // Feature with multiple TVs, one not frozen → misaligned
-  it('three TVs, last one not frozen → misaligned', () => {
+  // Feature with multiple TVs, FV freeze not passed → after_requested
+  it('three TVs, committed freeze not passed → after_requested', () => {
     const feats = [makeFeat('rhoai-3.4, rhoai-3.5, rhoai-3.6', 'rhoai-3.7')];
     const releaseDates = {
       'rhoai-3.4': { planningFreezeDate: '2026-01-01' },
       'rhoai-3.5': { planningFreezeDate: '2026-03-01' },
-      'rhoai-3.6': { planningFreezeDate: '2026-12-01' }, // future
+      'rhoai-3.6': { planningFreezeDate: '2026-12-01' },
     };
     const result = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result).toHaveLength(1);
-    expect(result[0].category).toBe('misaligned');
+    expect(result[0].category).toBe('after_requested');
   });
 
   // Feature with TV matching FV (exact match via normVer despite case diff)
@@ -956,7 +982,7 @@ describe('classifyFeatures', () => {
     // branch because fvMatch is false for this release. FV=3.6 is after TV=3.5, 3.5 not frozen → misaligned
     // BUT FV=3.6 matches TV=3.6 (cmp=0) → no action (cmp not < 0 and not > 0)
     // The worst from the loop is the unfrozen check on 3.5
-    expect(on35.category).toBe('misaligned');
+    expect(on35.category).toBe('after_requested');
     // On 3.6: tvMatch=true, fvMatch=true → aligned_on_time
     expect(on36.category).toBe('aligned_on_time');
   });
@@ -985,18 +1011,18 @@ describe('classifyFeatures — Case 3 edge cases', () => {
     };
   }
 
-  it('FV matches release, TV is earlier → FV slipped (no freeze = misaligned)', () => {
-    // TV=3.4, FV=3.5 → feature targeted for 3.4 but committed to 3.5 (slipped)
+  it('FV matches release, TV is earlier → FV slipped (no freeze = after_requested)', () => {
+    // TV=3.4, FV=3.5 → feature targeted for 3.4 but committed to 3.5
     const feats = [makeFeat('rhoai-3.4', 'rhoai-3.5')];
     const result = classifyFeatures(feats, ['rhoai-3.5'], {});
     expect(result).toHaveLength(1);
-    expect(result[0].category).toBe('misaligned'); // no freeze dates → conservative
+    expect(result[0].category).toBe('after_requested');
   });
 
-  it('FV matches release, TV is earlier, TV frozen → aligned_late', () => {
+  it('FV matches release, TV is earlier, committed freeze passed → aligned_late', () => {
     const feats = [makeFeat('rhoai-3.4', 'rhoai-3.5')];
     const releaseDates = {
-      'rhoai-3.4': { planningFreezeDate: '2026-01-01' },
+      'rhoai-3.5': { planningFreezeDate: '2026-01-01' },
     };
     const result = classifyFeatures(feats, ['rhoai-3.5'], releaseDates);
     expect(result).toHaveLength(1);
@@ -1055,6 +1081,7 @@ describe('buildExport', () => {
     expect(summary.total).toBe(3);
     expect(summary.aligned_on_time).toBe(1);
     expect(summary.aligned_late).toBe(1);
+    expect(summary.after_requested).toBe(0);
     expect(summary.tv_only).toBe(1);
     expect(summary.fv_only).toBe(0);
     expect(summary.misaligned).toBe(0);
@@ -1363,8 +1390,7 @@ describe('Integration tests', () => {
     };
     const result = classifyFeatures(feats, ['rhoai-3.5', 'rhoai-3.6'], releaseDates);
     // X-1: aligned_on_time on 3.5 (TV=FV=3.5)
-    // X-2: aligned_late on 3.5 (TV=3.5 frozen, FV=3.6)
-    // X-2: aligned_late on 3.6 (FV=3.6, TV=3.5 frozen → late)
+    // X-2: after_requested on 3.5 and 3.6 (FV=3.6 freeze not in dates)
     // X-3: aligned_on_time on 3.6 (TV=FV=3.6)
     expect(result).toHaveLength(4);
     const x1 = result.find(r => r.key === 'X-1');
@@ -1372,8 +1398,8 @@ describe('Integration tests', () => {
     const x2_on36 = result.find(r => r.key === 'X-2' && r.release === 'rhoai-3.6');
     const x3 = result.find(r => r.key === 'X-3');
     expect(x1.category).toBe('aligned_on_time');
-    expect(x2_on35.category).toBe('aligned_late');
-    expect(x2_on36.category).toBe('aligned_late');
+    expect(x2_on35.category).toBe('after_requested');
+    expect(x2_on36.category).toBe('after_requested');
     expect(x3.category).toBe('aligned_on_time');
   });
 
@@ -1400,12 +1426,12 @@ describe('Integration tests', () => {
     expect(result.every(r => r.category === 'aligned_on_time')).toBe(true);
   });
 
-  it('all features misaligned', () => {
+  it('all features after requested', () => {
     const feats = [
       makeFeat('X-1', 'rhoai-3.5', 'rhoai-3.6'),
       makeFeat('X-2', 'rhoai-3.5', 'rhoai-3.7'),
     ];
     const result = classifyFeatures(feats, ['rhoai-3.5'], {}); // no freeze dates
-    expect(result.every(r => r.category === 'misaligned')).toBe(true);
+    expect(result.every(r => r.category === 'after_requested')).toBe(true);
   });
 });
