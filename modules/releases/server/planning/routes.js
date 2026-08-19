@@ -28,6 +28,7 @@ const { blockDuringImpersonation } = require('../../../../shared/server/auth')
 const healthRoutes = require('./health/health-routes')
 var { buildFeatureReadiness } = require('./feature-readiness')
 var { fetchFeaturesWithTimeout } = require('./feature-query')
+var { extractFirstInProgressAt } = require('./bu-feedback-issue')
 
 const { isValidVersionParam } = require('../version-utils')
 
@@ -497,10 +498,10 @@ module.exports = async function registerPlanningRoutes(router, context) {
    *     summary: List field and BU feedback issues from Jira
    *     tags: [releases-planning]
    *     security: [{ bearerAuth: [] }]
-   *     description: Queries Jira for issues labeled AIBU_Feedback or AISSA_Feedback, deduplicated, ordered by creation date descending.
+   *     description: Queries Jira for issues labeled AIBU_Feedback or AISSA_Feedback, deduplicated, ordered by creation date descending. Each issue includes resolved (resolutiondate) and inProgressAt (first changelog transition into an in-progress status) for process-efficiency metrics.
    *     responses:
    *       200:
-   *         description: Array of BU feedback issues
+   *         description: Array of BU feedback issues with resolved and inProgressAt timestamps
    *       503:
    *         description: Jira client not configured
    */
@@ -513,8 +514,8 @@ module.exports = async function registerPlanningRoutes(router, context) {
 
     try {
       var jql = 'labels IN ("AIBU_Feedback", "AISSA_Feedback") ORDER BY createdDate DESC'
-      var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels'
-      var rawIssues = await jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 200 })
+      var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels,resolutiondate'
+      var rawIssues = await jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 200, expand: 'changelog' })
 
       var seen = {}
       var issues = []
@@ -538,6 +539,8 @@ module.exports = async function registerPlanningRoutes(router, context) {
           created: f.created || null,
           updated: f.updated || null,
           dueDate: f.duedate || null,
+          resolved: f.resolutiondate || null,
+          inProgressAt: extractFirstInProgressAt(raw.changelog),
           components: (f.components || []).map(function(c) { return c.name }),
           fixVersions: (f.fixVersions || []).map(function(v) { return v.name }),
           labels: allLabels,

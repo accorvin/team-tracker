@@ -1,13 +1,17 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
+    <div class="flex items-start justify-between gap-4">
       <div>
         <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Field and BU Feedback</h2>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Issues labeled <code class="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">AIBU_Feedback</code> or <code class="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">AISSA_Feedback</code> from Jira, ordered by creation date.
+          Jira issues labeled
+          <span class="inline-block px-1.5 py-0.5 text-[11px] font-semibold rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" title="AIBU_Feedback">BU</span>
+          or
+          <span class="inline-block px-1.5 py-0.5 text-[11px] font-semibold rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" title="AISSA_Feedback">SSA</span>.
+          Click a row for reporter, resolution, and dates.
         </p>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 shrink-0">
         <span v-if="fetchedAt" class="text-xs text-gray-400 dark:text-gray-500">
           {{ issues.length }} issue{{ issues.length !== 1 ? 's' : '' }}
         </span>
@@ -31,6 +35,8 @@
       {{ warning }}
     </div>
 
+    <BuFeedbackExecutiveSummary v-if="issues.length" :issues="issues" />
+
     <BuFeedbackTable v-if="issues.length || (!loading && !error)" :issues="issues" />
   </div>
 </template>
@@ -38,6 +44,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { getApiBase } from '@shared/client/services/api'
+import BuFeedbackExecutiveSummary from '../components/BuFeedbackExecutiveSummary.vue'
 import BuFeedbackTable from '../components/BuFeedbackTable.vue'
 
 var issues = ref([])
