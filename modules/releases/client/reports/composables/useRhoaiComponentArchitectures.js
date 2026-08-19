@@ -1,13 +1,13 @@
 import { ref } from 'vue'
 
-const API_BASE = '/api/modules/releases/component-architectures'
+const API_BASE = '/api/modules/releases/rhoai-component-architectures'
 
 const data = ref(null)
 const loading = ref(false)
 const error = ref(null)
 const refreshing = ref(false)
 
-export function useComponentArchitectures() {
+export function useRhoaiComponentArchitectures() {
 
   async function loadData() {
     loading.value = true

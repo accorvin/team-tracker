@@ -20,7 +20,7 @@ const registerDraftPlanRoutes = require('./draft-plans/routes');
 const registerReleaseReadinessRoutes = require('./release-readiness/routes');
 const { registerCveSustainingRoutes, registerFixAvailabilityRoutes } = require('./cve-sustaining/routes');
 const registerAiAdoptionRoutes = require('./ai-adoption/routes');
-const registerComponentArchitecturesRoutes = require('./component-architectures/routes');
+const registerRhoaiComponentArchitecturesRoutes = require('./rhoai-component-architectures/routes');
 const { getAuditLog } = require('./planning/audit-log');
 
 /**
@@ -336,9 +336,9 @@ module.exports = async function registerRoutes(router, context) {
   });
   router.use('/ai-adoption', aiAdoptionRouter);
 
-  // Component Architectures sub-router (mounted at /api/modules/releases/component-architectures/)
-  const compArchRouter = express.Router();
-  registerComponentArchitecturesRoutes(compArchRouter, {
+  // RHOAI Component Architectures sub-router (mounted at /api/modules/releases/rhoai-component-architectures/)
+  const rhoaiCompArchRouter = express.Router();
+  registerRhoaiComponentArchitecturesRoutes(rhoaiCompArchRouter, {
     storage,
     requireAuth,
     requireAdmin,
@@ -347,7 +347,7 @@ module.exports = async function registerRoutes(router, context) {
     registerRefresh: context.registerRefresh || null,
     isRefreshRunning: context.isRefreshRunning || null
   });
-  router.use('/component-architectures', compArchRouter);
+  router.use('/rhoai-component-architectures', rhoaiCompArchRouter);
 
   // ─── Unified Audit Routes ───
 

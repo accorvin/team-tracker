@@ -10,7 +10,7 @@
         <ArrowLeft :size="18" />
       </button>
       <div class="flex-1">
-        <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Component Architectures (Multi-Arch Report)</h2>
+        <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">RHOAI Component Architectures (Multi-Arch)</h2>
         <p v-if="data?.fetchedAt" class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
           Fetched: {{ formatDate(data.fetchedAt) }}
           <template v-if="sourceUrl">
@@ -21,6 +21,16 @@
           </template>
         </p>
       </div>
+      <a
+        href="https://gitlab.cee.redhat.com/data-hub/component-maturity/-/blob/main/src/references/multi-arch.md"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border transition-colors bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+        title="Multi-arch guidance documentation"
+      >
+        <BookOpen :size="14" />
+        Guidance: multi-arch
+      </a>
       <a
         href="#/system-health/component-maturity"
         class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border transition-colors bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -244,13 +254,13 @@
 
 <script setup>
 import { ref, computed, onMounted, inject } from 'vue'
-import { ArrowLeft, RefreshCw, Cpu, Search, Check, Minus, Package, FileCode } from 'lucide-vue-next'
-import { useComponentArchitectures } from './composables/useComponentArchitectures'
+import { ArrowLeft, RefreshCw, Cpu, Search, Check, Minus, Package, FileCode, BookOpen } from 'lucide-vue-next'
+import { useRhoaiComponentArchitectures } from './composables/useRhoaiComponentArchitectures'
 
 const ARCHS = ['amd64', 'arm64', 'ppc64le', 's390x']
 
 const nav = inject('moduleNav')
-const { data, loading, error, refreshing, loadData, refresh } = useComponentArchitectures()
+const { data, loading, error, refreshing, loadData, refresh } = useRhoaiComponentArchitectures()
 
 const selectedBranch = ref(null)
 const searchQuery = ref('')
