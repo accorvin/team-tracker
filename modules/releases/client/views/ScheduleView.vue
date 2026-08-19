@@ -132,6 +132,9 @@
         </label>
       </div>
 
+      <!-- Release Timeline -->
+      <ReleaseTimeline :releases="baseFilteredReleases" :hide-past="hideReleased" />
+
       <!-- Releases table -->
       <div class="bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
         <div class="overflow-x-auto">
@@ -193,6 +196,7 @@ import {
   parseDate, daysFromNow, formatShort as formatShortBase,
   getProduct, getStream, releasePhase, milestoneProgress
 } from '../composables/useScheduleHelpers.js'
+import ReleaseTimeline from '../components/ReleaseTimeline.vue'
 
 function formatShort(dateStr) {
   return formatShortBase(dateStr, { year: true })
@@ -265,7 +269,7 @@ const streams = computed(() => {
   return Object.keys(set).sort()
 })
 
-const filteredReleases = computed(() => {
+const baseFilteredReleases = computed(() => {
   let list = releases.value
   if (selectedProduct.value) {
     list = list.filter(r => getProduct(r) === selectedProduct.value)
@@ -273,6 +277,11 @@ const filteredReleases = computed(() => {
   if (selectedStream.value) {
     list = list.filter(r => getStream(r) === selectedStream.value)
   }
+  return list
+})
+
+const filteredReleases = computed(() => {
+  let list = baseFilteredReleases.value
   if (hideReleased.value) {
     list = list.filter(r => !isReleased(r))
   }

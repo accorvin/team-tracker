@@ -7,6 +7,7 @@ vi.mock('@shared/client/services/api.js', () => ({
 
 import { apiRequest } from '@shared/client/services/api.js'
 import ScheduleView from '../../client/views/ScheduleView.vue'
+const ReleaseTimelineStub = { template: '<div class="timeline-stub"></div>', props: ['releases'] }
 
 function makeRelease(id, opts = {}) {
   return {
@@ -34,13 +35,13 @@ describe('ScheduleView', () => {
 
   it('renders loading state initially', () => {
     apiRequest.mockReturnValue(new Promise(() => {}))
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     expect(wrapper.text()).toContain('Loading schedule...')
   })
 
   it('renders empty state when no releases', async () => {
     apiRequest.mockResolvedValue({ releases: [] })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
     expect(wrapper.text()).toContain('No releases found')
   })
@@ -56,7 +57,7 @@ describe('ScheduleView', () => {
         })
       ]
     })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
     expect(wrapper.find('table').exists()).toBe(true)
@@ -72,7 +73,7 @@ describe('ScheduleView', () => {
         makeRelease('rhoai-3.5', { ga: '2026-09-15' })
       ]
     })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
     const cells = wrapper.findAll('td')
@@ -89,7 +90,7 @@ describe('ScheduleView', () => {
         makeRelease('rhoai-3.5', { ga: '2026-09-15' })
       ]
     })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
     await wrapper.find('input[type="checkbox"]').setValue(false)
@@ -106,7 +107,7 @@ describe('ScheduleView', () => {
         makeRelease('rhoai-3.4', { state: 'archived', ga: '2026-06-01' })
       ]
     })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
     const rows = getReleaseRows(wrapper)
@@ -122,7 +123,7 @@ describe('ScheduleView', () => {
         makeRelease('rhoai-3.5', { ga: '2028-09-15' })
       ]
     })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
     await wrapper.find('input[type="checkbox"]').setValue(false)
@@ -141,7 +142,7 @@ describe('ScheduleView', () => {
         makeRelease('rhoai-3.5', { planningFreeze: dateStr, ga: '2028-12-01' })
       ]
     })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('RHOAI-3.5')
@@ -156,7 +157,7 @@ describe('ScheduleView', () => {
         makeRelease('rhelai-1.0', { shortname: 'rhelai', displayName: 'RHELAI-1.0', ga: '2026-10-01' })
       ]
     })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('All')
@@ -171,7 +172,7 @@ describe('ScheduleView', () => {
         makeRelease('rhelai-1.0', { shortname: 'rhelai', displayName: 'RHELAI-1.0', ga: '2026-10-01' })
       ]
     })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
     const buttons = wrapper.findAll('button')
@@ -186,7 +187,7 @@ describe('ScheduleView', () => {
 
   it('calls the correct API endpoint', async () => {
     apiRequest.mockResolvedValue({ releases: [] })
-    mount(ScheduleView)
+    mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
     expect(apiRequest).toHaveBeenCalledWith('/modules/releases/registry')
   })
@@ -201,7 +202,7 @@ describe('ScheduleView', () => {
         makeRelease('rhoai-3.5', { ga: dateStr })
       ]
     })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('1d')
@@ -216,7 +217,7 @@ describe('ScheduleView', () => {
         makeRelease('rhoai-3.5', { ga: dateStr })
       ]
     })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('Today')
@@ -232,7 +233,7 @@ describe('ScheduleView', () => {
         makeRelease('rhoai-3.5', { planningFreeze: dateStr, ga: '2028-12-01' })
       ]
     })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('3d ago')
@@ -240,7 +241,7 @@ describe('ScheduleView', () => {
 
   it('refresh button re-fetches registry', async () => {
     apiRequest.mockResolvedValue({ releases: [makeRelease('rhoai-3.5', { ga: '2026-09-15' })] })
-    const wrapper = mount(ScheduleView)
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
     apiRequest.mockResolvedValue({ releases: [makeRelease('rhoai-3.5', { ga: '2026-09-20' })] })
