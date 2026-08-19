@@ -40,13 +40,15 @@ function sortBranchesDesc(branches) {
   })
 }
 
+const LEGACY_BRANCHES = ['rhoai-2.25', 'rhoai-3.3']
+
 function branchesFromRegistry(registry) {
-  if (!registry || !Array.isArray(registry.releases)) return []
-  const seen = new Set()
-  for (const release of registry.releases) {
-    if (release.state !== 'active') continue
-    const branch = registryIdToBranch(release.id)
-    if (branch) seen.add(branch)
+  const seen = new Set(LEGACY_BRANCHES)
+  if (registry && Array.isArray(registry.releases)) {
+    for (const release of registry.releases) {
+      const branch = registryIdToBranch(release.id)
+      if (branch) seen.add(branch)
+    }
   }
   return sortBranchesDesc([...seen])
 }
@@ -105,7 +107,7 @@ function registerRhoaiComponentArchitecturesFetcher(router, context) {
     const registry = await readFromStorage(REGISTRY_KEY)
     const branches = branchesFromRegistry(registry)
     if (!branches.length) {
-      return { status: 'error', message: 'No active releases found in the registry' }
+      return { status: 'error', message: 'No RHOAI releases found in the registry' }
     }
 
     const branchData = {}
