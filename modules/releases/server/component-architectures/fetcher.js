@@ -4,6 +4,7 @@ const { Octokit } = require('@octokit/rest')
 const yaml = require('js-yaml')
 
 const STORAGE_KEY = 'releases/component-architectures/latest.json'
+const REGISTRY_KEY = 'releases/registry.json'
 const OWNER = 'red-hat-data-services'
 const REPO = 'konflux-central'
 const REPORT_PATH = 'multi-arch-report.yaml'
@@ -16,18 +17,18 @@ function stripRhelSuffix(name) {
   return name.replace(/-rhel\d+$/, '')
 }
 
-async function discoverReleaseBranches(octokit) {
-  const branches = await octokit.paginate(octokit.rest.repos.listBranches, {
-    owner: OWNER,
-    repo: REPO,
-    per_page: 100
-  })
+function registryIdToBranch(id) {
+  const match = id.match(/^rhai-(\d+\.\d+)-?(ea\d+|ga)?$/)
+  if (!match) return null
+  const version = match[1]
+  const phase = match[2]
+  if (!phase || phase === 'ga') return `rhoai-${version}`
+  const eaNum = phase.replace('ea', '')
+  return `rhoai-${version}-ea.${eaNum}`
+}
 
-  const rhoaiBranches = branches
-    .map(b => b.name)
-    .filter(name => /^rhoai-\d/.test(name))
-
-  rhoaiBranches.sort((a, b) => {
+function sortBranchesDesc(branches) {
+  return [...branches].sort((a, b) => {
     const partsA = a.replace(/^rhoai-/, '').split(/[.-]/).map(Number)
     const partsB = b.replace(/^rhoai-/, '').split(/[.-]/).map(Number)
     for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
@@ -37,8 +38,17 @@ async function discoverReleaseBranches(octokit) {
     }
     return 0
   })
+}
 
-  return rhoaiBranches
+function branchesFromRegistry(registry) {
+  if (!registry || !Array.isArray(registry.releases)) return []
+  const seen = new Set()
+  for (const release of registry.releases) {
+    if (release.state !== 'active') continue
+    const branch = registryIdToBranch(release.id)
+    if (branch) seen.add(branch)
+  }
+  return sortBranchesDesc([...seen])
 }
 
 async function fetchBranchReport(octokit, branch) {
@@ -77,8 +87,8 @@ async function fetchBranchReport(octokit, branch) {
 }
 
 function registerComponentArchitecturesFetcher(router, context) {
-  const { storage, requireAdmin, requireScope, secrets } = context
-  const { writeToStorage } = storage
+  const { storage, requireAuth, requireScope, secrets } = context
+  const { readFromStorage, writeToStorage } = storage
 
   async function runFetch() {
     if (process.env.DEMO_MODE === 'true') {
@@ -92,9 +102,10 @@ function registerComponentArchitecturesFetcher(router, context) {
 
     const octokit = new Octokit({ auth: token, request: { timeout: 30000 } })
 
-    const branches = await discoverReleaseBranches(octokit)
+    const registry = await readFromStorage(REGISTRY_KEY)
+    const branches = branchesFromRegistry(registry)
     if (!branches.length) {
-      return { status: 'error', message: 'No rhoai-* release branches found' }
+      return { status: 'error', message: 'No active releases found in the registry' }
     }
 
     const branchData = {}
@@ -130,13 +141,13 @@ function registerComponentArchitecturesFetcher(router, context) {
    * @openapi
    * /api/modules/releases/component-architectures/refresh:
    *   post:
-   *     summary: Trigger component architecture data refresh from GitHub (admin only)
+   *     summary: Trigger component architecture data refresh from GitHub
    *     tags: [Releases - Component Architectures]
    *     responses:
    *       200:
    *         description: Refresh results
    */
-  router.post('/refresh', requireAdmin, requireScope('releases:write'), async function (req, res) {
+  router.post('/refresh', requireAuth, requireScope('releases:write'), async function (req, res) {
     if (context.isRefreshRunning && context.isRefreshRunning()) {
       return res.json({ status: 'already_running', message: 'A refresh is already in progress' })
     }
@@ -168,7 +179,8 @@ function registerComponentArchitecturesFetcher(router, context) {
 module.exports = {
   registerComponentArchitecturesFetcher,
   STORAGE_KEY,
-  discoverReleaseBranches,
+  registryIdToBranch,
+  branchesFromRegistry,
   fetchBranchReport,
   stripRhelSuffix
 }
