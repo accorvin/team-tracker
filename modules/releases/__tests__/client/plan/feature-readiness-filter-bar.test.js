@@ -389,6 +389,21 @@ describe('FeatureReadinessFilterBar', function() {
     wrapper.unmount()
   })
 
+  it('After requested checkbox selects yellow and green categories', async function() {
+    var wrapper = mount(FeatureReadinessFilterBar, {
+      props: { filterMeta: FILTER_META, modelValue: defaultModelValue() },
+      attachTo: document.body
+    })
+    var alignBtn = findButtonByText(wrapper, 'All alignments')
+    await alignBtn[0].trigger('click')
+    var labels = wrapper.findAll('label').filter(function(l) { return l.text().trim() === 'After requested' })
+    expect(labels.length).toBe(1)
+    await labels[0].find('input').setValue(true)
+    var emitted = wrapper.emitted('update:modelValue')
+    expect(emitted[emitted.length - 1][0].alignment).toEqual(['after_requested', 'aligned_late'])
+    wrapper.unmount()
+  })
+
   it('emits product selection', async function() {
     var wrapper = mount(FeatureReadinessFilterBar, {
       props: { filterMeta: FILTER_META, modelValue: defaultModelValue() },

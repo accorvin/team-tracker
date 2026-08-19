@@ -7,7 +7,8 @@ import {
   countAlignment,
   countAlignmentForGroups,
   buildAlignmentRollup,
-  countDeliveredInVisibleVersions
+  countDeliveredInVisibleVersions,
+  afterRequestedSplit
 } from '../../../client/plan/utils/alignment-rollup.js'
 
 function feature(overrides) {
@@ -60,7 +61,7 @@ describe('uniqueFeaturesFromGroups', function() {
 })
 
 describe('countAlignment', function() {
-  it('computes Align % as on time plus late over unique keys', function() {
+  it('computes Align % as Early or as requested plus green After requested', function() {
     var counts = countAlignment([
       feature({ key: 'A', alignmentCategory: 'aligned_on_time' }),
       feature({ key: 'B', alignmentCategory: 'aligned_late' }),
@@ -76,6 +77,28 @@ describe('countAlignment', function() {
     expect(counts.fv_only).toBe(1)
     expect(counts.misaligned).toBe(1)
     expect(counts.alignment_pct).toBe(40)
+  })
+
+  it('does not count yellow After requested as aligned', function() {
+    var counts = countAlignment([
+      feature({ key: 'A', alignmentCategory: 'aligned_on_time' }),
+      feature({ key: 'B', alignmentCategory: 'after_requested' })
+    ])
+    expect(counts.total).toBe(2)
+    expect(counts.after_requested).toBe(1)
+    expect(counts.alignment_pct).toBe(50)
+  })
+})
+
+describe('afterRequestedSplit', function() {
+  it('splits yellow and green After requested counts', function() {
+    var split = afterRequestedSplit({
+      after_requested: 7,
+      aligned_late: 4
+    })
+    expect(split.yellow).toBe(7)
+    expect(split.green).toBe(4)
+    expect(split.total).toBe(11)
   })
 })
 
@@ -182,5 +205,56 @@ describe('countAlignmentForGroups', function() {
     expect(counts.total).toBe(1)
     expect(counts.aligned_late).toBe(1)
     expect(counts.alignment_pct).toBe(100)
+  })
+})
+
+describe('buildAlignmentRollup open-plan vs per-release', function() {
+  it('scope follows open plan while frozen EA1 row discounts leavers', function() {
+    var groups = [
+      {
+        version: '3.6 EA1 RHOAI RELEASE',
+        planningFrozen: true,
+        components: [{
+          component: 'Dashboard',
+          requestedFeatures: [
+            feature({ key: 'STAY', alignmentCategory: 'aligned_on_time' }),
+            feature({ key: 'MOVED', alignmentCategory: 'after_requested' })
+          ],
+          committedFeatures: [feature({ key: 'STAY', alignmentCategory: 'aligned_on_time' })]
+        }]
+      },
+      {
+        version: '3.6 EA2 RHOAI RELEASE',
+        planningFrozen: false,
+        components: [{
+          component: 'Dashboard',
+          requestedFeatures: [],
+          committedFeatures: [
+            feature({ key: 'MOVED', alignmentCategory: 'after_requested' }),
+            feature({ key: 'NEW', alignmentCategory: 'aligned_on_time' })
+          ]
+        }]
+      }
+    ]
+    var rollup = buildAlignmentRollup(groups)
+    // Hub tile / selected scope: open plan only (EA2)
+    expect(rollup.scope.counts.total).toBe(2)
+    expect(rollup.scope.counts.after_requested).toBe(1)
+    expect(rollup.scope.counts.aligned_on_time).toBe(1)
+    expect(rollup.scope.counts.alignment_pct).toBe(50)
+
+    var ea1 = rollup.cycles[0].milestones.find(function(ms) { return ms.key.indexOf('EA1') !== -1 })
+    var ea2 = rollup.cycles[0].milestones.find(function(ms) { return ms.key.indexOf('EA2') !== -1 })
+    expect(ea1).toBeTruthy()
+    expect(ea2).toBeTruthy()
+    // Frozen EA1 discounts the leaver
+    expect(ea1.counts.total).toBe(1)
+    expect(ea1.counts.aligned_on_time).toBe(1)
+    expect(ea1.counts.after_requested).toBe(0)
+    expect(ea1.counts.alignment_pct).toBe(100)
+    // Open EA2 keeps yellow After requested out of Align %
+    expect(ea2.counts.total).toBe(2)
+    expect(ea2.counts.after_requested).toBe(1)
+    expect(ea2.counts.alignment_pct).toBe(50)
   })
 })

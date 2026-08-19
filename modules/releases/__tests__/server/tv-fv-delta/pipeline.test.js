@@ -11,6 +11,8 @@ const {
   extractProduct,
   buildReleaseDatesMap,
   isReleaseFrozen,
+  categoryForLaterFixVersion,
+  worseLaterCategory,
   normalizeIssue,
   classifyFeatures,
   buildExport,
@@ -438,6 +440,41 @@ describe('isReleaseFrozen', () => {
       'rhoai 3 5': { planningFreezeDate: '2026-06-01' },
     };
     expect(isReleaseFrozen('RHOAI-3.5', releaseDates)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// categoryForLaterFixVersion / worseLaterCategory
+// ---------------------------------------------------------------------------
+
+describe('categoryForLaterFixVersion', () => {
+  it('returns after_requested when Fix Version freeze has not passed', () => {
+    const releaseDates = {
+      'rhoai-3.6': { planningFreezeDate: '2026-09-01' },
+    };
+    expect(categoryForLaterFixVersion('rhoai-3.6', releaseDates)).toBe('after_requested');
+  });
+
+  it('returns aligned_late when Fix Version freeze has passed', () => {
+    const releaseDates = {
+      'rhoai-3.6': { planningFreezeDate: '2026-06-01' },
+    };
+    expect(categoryForLaterFixVersion('rhoai-3.6', releaseDates)).toBe('aligned_late');
+  });
+
+  it('returns after_requested when Fix Version has no dates', () => {
+    expect(categoryForLaterFixVersion('rhoai-3.6', {})).toBe('after_requested');
+  });
+});
+
+describe('worseLaterCategory', () => {
+  it('prefers after_requested over aligned_late', () => {
+    expect(worseLaterCategory('aligned_late', 'after_requested')).toBe('after_requested');
+    expect(worseLaterCategory('after_requested', 'aligned_late')).toBe('after_requested');
+  });
+
+  it('keeps aligned_on_time when both are on time', () => {
+    expect(worseLaterCategory('aligned_on_time', 'aligned_on_time')).toBe('aligned_on_time');
   });
 });
 

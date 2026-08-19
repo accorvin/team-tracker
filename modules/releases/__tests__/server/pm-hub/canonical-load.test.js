@@ -117,4 +117,54 @@ describe('canonical-load', function() {
     expect(comp.committedCount).toBe(1)
     expect(comp.committedFeatures[0].key).toBe('FV-ONLY-1')
   })
+
+  it('stamps planningFrozen from Fix Version freeze dates', function() {
+    var built = buildComponentReleaseLoadGroups([
+      feature({
+        key: 'A-1',
+        targetVersions: ['rhoai-3.5'],
+        fixVersions: ['rhoai-3.5'],
+        fixVersion: 'rhoai-3.5'
+      }),
+      feature({
+        key: 'B-1',
+        targetVersions: ['rhoai-3.6'],
+        fixVersions: ['rhoai-3.6'],
+        fixVersion: 'rhoai-3.6'
+      })
+    ], {
+      components: ['Dashboard'],
+      versions: ['rhoai-3.5', 'rhoai-3.6'],
+      releaseDates: {
+        'rhoai-3.5': { planningFreezeDate: '2026-06-01' },
+        'rhoai-3.6': { planningFreezeDate: '2026-09-01' }
+      }
+    })
+    var g35 = built.groups.find(function(g) { return g.version === 'rhoai-3.5' })
+    var g36 = built.groups.find(function(g) { return g.version === 'rhoai-3.6' })
+    expect(g35).toBeTruthy()
+    expect(g36).toBeTruthy()
+    expect(g35.planningFrozen).toBe(true)
+    expect(g36.planningFrozen).toBe(false)
+  })
+
+  it('classifies later Fix Version as after_requested until committed freeze', function() {
+    var built = buildComponentReleaseLoadGroups([
+      feature({
+        key: 'SLIP-1',
+        targetVersions: ['rhoai-3.5'],
+        fixVersions: ['rhoai-3.6'],
+        fixVersion: 'rhoai-3.6'
+      })
+    ], {
+      components: ['Dashboard'],
+      versions: ['rhoai-3.5'],
+      releaseDates: {
+        'rhoai-3.5': { planningFreezeDate: '2026-06-01' }
+      }
+    })
+    var row = built.groups[0].components[0].requestedFeatures[0]
+    expect(row.alignmentCategory).toBe('after_requested')
+    expect(row.pmDoAligned).toBe(false)
+  })
 })

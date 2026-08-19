@@ -23,14 +23,6 @@ export var ALIGNMENT_COUNT_KEYS = [
   'misaligned'
 ]
 
-export var ALIGNMENT_DISPLAY_KEYS = [
-  'aligned_on_time',
-  'after_requested',
-  'tv_only',
-  'fv_only',
-  'misaligned'
-]
-
 export function emptyAlignmentCounts() {
   return {
     total: 0,
