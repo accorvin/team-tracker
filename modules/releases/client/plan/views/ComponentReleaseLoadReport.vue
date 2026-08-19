@@ -346,6 +346,10 @@
         </div>
       </div>
 
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">TV/FV Align</span>
+        <AlignmentLegendPopover variant="button" />
+      </div>
       <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
         <button
           v-for="cat in alignmentChipKeys"
@@ -438,6 +442,7 @@ import { getApiBase } from '@shared/client/services/api'
 import { buildComponentLeadsMap } from '../../composables/componentLeads'
 import ComponentReleaseLoadTable from '../components/ComponentReleaseLoadTable.vue'
 import AlignmentRollupTable from '../components/AlignmentRollupTable.vue'
+import AlignmentLegendPopover from '../components/AlignmentLegendPopover.vue'
 import PillarConfigPanel from '../components/PillarConfigPanel.vue'
 import FeatureReadinessDrawer from '../components/FeatureReadinessDrawer.vue'
 import { toDrawerFeature } from '../utils/feature-readiness-drawer-model.js'
@@ -815,7 +820,7 @@ function filterGroups(opts) {
         requestedCount: newReq.length,
         committedCount: newCom.length,
         blockedCount: filtered.filter(function(ff) { return ff.isBlocked }).length,
-        notAlignedCount: filtered.filter(function(ff) { return !ff.pmDoAligned }).length
+        alignmentCounts: countAlignment(filtered)
       })
     }).filter(function(comp) {
       return (comp.requestedFeatures.length + comp.committedFeatures.length) > 0

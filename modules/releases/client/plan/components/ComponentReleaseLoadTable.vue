@@ -3,6 +3,7 @@ import { reactive, computed } from 'vue'
 import { getComponentLeads } from '../../composables/componentLeads'
 import FPDoRPopover from './FPDoRPopover.vue'
 import AlignmentPopover from './AlignmentPopover.vue'
+import AlignmentLegendPopover from './AlignmentLegendPopover.vue'
 import { failedFpdorNames } from '../utils/feature-readiness-export.js'
 import {
   fpdorItemSeverity,
@@ -20,8 +21,11 @@ import {
 } from '../utils/docs-required-display.js'
 import {
   worseAlignmentCategory,
-  isAlignedCategory
+  isAlignedCategory,
+  alignmentCategoryLabel,
+  alignmentCategoryChipClass
 } from '../utils/tv-fv-alignment-display.js'
+import { ALIGNMENT_COUNT_KEYS, countAlignment } from '../utils/alignment-rollup.js'
 
 const props = defineProps({
   groups: { type: Array, default: () => [] },
@@ -304,12 +308,10 @@ var componentGroups = computed(function() {
     var reqCount = 0
     var comCount = 0
     var blkCount = 0
-    var notAlignedCount = 0
     for (var fli = 0; fli < featureList.length; fli++) {
       if (featureList[fli].isRequested) reqCount++
       if (featureList[fli].isCommitted) comCount++
       if (featureList[fli].isBlocked) blkCount++
-      if (!featureList[fli].pmDoAligned) notAlignedCount++
     }
 
     result.push({
@@ -318,7 +320,7 @@ var componentGroups = computed(function() {
       requestedCount: reqCount,
       committedCount: comCount,
       blockedCount: blkCount,
-      notAlignedCount: notAlignedCount
+      alignmentCounts: countAlignment(featureList)
     })
   }
 
@@ -351,7 +353,12 @@ defineExpose({ expandAll, collapseAll })
 </script>
 
 <template>
-  <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+  <div class="rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+    <div class="flex items-center justify-between gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
+      <span class="text-xs font-semibold text-gray-700 dark:text-gray-200">Component load</span>
+      <AlignmentLegendPopover variant="button" align="right" />
+    </div>
+    <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)]">
     <table class="w-full text-sm border-collapse min-w-[1400px]">
       <tbody>
         <template v-for="comp in componentGroups" :key="comp.component">
@@ -362,7 +369,7 @@ defineExpose({ expandAll, collapseAll })
             @click="toggleComponent(comp.component)"
           >
             <td colspan="14" class="px-4 py-3">
-              <div class="flex items-center gap-3">
+              <div class="flex flex-wrap items-center gap-2">
                 <svg
                   class="w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-200 flex-shrink-0"
                   :class="{ 'rotate-90': isComponentExpanded(comp.component) }"
@@ -385,11 +392,14 @@ defineExpose({ expandAll, collapseAll })
                     : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'"
                 >{{ comp.blockedCount }} blocked</span>
                 <span
+                  v-for="cat in ALIGNMENT_COUNT_KEYS"
+                  :key="cat"
                   class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                  :class="comp.notAlignedCount > 0
-                    ? 'bg-amber-100 dark:bg-amber-800/40 text-amber-700 dark:text-amber-300'
+                  :class="comp.alignmentCounts[cat] > 0
+                    ? alignmentCategoryChipClass(cat)
                     : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'"
-                >{{ comp.notAlignedCount }} not aligned</span>
+                  :title="'Unique features in this component only. Hub tiles above count each issue once across all components.'"
+                >{{ comp.alignmentCounts[cat] }} {{ alignmentCategoryLabel(cat) }}</span>
               </div>
               <div v-if="getLeads(comp.component)" class="flex items-center gap-5 mt-2 ml-[38px]">
                 <div v-if="getLeads(comp.component).pmLead" class="flex items-center gap-1.5">
@@ -627,5 +637,6 @@ defineExpose({ expandAll, collapseAll })
         </tr>
       </tbody>
     </table>
+    </div>
   </div>
 </template>

@@ -20,11 +20,36 @@ export var ALIGNMENT_CATEGORY_LABELS = {
 }
 
 export var ALIGNMENT_CATEGORY_HELP = {
-  aligned_on_time: 'Fix Version matches Target Version, or ships earlier than planned.',
-  aligned_late: 'Fix Version is later than Target Version, but planning freeze for that Target Version has already passed — accepted slip.',
-  misaligned: 'Fix Version slips past Target Version before planning freeze, or TV/FV point at different products (for example RHOAI vs RHAII).',
-  tv_only: 'Target Version is set for this release, but Fix Version is empty.',
-  fv_only: 'Fix Version is set for this release, but Target Version is empty.'
+  aligned_on_time: 'Target Version and Fix Version are the same milestone, or Fix Version is an earlier one. This is not a calendar on-schedule flag.',
+  aligned_late: 'Fix Version is a later milestone than Target Version, and that Target Version planning freeze has already passed. Accepted slip — not overdue.',
+  misaligned: 'Fix Version slips past Target Version before planning freeze, or Target Version and Fix Version point at different products (for example RHOAI vs RHAII).',
+  tv_only: 'Target Version is set for this release; Fix Version is empty. Requested, not committed.',
+  fv_only: 'Fix Version is set for this release; Target Version is empty.'
+}
+
+export var ALIGNMENT_LEGEND_ORDER = [
+  'aligned_on_time',
+  'aligned_late',
+  'tv_only',
+  'fv_only',
+  'misaligned'
+]
+
+export var ALIGNMENT_LEGEND_NOTES = [
+  'These labels compare Target Version (PM request) to Fix Version (engineering commitment). They are not calendar on-schedule or overdue flags.',
+  'Align % is (On time + Late) divided by unique keys that have Target Version or Fix Version in this view.',
+  'Hub tiles count each issue once. Component chips count unique keys in that component only. A feature on two components appears in both headers.'
+]
+
+export function alignmentLegendEntries() {
+  return ALIGNMENT_LEGEND_ORDER.map(function(cat) {
+    return {
+      key: cat,
+      label: alignmentCategoryLabel(cat),
+      help: alignmentCategoryHelp(cat),
+      chipClass: alignmentCategoryChipClass(cat)
+    }
+  })
 }
 
 export function isAlignedCategory(category) {

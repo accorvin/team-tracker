@@ -33,11 +33,11 @@ var CATEGORY_LABELS = {
 }
 
 var CATEGORY_HELP = {
-  aligned_on_time: 'Fix Version matches Target Version, or ships earlier than planned.',
-  aligned_late: 'Fix Version is later than Target Version, but planning freeze for that Target Version has already passed — accepted slip.',
-  misaligned: 'Fix Version slips past Target Version before planning freeze, or TV/FV point at different products (for example RHOAI vs RHAII).',
-  tv_only: 'Target Version is set for this release, but Fix Version is empty.',
-  fv_only: 'Fix Version is set for this release, but Target Version is empty.'
+  aligned_on_time: 'Target Version and Fix Version are the same milestone, or Fix Version is an earlier one. This is not a calendar on-schedule flag.',
+  aligned_late: 'Fix Version is a later milestone than Target Version, and that Target Version planning freeze has already passed. Accepted slip — not overdue.',
+  misaligned: 'Fix Version slips past Target Version before planning freeze, or Target Version and Fix Version point at different products (for example RHOAI vs RHAII).',
+  tv_only: 'Target Version is set for this release; Fix Version is empty. Requested, not committed.',
+  fv_only: 'Fix Version is set for this release; Target Version is empty.'
 }
 
 /**

@@ -8,9 +8,11 @@ import {
   alignmentCategoryLabel,
   alignmentCategoryHelp,
   alignmentCategoryChipClass,
+  alignmentLegendEntries,
   buildAlignmentDetail,
   ALIGNMENT_CATEGORY_LABELS,
-  ALIGNMENT_CATEGORY_HELP
+  ALIGNMENT_CATEGORY_HELP,
+  ALIGNMENT_LEGEND_NOTES
 } from '../../../client/plan/utils/tv-fv-alignment-display.js'
 
 describe('tv-fv-alignment-display', function() {
@@ -46,7 +48,26 @@ describe('tv-fv-alignment-display', function() {
     Object.keys(ALIGNMENT_CATEGORY_HELP).forEach(function(cat) {
       expect(alignmentCategoryHelp(cat).length).toBeGreaterThan(10)
     })
-    expect(alignmentCategoryHelp('aligned_on_time')).toMatch(/Fix Version matches Target Version|ships earlier/i)
+    expect(alignmentCategoryHelp('aligned_on_time')).toMatch(/same milestone|earlier/i)
+    expect(alignmentCategoryHelp('aligned_late')).toMatch(/later milestone|Accepted slip/i)
+  })
+
+  it('legend entries cover all five categories plus unique-key notes', function() {
+    var entries = alignmentLegendEntries()
+    expect(entries.map(function(e) { return e.key })).toEqual([
+      'aligned_on_time',
+      'aligned_late',
+      'tv_only',
+      'fv_only',
+      'misaligned'
+    ])
+    entries.forEach(function(entry) {
+      expect(entry.label).toBeTruthy()
+      expect(entry.help.length).toBeGreaterThan(10)
+      expect(entry.chipClass).toBeTruthy()
+    })
+    expect(ALIGNMENT_LEGEND_NOTES.length).toBe(3)
+    expect(ALIGNMENT_LEGEND_NOTES[2]).toMatch(/Hub tiles count each issue once/i)
   })
 
   it('chip classes are defined for all categories', function() {
