@@ -105,8 +105,17 @@
         </p>
       </div>
 
+      <!-- No report for this branch -->
+      <div v-if="currentBranchData && currentBranchData.reportAvailable === false" class="text-center py-16">
+        <Cpu :size="40" class="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+        <h3 class="text-base font-medium text-gray-700 dark:text-gray-300 mb-1">No multi-arch report for {{ selectedBranch }}</h3>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          The <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">multi-arch-report.yaml</code> file has not been generated for this branch yet.
+        </p>
+      </div>
+
       <!-- Summary cards -->
-      <div v-if="summary" class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div v-else-if="summary" class="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center flex flex-col justify-between">
           <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 h-8 flex items-center justify-center">Total</p>
           <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ summary.totalComponents }}</p>
@@ -130,7 +139,7 @@
       </div>
 
       <!-- Architecture matrix table -->
-      <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div v-if="currentBranchData?.reportAvailable !== false" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
@@ -159,8 +168,8 @@
                       <Package :size="14" />
                     </a>
                     <a
-                      v-if="comp.imageName"
-                      :href="pipelineRunUrl(comp.imageName)"
+                      v-if="comp.pipelineRunFile"
+                      :href="pipelineRunUrl(comp)"
                       target="_blank"
                       rel="noopener noreferrer"
                       class="text-gray-400 hover:text-primary-500 dark:text-gray-500 dark:hover:text-primary-400 transition-colors"
@@ -286,9 +295,12 @@ function quayUrl(image) {
   return `https://quay.io/repository/${name}?tab=tags`
 }
 
-function pipelineRunUrl(imageName) {
-  if (!imageName || !selectedBranch.value) return '#'
-  return `https://github.com/red-hat-data-services/konflux-central/tree/${selectedBranch.value}/pipelineruns/${imageName}`
+function pipelineRunUrl(comp) {
+  if (!selectedBranch.value) return '#'
+  if (comp.pipelineRunFile) {
+    return `https://github.com/red-hat-data-services/konflux-central/blob/${selectedBranch.value}/${comp.pipelineRunFile}`
+  }
+  return '#'
 }
 
 function formatDate(iso) {
