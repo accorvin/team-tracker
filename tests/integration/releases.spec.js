@@ -411,7 +411,7 @@ test.describe('Releases Field and BU Feedback @releases', () => {
     await expect(page.locator('h2', { hasText: 'Field and BU Feedback' })).toBeVisible();
     await expect(page.getByTestId('bu-feedback-search')).toBeVisible();
     await expect(page.getByTestId('bu-feedback-filter-status')).toBeVisible();
-    await expect(page.getByLabel('Filter by component')).toBeVisible();
+    await expect(page.getByTestId('bu-feedback-filter-component')).toBeVisible();
 
     const table = page.getByTestId('bu-feedback-table');
     await expect(table).toBeVisible();
