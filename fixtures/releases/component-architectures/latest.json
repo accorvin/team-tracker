@@ -1302,12 +1302,22 @@
       },
       "reportAvailable": true
     },
-    "rhoai-3.3": {
+    "rhoai-3.5-ea.1": {
       "reportAvailable": false,
       "components": [],
       "summary": null
     },
-    "rhoai-2.25": {
+    "rhoai-3.5-ea.2": {
+      "reportAvailable": false,
+      "components": [],
+      "summary": null
+    },
+    "rhoai-3.6": {
+      "reportAvailable": false,
+      "components": [],
+      "summary": null
+    },
+    "rhoai-3.6-ea.2": {
       "reportAvailable": false,
       "components": [],
       "summary": null
