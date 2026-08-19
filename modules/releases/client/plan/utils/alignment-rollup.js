@@ -1,10 +1,10 @@
 /**
  * Filtered-view TV/FV Align roll-up for PM Hub.
- * Unique issue keys; categories are the same five as Reports → TV vs FV Delta.
- * Scope follows the groups already on screen (pillar / component / product / blocked / docs).
+ * Unique issue keys. After requested is one label: yellow until Fix Version
+ * freeze (after_requested), green after (aligned_late).
  */
 
-import { worseAlignmentCategory } from './tv-fv-alignment-display.js'
+import { worseAlignmentCategory, isAfterRequestedCategory } from './tv-fv-alignment-display.js'
 import {
   extractCycle,
   extractMilestoneGroup,
@@ -16,6 +16,7 @@ import {
 
 export var ALIGNMENT_COUNT_KEYS = [
   'aligned_on_time',
+  'after_requested',
   'aligned_late',
   'tv_only',
   'fv_only',
@@ -26,6 +27,7 @@ export function emptyAlignmentCounts() {
   return {
     total: 0,
     aligned_on_time: 0,
+    after_requested: 0,
     aligned_late: 0,
     tv_only: 0,
     fv_only: 0,
@@ -40,6 +42,15 @@ export function finishCounts(counts) {
   return counts
 }
 
+export function afterRequestedSplit(counts) {
+  var c = counts || emptyAlignmentCounts()
+  return {
+    yellow: c.after_requested || 0,
+    green: c.aligned_late || 0,
+    total: (c.after_requested || 0) + (c.aligned_late || 0)
+  }
+}
+
 export function countAlignment(features) {
   var counts = emptyAlignmentCounts()
   var list = features || []
@@ -49,6 +60,16 @@ export function countAlignment(features) {
     if (cat && counts[cat] != null) counts[cat]++
   }
   return finishCounts(counts)
+}
+
+function shouldDiscountClosedLeaver(feature) {
+  if (!feature || !isAfterRequestedCategory(feature.alignmentCategory)) return false
+  var byVersion = feature.byVersion || {}
+  var versions = Object.keys(byVersion)
+  for (var i = 0; i < versions.length; i++) {
+    if (byVersion[versions[i]].isCommitted) return false
+  }
+  return true
 }
 
 /**
@@ -62,8 +83,11 @@ export function uniqueFeaturesFromGroups(groups) {
     var version = groupsArr[gi].version
     var comps = groupsArr[gi].components || []
     for (var ci = 0; ci < comps.length; ci++) {
-      var lists = [comps[ci].requestedFeatures || [], comps[ci].committedFeatures || []]
+      var reqList = comps[ci].requestedFeatures || []
+      var comList = comps[ci].committedFeatures || []
+      var lists = [reqList, comList]
       for (var li = 0; li < lists.length; li++) {
+        var isRequestedList = li === 0
         for (var fi = 0; fi < lists[li].length; fi++) {
           var f = lists[li][fi]
           if (!f || !f.key) continue
@@ -74,11 +98,17 @@ export function uniqueFeaturesFromGroups(groups) {
               byVersion: {}
             }
           }
-          var nextCat = worseAlignmentCategory(
-            byKey[f.key].byVersion[version] || null,
-            f.alignmentCategory || null
-          )
-          byKey[f.key].byVersion[version] = nextCat
+          if (!byKey[f.key].byVersion[version]) {
+            byKey[f.key].byVersion[version] = {
+              category: null,
+              isRequested: false,
+              isCommitted: false
+            }
+          }
+          var rec = byKey[f.key].byVersion[version]
+          rec.category = worseAlignmentCategory(rec.category, f.alignmentCategory || null)
+          if (isRequestedList) rec.isRequested = true
+          else rec.isCommitted = true
           byKey[f.key].alignmentCategory = worseAlignmentCategory(
             byKey[f.key].alignmentCategory,
             f.alignmentCategory || null
@@ -91,6 +121,28 @@ export function uniqueFeaturesFromGroups(groups) {
   var out = []
   for (var i = 0; i < keys.length; i++) out.push(byKey[keys[i]])
   return out
+}
+
+/**
+ * Open-plan Align % uses unfrozen selected versions.
+ * All-frozen (closed plan) leaves After requested leavers out of that release %.
+ */
+export function countAlignmentForGroups(groups) {
+  var src = groups || []
+  var open = []
+  for (var i = 0; i < src.length; i++) {
+    if (!src[i].planningFrozen) open.push(src[i])
+  }
+  if (open.length > 0) return countAlignment(uniqueFeaturesFromGroups(open))
+  var unique = uniqueFeaturesFromGroups(src)
+  var counts = emptyAlignmentCounts()
+  for (var ui = 0; ui < unique.length; ui++) {
+    if (shouldDiscountClosedLeaver(unique[ui])) continue
+    counts.total++
+    var cat = unique[ui].alignmentCategory
+    if (cat && counts[cat] != null) counts[cat]++
+  }
+  return finishCounts(counts)
 }
 
 export function visibleVersionNames(groups) {
@@ -156,7 +208,7 @@ export function buildAlignmentRollup(groups) {
     kind: 'scope',
     label: 'Selected scope',
     versionNames: visibleVersionNames(src),
-    counts: countAlignment(uniqueFeaturesFromGroups(src))
+    counts: countAlignmentForGroups(src)
   }
 
   var cycleMap = {}
@@ -195,7 +247,7 @@ export function buildAlignmentRollup(groups) {
       label: product ? productLabel(product) : version,
       product: product ? productLabel(product) : null,
       versionNames: [version],
-      counts: countAlignment(uniqueFeaturesFromGroups([src[gi]]))
+      counts: countAlignmentForGroups([src[gi]])
     })
   }
 
@@ -215,7 +267,7 @@ export function buildAlignmentRollup(groups) {
         kind: 'milestone',
         label: msRow.label,
         versionNames: msRow.versionNames,
-        counts: countAlignment(uniqueFeaturesFromGroups(msRow.groups)),
+        counts: countAlignmentForGroups(msRow.groups),
         rows: msRow.rows || []
       })
     }

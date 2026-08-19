@@ -72,7 +72,8 @@ export function getSortValue(feature, column) {
       aligned_late: 1,
       fv_only: 2,
       tv_only: 3,
-      misaligned: 4
+      after_requested: 4,
+      misaligned: 5
     }
     var ao = order[feature.alignmentCategory]
     return ao !== undefined ? ao : 99

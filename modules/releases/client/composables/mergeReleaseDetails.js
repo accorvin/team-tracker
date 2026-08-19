@@ -5,6 +5,7 @@
  * @param {Record<string, {
  *   aligned_on_time?: object[],
  *   aligned_late?: object[],
+ *   after_requested?: object[],
  *   tv_only?: object[],
  *   fv_only?: object[],
  *   misaligned?: object[],
@@ -13,6 +14,7 @@
  * @returns {{
  *   aligned_on_time: object[],
  *   aligned_late: object[],
+ *   after_requested: object[],
  *   tv_only: object[],
  *   fv_only: object[],
  *   misaligned: object[],
@@ -21,10 +23,11 @@
 export function mergeReleaseDetails(releasesMap, names) {
   if (!releasesMap || !names || !names.length) return null
 
-  var cats = ['aligned_on_time', 'aligned_late', 'tv_only', 'fv_only', 'misaligned']
+  var cats = ['aligned_on_time', 'aligned_late', 'after_requested', 'tv_only', 'fv_only', 'misaligned']
   var out = {
     aligned_on_time: [],
     aligned_late: [],
+    after_requested: [],
     tv_only: [],
     fv_only: [],
     misaligned: [],
@@ -32,6 +35,7 @@ export function mergeReleaseDetails(releasesMap, names) {
   var seen = {
     aligned_on_time: {},
     aligned_late: {},
+    after_requested: {},
     tv_only: {},
     fv_only: {},
     misaligned: {},
@@ -72,6 +76,7 @@ export function mergeReleaseDetails(releasesMap, names) {
  *   total: number,
  *   aligned_on_time: number,
  *   aligned_late: number,
+ *   after_requested: number,
  *   tv_only: number,
  *   fv_only: number,
  *   misaligned: number,
@@ -89,11 +94,12 @@ export function countUniqueCategoryTotals(releasesMap, names) {
   var merged = mergeReleaseDetails(releasesMap, names)
   if (!merged) return null
 
-  var cats = ['aligned_on_time', 'aligned_late', 'tv_only', 'fv_only', 'misaligned']
+  var cats = ['aligned_on_time', 'aligned_late', 'after_requested', 'tv_only', 'fv_only', 'misaligned']
   var allKeys = {}
   var counts = {
     aligned_on_time: 0,
     aligned_late: 0,
+    after_requested: 0,
     tv_only: 0,
     fv_only: 0,
     misaligned: 0,
@@ -114,6 +120,7 @@ export function countUniqueCategoryTotals(releasesMap, names) {
     total: total,
     aligned_on_time: counts.aligned_on_time,
     aligned_late: counts.aligned_late,
+    after_requested: counts.after_requested,
     tv_only: counts.tv_only,
     fv_only: counts.fv_only,
     misaligned: counts.misaligned,

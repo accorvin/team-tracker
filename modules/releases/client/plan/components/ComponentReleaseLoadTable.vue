@@ -3,6 +3,7 @@ import { reactive, computed } from 'vue'
 import { getComponentLeads } from '../../composables/componentLeads'
 import FPDoRPopover from './FPDoRPopover.vue'
 import AlignmentPopover from './AlignmentPopover.vue'
+import AlignmentLegendPopover from './AlignmentLegendPopover.vue'
 import { failedFpdorNames } from '../utils/feature-readiness-export.js'
 import {
   fpdorItemSeverity,
@@ -20,8 +21,12 @@ import {
 } from '../utils/docs-required-display.js'
 import {
   worseAlignmentCategory,
-  isAlignedCategory
+  isAlignedCategory,
+  alignmentCategoryLabel,
+  alignmentCategoryChipClass,
+  ALIGNMENT_DISPLAY_KEYS
 } from '../utils/tv-fv-alignment-display.js'
+import { countAlignment, afterRequestedSplit } from '../utils/alignment-rollup.js'
 
 const props = defineProps({
   groups: { type: Array, default: () => [] },
@@ -52,7 +57,8 @@ var ALIGNMENT_SORT_ORDER = {
   aligned_late: 1,
   fv_only: 2,
   tv_only: 3,
-  misaligned: 4
+  after_requested: 4,
+  misaligned: 5
 }
 
 var sortState = reactive({
@@ -304,12 +310,10 @@ var componentGroups = computed(function() {
     var reqCount = 0
     var comCount = 0
     var blkCount = 0
-    var notAlignedCount = 0
     for (var fli = 0; fli < featureList.length; fli++) {
       if (featureList[fli].isRequested) reqCount++
       if (featureList[fli].isCommitted) comCount++
       if (featureList[fli].isBlocked) blkCount++
-      if (!featureList[fli].pmDoAligned) notAlignedCount++
     }
 
     result.push({
@@ -318,7 +322,7 @@ var componentGroups = computed(function() {
       requestedCount: reqCount,
       committedCount: comCount,
       blockedCount: blkCount,
-      notAlignedCount: notAlignedCount
+      alignmentCounts: countAlignment(featureList)
     })
   }
 
@@ -351,7 +355,12 @@ defineExpose({ expandAll, collapseAll })
 </script>
 
 <template>
-  <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+  <div class="rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+    <div class="flex items-center justify-between gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
+      <span class="text-xs font-semibold text-gray-700 dark:text-gray-200">Component load</span>
+      <AlignmentLegendPopover variant="button" align="right" />
+    </div>
+    <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)]">
     <table class="w-full text-sm border-collapse min-w-[1400px]">
       <tbody>
         <template v-for="comp in componentGroups" :key="comp.component">
@@ -362,7 +371,7 @@ defineExpose({ expandAll, collapseAll })
             @click="toggleComponent(comp.component)"
           >
             <td colspan="14" class="px-4 py-3">
-              <div class="flex items-center gap-3">
+              <div class="flex flex-wrap items-center gap-2">
                 <svg
                   class="w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-200 flex-shrink-0"
                   :class="{ 'rotate-90': isComponentExpanded(comp.component) }"
@@ -384,12 +393,29 @@ defineExpose({ expandAll, collapseAll })
                     ? 'bg-red-100 dark:bg-red-800/40 text-red-700 dark:text-red-300'
                     : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'"
                 >{{ comp.blockedCount }} blocked</span>
-                <span
-                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                  :class="comp.notAlignedCount > 0
-                    ? 'bg-amber-100 dark:bg-amber-800/40 text-amber-700 dark:text-amber-300'
-                    : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'"
-                >{{ comp.notAlignedCount }} not aligned</span>
+                <template v-for="cat in ALIGNMENT_DISPLAY_KEYS" :key="cat">
+                  <span
+                    v-if="cat !== 'after_requested'"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                    :class="comp.alignmentCounts[cat] > 0
+                      ? alignmentCategoryChipClass(cat)
+                      : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'"
+                    :title="'Unique features in this component only. Hub tiles above count each issue once across all components.'"
+                  >{{ comp.alignmentCounts[cat] || 0 }} {{ alignmentCategoryLabel(cat) }}</span>
+                  <span
+                    v-else
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                    :class="afterRequestedSplit(comp.alignmentCounts).total > 0
+                      ? 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200'
+                      : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'"
+                    title="After requested: yellow until the committed version freeze, then green. Unique features in this component only."
+                  >
+                    <span class="tabular-nums" :class="afterRequestedSplit(comp.alignmentCounts).yellow > 0 ? 'text-amber-700 dark:text-amber-300' : ''">{{ afterRequestedSplit(comp.alignmentCounts).yellow }}</span>
+                    <span>/</span>
+                    <span class="tabular-nums" :class="afterRequestedSplit(comp.alignmentCounts).green > 0 ? 'text-emerald-700 dark:text-emerald-300' : ''">{{ afterRequestedSplit(comp.alignmentCounts).green }}</span>
+                    After requested
+                  </span>
+                </template>
               </div>
               <div v-if="getLeads(comp.component)" class="flex items-center gap-5 mt-2 ml-[38px]">
                 <div v-if="getLeads(comp.component).pmLead" class="flex items-center gap-1.5">
@@ -627,5 +653,6 @@ defineExpose({ expandAll, collapseAll })
         </tr>
       </tbody>
     </table>
+    </div>
   </div>
 </template>

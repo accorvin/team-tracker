@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import { buildKeysJqlUrl } from './jiraKeysJql'
 
-var CATEGORIES = ['aligned_on_time', 'aligned_late', 'tv_only', 'fv_only', 'misaligned']
+var CATEGORIES = ['aligned_on_time', 'aligned_late', 'after_requested', 'tv_only', 'fv_only', 'misaligned']
 
 function emptyBucket() {
   return {
@@ -9,6 +9,7 @@ function emptyBucket() {
     total: 0,
     aligned_on_time: 0,
     aligned_late: 0,
+    after_requested: 0,
     tv_only: 0,
     fv_only: 0,
     misaligned: 0,
@@ -16,6 +17,7 @@ function emptyBucket() {
     total_jql: '',
     aligned_on_time_jql: '',
     aligned_late_jql: '',
+    after_requested_jql: '',
     tv_only_jql: '',
     fv_only_jql: '',
     misaligned_jql: '',
@@ -43,6 +45,7 @@ function toRow(compName, bucket, byKey) {
     total: bucket.total,
     aligned_on_time: bucket.aligned_on_time,
     aligned_late: bucket.aligned_late,
+    after_requested: bucket.after_requested,
     tv_only: bucket.tv_only,
     fv_only: bucket.fv_only,
     misaligned: bucket.misaligned,
@@ -52,6 +55,7 @@ function toRow(compName, bucket, byKey) {
     total_jql: buildKeysJqlUrl(totalFeatures),
     aligned_on_time_jql: buildKeysJqlUrl(featuresForKeys(bucket.byCategory.aligned_on_time, byKey)),
     aligned_late_jql: buildKeysJqlUrl(featuresForKeys(bucket.byCategory.aligned_late, byKey)),
+    after_requested_jql: buildKeysJqlUrl(featuresForKeys(bucket.byCategory.after_requested, byKey)),
     tv_only_jql: buildKeysJqlUrl(featuresForKeys(bucket.byCategory.tv_only, byKey)),
     fv_only_jql: buildKeysJqlUrl(featuresForKeys(bucket.byCategory.fv_only, byKey)),
     misaligned_jql: buildKeysJqlUrl(featuresForKeys(bucket.byCategory.misaligned, byKey)),
@@ -64,11 +68,12 @@ export function useComponentBreakdown(data, releaseData) {
     if (!releaseData.value || !data.value) return []
 
     const allFeatures = [
-      ...releaseData.value.aligned_on_time.map(f => ({ ...f, category: 'aligned_on_time' })),
-      ...releaseData.value.aligned_late.map(f => ({ ...f, category: 'aligned_late' })),
-      ...releaseData.value.tv_only.map(f => ({ ...f, category: 'tv_only' })),
-      ...releaseData.value.fv_only.map(f => ({ ...f, category: 'fv_only' })),
-      ...releaseData.value.misaligned.map(f => ({ ...f, category: 'misaligned' })),
+      ...(releaseData.value.aligned_on_time || []).map(f => ({ ...f, category: 'aligned_on_time' })),
+      ...(releaseData.value.aligned_late || []).map(f => ({ ...f, category: 'aligned_late' })),
+      ...(releaseData.value.after_requested || []).map(f => ({ ...f, category: 'after_requested' })),
+      ...(releaseData.value.tv_only || []).map(f => ({ ...f, category: 'tv_only' })),
+      ...(releaseData.value.fv_only || []).map(f => ({ ...f, category: 'fv_only' })),
+      ...(releaseData.value.misaligned || []).map(f => ({ ...f, category: 'misaligned' })),
     ]
 
     const byKey = {}
@@ -89,6 +94,7 @@ export function useComponentBreakdown(data, releaseData) {
             total: 0,
             aligned_on_time: 0,
             aligned_late: 0,
+            after_requested: 0,
             tv_only: 0,
             fv_only: 0,
             misaligned: 0,

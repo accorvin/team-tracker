@@ -167,6 +167,7 @@ function sumRows(rows) {
   var total = 0
   var alignedOnTime = 0
   var alignedLate = 0
+  var afterRequested = 0
   var tvOnly = 0
   var fvOnly = 0
   var misaligned = 0
@@ -181,6 +182,7 @@ function sumRows(rows) {
     // Prefer 5-category fields; fall back to pre-migration `aligned` / `mismatched`
     alignedOnTime += r.aligned_on_time != null ? r.aligned_on_time : (r.aligned || 0)
     alignedLate += r.aligned_late || 0
+    afterRequested += r.after_requested || 0
     tvOnly += r.tv_only || 0
     fvOnly += r.fv_only || 0
     misaligned += r.misaligned != null ? r.misaligned : (r.mismatched || 0)
@@ -190,6 +192,7 @@ function sumRows(rows) {
     total: total,
     aligned_on_time: alignedOnTime,
     aligned_late: alignedLate,
+    after_requested: afterRequested,
     tv_only: tvOnly,
     fv_only: fvOnly,
     misaligned: misaligned,
@@ -359,7 +362,7 @@ export function useReleaseFamily(filteredSummary, data) {
         return compareReleases(a.release, b.release) * dir
       }
       if (col === 'alignment_pct' || col === 'total' || col === 'aligned_on_time' || col === 'aligned_late' ||
-          col === 'tv_only' || col === 'fv_only' || col === 'misaligned') {
+          col === 'after_requested' || col === 'tv_only' || col === 'fv_only' || col === 'misaligned') {
         va = a[col] ?? 0
         vb = b[col] ?? 0
         return (va - vb) * dir

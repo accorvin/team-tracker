@@ -4,7 +4,8 @@
  */
 
 export var ALIGNMENT_CATEGORY_PRIORITY = {
-  misaligned: 4,
+  misaligned: 5,
+  after_requested: 4,
   tv_only: 3,
   fv_only: 2,
   aligned_late: 1,
@@ -12,19 +13,96 @@ export var ALIGNMENT_CATEGORY_PRIORITY = {
 }
 
 export var ALIGNMENT_CATEGORY_LABELS = {
-  aligned_on_time: 'On time',
-  aligned_late: 'Late',
-  misaligned: 'Misaligned',
+  aligned_on_time: 'Early or as requested',
+  aligned_late: 'After requested',
+  after_requested: 'After requested',
+  misaligned: 'Different products',
   tv_only: 'TV only',
   fv_only: 'FV only'
 }
 
 export var ALIGNMENT_CATEGORY_HELP = {
-  aligned_on_time: 'Fix Version matches Target Version, or ships earlier than planned.',
-  aligned_late: 'Fix Version is later than Target Version, but planning freeze for that Target Version has already passed — accepted slip.',
-  misaligned: 'Fix Version slips past Target Version before planning freeze, or TV/FV point at different products (for example RHOAI vs RHAII).',
-  tv_only: 'Target Version is set for this release, but Fix Version is empty.',
-  fv_only: 'Fix Version is set for this release, but Target Version is empty.'
+  aligned_on_time: 'Fix Version is the same milestone as Target Version, or an earlier one.',
+  aligned_late: 'Fix Version is a later milestone than Target Version, and the committed version freeze has passed. Green. Counts in Align % for that committed release.',
+  after_requested: 'Fix Version is a later milestone than Target Version, and the committed version freeze has not passed. Yellow. Does not count in Align % yet.',
+  misaligned: 'Target Version and Fix Version are different products, or the version names cannot be compared.',
+  tv_only: 'Target Version is set for this release; Fix Version is empty. Requested, not committed.',
+  fv_only: 'Fix Version is set for this release; Target Version is empty.'
+}
+
+/** Hub tiles and legend — After requested is one label covering yellow and green. */
+export var ALIGNMENT_DISPLAY_KEYS = [
+  'aligned_on_time',
+  'after_requested',
+  'tv_only',
+  'fv_only',
+  'misaligned'
+]
+
+export var ALIGNMENT_LEGEND_NOTES = [
+  'These labels compare Target Version (PM request) to Fix Version (engineering commitment). They are not calendar on-schedule or overdue flags.',
+  'After requested is yellow until the committed (Fix Version) freeze, then green. Hub Align % follows selected releases that are still before freeze. After a requested release freeze, features that moved later are left out of that release Align %.',
+  'Hub tiles count each issue once. Component chips count unique keys in that component only. A feature on two components appears in both headers.'
+]
+
+export function categoriesForDisplayKey(displayKey) {
+  if (displayKey === 'after_requested') return ['after_requested', 'aligned_late']
+  return [displayKey]
+}
+
+export function isAfterRequestedCategory(category) {
+  return category === 'after_requested' || category === 'aligned_late'
+}
+
+export function displayKeySelected(displayKey, selected) {
+  var cats = categoriesForDisplayKey(displayKey)
+  var cur = selected || []
+  for (var i = 0; i < cats.length; i++) {
+    if (cur.indexOf(cats[i]) === -1) return false
+  }
+  return cats.length > 0
+}
+
+export function toggleDisplayKeyInSelection(displayKey, selected) {
+  var cats = categoriesForDisplayKey(displayKey)
+  var current = (selected || []).slice()
+  if (displayKeySelected(displayKey, current)) {
+    return current.filter(function(c) { return cats.indexOf(c) === -1 })
+  }
+  for (var i = 0; i < cats.length; i++) {
+    if (current.indexOf(cats[i]) === -1) current.push(cats[i])
+  }
+  return current
+}
+
+export function categorySetsEqual(a, b) {
+  var left = (a || []).slice().sort()
+  var right = (b || []).slice().sort()
+  if (left.length !== right.length) return false
+  for (var i = 0; i < left.length; i++) {
+    if (left[i] !== right[i]) return false
+  }
+  return true
+}
+
+export function alignmentLegendEntries() {
+  return ALIGNMENT_DISPLAY_KEYS.map(function(key) {
+    if (key === 'after_requested') {
+      return {
+        key: key,
+        label: 'After requested',
+        help: 'Fix Version is a later milestone than Target Version. Yellow until the committed version freeze; green after that freeze. Yellow does not count in Align %. After a requested release freeze, these features are left out of that release Align %.',
+        chipClass: alignmentCategoryChipClass('after_requested'),
+        secondaryChipClass: alignmentCategoryChipClass('aligned_late')
+      }
+    }
+    return {
+      key: key,
+      label: alignmentCategoryLabel(key),
+      help: alignmentCategoryHelp(key),
+      chipClass: alignmentCategoryChipClass(key)
+    }
+  })
 }
 
 export function isAlignedCategory(category) {
@@ -56,9 +134,11 @@ export function alignmentCategoryChipClass(category) {
     case 'aligned_on_time':
       return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
     case 'aligned_late':
-      return 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200'
+      return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+    case 'after_requested':
+      return 'bg-amber-100 dark:bg-amber-800/40 text-amber-800 dark:text-amber-200'
     case 'misaligned':
-      return 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
+      return 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200'
     case 'tv_only':
       return 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
     case 'fv_only':

@@ -249,6 +249,27 @@ function isReleaseFrozen(releaseName, releaseDates) {
   return false
 }
 
+/**
+ * Same-product later Fix Version: After requested.
+ * Green (aligned_late) only after the committed version freeze; otherwise yellow.
+ */
+function categoryForLaterFixVersion(fixVersionName, releaseDates) {
+  return isReleaseFrozen(fixVersionName, releaseDates) ? 'aligned_late' : 'after_requested'
+}
+
+var LATER_CATEGORY_RANK = {
+  aligned_on_time: 0,
+  aligned_late: 1,
+  after_requested: 2,
+  misaligned: 4
+}
+
+function worseLaterCategory(a, b) {
+  var ra = LATER_CATEGORY_RANK[a] != null ? LATER_CATEGORY_RANK[a] : 0
+  var rb = LATER_CATEGORY_RANK[b] != null ? LATER_CATEGORY_RANK[b] : 0
+  return rb > ra ? b : a
+}
+
 // ---------------------------------------------------------------------------
 // Version normalisation
 // ---------------------------------------------------------------------------
@@ -454,16 +475,11 @@ function classifyFeatures(features, releases, releaseDates) {
                 // FV before this TV (ahead) - aligned_on_time (best)
                 // Keep current worstCategory
               } else if (cmp !== null && cmp > 0) {
-                // FV after this TV - check freeze
-                let frozen = isReleaseFrozen(tvRawAll[tvi], releaseDates)
-                if (!frozen) {
-                  // Not frozen = misaligned (worst)
-                  worstCategory = 'misaligned'
-                  break
-                } else if (worstCategory !== 'misaligned') {
-                  // Frozen = aligned_late (middle)
-                  worstCategory = 'aligned_late'
-                }
+                // After requested: yellow until Fix Version freeze, then green.
+                worstCategory = worseLaterCategory(
+                  worstCategory,
+                  categoryForLaterFixVersion(fvRaw[fvi], releaseDates)
+                )
               }
             }
 
@@ -519,16 +535,11 @@ function classifyFeatures(features, releases, releaseDates) {
               // FV before TV (ahead) - aligned_on_time (best)
               // Keep current worstCategory
             } else if (cmp !== null && cmp > 0) {
-              // FV after TV - check freeze
-              let frozen = isReleaseFrozen(tvRaw[tvi], releaseDates)
-              if (!frozen) {
-                // Any unfrozen TV where FV is after = misaligned (worst)
-                worstCategory = 'misaligned'
-                break
-              } else if (worstCategory !== 'misaligned') {
-                // All TVs frozen = aligned_late (middle)
-                worstCategory = 'aligned_late'
-              }
+              // After requested: yellow until Fix Version (this release) freeze.
+              worstCategory = worseLaterCategory(
+                worstCategory,
+                categoryForLaterFixVersion(release, releaseDates)
+              )
             }
             // else cmp === 0 means same release (shouldn't happen since fvMatch && !tvMatch)
           }
@@ -579,9 +590,9 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
     const items = classifications.filter(function(c) { return c.release === release })
     const nTotal = items.length
 
-    const cats = { aligned_on_time: 0, aligned_late: 0, misaligned: 0, tv_only: 0, fv_only: 0 }
+    const cats = { aligned_on_time: 0, aligned_late: 0, after_requested: 0, misaligned: 0, tv_only: 0, fv_only: 0 }
     for (let i = 0; i < items.length; i++) {
-      cats[items[i].category]++
+      if (cats[items[i].category] != null) cats[items[i].category]++
     }
 
     const alignPct = nTotal > 0 ? Math.round(1000 * (cats.aligned_on_time + cats.aligned_late) / nTotal) / 10 : 0
@@ -626,7 +637,9 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
       aligned_on_time: cats.aligned_on_time,
       aligned_on_time_jql: jqlUrl(baseJql + ' AND (' + alignedOnTimeJql + ')'),
       aligned_late: cats.aligned_late,
-      aligned_late_jql: null, // Cannot express temporal + freeze logic in JQL
+      aligned_late_jql: null,
+      after_requested: cats.after_requested,
+      after_requested_jql: null,
       misaligned: cats.misaligned,
       misaligned_jql: null, // Cannot express temporal + freeze logic in JQL
       tv_only: cats.tv_only,
@@ -639,7 +652,7 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
     })
 
     // Per-release feature lists
-    const bucket = { aligned_on_time: [], aligned_late: [], misaligned: [], tv_only: [], fv_only: [] }
+    const bucket = { aligned_on_time: [], aligned_late: [], after_requested: [], misaligned: [], tv_only: [], fv_only: [] }
     for (let ci = 0; ci < items.length; ci++) {
       const item = items[ci]
       const row = {
@@ -656,15 +669,15 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
         target_version: item.target_version,
         fix_versions: item.fix_versions
       }
-      bucket[item.category].push(row)
+      if (bucket[item.category]) bucket[item.category].push(row)
     }
     releaseBuckets[release] = bucket
   }
 
   // Component breakdown — deduplicate by issue key per component
   // When a feature appears in multiple releases, pick the worst category:
-  // misaligned > tv_only > fv_only > aligned_late > aligned_on_time
-  const CATEGORY_PRIORITY = { misaligned: 4, tv_only: 3, fv_only: 2, aligned_late: 1, aligned_on_time: 0 }
+  // misaligned > after_requested > tv_only > fv_only > aligned_late > aligned_on_time
+  const CATEGORY_PRIORITY = { misaligned: 5, after_requested: 4, tv_only: 3, fv_only: 2, aligned_late: 1, aligned_on_time: 0 }
   const compMap = {}
   for (let ki = 0; ki < classifications.length; ki++) {
     const cl = classifications[ki]
@@ -692,6 +705,7 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
     let total = 0
     let aligned_on_time = 0
     let aligned_late = 0
+    let after_requested = 0
     let tv_only = 0
     let fv_only = 0
     let misaligned = 0
@@ -702,6 +716,7 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
       for (let ei = 0; ei < entries.length; ei++) {
         if (entries[ei] === 'aligned_on_time') aligned_on_time++
         else if (entries[ei] === 'aligned_late') aligned_late++
+        else if (entries[ei] === 'after_requested') after_requested++
         else if (entries[ei] === 'tv_only') tv_only++
         else if (entries[ei] === 'fv_only') fv_only++
         else if (entries[ei] === 'misaligned') misaligned++
@@ -715,6 +730,7 @@ function buildExport(classifications, releases, fetchTimestamp, allComponents, j
       total_jql: jqlUrl(baseJql + ' AND component = ' + compQ + ' AND ("Target Version" in (' + releases.map(quoteRelease).join(', ') + ') OR fixVersion in (' + releases.map(quoteRelease).join(', ') + '))'),
       aligned_on_time: aligned_on_time,
       aligned_late: aligned_late,
+      after_requested: after_requested,
       tv_only: tv_only,
       fv_only: fv_only,
       misaligned: misaligned,
@@ -831,6 +847,7 @@ function normalizeLegacyTvFvCache(data) {
           next.aligned_on_time_jql = next.aligned_jql
         }
         if (next.aligned_late == null) next.aligned_late = 0
+        if (next.after_requested == null) next.after_requested = 0
         if (next.misaligned == null && next.mismatched != null) {
           next.misaligned = next.mismatched
         }
@@ -875,6 +892,7 @@ function normalizeLegacyTvFvCache(data) {
           nextBucket.aligned_on_time = nextBucket.aligned
         }
         if (!Array.isArray(nextBucket.aligned_late)) nextBucket.aligned_late = []
+        if (!Array.isArray(nextBucket.after_requested)) nextBucket.after_requested = []
         if (!Array.isArray(nextBucket.misaligned) && Array.isArray(nextBucket.mismatched)) {
           nextBucket.misaligned = nextBucket.mismatched
         }
@@ -905,6 +923,7 @@ function normalizeLegacyTvFvCache(data) {
         var next = Object.assign({}, comp)
         if (next.aligned_on_time == null && next.aligned != null) next.aligned_on_time = next.aligned
         if (next.aligned_late == null) next.aligned_late = 0
+        if (next.after_requested == null) next.after_requested = 0
         if (next.misaligned == null && next.mismatched != null) next.misaligned = next.mismatched
         var cTotal = next.total || 0
         next.alignment_pct = cTotal > 0
@@ -914,6 +933,70 @@ function normalizeLegacyTvFvCache(data) {
       })
     }
   }
+
+  function fillAfterRequestedOnSummary() {
+    if (!Array.isArray(out.executive_summary)) return
+    for (var fi = 0; fi < out.executive_summary.length; fi++) {
+      var frow = out.executive_summary[fi]
+      if (frow && typeof frow === 'object' && frow.after_requested == null) {
+        ensureClone()
+        migrated = true
+        out.executive_summary = out.executive_summary.map(function (row) {
+          if (!row || typeof row !== 'object') return row
+          if (row.after_requested != null) return row
+          var next = Object.assign({}, row)
+          next.after_requested = 0
+          return next
+        })
+        return
+      }
+    }
+  }
+
+  function fillAfterRequestedOnReleases() {
+    if (!out.releases || typeof out.releases !== 'object') return
+    var names = Object.keys(out.releases)
+    for (var ri = 0; ri < names.length; ri++) {
+      var bucket = out.releases[names[ri]]
+      if (bucket && typeof bucket === 'object' && !Array.isArray(bucket.after_requested)) {
+        ensureClone()
+        migrated = true
+        out.releases = Object.assign({}, out.releases)
+        for (var rj = 0; rj < names.length; rj++) {
+          var src = out.releases[names[rj]]
+          if (!src || typeof src !== 'object') continue
+          if (Array.isArray(src.after_requested)) continue
+          var nextBucket = Object.assign({}, src)
+          nextBucket.after_requested = []
+          out.releases[names[rj]] = nextBucket
+        }
+        return
+      }
+    }
+  }
+
+  function fillAfterRequestedOnComps() {
+    if (!Array.isArray(out.component_breakdown)) return
+    for (var ci = 0; ci < out.component_breakdown.length; ci++) {
+      var comp = out.component_breakdown[ci]
+      if (comp && typeof comp === 'object' && comp.after_requested == null) {
+        ensureClone()
+        migrated = true
+        out.component_breakdown = out.component_breakdown.map(function (row) {
+          if (!row || typeof row !== 'object') return row
+          if (row.after_requested != null) return row
+          var next = Object.assign({}, row)
+          next.after_requested = 0
+          return next
+        })
+        return
+      }
+    }
+  }
+
+  fillAfterRequestedOnSummary()
+  fillAfterRequestedOnReleases()
+  fillAfterRequestedOnComps()
 
   if (migrated) {
     ensureClone()
@@ -939,6 +1022,8 @@ module.exports.compareReleasesTemporally = compareReleasesTemporally
 module.exports.extractProduct = extractProduct
 module.exports.buildReleaseDatesMap = buildReleaseDatesMap
 module.exports.isReleaseFrozen = isReleaseFrozen
+module.exports.categoryForLaterFixVersion = categoryForLaterFixVersion
+module.exports.worseLaterCategory = worseLaterCategory
 module.exports.normalizeIssue = normalizeIssue
 module.exports.classifyFeatures = classifyFeatures
 module.exports.buildExport = buildExport

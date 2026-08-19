@@ -8,11 +8,13 @@
 const {
   classifyFeatures,
   buildReleaseDatesMap,
-  parseVersions
+  parseVersions,
+  isReleaseFrozen
 } = require('./routes')
 
 var CATEGORY_PRIORITY = {
-  misaligned: 4,
+  misaligned: 5,
+  after_requested: 4,
   tv_only: 3,
   fv_only: 2,
   aligned_late: 1,
@@ -25,19 +27,21 @@ var ALIGNED_CATEGORIES = {
 }
 
 var CATEGORY_LABELS = {
-  aligned_on_time: 'On time',
-  aligned_late: 'Late',
-  misaligned: 'Misaligned',
+  aligned_on_time: 'Early or as requested',
+  aligned_late: 'After requested',
+  after_requested: 'After requested',
+  misaligned: 'Different products',
   tv_only: 'TV only',
   fv_only: 'FV only'
 }
 
 var CATEGORY_HELP = {
-  aligned_on_time: 'Fix Version matches Target Version, or ships earlier than planned.',
-  aligned_late: 'Fix Version is later than Target Version, but planning freeze for that Target Version has already passed — accepted slip.',
-  misaligned: 'Fix Version slips past Target Version before planning freeze, or TV/FV point at different products (for example RHOAI vs RHAII).',
-  tv_only: 'Target Version is set for this release, but Fix Version is empty.',
-  fv_only: 'Fix Version is set for this release, but Target Version is empty.'
+  aligned_on_time: 'Fix Version is the same milestone as Target Version, or an earlier one.',
+  aligned_late: 'Fix Version is a later milestone than Target Version, and that committed version freeze has passed. Green After requested. Counts in Align % for the committed release.',
+  after_requested: 'Fix Version is a later milestone than Target Version, and that committed version freeze has not passed. Yellow. Does not count in Align % yet.',
+  misaligned: 'Target Version and Fix Version are different products, or the version names cannot be compared.',
+  tv_only: 'Target Version is set for this release; Fix Version is empty. Requested, not committed.',
+  fv_only: 'Fix Version is set for this release; Target Version is empty.'
 }
 
 /**
@@ -150,12 +154,16 @@ function worstCategory(categories) {
 }
 
 /**
- * PM/DO "aligned" for KPIs: on-time or accepted late slip.
+ * PM/DO "aligned" for KPIs: Early or as requested, plus green After requested.
  * @param {string|null} category
  * @returns {boolean}
  */
 function isAlignedCategory(category) {
   return !!(category && ALIGNED_CATEGORIES[category])
+}
+
+function isAfterRequestedCategory(category) {
+  return category === 'after_requested' || category === 'aligned_late'
 }
 
 /**
@@ -201,6 +209,8 @@ module.exports = {
   classifyOverall,
   worstCategory,
   isAlignedCategory,
+  isAfterRequestedCategory,
+  isReleaseFrozen,
   categoryLabel,
   categoryHelp,
   loadReleaseDatesMap,
