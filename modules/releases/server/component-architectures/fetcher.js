@@ -141,7 +141,7 @@ function registerComponentArchitecturesFetcher(router, context) {
    * @openapi
    * /api/modules/releases/component-architectures/refresh:
    *   post:
-   *     summary: Trigger component architecture data refresh from GitHub (admin only)
+   *     summary: Trigger component architecture data refresh from GitHub
    *     tags: [Releases - Component Architectures]
    *     responses:
    *       200:
