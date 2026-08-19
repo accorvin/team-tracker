@@ -585,7 +585,7 @@ module.exports = async function registerPlanningRoutes(router, context) {
     var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels,resolutiondate'
 
     var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 200, expand: 'changelog' })
-    var sfdcPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND "SFDC Cases Counter" is not EMPTY')
+    var sfdcPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter is not EMPTY')
     var rawIssues = deduplicateRaw(await rawPromise)
     var sfdcKeys = await sfdcPromise
 
@@ -599,10 +599,7 @@ module.exports = async function registerPlanningRoutes(router, context) {
   }
 
   async function fetchSfdcCountMap(scopeJql) {
-    var THRESHOLDS = []
-    var i
-    for (i = 1; i <= 20; i++) THRESHOLDS.push(i)
-    THRESHOLDS.push(30, 50)
+    var THRESHOLDS = [1, 3, 6, 11, 30]
 
     var bucketSets = {}
     var promises = THRESHOLDS.map(function(t) {
@@ -639,12 +636,12 @@ module.exports = async function registerPlanningRoutes(router, context) {
 
   async function fetchSfdcIssuesFromJira() {
     var projectList = SFDC_PROJECTS.map(function(p) { return '"' + p + '"' }).join(', ')
-    var scopeJql = 'project IN (' + projectList + ') AND "SFDC Cases Counter" is not EMPTY'
+    var scopeJql = 'project IN (' + projectList + ') AND SFDC_Cases_Counter is not EMPTY'
     var jql = scopeJql + ' ORDER BY priority DESC, createdDate DESC'
     var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels,resolutiondate'
 
     var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 500, expand: 'changelog' })
-    var feedbackPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND "SFDC Cases Counter" is not EMPTY')
+    var feedbackPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter is not EMPTY')
     var countMapPromise = fetchSfdcCountMap(scopeJql)
     var rawIssues = deduplicateRaw(await rawPromise)
     var feedbackKeys = await feedbackPromise

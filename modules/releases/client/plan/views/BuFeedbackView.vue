@@ -69,7 +69,7 @@
       {{ warning }}
     </div>
 
-    <BuFeedbackExecutiveSummary v-if="issues.length" :issues="issues" />
+    <BuFeedbackExecutiveSummary v-if="activeView === 'feedback' && issues.length" :issues="issues" />
 
     <BuFeedbackTable v-if="issues.length || (!loading && !error)" :issues="issues" />
   </div>

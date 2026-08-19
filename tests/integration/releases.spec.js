@@ -453,6 +453,52 @@ test.describe('Releases Field and BU Feedback @releases', () => {
 
     expect(page.errors).toHaveLength(0);
   });
+
+  test('toggle switch between BU Feedback and SFDC Issues views', async ({ page }) => {
+    await page.goto('/#/releases/plan?tab=bu-feedback');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await expect(page.locator('h2', { hasText: 'Field and BU Feedback' })).toBeVisible();
+    const sfdcTab = page.locator('button[role="tab"]', { hasText: 'SFDC Issues' });
+    await expect(sfdcTab).toBeVisible();
+
+    await sfdcTab.click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await expect(page.locator('h2', { hasText: 'SFDC Issues' })).toBeVisible();
+    await expect(page.getByTestId('bu-feedback-table')).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('sfdc-issues API returns issues with sfdcCasesCount', async ({ request }) => {
+    const apiResponse = await request.get('/api/modules/releases/planning/sfdc-issues');
+    expect(apiResponse.ok()).toBe(true);
+    const body = await apiResponse.json();
+    expect(body).toHaveProperty('issues');
+    expect(Array.isArray(body.issues)).toBe(true);
+    if (body.issues.length > 0) {
+      expect(body.issues[0]).toHaveProperty('sfdcCasesCount');
+      expect(body.issues[0]).toHaveProperty('hasFeedbackLabel');
+    }
+  });
+
+  test('Executive Summary is hidden in SFDC view', async ({ page }) => {
+    await page.goto('/#/releases/plan?tab=bu-feedback');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const sfdcTab = page.locator('button[role="tab"]', { hasText: 'SFDC Issues' });
+    await sfdcTab.click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await expect(page.getByTestId('bu-feedback-exec-summary')).toHaveCount(0);
+
+    expect(page.errors).toHaveLength(0);
+  });
 });
 
 /**
