@@ -56,5 +56,13 @@ export const reports = [
     label: 'AI Adoption Report',
     description: 'Scorecard tracking AI pipeline adoption across components, with release-over-release trends.',
     component: defineAsyncComponent(() => import('./AiAdoptionReport.vue'))
+  },
+  {
+    id: 'component-architectures',
+    label: 'Component Architectures (Multi-Arch Report)',
+    description: 'Multi-architecture build support matrix for RHOAI components per release branch.',
+    icon: 'Cpu',
+    tags: ['Build', 'Architecture', 'Multi-Arch'],
+    component: defineAsyncComponent(() => import('./ComponentArchitecturesReport.vue'))
   }
 ]
