@@ -20,6 +20,7 @@ const registerDraftPlanRoutes = require('./draft-plans/routes');
 const registerReleaseReadinessRoutes = require('./release-readiness/routes');
 const { registerCveSustainingRoutes, registerFixAvailabilityRoutes } = require('./cve-sustaining/routes');
 const registerAiAdoptionRoutes = require('./ai-adoption/routes');
+const registerComponentArchitecturesRoutes = require('./component-architectures/routes');
 const { getAuditLog } = require('./planning/audit-log');
 
 /**
@@ -334,6 +335,19 @@ module.exports = async function registerRoutes(router, context) {
     jira
   });
   router.use('/ai-adoption', aiAdoptionRouter);
+
+  // Component Architectures sub-router (mounted at /api/modules/releases/component-architectures/)
+  const compArchRouter = express.Router();
+  registerComponentArchitecturesRoutes(compArchRouter, {
+    storage,
+    requireAuth,
+    requireAdmin,
+    requireScope,
+    secrets,
+    registerRefresh: context.registerRefresh || null,
+    isRefreshRunning: context.isRefreshRunning || null
+  });
+  router.use('/component-architectures', compArchRouter);
 
   // ─── Unified Audit Routes ───
 

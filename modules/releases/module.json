@@ -36,7 +36,7 @@
     "entry": "./server/index.js"
   },
   "secrets": {
-    "platform": ["jira"],
+    "platform": ["jira", "github"],
     "module": [
       {
         "key": "PRODUCT_PAGES_CLIENT_ID",
@@ -78,7 +78,8 @@
     "files": [
       { "path": "releases/registry.json", "notes": "Canonical release registry" },
       { "path": "releases/execution/index.json", "notes": "Feature index with summary metrics" },
-      { "path": "releases/execution/features/*.json", "notes": "Per-feature detail files" }
+      { "path": "releases/execution/features/*.json", "notes": "Per-feature detail files" },
+      { "path": "releases/component-architectures/latest.json", "notes": "Component architecture support matrix" }
     ]
   }
 }
