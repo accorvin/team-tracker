@@ -3,10 +3,24 @@
  * Mounted at /api/modules/team-tracker/allocation/ by the team-tracker server.
  */
 
-const { readTeams, extractBoardId, updateTeamFields } = require('../../../shared/server/team-store');
+const _teamStoreModule = require('../../../shared/server/team-store');
+const { extractBoardId } = _teamStoreModule;
 const { getOrgDisplayNames } = require('../../../shared/server/roster-sync/config');
 const permissions = require('../../../shared/server/permissions');
 const { allocationKey } = require('./config');
+
+// Normalise the team-store API across two generations of the core package:
+//  - core ≤ 2.0.x: factory pattern — module.exports = { createTeamStore, extractBoardId, … }
+//  - core ≥ 2.0.64 (npm): standalone functions — module.exports = { readTeams, updateTeamFields, … }
+function _getTeamStore(storage) {
+  if (typeof _teamStoreModule.createTeamStore === 'function') {
+    return _teamStoreModule.createTeamStore(storage);
+  }
+  return {
+    readTeams: () => _teamStoreModule.readTeams(storage),
+    updateTeamFields: (teamId, fields, actorEmail) => _teamStoreModule.updateTeamFields(storage, teamId, fields, actorEmail)
+  };
+}
 
 function isValidBoardId(id) { return /^(\d+|kanban-\d+)$/.test(id); }
 function isValidSprintId(id) { return /^(\d+|kanban-\d+)$/.test(id); }
@@ -17,6 +31,7 @@ const ALLOCATION_MODES = ['points', 'counts'];
 module.exports = function registerAllocationRoutes(router, context) {
   const { storage, requireScope } = context;
   const { readFromStorage, writeToStorage } = storage;
+  const teamStore = _getTeamStore(storage);
 
   const DEMO_MODE = process.env.DEMO_MODE === 'true';
 
@@ -52,7 +67,7 @@ module.exports = function registerAllocationRoutes(router, context) {
   // count is always current and reflects setting changes immediately.
   async function enrichConfigured(teamsArr) {
     if (!Array.isArray(teamsArr) || teamsArr.length === 0) return teamsArr;
-    const teamData = await readTeams(storage);
+    const teamData = await teamStore.readTeams();
     const teamsById = teamData.teams || {};
     return teamsArr.map(t => {
       const mode = teamsById[t.teamId]?.metadata?.allocationMode;
@@ -186,7 +201,7 @@ module.exports = function registerAllocationRoutes(router, context) {
     setImmediate(async function() {
       try {
         // Read all teams from team-store
-        const teamData = await readTeams(storage);
+        const teamData = await teamStore.readTeams();
         let teams = Object.values(teamData.teams || {});
 
         // Filter to single team if requested
@@ -284,7 +299,7 @@ module.exports = function registerAllocationRoutes(router, context) {
     refreshState.startedAt = new Date().toISOString();
 
     try {
-      const teamData = await readTeams(storage);
+      const teamData = await teamStore.readTeams();
       let teams = Object.values(teamData.teams || {});
 
       for (const t of teams) {
@@ -397,7 +412,7 @@ module.exports = function registerAllocationRoutes(router, context) {
       if (!isValidTeamId(teamId)) {
         return res.status(400).json({ error: 'Invalid request parameter' });
       }
-      const teamData = await readTeams(storage);
+      const teamData = await teamStore.readTeams();
       const team = teamData.teams && teamData.teams[teamId];
       if (!team) return res.status(404).json({ error: 'Team not found' });
       const mode = team.metadata?.allocationMode;
@@ -460,7 +475,7 @@ module.exports = function registerAllocationRoutes(router, context) {
       if (!(await hasTeamPurview(req, teamId))) {
         return res.status(403).json({ error: 'Not authorized for this team' });
       }
-      const result = await updateTeamFields(storage, teamId, { allocationMode }, req.auditActor);
+      const result = await teamStore.updateTeamFields(teamId, { allocationMode }, req.auditActor);
       if (!result) return res.status(404).json({ error: 'Team not found' });
       res.json({ allocationMode });
     } catch (error) {
