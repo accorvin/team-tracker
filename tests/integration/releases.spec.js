@@ -370,6 +370,138 @@ test.describe('Releases PM Hub @releases', () => {
 });
 
 /**
+ * Field and BU Feedback (Plan tab)
+ *
+ * Verify the Field and BU Feedback tab loads under Plan, renders the compact
+ * table chrome (search + filters), and that the planning API responds.
+ */
+test.describe('Releases Field and BU Feedback @releases', () => {
+  test.beforeEach(async ({ page }) => {
+    setupErrorTracking(page);
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    logCapturedErrors(page, testInfo);
+  });
+
+  test('should show Field and BU Feedback tab under Plan', async ({ page }) => {
+    await page.goto('/#/releases/plan');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const feedbackTab = page.locator('button', { hasText: 'Field and BU Feedback' });
+    await expect(feedbackTab).toBeVisible();
+
+    await feedbackTab.click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await expect(page.locator('h2', { hasText: 'Field and BU Feedback' })).toBeVisible();
+    await expect(page.getByTestId('bu-feedback-search')).toBeVisible();
+    await expect(page.getByTestId('bu-feedback-table')).toBeVisible();
+    await expect(page.getByTestId('bu-feedback-filter-type')).toBeVisible();
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('Field and BU Feedback deep link loads compact table chrome', async ({ page }) => {
+    await page.goto('/#/releases/plan?tab=bu-feedback');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await expect(page.locator('h2', { hasText: 'Field and BU Feedback' })).toBeVisible();
+    await expect(page.getByTestId('bu-feedback-search')).toBeVisible();
+    await expect(page.getByTestId('bu-feedback-filter-status')).toBeVisible();
+    await expect(page.getByTestId('bu-feedback-filter-component')).toBeVisible();
+
+    const table = page.getByTestId('bu-feedback-table');
+    await expect(table).toBeVisible();
+    await expect(page.locator('thead th', { hasText: 'Issue' }).first()).toBeVisible();
+    await expect(page.locator('thead th', { hasText: 'Status' }).first()).toBeVisible();
+    await expect(page.locator('thead select')).toHaveCount(0);
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('bu-feedback API returns issues with resolved and inProgressAt fields', async ({ request }) => {
+    const apiResponse = await request.get('/api/modules/releases/planning/bu-feedback');
+    expect(apiResponse.ok()).toBe(true);
+    const body = await apiResponse.json();
+    expect(body).toHaveProperty('issues');
+    expect(Array.isArray(body.issues)).toBe(true);
+    if (body.issues.length > 0) {
+      expect(body.issues[0]).toHaveProperty('resolved');
+      expect(body.issues[0]).toHaveProperty('inProgressAt');
+    }
+  });
+
+  test('Executive Summary renders when issues exist', async ({ page }) => {
+    await page.goto('/#/releases/plan?tab=bu-feedback');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const apiResponse = await page.request.get('/api/modules/releases/planning/bu-feedback');
+    const body = await apiResponse.json();
+    if (!body.issues || body.issues.length === 0) {
+      test.skip();
+      return;
+    }
+
+    const summary = page.getByTestId('bu-feedback-exec-summary');
+    await expect(summary).toBeVisible();
+    await expect(summary.locator('text=Executive Summary')).toBeVisible();
+    await expect(page.getByTestId('bu-feedback-metrics-table')).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('toggle switch between BU Feedback and SFDC Issues views', async ({ page }) => {
+    await page.goto('/#/releases/plan?tab=bu-feedback');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await expect(page.locator('h2', { hasText: 'Field and BU Feedback' })).toBeVisible();
+    const sfdcTab = page.locator('button[role="tab"]', { hasText: 'SFDC Issues' });
+    await expect(sfdcTab).toBeVisible();
+
+    await sfdcTab.click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await expect(page.locator('h2', { hasText: 'SFDC Issues' })).toBeVisible();
+    await expect(page.getByTestId('bu-feedback-table')).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('sfdc-issues API returns issues with sfdcCasesCount', async ({ request }) => {
+    const apiResponse = await request.get('/api/modules/releases/planning/sfdc-issues');
+    expect(apiResponse.ok()).toBe(true);
+    const body = await apiResponse.json();
+    expect(body).toHaveProperty('issues');
+    expect(Array.isArray(body.issues)).toBe(true);
+    if (body.issues.length > 0) {
+      expect(body.issues[0]).toHaveProperty('sfdcCasesCount');
+      expect(body.issues[0]).toHaveProperty('hasFeedbackLabel');
+    }
+  });
+
+  test('Executive Summary is hidden in SFDC view', async ({ page }) => {
+    await page.goto('/#/releases/plan?tab=bu-feedback');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const sfdcTab = page.locator('button[role="tab"]', { hasText: 'SFDC Issues' });
+    await sfdcTab.click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await expect(page.getByTestId('bu-feedback-exec-summary')).toHaveCount(0);
+
+    expect(page.errors).toHaveLength(0);
+  });
+});
+
+/**
  * Draft Plans (Plan tab)
  *
  * Verify the Draft Plans red-pen view loads under Plan (tab + deep link),

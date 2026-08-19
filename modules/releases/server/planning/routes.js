@@ -28,6 +28,7 @@ const { blockDuringImpersonation } = require('../../../../shared/server/auth')
 const healthRoutes = require('./health/health-routes')
 var { buildFeatureReadiness } = require('./feature-readiness')
 var { fetchFeaturesWithTimeout } = require('./feature-query')
+var { extractFirstInProgressAt } = require('./bu-feedback-issue')
 
 const { isValidVersionParam } = require('../version-utils')
 
@@ -497,59 +498,250 @@ module.exports = async function registerPlanningRoutes(router, context) {
    *     summary: List field and BU feedback issues from Jira
    *     tags: [releases-planning]
    *     security: [{ bearerAuth: [] }]
-   *     description: Queries Jira for issues labeled AIBU_Feedback or AISSA_Feedback, deduplicated, ordered by creation date descending.
+   *     description: >
+   *       Returns cached BU/SSA feedback issues (AIBU_Feedback / AISSA_Feedback labels).
+   *       Each issue includes resolved (resolutiondate), inProgressAt (first changelog
+   *       transition into an in-progress status) for process-efficiency metrics, and
+   *       hasSfdcCases (boolean, derived via JQL since the field is encrypted at rest).
+   *       Data is cached server-side for 15 minutes. Pass ?refresh=true to force a live
+   *       Jira fetch and update the cache.
+   *     parameters:
+   *       - in: query
+   *         name: refresh
+   *         schema:
+   *           type: string
+   *         description: Set to "true" to bypass cache and fetch live from Jira
    *     responses:
    *       200:
-   *         description: Array of BU feedback issues
+   *         description: Array of BU feedback issues with resolved and inProgressAt timestamps
    *       503:
    *         description: Jira client not configured
    */
+  var BU_FEEDBACK_CACHE_KEY = DATA_PREFIX + '/bu-feedback-cache.json'
+  var SFDC_ISSUES_CACHE_KEY = DATA_PREFIX + '/sfdc-issues-cache.json'
+  var FEEDBACK_LABELS = ['AIBU_Feedback', 'AISSA_Feedback']
+  var SFDC_PROJECTS = [
+    'Red Hat OpenShift AI Engineering',
+    'Red Hat AI Engineering',
+    'Inference Engineering Project',
+    'OpenShift AI Support'
+  ]
+
+  function mapRawIssue(raw, extraFlags) {
+    var f = raw.fields || {}
+    var allLabels = f.labels || []
+    var feedbackLabels = allLabels.filter(function(l) { return FEEDBACK_LABELS.indexOf(l) !== -1 })
+    var issue = {
+      key: raw.key,
+      summary: f.summary || '',
+      issueType: f.issuetype ? f.issuetype.name : '',
+      assignee: f.assignee ? f.assignee.displayName : 'Unassigned',
+      reporter: f.reporter ? f.reporter.displayName : '',
+      priority: f.priority ? f.priority.name : '',
+      status: f.status ? f.status.name : '',
+      statusCategory: f.status && f.status.statusCategory ? f.status.statusCategory.name : '',
+      resolution: f.resolution ? f.resolution.name : 'Unresolved',
+      created: f.created || null,
+      updated: f.updated || null,
+      dueDate: f.duedate || null,
+      resolved: f.resolutiondate || null,
+      inProgressAt: extractFirstInProgressAt(raw.changelog),
+      components: (f.components || []).map(function(c) { return c.name }),
+      fixVersions: (f.fixVersions || []).map(function(v) { return v.name }),
+      labels: allLabels,
+      feedbackLabels: feedbackLabels,
+      url: 'https://issues.redhat.com/browse/' + raw.key
+    }
+    if (extraFlags) Object.assign(issue, extraFlags)
+    return issue
+  }
+
+  function deduplicateRaw(rawIssues) {
+    var seen = {}
+    var result = []
+    for (var i = 0; i < rawIssues.length; i++) {
+      if (!seen[rawIssues[i].key]) {
+        seen[rawIssues[i].key] = true
+        result.push(rawIssues[i])
+      }
+    }
+    return result
+  }
+
+  async function fetchKeySet(jql) {
+    try {
+      var issues = await jiraClient.fetchAllJqlResults(jql, 'key', { maxResults: 500 })
+      var keys = {}
+      for (var i = 0; i < issues.length; i++) keys[issues[i].key] = true
+      return keys
+    } catch (err) {
+      console.warn('[releases/planning] Key-set lookup failed:', err.message)
+      return {}
+    }
+  }
+
+  async function fetchBuFeedbackFromJira() {
+    var jql = 'labels IN ("AIBU_Feedback", "AISSA_Feedback") ORDER BY createdDate DESC'
+    var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels,resolutiondate'
+
+    var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 200, expand: 'changelog' })
+    var sfdcPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter is not EMPTY')
+    var rawIssues = deduplicateRaw(await rawPromise)
+    var sfdcKeys = await sfdcPromise
+
+    var issues = rawIssues.map(function(raw) {
+      return mapRawIssue(raw, { hasSfdcCases: !!sfdcKeys[raw.key] })
+    })
+
+    var payload = { issues: issues, fetchedAt: new Date().toISOString(), cachedAt: new Date().toISOString() }
+    await writeToStorage(BU_FEEDBACK_CACHE_KEY, payload)
+    return payload
+  }
+
+  async function fetchSfdcCountMap(scopeJql) {
+    var THRESHOLDS = [1, 3, 6, 11, 30]
+
+    var bucketSets = {}
+    var promises = THRESHOLDS.map(function(t) {
+      var jql = scopeJql + ' AND SFDC_Cases_Counter >= ' + t
+      return jiraClient.fetchAllJqlResults(jql, 'key', { maxResults: 500 })
+        .then(function(issues) {
+          var set = {}
+          for (var j = 0; j < issues.length; j++) set[issues[j].key] = true
+          bucketSets[t] = set
+        })
+        .catch(function(err) {
+          console.warn('[releases/planning] SFDC count threshold ' + t + ' failed:', err.message)
+          bucketSets[t] = {}
+        })
+    })
+    await Promise.all(promises)
+
+    var countMap = {}
+    var allKeys = Object.keys(bucketSets[1] || {})
+    for (var k = 0; k < allKeys.length; k++) {
+      var key = allKeys[k]
+      var count = 1
+      for (var ti = 1; ti < THRESHOLDS.length; ti++) {
+        if (bucketSets[THRESHOLDS[ti]] && bucketSets[THRESHOLDS[ti]][key]) {
+          count = THRESHOLDS[ti]
+        } else {
+          break
+        }
+      }
+      countMap[key] = count
+    }
+    return countMap
+  }
+
+  async function fetchSfdcIssuesFromJira() {
+    var projectList = SFDC_PROJECTS.map(function(p) { return '"' + p + '"' }).join(', ')
+    var scopeJql = 'project IN (' + projectList + ') AND SFDC_Cases_Counter is not EMPTY'
+    var jql = scopeJql + ' ORDER BY priority DESC, createdDate DESC'
+    var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels,resolutiondate'
+
+    var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 500, expand: 'changelog' })
+    var feedbackPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter is not EMPTY')
+    var countMapPromise = fetchSfdcCountMap(scopeJql)
+    var rawIssues = deduplicateRaw(await rawPromise)
+    var feedbackKeys = await feedbackPromise
+    var countMap = await countMapPromise
+
+    var issues = rawIssues.map(function(raw) {
+      return mapRawIssue(raw, {
+        hasSfdcCases: true,
+        hasFeedbackLabel: !!feedbackKeys[raw.key],
+        sfdcCasesCount: countMap[raw.key] || 0
+      })
+    })
+
+    var payload = { issues: issues, fetchedAt: new Date().toISOString(), cachedAt: new Date().toISOString() }
+    await writeToStorage(SFDC_ISSUES_CACHE_KEY, payload)
+    return payload
+  }
+
   router.get('/bu-feedback', requireAuth, requireScope('releases:read'), async function(req, res) {
     if (!jiraClient) {
       return res.json({ issues: [], fetchedAt: new Date().toISOString(), warning: 'Jira not configured' })
     }
 
-    var FEEDBACK_LABELS = ['AIBU_Feedback', 'AISSA_Feedback']
+    var forceRefresh = req.query.refresh === 'true'
 
     try {
-      var jql = 'labels IN ("AIBU_Feedback", "AISSA_Feedback") ORDER BY createdDate DESC'
-      var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels'
-      var rawIssues = await jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 200 })
-
-      var seen = {}
-      var issues = []
-      for (var i = 0; i < rawIssues.length; i++) {
-        var raw = rawIssues[i]
-        if (seen[raw.key]) continue
-        seen[raw.key] = true
-        var f = raw.fields || {}
-        var allLabels = f.labels || []
-        var feedbackLabels = allLabels.filter(function(l) { return FEEDBACK_LABELS.indexOf(l) !== -1 })
-        issues.push({
-          key: raw.key,
-          summary: f.summary || '',
-          issueType: f.issuetype ? f.issuetype.name : '',
-          assignee: f.assignee ? f.assignee.displayName : 'Unassigned',
-          reporter: f.reporter ? f.reporter.displayName : '',
-          priority: f.priority ? f.priority.name : '',
-          status: f.status ? f.status.name : '',
-          statusCategory: f.status && f.status.statusCategory ? f.status.statusCategory.name : '',
-          resolution: f.resolution ? f.resolution.name : 'Unresolved',
-          created: f.created || null,
-          updated: f.updated || null,
-          dueDate: f.duedate || null,
-          components: (f.components || []).map(function(c) { return c.name }),
-          fixVersions: (f.fixVersions || []).map(function(v) { return v.name }),
-          labels: allLabels,
-          feedbackLabels: feedbackLabels,
-          url: 'https://issues.redhat.com/browse/' + raw.key
-        })
+      if (!forceRefresh) {
+        var cached = await readFromStorage(BU_FEEDBACK_CACHE_KEY)
+        if (cached && cached.cachedAt) {
+          var age = Date.now() - new Date(cached.cachedAt).getTime()
+          if (age < CACHE_MAX_AGE_MS) {
+            return res.json(cached)
+          }
+        }
       }
 
-      res.json({ issues: issues, fetchedAt: new Date().toISOString() })
+      var payload = await fetchBuFeedbackFromJira()
+      res.json(payload)
     } catch (err) {
       console.error('[releases/planning] BU feedback query failed:', err.message)
+      var stale = await readFromStorage(BU_FEEDBACK_CACHE_KEY)
+      if (stale && stale.issues) {
+        stale.warning = 'Showing cached data — live refresh failed: ' + err.message
+        return res.json(stale)
+      }
       res.status(500).json({ error: 'Failed to fetch BU feedback issues' })
+    }
+  })
+
+  /**
+   * @openapi
+   * /api/modules/releases/planning/sfdc-issues:
+   *   get:
+   *     summary: List open SFDC-linked issues from AI Engineering projects
+   *     tags: [releases-planning]
+   *     security: [{ bearerAuth: [] }]
+   *     description: >
+   *       Returns issues (any status) with SFDC Cases Counter populated from RHOAIENG,
+   *       RHAIENG, INFERENG, and RHOAISUP projects. Each issue includes hasFeedbackLabel
+   *       (boolean) indicating overlap with the BU feedback report. Cached for 15 minutes.
+   *     parameters:
+   *       - in: query
+   *         name: refresh
+   *         schema:
+   *           type: string
+   *         description: Set to "true" to bypass cache and fetch live from Jira
+   *     responses:
+   *       200:
+   *         description: Array of SFDC-linked issues
+   *       503:
+   *         description: Jira client not configured
+   */
+  router.get('/sfdc-issues', requireAuth, requireScope('releases:read'), async function(req, res) {
+    if (!jiraClient) {
+      return res.json({ issues: [], fetchedAt: new Date().toISOString(), warning: 'Jira not configured' })
+    }
+
+    var forceRefresh = req.query.refresh === 'true'
+
+    try {
+      if (!forceRefresh) {
+        var cached = await readFromStorage(SFDC_ISSUES_CACHE_KEY)
+        if (cached && cached.cachedAt) {
+          var age = Date.now() - new Date(cached.cachedAt).getTime()
+          if (age < CACHE_MAX_AGE_MS) {
+            return res.json(cached)
+          }
+        }
+      }
+
+      var payload = await fetchSfdcIssuesFromJira()
+      res.json(payload)
+    } catch (err) {
+      console.error('[releases/planning] SFDC issues query failed:', err.message)
+      var stale = await readFromStorage(SFDC_ISSUES_CACHE_KEY)
+      if (stale && stale.issues) {
+        stale.warning = 'Showing cached data — live refresh failed: ' + err.message
+        return res.json(stale)
+      }
+      res.status(500).json({ error: 'Failed to fetch SFDC issues' })
     }
   })
 
