@@ -9,6 +9,7 @@ import {
   sortIssues,
   paginate,
   sourceShortLabel,
+  toggleFilterValue,
   typeBadgeClass,
   statusClasses,
   priorityDot,
@@ -44,7 +45,7 @@ describe('bu-feedback-table helpers', function() {
 
     it('is true when search or a select is set', function() {
       expect(hasActiveFilters(Object.assign(emptyFilters(), { search: 'dash' }))).toBe(true)
-      expect(hasActiveFilters(Object.assign(emptyFilters(), { status: 'New' }))).toBe(true)
+      expect(hasActiveFilters(Object.assign(emptyFilters(), { status: ['New'] }))).toBe(true)
     })
   })
 
@@ -82,14 +83,19 @@ describe('bu-feedback-table helpers', function() {
     ]
 
     it('filters by type, status, priority, component, and source', function() {
-      expect(filterIssues(rows, Object.assign(emptyFilters(), { issueType: 'Bug' })).map(function(i) { return i.key })).toEqual(['A'])
-      expect(filterIssues(rows, Object.assign(emptyFilters(), { status: 'Done' })).map(function(i) { return i.key })).toEqual(['B'])
-      expect(filterIssues(rows, Object.assign(emptyFilters(), { component: 'Serving' })).map(function(i) { return i.key })).toEqual(['B'])
-      expect(filterIssues(rows, Object.assign(emptyFilters(), { source: 'AIBU_Feedback' })).map(function(i) { return i.key })).toEqual(['A'])
+      expect(filterIssues(rows, Object.assign(emptyFilters(), { issueType: ['Bug'] })).map(function(i) { return i.key })).toEqual(['A'])
+      expect(filterIssues(rows, Object.assign(emptyFilters(), { status: ['Done'] })).map(function(i) { return i.key })).toEqual(['B'])
+      expect(filterIssues(rows, Object.assign(emptyFilters(), { component: ['Serving'] })).map(function(i) { return i.key })).toEqual(['B'])
+      expect(filterIssues(rows, Object.assign(emptyFilters(), { source: ['AIBU_Feedback'] })).map(function(i) { return i.key })).toEqual(['A'])
+    })
+
+    it('multi-selects multiple values in a single filter', function() {
+      expect(filterIssues(rows, Object.assign(emptyFilters(), { issueType: ['Bug', 'Feature Request'] })).map(function(i) { return i.key })).toEqual(['A', 'B'])
+      expect(filterIssues(rows, Object.assign(emptyFilters(), { status: ['New', 'Done'] })).map(function(i) { return i.key })).toEqual(['A', 'B'])
     })
 
     it('combines search with selects', function() {
-      var result = filterIssues(rows, Object.assign(emptyFilters(), { search: 'feature', issueType: 'Bug' }))
+      var result = filterIssues(rows, Object.assign(emptyFilters(), { search: 'feature', issueType: ['Bug'] }))
       expect(result).toEqual([])
     })
   })
@@ -132,6 +138,20 @@ describe('bu-feedback-table helpers', function() {
       var page = paginate([issue()], 99, PAGE_SIZE)
       expect(page.page).toBe(1)
       expect(page.items.length).toBe(1)
+    })
+  })
+
+  describe('toggleFilterValue', function() {
+    it('adds a value when not present', function() {
+      var arr = []
+      toggleFilterValue(arr, 'Bug')
+      expect(arr).toEqual(['Bug'])
+    })
+
+    it('removes a value when already present', function() {
+      var arr = ['Bug', 'Story']
+      toggleFilterValue(arr, 'Bug')
+      expect(arr).toEqual(['Story'])
     })
   })
 

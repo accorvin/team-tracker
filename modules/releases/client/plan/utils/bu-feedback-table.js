@@ -9,17 +9,25 @@ var SOURCE_SHORT = {
 export function emptyFilters() {
   return {
     search: '',
-    issueType: '',
-    component: '',
-    priority: '',
-    status: '',
-    source: ''
+    issueType: [],
+    component: [],
+    priority: [],
+    status: [],
+    source: [],
+    sfdc: []
   }
 }
 
+export var FILTER_KEYS = ['issueType', 'component', 'priority', 'status', 'source', 'sfdc']
+
 export function hasActiveFilters(filters) {
   if (!filters) return false
-  return !!(filters.search || filters.issueType || filters.component || filters.priority || filters.status || filters.source)
+  if (filters.search) return true
+  for (var i = 0; i < FILTER_KEYS.length; i++) {
+    var v = filters[FILTER_KEYS[i]]
+    if (Array.isArray(v) ? v.length > 0 : !!v) return true
+  }
+  return false
 }
 
 export function uniqueSortedValues(issues, getter) {
@@ -45,8 +53,45 @@ export function collectFilterOptions(issues) {
     component: uniqueSortedValues(issues, function(issue) { return issue.components || [] }),
     priority: uniqueSortedValues(issues, function(issue) { return issue.priority ? [issue.priority] : [] }),
     status: uniqueSortedValues(issues, function(issue) { return issue.status ? [issue.status] : [] }),
-    source: uniqueSortedValues(issues, function(issue) { return issue.feedbackLabels || [] })
+    source: uniqueSortedValues(issues, function(issue) { return issue.feedbackLabels || [] }),
+    sfdc: collectSfdcOptions(issues)
   }
+}
+
+export var SFDC_BUCKETS = [
+  { id: '0', label: 'None', min: 0, max: 0 },
+  { id: '1-2', label: '1–2', min: 1, max: 2 },
+  { id: '3-5', label: '3–5', min: 3, max: 5 },
+  { id: '6-10', label: '6–10', min: 6, max: 10 },
+  { id: '11+', label: '11+', min: 11, max: Infinity }
+]
+
+export function sfdcBucketId(count) {
+  var n = count || 0
+  for (var i = 0; i < SFDC_BUCKETS.length; i++) {
+    if (n >= SFDC_BUCKETS[i].min && n <= SFDC_BUCKETS[i].max) return SFDC_BUCKETS[i].id
+  }
+  return '0'
+}
+
+export function sfdcBucketLabel(id) {
+  for (var i = 0; i < SFDC_BUCKETS.length; i++) {
+    if (SFDC_BUCKETS[i].id === id) return SFDC_BUCKETS[i].label
+  }
+  return id
+}
+
+export function collectSfdcOptions(issues) {
+  var seen = {}
+  for (var i = 0; i < (issues || []).length; i++) {
+    var count = issues[i].sfdcCasesCount || (issues[i].hasSfdcCases ? 1 : 0)
+    seen[sfdcBucketId(count)] = true
+  }
+  var opts = []
+  for (var j = 0; j < SFDC_BUCKETS.length; j++) {
+    if (seen[SFDC_BUCKETS[j].id]) opts.push(SFDC_BUCKETS[j].id)
+  }
+  return opts
 }
 
 export function issueMatchesSearch(issue, query) {
@@ -67,15 +112,32 @@ export function issueMatchesSearch(issue, query) {
   return false
 }
 
+function matchesMulti(selected, value) {
+  if (!selected || !selected.length) return true
+  return selected.indexOf(value) !== -1
+}
+
+function matchesMultiArray(selected, values) {
+  if (!selected || !selected.length) return true
+  for (var i = 0; i < (values || []).length; i++) {
+    if (selected.indexOf(values[i]) !== -1) return true
+  }
+  return false
+}
+
 export function filterIssues(issues, filters) {
   var f = filters || emptyFilters()
   return (issues || []).filter(function(issue) {
     if (!issueMatchesSearch(issue, f.search)) return false
-    if (f.issueType && issue.issueType !== f.issueType) return false
-    if (f.priority && issue.priority !== f.priority) return false
-    if (f.status && issue.status !== f.status) return false
-    if (f.component && (issue.components || []).indexOf(f.component) === -1) return false
-    if (f.source && (issue.feedbackLabels || []).indexOf(f.source) === -1) return false
+    if (!matchesMulti(f.issueType, issue.issueType)) return false
+    if (!matchesMulti(f.priority, issue.priority)) return false
+    if (!matchesMulti(f.status, issue.status)) return false
+    if (!matchesMultiArray(f.component, issue.components)) return false
+    if (!matchesMultiArray(f.source, issue.feedbackLabels)) return false
+    if (f.sfdc && f.sfdc.length) {
+      var count = issue.sfdcCasesCount || (issue.hasSfdcCases ? 1 : 0)
+      if (f.sfdc.indexOf(sfdcBucketId(count)) === -1) return false
+    }
     return true
   })
 }
@@ -83,6 +145,7 @@ export function filterIssues(issues, filters) {
 function sortValue(issue, key) {
   if (key === 'component') return (issue.components || []).join(', ')
   if (key === 'source') return (issue.feedbackLabels || []).join(', ')
+  if (key === 'hasSfdcCases') return issue.sfdcCasesCount || (issue.hasSfdcCases ? 1 : 0)
   return issue[key] || ''
 }
 
@@ -114,6 +177,15 @@ export function paginate(items, page, pageSize) {
     start: total ? start + 1 : 0,
     end: Math.min(start + size, total),
     items: (items || []).slice(start, start + size)
+  }
+}
+
+export function toggleFilterValue(arr, value) {
+  var idx = arr.indexOf(value)
+  if (idx === -1) {
+    arr.push(value)
+  } else {
+    arr.splice(idx, 1)
   }
 }
 

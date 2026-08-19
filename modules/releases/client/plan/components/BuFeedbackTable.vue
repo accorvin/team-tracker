@@ -13,55 +13,42 @@
         />
       </label>
 
-      <select
-        v-model="filters.issueType"
-        aria-label="Filter by type"
-        data-testid="bu-feedback-filter-type"
-        :class="selectClass"
-      >
-        <option value="">All types</option>
-        <option v-for="opt in filterOptions.issueType" :key="opt" :value="opt">{{ opt }}</option>
-      </select>
-
-      <select
-        v-model="filters.status"
-        aria-label="Filter by status"
-        data-testid="bu-feedback-filter-status"
-        :class="selectClass"
-      >
-        <option value="">All statuses</option>
-        <option v-for="opt in filterOptions.status" :key="opt" :value="opt">{{ opt }}</option>
-      </select>
-
-      <select
-        v-model="filters.priority"
-        aria-label="Filter by priority"
-        data-testid="bu-feedback-filter-priority"
-        :class="selectClass"
-      >
-        <option value="">All priorities</option>
-        <option v-for="opt in filterOptions.priority" :key="opt" :value="opt">{{ opt }}</option>
-      </select>
-
-      <select
-        v-model="filters.component"
-        aria-label="Filter by component"
-        data-testid="bu-feedback-filter-component"
-        :class="selectClass"
-      >
-        <option value="">All components</option>
-        <option v-for="opt in filterOptions.component" :key="opt" :value="opt">{{ opt }}</option>
-      </select>
-
-      <select
-        v-model="filters.source"
-        aria-label="Filter by source"
-        data-testid="bu-feedback-filter-source"
-        :class="selectClass"
-      >
-        <option value="">All sources</option>
-        <option v-for="opt in filterOptions.source" :key="opt" :value="opt">{{ sourceShortLabel(opt) }}</option>
-      </select>
+      <div v-for="fd in filterDefs" :key="fd.key" class="relative" :data-testid="'bu-feedback-filter-' + fd.testId">
+        <button
+          type="button"
+          :class="[selectClass, 'inline-flex items-center gap-1.5 cursor-pointer select-none']"
+          :aria-expanded="openDropdown === fd.key"
+          :aria-label="'Filter by ' + fd.label.toLowerCase()"
+          @click.stop="toggleDropdown(fd.key)"
+        >
+          <span>{{ fd.label }}</span>
+          <span
+            v-if="filters[fd.key].length"
+            class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold rounded-full bg-primary-600 text-white leading-none"
+          >{{ filters[fd.key].length }}</span>
+          <svg class="w-3.5 h-3.5 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+        </button>
+        <div
+          v-if="openDropdown === fd.key"
+          class="absolute z-30 mt-1 w-56 max-h-64 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg py-1"
+          @click.stop
+        >
+          <label
+            v-for="opt in filterOptions[fd.key]"
+            :key="opt"
+            class="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+          >
+            <input
+              type="checkbox"
+              :checked="filters[fd.key].indexOf(opt) !== -1"
+              class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+              @change="toggleFilter(fd.key, opt)"
+            />
+            <span class="truncate">{{ fd.displayFn ? fd.displayFn(opt) : opt }}</span>
+          </label>
+          <p v-if="!filterOptions[fd.key].length" class="px-3 py-2 text-xs text-gray-400">No options</p>
+        </div>
+      </div>
 
       <button
         v-if="filtersActive"
@@ -185,6 +172,19 @@
                   <span class="truncate">{{ issue.priority || '—' }}</span>
                 </span>
               </td>
+              <td class="px-3 py-2.5 align-top hidden sm:table-cell text-center whitespace-nowrap">
+                <span
+                  v-if="issue.sfdcCasesCount > 0"
+                  class="inline-flex items-center justify-center min-w-[1.75rem] px-1.5 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                  :title="issue.sfdcCasesCount + ' linked SFDC case' + (issue.sfdcCasesCount !== 1 ? 's' : '')"
+                >{{ issue.sfdcCasesCount > 30 ? '30+' : issue.sfdcCasesCount }}</span>
+                <span
+                  v-else-if="issue.hasSfdcCases"
+                  class="inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                  title="Has linked SFDC cases"
+                >SFDC</span>
+                <span v-else class="text-gray-300 dark:text-gray-600">—</span>
+              </td>
               <td class="px-3 py-2.5 align-top hidden lg:table-cell text-gray-500 dark:text-gray-400 whitespace-nowrap">
                 {{ formatDate(issue.created) }}
               </td>
@@ -260,7 +260,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, watch } from 'vue'
+import { reactive, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import {
   PAGE_SIZE,
   emptyFilters,
@@ -270,6 +270,8 @@ import {
   sortIssues,
   paginate,
   sourceShortLabel,
+  sfdcBucketLabel,
+  toggleFilterValue,
   typeBadgeClass,
   statusClasses,
   priorityDot,
@@ -281,7 +283,37 @@ var props = defineProps({
   issues: { type: Array, default: function() { return [] } }
 })
 
-var selectClass = 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 max-w-[11rem]'
+var selectClass = 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500'
+
+var filterDefs = [
+  { key: 'issueType', testId: 'type', label: 'All types' },
+  { key: 'status', testId: 'status', label: 'All statuses' },
+  { key: 'priority', testId: 'priority', label: 'All priorities' },
+  { key: 'component', testId: 'component', label: 'All components' },
+  { key: 'source', testId: 'source', label: 'All sources', displayFn: sourceShortLabel },
+  { key: 'sfdc', testId: 'sfdc', label: 'SFDC cases', displayFn: sfdcBucketLabel }
+]
+
+var openDropdown = ref(null)
+
+function toggleDropdown(key) {
+  openDropdown.value = openDropdown.value === key ? null : key
+}
+
+function toggleFilter(key, value) {
+  toggleFilterValue(filters[key], value)
+}
+
+function closeDropdowns() {
+  openDropdown.value = null
+}
+
+onMounted(function() {
+  document.addEventListener('click', closeDropdowns)
+})
+onBeforeUnmount(function() {
+  document.removeEventListener('click', closeDropdowns)
+})
 
 var columns = [
   { key: 'key', label: 'Key', widthClass: 'w-44' },
@@ -289,6 +321,7 @@ var columns = [
   { key: 'component', label: 'Components', widthClass: 'w-40', hideClass: 'hidden md:table-cell' },
   { key: 'status', label: 'Status', widthClass: 'w-28' },
   { key: 'priority', label: 'Priority', widthClass: 'w-24', hideClass: 'hidden sm:table-cell' },
+  { key: 'hasSfdcCases', label: 'SFDC', widthClass: 'w-14', hideClass: 'hidden sm:table-cell' },
   { key: 'created', label: 'Created', widthClass: 'w-24', hideClass: 'hidden lg:table-cell' }
 ]
 

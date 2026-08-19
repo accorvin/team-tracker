@@ -29,7 +29,7 @@ function mountTable(issues) {
 }
 
 describe('BuFeedbackTable', function() {
-  it('renders a compact table with search and filters outside column headers', function() {
+  it('renders a compact table with search and multi-select filters outside column headers', function() {
     var wrapper = mountTable([issue()])
     expect(wrapper.find('[data-testid="bu-feedback-search"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="bu-feedback-filter-type"]').exists()).toBe(true)
@@ -38,6 +38,7 @@ describe('BuFeedbackTable', function() {
     expect(wrapper.text()).toContain('Dashboard filter is broken')
     expect(wrapper.text()).toContain('BU')
     expect(wrapper.find('thead select').exists()).toBe(false)
+    expect(wrapper.find('select').exists()).toBe(false)
   })
 
   it('shows the full issue type name', function() {
