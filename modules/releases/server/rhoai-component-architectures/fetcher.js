@@ -3,7 +3,7 @@
 const { Octokit } = require('@octokit/rest')
 const yaml = require('js-yaml')
 
-const STORAGE_KEY = 'releases/component-architectures/latest.json'
+const STORAGE_KEY = 'releases/rhoai-component-architectures/latest.json'
 const REGISTRY_KEY = 'releases/registry.json'
 const OWNER = 'red-hat-data-services'
 const REPO = 'konflux-central'
@@ -18,7 +18,7 @@ function stripRhelSuffix(name) {
 }
 
 function registryIdToBranch(id) {
-  const match = id.match(/^rhai-(\d+\.\d+)-?(ea\d+|ga)?$/)
+  const match = id.match(/^rh(?:oai|ai)-(\d+\.\d+)[.-]?(ea\d+|ga)?$/)
   if (!match) return null
   const version = match[1]
   const phase = match[2]
@@ -86,7 +86,7 @@ async function fetchBranchReport(octokit, branch) {
   }
 }
 
-function registerComponentArchitecturesFetcher(router, context) {
+function registerRhoaiComponentArchitecturesFetcher(router, context) {
   const { storage, requireAuth, requireScope, secrets } = context
   const { readFromStorage, writeToStorage } = storage
 
@@ -111,11 +111,11 @@ function registerComponentArchitecturesFetcher(router, context) {
     const branchData = {}
     for (let i = 0; i < branches.length; i++) {
       const branch = branches[i]
-      console.log(`[component-architectures] Fetching report from ${branch} (${i + 1}/${branches.length})`)
+      console.log(`[rhoai-component-architectures] Fetching report from ${branch} (${i + 1}/${branches.length})`)
       try {
         branchData[branch] = await fetchBranchReport(octokit, branch)
       } catch (err) {
-        console.warn(`[component-architectures] No report on ${branch}: ${err.message}`)
+        console.warn(`[rhoai-component-architectures] No report on ${branch}: ${err.message}`)
         branchData[branch] = { reportAvailable: false, components: [], summary: null }
       }
       if (i < branches.length - 1) await delay(200)
@@ -139,10 +139,10 @@ function registerComponentArchitecturesFetcher(router, context) {
 
   /**
    * @openapi
-   * /api/modules/releases/component-architectures/refresh:
+   * /api/modules/releases/rhoai-component-architectures/refresh:
    *   post:
    *     summary: Trigger component architecture data refresh from GitHub
-   *     tags: [Releases - Component Architectures]
+   *     tags: [Releases - RHOAI Component Architectures]
    *     responses:
    *       200:
    *         description: Refresh results
@@ -155,13 +155,13 @@ function registerComponentArchitecturesFetcher(router, context) {
       const result = await runFetch()
       res.json(result)
     } catch (err) {
-      console.error('[component-architectures] Refresh error:', err.message)
+      console.error('[rhoai-component-architectures] Refresh error:', err.message)
       res.status(500).json({ error: err.message })
     }
   })
 
   if (context.registerRefresh) {
-    context.registerRefresh('component-architectures', {
+    context.registerRefresh('rhoai-component-architectures', {
       order: 85,
       cadence: '24h',
       timeout: 300000,
@@ -177,7 +177,7 @@ function registerComponentArchitecturesFetcher(router, context) {
 }
 
 module.exports = {
-  registerComponentArchitecturesFetcher,
+  registerRhoaiComponentArchitecturesFetcher,
   STORAGE_KEY,
   REGISTRY_KEY,
   registryIdToBranch,

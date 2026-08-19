@@ -1,23 +1,23 @@
 'use strict'
 
-const { registerComponentArchitecturesFetcher, STORAGE_KEY, REGISTRY_KEY, branchesFromRegistry } = require('./fetcher')
+const { registerRhoaiComponentArchitecturesFetcher, STORAGE_KEY, REGISTRY_KEY, branchesFromRegistry } = require('./fetcher')
 
 /**
  * @param {import('express').Router} router
  * @param {object} context
  */
-function registerComponentArchitecturesRoutes(router, context) {
+function registerRhoaiComponentArchitecturesRoutes(router, context) {
   const { storage, requireAuth, requireScope } = context
   const { readFromStorage } = storage
 
-  registerComponentArchitecturesFetcher(router, context)
+  registerRhoaiComponentArchitecturesFetcher(router, context)
 
   /**
    * @openapi
-   * /api/modules/releases/component-architectures:
+   * /api/modules/releases/rhoai-component-architectures:
    *   get:
    *     summary: Get cached component architecture data
-   *     tags: [Releases - Component Architectures]
+   *     tags: [Releases - RHOAI Component Architectures]
    *     parameters:
    *       - in: query
    *         name: branch
@@ -48,12 +48,12 @@ function registerComponentArchitecturesRoutes(router, context) {
         return res.json(shell)
       }
 
-      if (!data.branches) data.branches = {}
+      const cachedBranches = data.branches || {}
+      const branches = {}
       for (const branch of registryBranches) {
-        if (!data.branches[branch]) {
-          data.branches[branch] = { reportAvailable: false, components: [], summary: null }
-        }
+        branches[branch] = cachedBranches[branch] || { reportAvailable: false, components: [], summary: null }
       }
+      data.branches = branches
 
       if (req.query.branch) {
         const branch = data.branches[req.query.branch]
@@ -65,10 +65,10 @@ function registerComponentArchitecturesRoutes(router, context) {
 
       res.json(data)
     } catch (err) {
-      console.error('[component-architectures] GET error:', err.message)
+      console.error('[rhoai-component-architectures] GET error:', err.message)
       res.status(500).json({ error: err.message })
     }
   })
 }
 
-module.exports = registerComponentArchitecturesRoutes
+module.exports = registerRhoaiComponentArchitecturesRoutes

@@ -1566,7 +1566,7 @@ JSON Lines format (one JSON object per line). Partitioned by month for efficient
 
 ---
 
-## Releases — Component Architectures (`data/releases/component-architectures/latest.json`)
+## Releases — RHOAI Component Architectures (`data/releases/rhoai-component-architectures/latest.json`)
 
 Multi-architecture build support matrix for RHOAI components across release branches. Fetched from pre-generated `multi-arch-report.yaml` files in the `red-hat-data-services/konflux-central` repo.
 

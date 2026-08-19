@@ -128,7 +128,7 @@ export const viewOwners = {
   // releases > reports
   'releases/reports/ai-adoption':                  'Saiesh Prabhu',
   'releases/reports/capacity-commitment':          'Alex Corvin',
-  'releases/reports/component-architectures':      'Waldemar Znoinski',
+  'releases/reports/rhoai-component-architectures': 'Waldemar Znoinski',
   'releases/reports/cve-sustaining':               'Saiesh Prabhu',
   'releases/reports/feature-pressure':             'Dimitri Saridakis',
   'releases/reports/program-hygiene':              'Alex Corvin',

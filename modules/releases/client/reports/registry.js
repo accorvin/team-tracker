@@ -58,11 +58,11 @@ export const reports = [
     component: defineAsyncComponent(() => import('./AiAdoptionReport.vue'))
   },
   {
-    id: 'component-architectures',
-    label: 'Component Architectures (Multi-Arch Report)',
+    id: 'rhoai-component-architectures',
+    label: 'RHOAI Component Architectures (Multi-Arch)',
     description: 'Multi-architecture build support matrix for RHOAI components per release branch.',
     icon: 'Cpu',
     tags: ['Build', 'Architecture', 'Multi-Arch'],
-    component: defineAsyncComponent(() => import('./ComponentArchitecturesReport.vue'))
+    component: defineAsyncComponent(() => import('./RhoaiComponentArchitecturesReport.vue'))
   }
 ]
