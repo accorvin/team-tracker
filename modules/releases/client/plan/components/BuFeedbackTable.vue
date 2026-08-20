@@ -176,8 +176,8 @@
                 <span
                   v-if="issue.sfdcCasesCount > 0"
                   class="inline-flex items-center justify-center min-w-[1.75rem] px-1.5 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                  :title="sfdcBucketLabel(sfdcBucketId(issue.sfdcCasesCount)) + ' SFDC cases'"
-                >{{ sfdcBucketLabel(sfdcBucketId(issue.sfdcCasesCount)) }}</span>
+                  :title="issue.sfdcCasesCount + ' linked SFDC case' + (issue.sfdcCasesCount !== 1 ? 's' : '')"
+                >{{ issue.sfdcCasesCount }}</span>
                 <span
                   v-else-if="issue.hasSfdcCases"
                   class="inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
@@ -270,7 +270,6 @@ import {
   sortIssues,
   paginate,
   sourceShortLabel,
-  sfdcBucketId,
   sfdcBucketLabel,
   toggleFilterValue,
   typeBadgeClass,
