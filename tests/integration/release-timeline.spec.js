@@ -209,8 +209,10 @@ test.describe('Release Timeline @release-timeline @releases', () => {
     await cycleButtons.first().click();
     await page.waitForTimeout(500);
 
-    // Click back to All
-    await allBtn.click();
+    // Re-query the All button after DOM update from cycle click
+    var allBtnRefresh = page.locator('button', { hasText: 'All' }).first();
+    await expect(allBtnRefresh).toBeVisible();
+    await allBtnRefresh.click();
     await page.waitForTimeout(500);
 
     expect(page.errors).toHaveLength(0);
