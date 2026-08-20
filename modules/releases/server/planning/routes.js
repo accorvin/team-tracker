@@ -640,9 +640,12 @@ module.exports = async function registerPlanningRoutes(router, context) {
     var jql = scopeJql + ' ORDER BY priority DESC, createdDate DESC'
     var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels,resolutiondate'
 
-    var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 500, expand: 'changelog' })
+    var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 500 })
     var feedbackPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter is not EMPTY')
-    var countMapPromise = fetchSfdcCountMap(scopeJql)
+    var countMapPromise = fetchSfdcCountMap(scopeJql).catch(function(err) {
+      console.warn('[releases/planning] SFDC count map failed, skipping counts:', err.message)
+      return {}
+    })
     var rawIssues = deduplicateRaw(await rawPromise)
     var feedbackKeys = await feedbackPromise
     var countMap = await countMapPromise
