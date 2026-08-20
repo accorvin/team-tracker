@@ -485,7 +485,11 @@ test.describe('Releases Field and BU Feedback @releases', () => {
     }
   });
 
-  test('SFDC tab switch works without errors', async ({ page }) => {
+  test('SFDC tab switch works without errors', async ({ page, request }) => {
+    const apiRes = await request.get('/api/modules/releases/planning/sfdc-issues');
+    const body = await apiRes.json();
+    const hasIssues = body.issues && body.issues.length > 0;
+
     await page.goto('/#/releases/plan?tab=bu-feedback');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
@@ -497,10 +501,7 @@ test.describe('Releases Field and BU Feedback @releases', () => {
 
     await expect(page.locator('h2', { hasText: 'SFDC Issues' })).toBeVisible();
 
-    // Executive Summary only renders when issues are loaded (data-dependent)
-    var issueCount = page.locator('[data-testid="bu-feedback-table"] tbody tr');
-    var rows = await issueCount.count();
-    if (rows > 0) {
+    if (hasIssues) {
       await expect(page.getByTestId('bu-feedback-exec-summary')).toBeVisible();
     }
 

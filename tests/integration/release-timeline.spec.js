@@ -191,21 +191,32 @@ test.describe('Release Timeline @release-timeline @releases', () => {
     expect(page.errors).toHaveLength(0);
   });
 
-  test('cycle filter buttons are visible and clickable', async ({ page }) => {
+  test('cycle filter buttons are visible and clickable', async ({ page, request }) => {
+    // Filter pills only render when the registry has >1 product or >1 stream.
+    // Check via API first to avoid flaky DOM race conditions.
+    var regRes = await request.get('/api/modules/releases/registry');
+    var regBody = await regRes.json();
+    var active = (regBody.releases || []).filter(function(r) { return r.state === 'active' });
+    var streamSet = {};
+    for (var i = 0; i < active.length; i++) {
+      var sources = [active[i].productPagesVersion, active[i].displayName, active[i].id];
+      for (var j = 0; j < sources.length; j++) {
+        if (!sources[j]) continue;
+        var m = sources[j].match(/(\d+\.\d+)/);
+        if (m) { streamSet[m[1]] = true; break; }
+      }
+    }
+    if (Object.keys(streamSet).length < 2) {
+      test.skip();
+      return;
+    }
+
     await page.goto('/#/releases/schedule');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Filter pills only render when the fixture has >1 product or >1 stream.
-    // In some CI environments the registry data may not produce multiple
-    // streams, so skip gracefully rather than fail the entire suite.
     var allBtn = page.locator('button').filter({ hasText: /^All$/ }).first();
-    var btnCount = await allBtn.count();
-    if (btnCount === 0) {
-      test.skip();
-      return;
-    }
-    await expect(allBtn).toBeVisible();
+    await expect(allBtn).toBeVisible({ timeout: 10000 });
 
     var cycleButtons = page.locator('button').filter({ hasText: /^\d+\.\d+$/ });
     var cycleCount = await cycleButtons.count();
