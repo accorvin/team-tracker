@@ -485,7 +485,7 @@ test.describe('Releases Field and BU Feedback @releases', () => {
     }
   });
 
-  test('Executive Summary is hidden in SFDC view', async ({ page }) => {
+  test('Executive Summary is visible in SFDC view', async ({ page }) => {
     await page.goto('/#/releases/plan?tab=bu-feedback');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
@@ -495,7 +495,7 @@ test.describe('Releases Field and BU Feedback @releases', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    await expect(page.getByTestId('bu-feedback-exec-summary')).toHaveCount(0);
+    await expect(page.getByTestId('bu-feedback-exec-summary')).toBeVisible();
 
     expect(page.errors).toHaveLength(0);
   });
