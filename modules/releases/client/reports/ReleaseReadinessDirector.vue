@@ -413,7 +413,7 @@
                   <div :class="phaseBarColor(phase.rag)" class="h-full transition-all duration-500" :style="{ width: phasePct(phase) + '%' }"></div>
                 </div>
                 <span class="text-xs font-medium text-gray-600 dark:text-gray-400 w-12 text-right">{{ phase.done }}/{{ phase.total }}</span>
-                <span :class="ragBadgeClass(phase.rag)" class="text-xs px-1.5 py-0.5 rounded font-medium text-white">
+                <span :class="ragBadgeClass(phase.rag)" class="text-xs px-1.5 py-0.5 rounded font-medium text-white w-16 text-center">
                   {{ phase.rag === 'GREEN' ? 'Done' : phase.rag === 'AMBER' ? 'Active' : 'Pending' }}
                 </span>
               </div>
@@ -432,7 +432,7 @@
                     <span class="text-xs text-gray-600 dark:text-gray-400">{{ task.summary }}</span>
                   </div>
                   <div class="flex items-center gap-2 flex-shrink-0">
-                    <span class="text-xs px-1.5 py-0.5 rounded" :class="statusPillClass(task.status_category)">{{ task.status }}</span>
+                    <span class="text-xs px-1.5 py-0.5 rounded" :class="statusPillClass(task.status_category, task.resolution)">{{ statusResolutionLabel(task.status, task.resolution) }}</span>
                     <span class="text-xs text-blue-500 dark:text-blue-400 font-mono">{{ task.key }}</span>
                   </div>
                 </a>
@@ -790,7 +790,20 @@ function ragBarClass(rag) {
   return 'bg-gray-400'
 }
 
-function statusPillClass(category) {
+// Resolutions that mean the item was closed without completing the work
+// (mirrors the no-work resolutions excluded from person-metrics, see docs/DATA-FORMATS.md)
+const NO_WORK_RESOLUTIONS = ["Won't Do", "Can't Do", 'Obsolete', 'Duplicate', 'Cannot Reproduce']
+
+function isNoWorkResolution(resolution) {
+  return !!resolution && NO_WORK_RESOLUTIONS.includes(resolution)
+}
+
+function statusResolutionLabel(status, resolution) {
+  return resolution ? `${status} - ${resolution}` : status
+}
+
+function statusPillClass(category, resolution) {
+  if (isNoWorkResolution(resolution)) return 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300'
   if (category === 'Done') return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
   if (['In Progress', 'In Review', 'Testing', 'Review'].includes(category)) return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
   return 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
