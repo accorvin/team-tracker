@@ -585,7 +585,7 @@ module.exports = async function registerPlanningRoutes(router, context) {
     var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels,resolutiondate'
 
     var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 200, expand: 'changelog' })
-    var sfdcPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter is not EMPTY')
+    var sfdcPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter > 0')
     var rawIssues = deduplicateRaw(await rawPromise)
     var sfdcKeys = await sfdcPromise
 
@@ -598,33 +598,37 @@ module.exports = async function registerPlanningRoutes(router, context) {
     return payload
   }
 
-  async function fetchSfdcCountMap(scopeJql) {
-    var THRESHOLDS = [1, 3, 6, 11, 30]
+  var SFDC_COUNT_THRESHOLDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 30, 50]
+  var SFDC_COUNT_BATCH_SIZE = 3
 
+  async function fetchSfdcCountMap(scopeJql) {
     var bucketSets = {}
-    var promises = THRESHOLDS.map(function(t) {
-      var jql = scopeJql + ' AND SFDC_Cases_Counter >= ' + t
-      return jiraClient.fetchAllJqlResults(jql, 'key', { maxResults: 500 })
-        .then(function(issues) {
-          var set = {}
-          for (var j = 0; j < issues.length; j++) set[issues[j].key] = true
-          bucketSets[t] = set
-        })
-        .catch(function(err) {
-          console.warn('[releases/planning] SFDC count threshold ' + t + ' failed:', err.message)
-          bucketSets[t] = {}
-        })
-    })
-    await Promise.all(promises)
+
+    for (var i = 0; i < SFDC_COUNT_THRESHOLDS.length; i += SFDC_COUNT_BATCH_SIZE) {
+      var batch = SFDC_COUNT_THRESHOLDS.slice(i, i + SFDC_COUNT_BATCH_SIZE)
+      await Promise.all(batch.map(function(t) {
+        var jql = scopeJql + ' AND SFDC_Cases_Counter >= ' + t
+        return jiraClient.fetchAllJqlResults(jql, 'key', { maxResults: 500 })
+          .then(function(issues) {
+            var set = {}
+            for (var j = 0; j < issues.length; j++) set[issues[j].key] = true
+            bucketSets[t] = set
+          })
+          .catch(function(err) {
+            console.warn('[releases/planning] SFDC count threshold ' + t + ' failed:', err.message)
+            bucketSets[t] = {}
+          })
+      }))
+    }
 
     var countMap = {}
     var allKeys = Object.keys(bucketSets[1] || {})
     for (var k = 0; k < allKeys.length; k++) {
       var key = allKeys[k]
       var count = 1
-      for (var ti = 1; ti < THRESHOLDS.length; ti++) {
-        if (bucketSets[THRESHOLDS[ti]] && bucketSets[THRESHOLDS[ti]][key]) {
-          count = THRESHOLDS[ti]
+      for (var ti = 1; ti < SFDC_COUNT_THRESHOLDS.length; ti++) {
+        if (bucketSets[SFDC_COUNT_THRESHOLDS[ti]] && bucketSets[SFDC_COUNT_THRESHOLDS[ti]][key]) {
+          count = SFDC_COUNT_THRESHOLDS[ti]
         } else {
           break
         }
@@ -634,29 +638,44 @@ module.exports = async function registerPlanningRoutes(router, context) {
     return countMap
   }
 
+  function enrichSfdcCounts(payload, scopeJql) {
+    fetchSfdcCountMap(scopeJql).then(function(countMap) {
+      var issues = payload.issues
+      for (var i = 0; i < issues.length; i++) {
+        issues[i].sfdcCasesCount = countMap[issues[i].key] || 0
+      }
+      payload.countsResolved = true
+      writeToStorage(SFDC_ISSUES_CACHE_KEY, payload).catch(function() {})
+      console.log('[releases/planning] SFDC counts resolved for ' + Object.keys(countMap).length + ' issues')
+    }).catch(function(err) {
+      console.warn('[releases/planning] Background SFDC count fetch failed:', err.message)
+    })
+  }
+
   async function fetchSfdcIssuesFromJira() {
     var projectList = SFDC_PROJECTS.map(function(p) { return '"' + p + '"' }).join(', ')
-    var scopeJql = 'project IN (' + projectList + ') AND SFDC_Cases_Counter is not EMPTY'
+    var scopeJql = 'project IN (' + projectList + ') AND SFDC_Cases_Counter > 0'
     var jql = scopeJql + ' ORDER BY priority DESC, createdDate DESC'
     var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels,resolutiondate'
 
-    var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 500, expand: 'changelog' })
-    var feedbackPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter is not EMPTY')
-    var countMapPromise = fetchSfdcCountMap(scopeJql)
+    var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 500 })
+    var feedbackPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter > 0')
     var rawIssues = deduplicateRaw(await rawPromise)
     var feedbackKeys = await feedbackPromise
-    var countMap = await countMapPromise
 
     var issues = rawIssues.map(function(raw) {
       return mapRawIssue(raw, {
         hasSfdcCases: true,
         hasFeedbackLabel: !!feedbackKeys[raw.key],
-        sfdcCasesCount: countMap[raw.key] || 0
+        sfdcCasesCount: 0
       })
     })
 
-    var payload = { issues: issues, fetchedAt: new Date().toISOString(), cachedAt: new Date().toISOString() }
+    var payload = { issues: issues, fetchedAt: new Date().toISOString(), cachedAt: new Date().toISOString(), countsResolved: false }
     await writeToStorage(SFDC_ISSUES_CACHE_KEY, payload)
+
+    enrichSfdcCounts(payload, scopeJql)
+
     return payload
   }
 
