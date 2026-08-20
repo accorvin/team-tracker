@@ -585,7 +585,7 @@ module.exports = async function registerPlanningRoutes(router, context) {
     var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels,resolutiondate'
 
     var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 200, expand: 'changelog' })
-    var sfdcPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter is not EMPTY')
+    var sfdcPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter > 0')
     var rawIssues = deduplicateRaw(await rawPromise)
     var sfdcKeys = await sfdcPromise
 
@@ -636,12 +636,12 @@ module.exports = async function registerPlanningRoutes(router, context) {
 
   async function fetchSfdcIssuesFromJira() {
     var projectList = SFDC_PROJECTS.map(function(p) { return '"' + p + '"' }).join(', ')
-    var scopeJql = 'project IN (' + projectList + ') AND SFDC_Cases_Counter is not EMPTY'
+    var scopeJql = 'project IN (' + projectList + ') AND SFDC_Cases_Counter > 0'
     var jql = scopeJql + ' ORDER BY priority DESC, createdDate DESC'
     var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels,resolutiondate'
 
     var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 500 })
-    var feedbackPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter is not EMPTY')
+    var feedbackPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter > 0')
     var countMapPromise = fetchSfdcCountMap(scopeJql).catch(function(err) {
       console.warn('[releases/planning] SFDC count map failed, skipping counts:', err.message)
       return {}
