@@ -4,13 +4,13 @@ import { countUniqueCategoryTotals } from './mergeReleaseDetails'
 // ═══ RELEASE NAME PARSING ═══
 
 /** Legacy: rhoai-3.6.EA1, RHELAI-3.2 */
-var LEGACY_PATTERN = /^(rhoai|rhelai|rhaii)[- _](\d+)\.(\d+)(?:\.EA(\d+))?$/i
+var LEGACY_PATTERN = /^(rhoai|rhelai|rhaii|rhai)[- _](\d+)\.(\d+)(?:\.EA(\d+))?$/i
 
 /** Product-family Jira names: "3.6 EA1 RHOAI RELEASE", "3.5 GA RHELAI RELEASE" */
-var PRODUCT_FAMILY_PATTERN = /^(\d+)\.(\d+)\s+(EA(\d+)|GA)\s+(RHOAI|RHAII|RHELAI)\s+RELEASE$/i
+var PRODUCT_FAMILY_PATTERN = /^(\d+)\.(\d+)\s+(EA(\d+)|GA)\s+(RHOAI|RHAII|RHELAI|RHAI)\s+RELEASE$/i
 
-var PRODUCT_ORDER = { rhoai: 0, rhaii: 1, rhelai: 2 }
-var PRODUCT_LABELS = { rhoai: 'RHOAI', rhelai: 'RHELAI', rhaii: 'RHAII' }
+var PRODUCT_ORDER = { rhoai: 0, rhaii: 1, rhelai: 2, rhai: 3 }
+var PRODUCT_LABELS = { rhoai: 'RHOAI', rhelai: 'RHELAI', rhaii: 'RHAII', rhai: 'RHAI' }
 
 /**
  * Parse a release name into structured parts.
@@ -85,7 +85,7 @@ function formatSortedVersions(value) {
 function extractProduct(name) {
   var parsed = parseReleaseName(name)
   if (parsed) return parsed.product
-  var m = /^(rhoai|rhelai|rhaii)/i.exec(name)
+  var m = /^(rhoai|rhelai|rhaii|rhai)/i.exec(name)
   return m ? m[1].toLowerCase() : null
 }
 
@@ -152,13 +152,13 @@ function getAlignmentTarget(days) {
 function extractFamily(name) {
   var parsed = parseReleaseName(name)
   if (parsed) return parsed.product + '-' + parsed.major + '.' + parsed.minor
-  var m = /^(rhoai|rhelai|rhaii)[- _](\d+\.\d+)/i.exec(name)
+  var m = /^(rhoai|rhelai|rhaii|rhai)[- _](\d+\.\d+)/i.exec(name)
   if (m) return m[1].toLowerCase() + '-' + m[2]
   return name.toLowerCase()
 }
 
 function familyLabel(familyKey) {
-  var m = /^(rhoai|rhelai|rhaii)-(.+)$/.exec(familyKey)
+  var m = /^(rhoai|rhelai|rhaii|rhai)-(.+)$/.exec(familyKey)
   if (m) return PRODUCT_LABELS[m[1]] + ' ' + m[2]
   return familyKey
 }

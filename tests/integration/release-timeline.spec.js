@@ -272,4 +272,25 @@ test.describe('Release Timeline @release-timeline @releases', () => {
     await expect(canvas).toBeVisible();
     expect(page.errors).toHaveLength(0);
   });
+
+  test('version filter pills appear and are clickable', async ({ page }) => {
+    await page.goto('/#/releases/schedule');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    var versionPills = page.locator('button').filter({ hasText: /^\d+\.\d+\s+(EA\d+|GA)$/ });
+    var pillCount = await versionPills.count();
+    expect(pillCount).toBeGreaterThan(0);
+
+    await versionPills.first().click();
+    await page.waitForTimeout(500);
+
+    var clearBtn = page.locator('button', { hasText: 'Clear' });
+    await expect(clearBtn).toBeVisible();
+
+    await clearBtn.click();
+    await page.waitForTimeout(500);
+
+    expect(page.errors).toHaveLength(0);
+  });
 });

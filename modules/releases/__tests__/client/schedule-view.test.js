@@ -252,4 +252,112 @@ describe('ScheduleView', () => {
     expect(apiRequest).toHaveBeenCalledTimes(2)
     expect(wrapper.text()).toContain('Sep 20, 2026')
   })
+
+  it('version filter pills appear when multiple versions exist', async () => {
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5-ea1', {
+          displayName: '3.5 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: '2028-06-10'
+        }),
+        makeRelease('rhoai-3.5-ga', {
+          displayName: '3.5 GA RHOAI RELEASE', shortname: 'rhoai', ga: '2028-08-18'
+        }),
+        makeRelease('rhoai-3.6-ea1', {
+          displayName: '3.6 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: '2028-09-15'
+        })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+    var buttons = wrapper.findAll('button').filter(b => /^\d+\.\d+\s+(EA\d+|GA)$/.test(b.text().trim()))
+    expect(buttons.length).toBe(3)
+  })
+
+  it('version pills are sorted most-recent-first', async () => {
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5-ea1', {
+          displayName: '3.5 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: '2028-06-10'
+        }),
+        makeRelease('rhoai-3.5-ga', {
+          displayName: '3.5 GA RHOAI RELEASE', shortname: 'rhoai', ga: '2028-08-18'
+        }),
+        makeRelease('rhoai-3.6-ea1', {
+          displayName: '3.6 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: '2028-09-15'
+        })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+    var buttons = wrapper.findAll('button').filter(b => /^\d+\.\d+\s+(EA\d+|GA)$/.test(b.text().trim()))
+    var labels = buttons.map(b => b.text().trim())
+    expect(labels).toEqual(['3.6 EA1', '3.5 GA', '3.5 EA1'])
+  })
+
+  it('clicking a version pill filters the releases passed to timeline', async () => {
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5-ga', {
+          displayName: '3.5 GA RHOAI RELEASE', shortname: 'rhoai', ga: '2028-08-18'
+        }),
+        makeRelease('rhoai-3.6-ea1', {
+          displayName: '3.6 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: '2028-09-15'
+        })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+    var versionBtns = wrapper.findAll('button').filter(b => b.text().trim() === '3.5 GA')
+    expect(versionBtns.length).toBe(1)
+    await versionBtns[0].trigger('click')
+    var timeline = wrapper.findComponent(ReleaseTimelineStub)
+    expect(timeline.props('releases').length).toBe(1)
+    expect(timeline.props('releases')[0].id).toBe('rhoai-3.5-ga')
+  })
+
+  it('multi-select: two version pills can be active simultaneously', async () => {
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5-ea1', {
+          displayName: '3.5 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: '2028-06-10'
+        }),
+        makeRelease('rhoai-3.5-ga', {
+          displayName: '3.5 GA RHOAI RELEASE', shortname: 'rhoai', ga: '2028-08-18'
+        }),
+        makeRelease('rhoai-3.6-ea1', {
+          displayName: '3.6 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: '2028-09-15'
+        })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+    var ea1Btn = wrapper.findAll('button').filter(b => b.text().trim() === '3.5 EA1')[0]
+    var gaBtn = wrapper.findAll('button').filter(b => b.text().trim() === '3.5 GA')[0]
+    await ea1Btn.trigger('click')
+    await gaBtn.trigger('click')
+    var timeline = wrapper.findComponent(ReleaseTimelineStub)
+    expect(timeline.props('releases').length).toBe(2)
+  })
+
+  it('Clear button resets version filter', async () => {
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5-ga', {
+          displayName: '3.5 GA RHOAI RELEASE', shortname: 'rhoai', ga: '2028-08-18'
+        }),
+        makeRelease('rhoai-3.6-ea1', {
+          displayName: '3.6 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: '2028-09-15'
+        })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+    var versionBtn = wrapper.findAll('button').filter(b => b.text().trim() === '3.5 GA')[0]
+    await versionBtn.trigger('click')
+    var clearBtn = wrapper.findAll('button').filter(b => b.text().trim() === 'Clear')[0]
+    expect(clearBtn).toBeTruthy()
+    await clearBtn.trigger('click')
+    var timeline = wrapper.findComponent(ReleaseTimelineStub)
+    expect(timeline.props('releases').length).toBe(2)
+  })
 })

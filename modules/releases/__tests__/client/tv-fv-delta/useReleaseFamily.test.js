@@ -79,6 +79,35 @@ describe('parseReleaseName', function () {
     expect(parseReleaseName('')).toBeNull()
     expect(parseReleaseName('random-text')).toBeNull()
   })
+
+  it('parses rhai legacy format', function () {
+    var r = parseReleaseName('rhai-3.6')
+    expect(r).not.toBeNull()
+    expect(r.product).toBe('rhai')
+    expect(r.major).toBe(3)
+    expect(r.minor).toBe(6)
+    expect(r.milestone).toBe('GA')
+  })
+
+  it('parses rhai with EA suffix', function () {
+    var r = parseReleaseName('rhai-3.6.EA1')
+    expect(r).not.toBeNull()
+    expect(r.product).toBe('rhai')
+    expect(r.milestone).toBe('EA1')
+  })
+
+  it('parses rhai product-family format', function () {
+    var r = parseReleaseName('3.6 GA RHAI RELEASE')
+    expect(r).not.toBeNull()
+    expect(r.product).toBe('rhai')
+    expect(r.milestone).toBe('GA')
+  })
+
+  it('rhaii still matches before rhai', function () {
+    var r = parseReleaseName('rhaii-3.5')
+    expect(r).not.toBeNull()
+    expect(r.product).toBe('rhaii')
+  })
 })
 
 // ═══ extractCycle / milestone ═══
@@ -92,6 +121,10 @@ describe('extractCycle', function () {
   it('extracts cycle from legacy names', function () {
     expect(extractCycle('rhoai-3.6.EA1')).toBe('3.6')
     expect(extractCycle('RHELAI-3.2')).toBe('3.2')
+  })
+
+  it('extracts cycle from rhai names', function () {
+    expect(extractCycle('rhai-3.6')).toBe('3.6')
   })
 })
 
