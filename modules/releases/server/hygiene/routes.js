@@ -679,7 +679,9 @@ module.exports = async function registerHygieneRoutes(router, context) {
           if (v.id === 'open-in-released-version') openInReleasedTotal++;
         }
 
-        var team = feature.team || 'Unassigned';
+        // Guard against a corrupted team value stored as "[object Object]"
+        // (a label-less Jira team object from before serializeField was fixed).
+        var team = (feature.team && feature.team !== '[object Object]') ? feature.team : 'Unassigned';
         if (violations.length > 0) {
           violationsByTeam[team] = (violationsByTeam[team] || 0) + violations.length;
         }
@@ -691,7 +693,7 @@ module.exports = async function registerHygieneRoutes(router, context) {
             summary: feature.summary,
             issueType: feature.issueType,
             status: feature.status,
-            team: feature.team || 'Unassigned',
+            team: team,
             assignee: feature.assignee || 'Unassigned',
             components: feature.components || [],
             labels: feature.labels || [],

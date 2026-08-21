@@ -4,6 +4,7 @@ import { apiRequest } from '@shared/client/services/api.js'
 import { useReleaseSelector } from '../composables/useReleaseSelector.js'
 import { useReportFilters } from './composables/useReportFilters.js'
 import ReportFilterModal from './components/ReportFilterModal.vue'
+import FeatureDrawer from '../execute/components/hygiene/FeatureDrawer.vue'
 
 const nav = inject('moduleNav')
 
@@ -198,26 +199,37 @@ const maxTeamCount = computed(() => sortedTeamViolations.value[0]?.count || 1)
 
 // ── Tab A: Feature-level table ──
 
-const popoverFeature = ref(null)
-const popoverStyle = ref({})
+// ── Feature detail drawer (same drawer as the Feature Status board) ──
 
-function showViolations(feature, event) {
-  if (feature.violationCount === 0) return
-  if (popoverFeature.value?.key === feature.key && popoverFeature.value?.version === feature.version) {
-    popoverFeature.value = null
-    return
+const drawerFeature = ref(null)
+
+// The program-report feature objects are lightweight; fetch the full stored
+// hygiene feature (status summary, version fields, violation objects) so the
+// shared FeatureDrawer renders the same detail as the Feature Status board.
+async function openFeatureDrawer(f) {
+  drawerFeature.value = f
+  try {
+    const data = await apiRequest(`/modules/releases/hygiene/features?version=${encodeURIComponent(f.version)}`)
+    const full = data.features && data.features[f.key]
+    if (full) {
+      // The stored violations reflect the last refresh; drop any whose rule no
+      // longer exists so the drawer matches the report's live-evaluated charts.
+      const known = ruleDefinitions.value
+      const violations = Array.isArray(full.violations)
+        ? full.violations.filter(v => v && known[v.id])
+        : full.violations
+      drawerFeature.value = { ...full, version: f.version, violations }
+    }
+  } catch {
+    // Fall back to the lightweight row data if the full fetch fails.
   }
-  const rect = event.currentTarget.getBoundingClientRect()
-  popoverStyle.value = {
-    position: 'absolute',
-    top: (rect.bottom + window.scrollY + 6) + 'px',
-    right: Math.max(12, window.innerWidth - rect.right) + 'px'
-  }
-  popoverFeature.value = feature
 }
 
-function closePopover() {
-  popoverFeature.value = null
+function openFeatureDetails() {
+  const f = drawerFeature.value
+  if (!f) return
+  drawerFeature.value = null
+  nav.navigateTo('feature-detail', { key: f.key, from: 'hygiene-report' })
 }
 
 const featureSortKey = ref('violationCount')
@@ -511,16 +523,16 @@ const tabs = [
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                  <tr v-for="f in sortedFeatures" :key="f.key + f.version" class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                  <tr
+                    v-for="f in sortedFeatures"
+                    :key="f.key + f.version"
+                    data-testid="hygiene-report-feature-row"
+                    class="hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer"
+                    @click="openFeatureDrawer(f)"
+                  >
                     <td class="px-4 py-2 whitespace-nowrap">
                       <div class="flex items-center gap-1.5">
-                        <button
-                          class="font-mono text-xs text-primary-600 dark:text-primary-400 hover:underline"
-                          @click="nav.navigateTo('feature-detail', {
-                            key: f.key,
-                            from: 'hygiene-report'
-                          })"
-                        >{{ f.key }}</button>
+                        <span class="font-mono text-xs text-primary-600 dark:text-primary-400">{{ f.key }}</span>
                         <a
                           :href="'https://redhat.atlassian.net/browse/' + f.key"
                           target="_blank"
@@ -541,13 +553,10 @@ const tabs = [
                     <td class="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{{ f.status || '—' }}</td>
                     <td class="px-4 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">{{ f.version }}</td>
                     <td class="px-4 py-2 text-right">
-                      <button
+                      <span
                         v-if="f.violationCount > 0"
-                        class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800/40 cursor-pointer transition-colors"
-                        @click="showViolations(f, $event)"
-                      >
-                        {{ f.violationCount }}
-                      </button>
+                        class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+                      >{{ f.violationCount }}</span>
                       <span v-else class="text-gray-300 dark:text-gray-600">0</span>
                     </td>
                   </tr>
@@ -557,42 +566,6 @@ const tabs = [
             <div v-if="sortedFeatures.length > 0" class="px-4 py-2 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-400">
               {{ sortedFeatures.length }} feature{{ sortedFeatures.length !== 1 ? 's' : '' }}
             </div>
-
-            <!-- Violations popover -->
-            <teleport to="body">
-              <div v-if="popoverFeature" class="fixed inset-0 z-40" @click="closePopover" />
-              <div
-                v-if="popoverFeature"
-                :style="popoverStyle"
-                class="z-50 w-80 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-xl"
-              >
-                <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                  <div class="min-w-0">
-                    <button
-                      class="text-xs font-mono text-primary-600 dark:text-primary-400 hover:underline"
-                      @click="nav.navigateTo('feature-detail', {
-                        key: popoverFeature.key,
-                        from: 'hygiene-report'
-                      })"
-                    >{{ popoverFeature.key }}</button>
-                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ popoverFeature.summary }}</div>
-                  </div>
-                  <button class="ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0" @click="closePopover">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <ul class="px-4 py-3 space-y-2">
-                  <li v-for="vid in popoverFeature.violations" :key="vid" class="flex items-start gap-2">
-                    <span class="mt-0.5 px-1.5 py-0.5 text-[9px] font-medium rounded shrink-0" :class="categoryColors[ruleDefinitions[vid]?.category] || 'bg-gray-100 text-gray-600'">
-                      {{ ruleDefinitions[vid]?.category || 'unknown' }}
-                    </span>
-                    <span class="text-sm text-gray-700 dark:text-gray-300">{{ ruleDefinitions[vid]?.name || vid }}</span>
-                  </li>
-                </ul>
-              </div>
-            </teleport>
           </div>
 
           <!-- Tab: Team Accountability -->
@@ -756,5 +729,12 @@ const tabs = [
 
     <!-- Field filter modal -->
     <ReportFilterModal :filters="filters" :available-filter-values="availableFilterValues" />
+
+    <!-- Feature summary drawer (shared with the Feature Status board) -->
+    <FeatureDrawer
+      :feature="drawerFeature"
+      @close="drawerFeature = null"
+      @view-details="openFeatureDetails"
+    />
   </div>
 </template>
