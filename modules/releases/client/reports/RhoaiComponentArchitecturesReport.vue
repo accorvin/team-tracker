@@ -98,7 +98,7 @@
     </div>
 
     <!-- Data -->
-    <div v-else class="space-y-16">
+    <div v-else class="space-y-6">
       <!-- Maturity warning banner -->
       <div v-if="data.maturity?.warning" class="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-700 dark:text-amber-300">
         <AlertTriangle :size="14" class="flex-shrink-0" />
