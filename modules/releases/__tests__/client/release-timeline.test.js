@@ -486,9 +486,9 @@ describe('ReleaseTimeline', () => {
     ]
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var m = wrapper.vm.layoutMetrics
-    // Both sides use laneBaseStem (28) for equal stem lengths
-    // belowSpace for 1 row = laneBaseStem + 70 = 98
-    expect(m.belowSpace).toBeGreaterThanOrEqual(98)
+    // Both sides use laneBaseStem (64) for equal stem lengths
+    // belowSpace for 1 row = laneBaseStem + 70 = 134
+    expect(m.belowSpace).toBeGreaterThanOrEqual(134)
     // infraSpace = 60, belowSpace must always exceed it when below tiles exist
     expect(m.belowSpace).toBeGreaterThan(60)
   })
@@ -504,13 +504,13 @@ describe('ReleaseTimeline', () => {
     var m = wrapper.vm.layoutMetrics
     // aboveSpace formula: laneBaseStem + (rows-1)*offset + 70
     // belowSpace formula: laneBaseStem + (rows-1)*offset + 70
-    // Both use laneBaseStem (28) so first-row stem length is identical
-    // For 1 row each: above = 28 + 70 = 98, below = 28 + 70 = 98
+    // Both use laneBaseStem (64) so first-row stem length is identical
+    // For 1 row each: above = 64 + 70 = 134, below = 64 + 70 = 134
     var aboveBase = m.aboveSpace - 70
     var belowBase = m.belowSpace - 70
-    // Both bases should be multiples of laneBaseStem (28) + row offsets
-    expect(aboveBase).toBeGreaterThanOrEqual(28)
-    expect(belowBase).toBeGreaterThanOrEqual(28)
+    // Both bases should be multiples of laneBaseStem (64) + row offsets
+    expect(aboveBase).toBeGreaterThanOrEqual(64)
+    expect(belowBase).toBeGreaterThanOrEqual(64)
   })
 
   it('visibleDays reflects the current zoom range', () => {
@@ -634,8 +634,8 @@ describe('ReleaseTimeline', () => {
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var m = wrapper.vm.layoutMetrics
     // With 4 nodes very close together, they need multiple rows
-    // aboveSpace must grow to accommodate them (laneBaseStem=28 + 70 = 98 min)
-    expect(m.aboveSpace).toBeGreaterThanOrEqual(98)
+    // aboveSpace must grow to accommodate them (laneBaseStem=64 + 70 = 134 min)
+    expect(m.aboveSpace).toBeGreaterThanOrEqual(134)
   })
 
   it('overlapping boxes in same cycle trigger stacking', () => {
