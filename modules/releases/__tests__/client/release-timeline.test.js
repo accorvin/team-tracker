@@ -6,6 +6,7 @@ vi.mock('@shared/client/services/api.js', () => ({
 }))
 
 import ReleaseTimeline from '../../client/components/ReleaseTimeline.vue'
+import { productLabel } from '../../client/composables/useReleaseFamily.js'
 
 // Timezone-safe date formatting: uses local components, not toISOString (which is UTC).
 function localIso(y, m, d) {
@@ -63,12 +64,12 @@ describe('ReleaseTimeline', () => {
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var nodes = wrapper.vm.nodes
 
-    expect(nodes).toHaveLength(2)
+    expect(nodes).toHaveLength(4)
 
-    var gaNode = nodes.find(function (n) { return n.isGa })
-    expect(gaNode).toBeTruthy()
-    expect(gaNode.productList).toContain('rhoai')
-    expect(gaNode.productList).toContain('rhelai')
+    var gaNodes = nodes.filter(function (n) { return n.isGa })
+    expect(gaNodes).toHaveLength(2)
+    expect(gaNodes[0].productList).toHaveLength(1)
+    expect(gaNodes[1].productList).toHaveLength(1)
   })
 
   it('skips null milestones', () => {
@@ -119,9 +120,11 @@ describe('ReleaseTimeline', () => {
       makeRelease('newprod-3.5.EA1', { displayName: 'newprod-3.5.EA1', shortname: 'newprod', ga: '2026-06-17' })
     ]
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
-    var gaNode = wrapper.vm.nodes.find(function (n) { return n.isGa })
-    expect(gaNode.productList).toContain('rhoai')
-    expect(gaNode.productList).toContain('newprod')
+    var gaNodes = wrapper.vm.nodes.filter(function (n) { return n.isGa })
+    expect(gaNodes).toHaveLength(2)
+    var products = gaNodes.map(function (n) { return n.productList[0] })
+    expect(products).toContain('rhoai')
+    expect(products).toContain('newprod')
   })
 
   it('uses CSS overlay for today marker instead of dataset', () => {
@@ -162,7 +165,7 @@ describe('ReleaseTimeline', () => {
     expect(ds.pointBorderWidth).toBe(0)
   })
 
-  it('shows product badges only on GA nodes', () => {
+  it('all nodes include productList for label rendering', () => {
     var releases = [
       makeRelease('rhoai-3.5', {
         displayName: 'RHAI 3.5 GA',
@@ -483,9 +486,9 @@ describe('ReleaseTimeline', () => {
     ]
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var m = wrapper.vm.layoutMetrics
-    // Both sides use laneBaseStem (65) for equal stem lengths
-    // belowSpace for 1 row = laneBaseStem + 70 = 135
-    expect(m.belowSpace).toBeGreaterThanOrEqual(135)
+    // Both sides use laneBaseStem (28) for equal stem lengths
+    // belowSpace for 1 row = laneBaseStem + 70 = 98
+    expect(m.belowSpace).toBeGreaterThanOrEqual(98)
     // infraSpace = 60, belowSpace must always exceed it when below tiles exist
     expect(m.belowSpace).toBeGreaterThan(60)
   })
@@ -501,13 +504,13 @@ describe('ReleaseTimeline', () => {
     var m = wrapper.vm.layoutMetrics
     // aboveSpace formula: laneBaseStem + (rows-1)*offset + 70
     // belowSpace formula: laneBaseStem + (rows-1)*offset + 70
-    // Both use laneBaseStem (65) so first-row stem length is identical
-    // For 1 row each: above = 65 + 70 = 135, below = 65 + 70 = 135
+    // Both use laneBaseStem (28) so first-row stem length is identical
+    // For 1 row each: above = 28 + 70 = 98, below = 28 + 70 = 98
     var aboveBase = m.aboveSpace - 70
     var belowBase = m.belowSpace - 70
-    // Both bases should be multiples of laneBaseStem (65) + row offsets
-    expect(aboveBase).toBeGreaterThanOrEqual(65)
-    expect(belowBase).toBeGreaterThanOrEqual(65)
+    // Both bases should be multiples of laneBaseStem (28) + row offsets
+    expect(aboveBase).toBeGreaterThanOrEqual(28)
+    expect(belowBase).toBeGreaterThanOrEqual(28)
   })
 
   it('visibleDays reflects the current zoom range', () => {
@@ -556,12 +559,12 @@ describe('ReleaseTimeline', () => {
     ]
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var m = wrapper.vm.layoutMetrics
-    // A box with 5 lines at 16px + 4px padding * 2 = 88px estimated max
-    // safeOff = max(80, 88 + 4 + 6) = max(80, 98) = 98
+    // A box with 3 lines at 16px + 4px padding * 2 = 56px estimated max
+    // safeOff = max(80, 56 + 4 + 6) = max(80, 66) = 80
     // Both aboveSpace and belowSpace must accommodate this
     var lineH = 16
     var pad = 4
-    var estMaxBoxH = 5 * lineH + pad * 2
+    var estMaxBoxH = 3 * lineH + pad * 2
     expect(m.aboveSpace).toBeGreaterThanOrEqual(estMaxBoxH)
     expect(m.belowSpace).toBeGreaterThanOrEqual(estMaxBoxH)
   })
@@ -631,8 +634,8 @@ describe('ReleaseTimeline', () => {
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var m = wrapper.vm.layoutMetrics
     // With 4 nodes very close together, they need multiple rows
-    // aboveSpace must grow to accommodate them
-    expect(m.aboveSpace).toBeGreaterThan(100)
+    // aboveSpace must grow to accommodate them (laneBaseStem=28 + 70 = 98 min)
+    expect(m.aboveSpace).toBeGreaterThanOrEqual(98)
   })
 
   it('overlapping boxes in same cycle trigger stacking', () => {
@@ -657,7 +660,7 @@ describe('ReleaseTimeline', () => {
     expect(wrapper.find('.mb-6').exists()).toBe(true)
   })
 
-  it('GA nodes include product list for side label rendering', () => {
+  it('GA nodes include product list', () => {
     var releases = [
       makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-08-20' }),
       makeRelease('rhelai-3.5', { displayName: 'rhelai-3.5', shortname: 'rhelai', ga: '2026-08-21' })
@@ -696,7 +699,7 @@ describe('ReleaseTimeline', () => {
     expect(m.safeOff).toBeGreaterThan(0)
   })
 
-  it('upcoming cycle is always placed above the axis', () => {
+  it('groupLabels interleave above and below by GA date', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-14T12:00:00'))
     var releases = [
@@ -709,12 +712,13 @@ describe('ReleaseTimeline', () => {
     ]
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var sides = wrapper.vm.cycleSides
-    // 3.6 has the most future milestones (4 vs 1), should be above
-    expect(sides['3.6']).toBe(true)
+    expect(sides['3.5 GA']).toBe(true)
+    expect(sides['3.6 EA1']).toBe(false)
+    expect(sides['3.6 EA2']).toBe(true)
     vi.useRealTimers()
   })
 
-  it('upcoming cycle stays above regardless of hide-past toggle', () => {
+  it('cycleSides is stable across hidePast toggle', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-14T12:00:00'))
     var releases = [
@@ -728,6 +732,17 @@ describe('ReleaseTimeline', () => {
     // cycleSides should be identical regardless of hidePast
     expect(wrapperA.vm.cycleSides).toEqual(wrapperB.vm.cycleSides)
     vi.useRealTimers()
+  })
+
+  it('non-versioned releases are always below', () => {
+    var releases = [
+      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-10-15' }),
+      makeRelease('infra-refresh', { displayName: 'Infrastructure Refresh', codeFreeze: '2026-10-01' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var sides = wrapper.vm.cycleSides
+    expect(sides['Infrastructure Refresh']).toBe(false)
+    expect(sides['3.6 GA']).toBe(true)
   })
 
   it('overlapping same-cycle nodes have distinct stack levels for peek rendering', () => {
@@ -762,19 +777,18 @@ describe('ReleaseTimeline', () => {
     expect(Math.abs(d1 - d0)).toBeGreaterThan(20 * 86400000)
   })
 
-  it('peek triggers when same-cycle milestones share the same date', () => {
-    // Two releases with GA on the same day: boxes fully overlap → peek
+  it('different release types on same date produce separate nodes', () => {
     var releases = [
       makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
         ga: '2026-08-19' }),
-      makeRelease('rhelai-3.5', { displayName: 'rhelai-3.5', shortname: 'rhelai',
+      makeRelease('rhoai-3.5.EA1', { displayName: 'rhoai-3.5.EA1', shortname: 'rhoai',
         ga: '2026-08-19' })
     ]
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var gaNodes = wrapper.vm.nodes.filter(function (n) { return n.isGa })
-    // Same date means their boxes fully overlap at any zoom level
-    expect(gaNodes.length).toBe(1)
+    expect(gaNodes.length).toBe(2)
     expect(gaNodes[0].date).toBe('2026-08-19')
+    expect(gaNodes[1].date).toBe('2026-08-19')
   })
 
   it('cards from spaced-apart milestones each get their own full rendering', () => {
@@ -795,10 +809,9 @@ describe('ReleaseTimeline', () => {
     }
   })
 
-  it('cycle with most future milestones goes above even if not nearest', () => {
+  it('interleaving alternates above/below by GA date order', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-01T12:00:00'))
-    // 3.5 has 1 future milestone (GA Aug 5), 3.6 has 3 future milestones
     var releases = [
       makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
         planningFreeze: '2026-07-01', ga: '2026-08-05' }),
@@ -809,16 +822,15 @@ describe('ReleaseTimeline', () => {
     ]
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var sides = wrapper.vm.cycleSides
-    // 3.6 has 3 future milestones vs 3.5's 1 — 3.6 goes above
-    expect(sides['3.6']).toBe(true)
-    expect(sides['3.5']).toBe(false)
+    expect(sides['3.5 GA']).toBe(true)
+    expect(sides['3.6 EA1']).toBe(false)
+    expect(sides['3.6 GA']).toBe(true)
     vi.useRealTimers()
   })
 
-  it('ties in future milestone count broken by nearest milestone', () => {
+  it('two releases interleave: earlier GA above, later GA below', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-01T12:00:00'))
-    // Both cycles have 1 future milestone each, but 3.5 is nearer
     var releases = [
       makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
         ga: '2026-08-10' }),
@@ -827,8 +839,8 @@ describe('ReleaseTimeline', () => {
     ]
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var sides = wrapper.vm.cycleSides
-    // Equal future count → nearest wins → 3.5 above
-    expect(sides['3.5']).toBe(true)
+    expect(sides['3.5 GA']).toBe(true)
+    expect(sides['3.6 EA1']).toBe(false)
     vi.useRealTimers()
   })
 
@@ -884,8 +896,7 @@ describe('ReleaseTimeline', () => {
     expect(labels).toContain('3.6 EA1')
   })
 
-  it('same-date milestones within a cycle produce single merged node', () => {
-    // Two releases with identical GA dates in the same cycle → merged into one node
+  it('same-date milestones from different products produce separate nodes', () => {
     var releases = [
       makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
         ga: '2026-08-19' }),
@@ -894,9 +905,11 @@ describe('ReleaseTimeline', () => {
     ]
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var gaNodes = wrapper.vm.allNodes.filter(function (n) { return n.isGa })
-    expect(gaNodes).toHaveLength(1)
-    expect(gaNodes[0].productList).toContain('rhoai')
-    expect(gaNodes[0].productList).toContain('rhelai')
+    expect(gaNodes).toHaveLength(2)
+    expect(gaNodes[0].productList).toHaveLength(1)
+    expect(gaNodes[1].productList).toHaveLength(1)
+    var products = gaNodes.map(function (n) { return n.productList[0] }).sort()
+    expect(products).toEqual(['rhelai', 'rhoai'])
   })
 
   it('render order: farther-from-today cards appear earlier in sorted date order', () => {
@@ -1001,8 +1014,7 @@ describe('ReleaseTimeline', () => {
     vi.useRealTimers()
   })
 
-  it('same-date milestones from same cycle merge into a single node', () => {
-    // Same-date GA milestones from the same cycle (3.6) merge → 1 node, not 3
+  it('different release types on same date produce separate nodes per groupLabel', () => {
     var releases = [
       makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
         ga: '2026-10-15' }),
@@ -1014,8 +1026,9 @@ describe('ReleaseTimeline', () => {
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var nodes = wrapper.vm.allNodes
     var oct15 = nodes.filter(function (n) { return n.date === '2026-10-15' })
-    expect(oct15.length).toBe(1)
-    expect(oct15[0].groupLabel).toMatch(/3\.6/)
+    expect(oct15.length).toBe(3)
+    var labels = oct15.map(function (n) { return n.groupLabel }).sort()
+    expect(labels).toEqual(['3.6 EA1', '3.6 EA2', '3.6 GA'])
   })
 
   it('penetration-based stacking: cards only stack when dot is inside front card area', () => {
@@ -1158,8 +1171,8 @@ describe('ReleaseTimeline', () => {
           ]
           var wrapper = mount(ReleaseTimeline, { props: { releases } })
           var sides = wrapper.vm.cycleSides
-          // 3.6 has more future milestones — always above
-          expect(sides['3.6']).toBe(true)
+          // 3.5 has nearest future GA (Aug 19) — always above
+          expect(sides['3.5 GA']).toBe(true)
           // Same result with hidePast toggled
           var wrapper2 = mount(ReleaseTimeline, { props: { releases, hidePast: true } })
           expect(wrapper2.vm.cycleSides).toEqual(sides)
@@ -1217,8 +1230,7 @@ describe('ReleaseTimeline', () => {
   })
 
   describe('stacking and peek invariants', () => {
-    it('same-date milestones from same cycle merge into one node (no phantom peeks)', () => {
-      // Three releases with GA on the same date in cycle 3.6 → merged into 1 node
+    it('different release types on same date produce separate nodes (no phantom merge)', () => {
       var releases = [
         makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
           ga: '2026-10-15' }),
@@ -1230,8 +1242,7 @@ describe('ReleaseTimeline', () => {
       var wrapper = mount(ReleaseTimeline, { props: { releases } })
       var nodes = wrapper.vm.allNodes
       var oct15 = nodes.filter(function (n) { return n.date === '2026-10-15' })
-      expect(oct15.length).toBe(1)
-      expect(oct15[0].groupLabel).toMatch(/3\.6/)
+      expect(oct15.length).toBe(3)
     })
 
     it('1-day-apart milestones in same cycle keep all nodes', () => {
@@ -1365,39 +1376,42 @@ describe('ReleaseTimeline', () => {
       expect(dotOrder).toEqual([0, 1])
     })
 
-    it('sideLabel is an array of product names, not a joined string', () => {
+    it('productList is an array of product names, not a joined string', () => {
       var releases = [
         makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-10-15' }),
         makeRelease('rhelai-3.6', { displayName: 'rhelai-3.6', shortname: 'rhelai', ga: '2026-10-15' })
       ]
       var wrapper = mount(ReleaseTimeline, { props: { releases } })
       var gaNodes = wrapper.vm.allNodes.filter(function (n) { return n.isGa })
-      expect(gaNodes.length).toBeGreaterThanOrEqual(1)
+      expect(gaNodes).toHaveLength(2)
       expect(Array.isArray(gaNodes[0].productList)).toBe(true)
-      expect(gaNodes[0].productList.length).toBeGreaterThanOrEqual(2)
+      expect(gaNodes[0].productList).toHaveLength(1)
+      expect(Array.isArray(gaNodes[1].productList)).toBe(true)
+      expect(gaNodes[1].productList).toHaveLength(1)
     })
 
-    it('same-date milestones from same cycle merge into one node', () => {
-      // rhoai-3.6.EA1 GA and RHAII-3.6 GA both on Sep 17 → single node
+    it('different release types from same product on same date produce separate nodes', () => {
+      var releases = [
+        makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai', ga: '2026-09-17' }),
+        makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-09-17' })
+      ]
+      var wrapper = mount(ReleaseTimeline, { props: { releases } })
+      var gaSep17 = wrapper.vm.allNodes.filter(function (n) { return n.date === '2026-09-17' && n.isGa })
+      expect(gaSep17.length).toBe(2)
+      expect(gaSep17[0].productList).toContain('rhoai')
+      expect(gaSep17[1].productList).toContain('rhoai')
+    })
+
+    it('cross-product same-date produces separate nodes', () => {
       var releases = [
         makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai', ga: '2026-09-17' }),
         makeRelease('RHAII-3.6', { displayName: 'RHAII-3.6', shortname: 'rhai', ga: '2026-09-17' })
       ]
       var wrapper = mount(ReleaseTimeline, { props: { releases } })
-      var nodes = wrapper.vm.allNodes
-      // Both releases produce GA on Sep 17 → merged into 1 node
-      var gaSep17 = nodes.filter(function (n) { return n.date === '2026-09-17' })
-      expect(gaSep17.length).toBe(1)
-    })
-
-    it('same-date merge preserves all products in productList', () => {
-      var releases = [
-        makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai', ga: '2026-09-17' }),
-        makeRelease('RHAII-3.6', { displayName: 'RHAII-3.6', shortname: 'rhai', ga: '2026-09-17' })
-      ]
-      var wrapper = mount(ReleaseTimeline, { props: { releases } })
-      var gaSep17 = wrapper.vm.allNodes.filter(function (n) { return n.date === '2026-09-17' })
-      expect(gaSep17[0].productList.length).toBeGreaterThanOrEqual(2)
+      var gaSep17 = wrapper.vm.allNodes.filter(function (n) { return n.date === '2026-09-17' && n.isGa })
+      expect(gaSep17.length).toBe(2)
+      expect(gaSep17[0].productList).toHaveLength(1)
+      expect(gaSep17[1].productList).toHaveLength(1)
     })
 
     it('different-date milestones from same cycle remain separate nodes', () => {
@@ -1421,10 +1435,11 @@ describe('ReleaseTimeline', () => {
       ]
       return mount(ReleaseTimeline, { props: { releases } }).vm
     }
-    function makeLayout(x, groupLabel, date, boxW) {
+    function makeLayout(x, groupLabel, date, boxW, product, subLane) {
       return {
         x: x, boxW: boxW || 120, above: true, stackLevel: 0,
-        nd: { date: date, groupLabel: groupLabel }
+        subLane: subLane !== undefined ? subLane : 0,
+        nd: { date: date, groupLabel: groupLabel, productList: product ? [product] : [] }
       }
     }
     var TODAY = new Date('2026-08-14').getTime()
@@ -1558,8 +1573,8 @@ describe('ReleaseTimeline', () => {
     it('different cycles do not stack with each other', () => {
       var vm = getVm()
       var layouts = [
-        makeLayout(200, '3.5 GA', '2026-09-16'),
-        makeLayout(250, '3.6 GA', '2026-09-17')
+        makeLayout(200, '3.5 GA', '2026-09-16', undefined, undefined, 0),
+        makeLayout(250, '3.6 GA', '2026-09-17', undefined, undefined, 1)
       ]
       vm.applyStacking(layouts, TODAY)
       expect(layouts[0].stackLevel).toBe(0)
@@ -1571,7 +1586,7 @@ describe('ReleaseTimeline', () => {
       var vm = getVm()
       var layouts = [
         makeLayout(200, '3.6 GA', '2026-09-16'),
-        { x: 250, boxW: 120, above: false, stackLevel: 0,
+        { x: 250, boxW: 120, above: false, stackLevel: 0, subLane: 0,
           nd: { date: '2026-09-17', groupLabel: '3.6 GA' } }
       ]
       vm.applyStacking(layouts, TODAY)
@@ -1579,7 +1594,7 @@ describe('ReleaseTimeline', () => {
       expect(layouts[1].stackLevel).toBe(0)
     })
 
-    it('above/below assignment is per-cycle, not per-node', () => {
+    it('above/below assignment is per-groupLabel, not per-node', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2026-08-14T12:00:00'))
       var releases = [
@@ -1593,18 +1608,13 @@ describe('ReleaseTimeline', () => {
       var wrapper = mount(ReleaseTimeline, { props: { releases } })
       var sides = wrapper.vm.cycleSides
       var nodes = wrapper.vm.allNodes
-      // Every node's cycle maps to the same side value
       for (var i = 0; i < nodes.length; i++) {
-        var cycle = nodes[i].groupLabel.match(/^(\d+\.\d+)/)[1]
-        var expectedSide = sides[cycle]
+        var expectedSide = sides[nodes[i].groupLabel]
         expect(expectedSide).toBeDefined()
-        // All nodes from the same cycle get the same side
-        var sameNodes = nodes.filter(function (n) {
-          return n.groupLabel.match(/^(\d+\.\d+)/)[1] === cycle
-        })
+        var gl = nodes[i].groupLabel
+        var sameNodes = nodes.filter(function (n) { return n.groupLabel === gl })
         for (var j = 0; j < sameNodes.length; j++) {
-          var c2 = sameNodes[j].groupLabel.match(/^(\d+\.\d+)/)[1]
-          expect(sides[c2]).toBe(expectedSide)
+          expect(sides[sameNodes[j].groupLabel]).toBe(expectedSide)
         }
       }
       vi.useRealTimers()
@@ -1707,10 +1717,11 @@ describe('ReleaseTimeline', () => {
       ]
       return mount(ReleaseTimeline, { props: { releases } }).vm
     }
-    function makeLayout(x, groupLabel, date, boxW) {
+    function makeLayout(x, groupLabel, date, boxW, product, subLane) {
       return {
         x: x, boxW: boxW || 120, above: true, stackLevel: 0,
-        nd: { date: date, groupLabel: groupLabel }
+        subLane: subLane !== undefined ? subLane : 0,
+        nd: { date: date, groupLabel: groupLabel, productList: product ? [product] : [] }
       }
     }
     var TODAY = new Date('2026-08-14').getTime()
@@ -1786,8 +1797,8 @@ describe('ReleaseTimeline', () => {
     it('cross-cycle never stacks even with overlapping boxes', () => {
       var vm = getVm()
       var layouts = [
-        makeLayout(258, '3.5 GA', '2026-09-10'),
-        makeLayout(260, '3.6 GA', '2026-09-17')
+        makeLayout(258, '3.5 GA', '2026-09-10', undefined, undefined, 0),
+        makeLayout(260, '3.6 GA', '2026-09-17', undefined, undefined, 1)
       ]
       vm.applyStacking(layouts, TODAY, 10)
       expect(layouts[0].stackLevel).toBe(0)
@@ -1814,5 +1825,532 @@ describe('ReleaseTimeline', () => {
       expect(fn('#000000', 1)).toBe('rgba(0,0,0,1)')
       expect(fn('invalid', 0.5)).toBe('invalid')
     })
+  })
+
+  it('stableCycleRowMap assigns row 0 to cycle with earliest GA on same side', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date(2026, 7, 1))
+      var wrapper = mount(ReleaseTimeline, {
+        props: {
+          releases: [
+            makeRelease('rhoai-3.4', { ga: '2026-12-01' }),
+            makeRelease('rhoai-3.5', { ga: '2026-09-01' }),
+            makeRelease('rhoai-3.6', { ga: '2026-11-01' })
+          ],
+          hidePast: false
+        }
+      })
+      var rowMap = wrapper.vm.stableCycleRowMap
+      // Find two cycles that share the same side (both -a or both -b)
+      var keys = Object.keys(rowMap)
+      var aboveKeys = keys.filter(function (k) { return k.endsWith('-a') })
+      var belowKeys = keys.filter(function (k) { return k.endsWith('-b') })
+      var sameSide = aboveKeys.length >= 2 ? aboveKeys : belowKeys
+      expect(sameSide.length).toBeGreaterThanOrEqual(2)
+      // Within same side, earlier GA should get lower row index
+      var sorted = sameSide.slice().sort(function (a, b) { return rowMap[a] - rowMap[b] })
+      for (var i = 0; i < sorted.length - 1; i++) {
+        expect(rowMap[sorted[i]]).toBeLessThan(rowMap[sorted[i + 1]])
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stableCycleRowMap is deterministic across calls', () => {
+    var wrapper = mount(ReleaseTimeline, {
+      props: {
+        releases: [
+          makeRelease('rhoai-3.5', { ga: '2026-09-01' }),
+          makeRelease('rhoai-3.6', { ga: '2026-11-01' })
+        ],
+        hidePast: false
+      }
+    })
+    var map1 = JSON.stringify(wrapper.vm.stableCycleRowMap)
+    var map2 = JSON.stringify(wrapper.vm.stableCycleRowMap)
+    expect(map1).toBe(map2)
+  })
+
+  it('non-GA nodes have productList populated', () => {
+    var wrapper = mount(ReleaseTimeline, {
+      props: {
+        releases: [makeRelease('rhoai-3.6.EA1', {
+          codeFreeze: localIso(2026, 9, 15)
+        })],
+        hidePast: false
+      }
+    })
+    var nodes = wrapper.vm.allNodes
+    expect(nodes.length).toBeGreaterThan(0)
+    expect(nodes[0].productList.length).toBeGreaterThan(0)
+  })
+
+  it('GA nodes have isGa flag for tint rendering', () => {
+    var wrapper = mount(ReleaseTimeline, {
+      props: {
+        releases: [makeRelease('rhoai-3.6', {
+          ga: localIso(2026, 11, 5)
+        })],
+        hidePast: false
+      }
+    })
+    var gaNodes = wrapper.vm.allNodes.filter(function (n) { return n.isGa })
+    expect(gaNodes.length).toBe(1)
+    expect(gaNodes[0].isGa).toBe(true)
+  })
+
+  it('same-release-type products share a groupLabel-keyed row', () => {
+    var wrapper = mount(ReleaseTimeline, {
+      props: {
+        releases: [
+          makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-11-01' }),
+          makeRelease('rhelai-3.6', { displayName: 'rhelai-3.6', shortname: 'rhelai', ga: '2026-11-01' })
+        ],
+        hidePast: false
+      }
+    })
+    var rowMap = wrapper.vm.stableCycleRowMap
+    var keys = Object.keys(rowMap)
+    expect(keys.length).toBe(1)
+    expect(keys[0]).toMatch(/^3\.6 GA-[ab]$/)
+    expect(keys.every(function (k) { return k.indexOf('rhoai') === -1 && k.indexOf('rhelai') === -1 })).toBe(true)
+  })
+
+  it('uses displayName as groupLabel when no version pattern found', () => {
+    var wrapper = mount(ReleaseTimeline, {
+      props: {
+        releases: [makeRelease('infra-refresh', {
+          displayName: 'Infrastructure Refresh',
+          codeFreeze: localIso(2026, 10, 1)
+        })],
+        hidePast: false
+      }
+    })
+    var nodes = wrapper.vm.allNodes
+    expect(nodes.length).toBe(1)
+    expect(nodes[0].groupLabel).toBe('Infrastructure Refresh')
+  })
+
+  it('different products on different subLanes do not stack', () => {
+    var releases = [
+      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-10-15' })
+    ]
+    var vm = mount(ReleaseTimeline, { props: { releases } }).vm
+    var layouts = [
+      { x: 100, boxW: 120, above: true, stackLevel: 0, subLane: 0,
+        nd: { date: '2026-10-15', groupLabel: '3.6 GA', productList: ['rhoai'] } },
+      { x: 105, boxW: 120, above: true, stackLevel: 0, subLane: 1,
+        nd: { date: '2026-10-16', groupLabel: '3.6 GA', productList: ['rhelai'] } }
+    ]
+    vm.applyStacking(layouts, new Date('2026-08-14').getTime(), 10)
+    expect(layouts[0].stackTopIdx).toBeUndefined()
+    expect(layouts[1].stackTopIdx).toBeUndefined()
+  })
+
+  it('same subLane cross-product cards stack together (merge-mode scenario)', () => {
+    var releases = [
+      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-10-15' })
+    ]
+    var vm = mount(ReleaseTimeline, { props: { releases } }).vm
+    var layouts = [
+      { x: 200, boxW: 120, above: true, stackLevel: 0, subLane: 0,
+        nd: { date: '2026-09-15', groupLabel: '3.6 GA', productList: ['rhoai'] } },
+      { x: 205, boxW: 120, above: true, stackLevel: 0, subLane: 0,
+        nd: { date: '2026-09-15', groupLabel: '3.6 Code Freeze', productList: ['rhelai'] } }
+    ]
+    vm.applyStacking(layouts, new Date('2026-08-14').getTime(), 10)
+    var stacked = layouts.filter(function (l) { return l.stackLevel > 0 })
+    expect(stacked.length).toBe(1)
+    expect(stacked[0].stackTopIdx).toBe(0)
+  })
+
+  it('stacked card retains node data (groupLabel, msLabel, productList)', () => {
+    var releases = [
+      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-10-15' })
+    ]
+    var vm = mount(ReleaseTimeline, { props: { releases } }).vm
+    var layouts = [
+      { x: 200, boxW: 120, above: true, stackLevel: 0, subLane: 0,
+        nd: { date: '2026-09-15', groupLabel: '3.6 GA', productList: ['rhoai'], msLabel: 'Generally Available' } },
+      { x: 205, boxW: 120, above: true, stackLevel: 0, subLane: 0,
+        nd: { date: '2026-09-15', groupLabel: '3.6 EA2', productList: ['rhelai'], msLabel: 'Code Freeze' } }
+    ]
+    vm.applyStacking(layouts, new Date('2026-08-14').getTime(), 10)
+    var behind = layouts.filter(function (l) { return l.stackLevel > 0 })
+    expect(behind.length).toBe(1)
+    expect(behind[0].nd).toHaveProperty('groupLabel')
+    expect(behind[0].nd).toHaveProperty('msLabel')
+    expect(behind[0].nd).toHaveProperty('productList')
+  })
+
+  it('two versions distribute above and below', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-01T12:00:00'))
+    var releases = [
+      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-10-15' }),
+      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-06-15' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var sides = wrapper.vm.cycleSides
+    var values = Object.values(sides)
+    var hasAbove = values.some(function (v) { return v === true })
+    var hasBelow = values.some(function (v) { return v === false })
+    expect(hasAbove).toBe(true)
+    expect(hasBelow).toBe(true)
+    vi.useRealTimers()
+  })
+
+  it('nodes carry sourceReleases array for tooltip', () => {
+    var releases = [
+      makeRelease('rhoai-3.6', { displayName: '3.6 GA RHOAI RELEASE', shortname: 'rhoai',
+        ga: '2026-10-15' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var gaNodes = wrapper.vm.allNodes.filter(function (n) { return n.isGa })
+    expect(gaNodes.length).toBeGreaterThanOrEqual(1)
+    expect(Array.isArray(gaNodes[0].releases)).toBe(true)
+    expect(gaNodes[0].releases.length).toBeGreaterThanOrEqual(1)
+    expect(gaNodes[0].releases[0]).toHaveProperty('state')
+    expect(gaNodes[0].releases[0]).toHaveProperty('displayName')
+  })
+
+  // --- Squeeze mode & hover discoverability tests ---
+
+  function makeMultiProductReleases() {
+    return [
+      makeRelease('rhoai-3.5-ea1', { displayName: 'rhoai-3.5-ea1', shortname: 'rhoai', ga: '2026-06-10', planningFreeze: '2026-04-01' }),
+      makeRelease('rhoai-3.5-ea2', { displayName: 'rhoai-3.5-ea2', shortname: 'rhoai', ga: '2026-07-14', planningFreeze: '2026-05-01' }),
+      makeRelease('rhoai-3.5-ga', { displayName: 'rhoai-3.5-ga', shortname: 'rhoai', ga: '2026-08-18', planningFreeze: '2026-06-01' }),
+      makeRelease('rhoai-3.6-ea1', { displayName: 'rhoai-3.6-ea1', shortname: 'rhoai', ga: '2026-09-15', planningFreeze: '2026-07-01' }),
+      makeRelease('rhoai-3.6-ea2', { displayName: 'rhoai-3.6-ea2', shortname: 'rhoai', ga: '2026-10-13', planningFreeze: '2026-08-01' }),
+      makeRelease('rhoai-3.6-ga', { displayName: 'rhoai-3.6-ga', shortname: 'rhoai', ga: '2026-11-17', planningFreeze: '2026-09-01' })
+    ]
+  }
+
+  it('isOverCard defaults to false', () => {
+    var releases = [
+      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-06-17' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    expect(wrapper.vm.isOverCard).toBe(false)
+  })
+
+  it('cursor style reflects isOverCard state', async () => {
+    var releases = [
+      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-06-17' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var div = wrapper.find('.relative')
+    expect(div.attributes('style')).toContain('default')
+
+    wrapper.vm.isOverCard = true
+    await wrapper.vm.$nextTick()
+    expect(div.attributes('style')).toContain('pointer')
+  })
+
+  it('auto-compress keeps chartHeight within cap with many releases', () => {
+    var wrapper = mount(ReleaseTimeline, {
+      props: { releases: makeMultiProductReleases(), hidePast: false }
+    })
+    expect(wrapper.vm.chartHeight).toBeLessThanOrEqual(450)
+    expect(wrapper.vm.chartHeight).toBeGreaterThan(0)
+    expect(wrapper.vm.layoutMetrics.safeOff).toBeLessThan(98)
+  })
+
+  it('overlapping same-date cards are placed on opposite sides for hover-to-front', () => {
+    var releases = [
+      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-09-01' }),
+      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-09-01' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var nodes = wrapper.vm.allNodes
+    expect(nodes.length).toBe(2)
+    var sides = wrapper.vm.cycleSides
+    // Interleaved: one above, one below — they overlap visually at same x
+    expect(sides[nodes[0].groupLabel]).not.toBe(sides[nodes[1].groupLabel])
+  })
+
+  it('non-versioned releases get highest below-axis row index', () => {
+    var releases = [
+      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-10-15' }),
+      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-11-15' }),
+      makeRelease('infra-refresh', { displayName: 'Infrastructure Refresh', shortname: null, codeFreeze: '2026-10-01' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var rowMap = wrapper.vm.stableCycleRowMap
+    var infraIdx = rowMap['Infrastructure Refresh-b']
+    var productIdxes = Object.keys(rowMap)
+      .filter(function (k) { return k.endsWith('-b') && k !== 'Infrastructure Refresh-b' })
+      .map(function (k) { return rowMap[k] })
+    for (var i = 0; i < productIdxes.length; i++) {
+      expect(infraIdx).toBeGreaterThan(productIdxes[i])
+    }
+  })
+
+  describe('dim line logic', () => {
+    function isDimLineEligible(groupLabel) {
+      var m = /^(\d+\.\d+)\s/.exec(groupLabel)
+      var cycle = m ? m[1] : groupLabel
+      return /^\d+\.\d+$/.test(cycle)
+    }
+
+    function futureDate(daysAhead) {
+      var d = new Date()
+      d.setDate(d.getDate() + daysAhead)
+      return d.toISOString().split('T')[0]
+    }
+
+    it('versioned groupLabels pass the dim line eligibility filter', () => {
+      expect(isDimLineEligible('3.6 GA')).toBe(true)
+      expect(isDimLineEligible('3.5 EA1')).toBe(true)
+      expect(isDimLineEligible('3.7 EA2')).toBe(true)
+    })
+
+    it('non-versioned (infra) groupLabels fail the dim line eligibility filter', () => {
+      expect(isDimLineEligible('Security Hardening')).toBe(false)
+      expect(isDimLineEligible('Infrastructure Refresh')).toBe(false)
+      expect(isDimLineEligible('other')).toBe(false)
+    })
+
+    it('per-segment overlap marks segments sharing horizontal space on same side', () => {
+      var segs = [
+        { gi: 0, above: true, left: 100, right: 300, needsLabel: false },
+        { gi: 1, above: true, left: 200, right: 400, needsLabel: false }
+      ]
+      for (var i = 0; i < segs.length; i++) {
+        for (var j = 0; j < segs.length; j++) {
+          if (segs[j].gi !== segs[i].gi && segs[j].above === segs[i].above &&
+              segs[j].left < segs[i].right && segs[i].left < segs[j].right) {
+            segs[i].needsLabel = true
+            break
+          }
+        }
+      }
+      expect(segs[0].needsLabel).toBe(true)
+      expect(segs[1].needsLabel).toBe(true)
+    })
+
+    it('per-segment overlap does not mark non-overlapping segments', () => {
+      var segs = [
+        { gi: 0, above: true, left: 100, right: 200, needsLabel: false },
+        { gi: 1, above: true, left: 300, right: 400, needsLabel: false }
+      ]
+      for (var i = 0; i < segs.length; i++) {
+        for (var j = 0; j < segs.length; j++) {
+          if (segs[j].gi !== segs[i].gi && segs[j].above === segs[i].above &&
+              segs[j].left < segs[i].right && segs[i].left < segs[j].right) {
+            segs[i].needsLabel = true
+            break
+          }
+        }
+      }
+      expect(segs[0].needsLabel).toBe(false)
+      expect(segs[1].needsLabel).toBe(false)
+    })
+
+    it('per-segment overlap ignores segments on opposite sides', () => {
+      var segs = [
+        { gi: 0, above: true, left: 100, right: 300, needsLabel: false },
+        { gi: 1, above: false, left: 100, right: 300, needsLabel: false }
+      ]
+      for (var i = 0; i < segs.length; i++) {
+        for (var j = 0; j < segs.length; j++) {
+          if (segs[j].gi !== segs[i].gi && segs[j].above === segs[i].above &&
+              segs[j].left < segs[i].right && segs[i].left < segs[j].right) {
+            segs[i].needsLabel = true
+            break
+          }
+        }
+      }
+      expect(segs[0].needsLabel).toBe(false)
+      expect(segs[1].needsLabel).toBe(false)
+    })
+
+    it('per-segment overlap ignores segments from same group', () => {
+      var segs = [
+        { gi: 0, above: true, left: 100, right: 300, needsLabel: false },
+        { gi: 0, above: true, left: 200, right: 400, needsLabel: false }
+      ]
+      for (var i = 0; i < segs.length; i++) {
+        for (var j = 0; j < segs.length; j++) {
+          if (segs[j].gi !== segs[i].gi && segs[j].above === segs[i].above &&
+              segs[j].left < segs[i].right && segs[i].left < segs[j].right) {
+            segs[i].needsLabel = true
+            break
+          }
+        }
+      }
+      expect(segs[0].needsLabel).toBe(false)
+      expect(segs[1].needsLabel).toBe(false)
+    })
+
+    it('infra releases produce allNodes but their groupLabels are non-versioned', () => {
+      var releases = [
+        makeRelease('rhoai-3.5', { displayName: '3.5 GA RHOAI RELEASE', shortname: 'rhoai',
+          planningFreeze: '2026-06-01', ga: '2026-06-17' }),
+        makeRelease('infra-security', { displayName: 'Security Hardening', shortname: null,
+          planningFreeze: '2026-10-15', featureFreeze: '2026-11-01',
+          codeFreeze: '2026-11-15', ga: null })
+      ]
+      var wrapper = mount(ReleaseTimeline, { props: { releases } })
+      var nodes = wrapper.vm.allNodes
+      var infraNodes = nodes.filter(function (nd) { return nd.groupLabel === 'Security Hardening' })
+      expect(infraNodes.length).toBeGreaterThanOrEqual(2)
+      for (var i = 0; i < infraNodes.length; i++) {
+        var m = /^(\d+\.\d+)\s/.exec(infraNodes[i].groupLabel)
+        var cycle = m ? m[1] : infraNodes[i].groupLabel
+        expect(/^\d+\.\d+$/.test(cycle)).toBe(false)
+      }
+    })
+
+    it('nextMilestoneLabel includes product prefix and milestone for GA', () => {
+      var releases = [
+        makeRelease('rhoai-3.5', { displayName: '3.5 GA RHOAI RELEASE', shortname: 'rhoai',
+          ga: futureDate(1) })
+      ]
+      var wrapper = mount(ReleaseTimeline, { props: { releases } })
+      var nml = wrapper.vm.nextMilestoneLabel
+      expect(nml).not.toBeNull()
+      expect(nml.desc).toContain('RHOAI')
+      expect(nml.desc).toContain('3.5 GA')
+      expect(nml.desc).toContain('Generally Available')
+      expect(nml.daysText).toBe('in 1d')
+    })
+
+    it('nextMilestoneLabel includes product prefix for non-GA milestone', () => {
+      var releases = [
+        makeRelease('rhoai-3.6', { displayName: '3.6 EA1 RHOAI RELEASE', shortname: 'rhoai',
+          featureFreeze: futureDate(3), ga: futureDate(30) })
+      ]
+      var wrapper = mount(ReleaseTimeline, { props: { releases } })
+      var nml = wrapper.vm.nextMilestoneLabel
+      expect(nml).not.toBeNull()
+      expect(nml.desc).toContain('RHOAI')
+      expect(nml.desc).toContain('Feature Freeze')
+    })
+
+    it('nextMilestoneLabel omits product prefix for non-product releases', () => {
+      var releases = [{
+        id: 'infra-security-hardening',
+        displayName: 'Security Hardening',
+        state: 'active',
+        productPagesShortname: null,
+        milestones: { planningFreeze: futureDate(5), featureFreeze: null, codeFreeze: null, ga: null }
+      }]
+      var wrapper = mount(ReleaseTimeline, { props: { releases } })
+      var nml = wrapper.vm.nextMilestoneLabel
+      expect(nml).not.toBeNull()
+      expect(nml.desc).toMatch(/^Security Hardening/)
+    })
+
+    it('product prefix joins multiple products with slash via productLabel', () => {
+      var productList = ['rhelai', 'rhoai']
+      var prefix = productList.map(productLabel).join('/')
+      expect(prefix).toBe('RHELAI/RHOAI')
+    })
+
+    it('segment touching today gets leftIsToday/rightIsToday flags', () => {
+      var todayTs = 1000
+      var points = [
+        { x: 50, ts: 500 },
+        { x: 150, ts: todayTs },
+        { x: 250, ts: 1500 }
+      ]
+      points.sort(function (a, b) { return a.ts - b.ts })
+      var dimGap = 6
+      var segs = []
+      for (var j = 1; j < points.length; j++) {
+        segs.push({
+          left: points[j - 1].x + dimGap,
+          right: points[j].x - dimGap,
+          leftIsToday: points[j - 1].ts === todayTs,
+          rightIsToday: points[j].ts === todayTs
+        })
+      }
+      expect(segs[0].leftIsToday).toBe(false)
+      expect(segs[0].rightIsToday).toBe(true)
+      expect(segs[1].leftIsToday).toBe(true)
+      expect(segs[1].rightIsToday).toBe(false)
+    })
+
+    it('segment not touching today has no today flags', () => {
+      var todayTs = 9999
+      var points = [
+        { x: 50, ts: 500 },
+        { x: 150, ts: 1000 },
+        { x: 250, ts: 1500 }
+      ]
+      var segs = []
+      for (var j = 1; j < points.length; j++) {
+        segs.push({
+          leftIsToday: points[j - 1].ts === todayTs,
+          rightIsToday: points[j].ts === todayTs
+        })
+      }
+      expect(segs[0].leftIsToday).toBe(false)
+      expect(segs[0].rightIsToday).toBe(false)
+      expect(segs[1].leftIsToday).toBe(false)
+      expect(segs[1].rightIsToday).toBe(false)
+    })
+  })
+
+  it('visibleProducts lists only products present in data', () => {
+    var releases = [
+      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-10-15' }),
+      makeRelease('rhelai-3.5', { displayName: 'rhelai-3.5', shortname: 'rhelai', ga: '2026-10-20' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    expect(wrapper.vm.visibleProducts).toContain('rhoai')
+    expect(wrapper.vm.visibleProducts).toContain('rhelai')
+    expect(wrapper.vm.visibleProducts).not.toContain('rhaii')
+  })
+
+  it('no tooltip element in DOM', () => {
+    var releases = [
+      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-10-15' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    expect(wrapper.find('.z-20').exists()).toBe(false)
+  })
+
+  it('legend renders colored dots for visible products', () => {
+    var releases = [
+      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-10-15' }),
+      makeRelease('rhelai-3.5', { displayName: 'rhelai-3.5', shortname: 'rhelai', ga: '2026-10-20' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var legendDots = wrapper.findAll('.rounded-full.w-2')
+    expect(legendDots.length).toBe(2)
+  })
+
+  it('allNodes carry groupLabel, msLabel, and date (no product text line)', () => {
+    var releases = [
+      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-10-15' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var nodes = wrapper.vm.allNodes
+    expect(nodes.length).toBeGreaterThan(0)
+    expect(nodes[0].productList).toContain('rhoai')
+    expect(nodes[0].groupLabel).toBeTruthy()
+    expect(nodes[0].msLabel).toBeTruthy()
+    expect(nodes[0].date).toBeTruthy()
+  })
+
+  it('multiple releases on same side produce distinct stableCycleRowMap entries', () => {
+    var releases = [
+      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
+        planningFreeze: '2026-06-01', ga: '2026-06-17' }),
+      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai',
+        planningFreeze: '2026-09-01', ga: '2026-11-19' }),
+      makeRelease('rhoai-3.7', { displayName: 'rhoai-3.7', shortname: 'rhoai',
+        planningFreeze: '2026-12-01', ga: '2027-02-15' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var map = wrapper.vm.stableCycleRowMap
+    var aboveKeys = Object.keys(map).filter(function (k) { return k.endsWith('-a') })
+    var belowKeys = Object.keys(map).filter(function (k) { return k.endsWith('-b') })
+    expect(Math.max(aboveKeys.length, belowKeys.length)).toBeGreaterThanOrEqual(2)
   })
 })

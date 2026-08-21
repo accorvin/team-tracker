@@ -133,6 +133,23 @@
         </label>
       </div>
 
+      <div v-if="availableVersions.length > 1" class="flex flex-wrap gap-2 mb-5 -mt-3">
+        <button
+          v-for="v in availableVersions"
+          :key="v"
+          @click="toggleVersion(v)"
+          class="px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-colors border"
+          :class="selectedVersions.indexOf(v) !== -1
+            ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
+            : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
+        >{{ v }}</button>
+        <button
+          v-if="selectedVersions.length > 0"
+          @click="selectedVersions = []"
+          class="px-2.5 py-0.5 rounded-full text-[11px] font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        >Clear</button>
+      </div>
+
       <!-- Release Timeline -->
       <ReleaseTimeline :releases="baseFilteredReleases" :hide-past="hideReleased" />
 
@@ -198,6 +215,7 @@ import {
   getProduct, getStream, releasePhase, milestoneProgress
 } from '../composables/useScheduleHelpers.js'
 import ReleaseTimeline from '../components/ReleaseTimeline.vue'
+import { parseReleaseName } from '../composables/useReleaseFamily.js'
 
 function formatShort(dateStr) {
   return formatShortBase(dateStr, { year: true })
@@ -211,6 +229,7 @@ const error = ref(null)
 const selectedProduct = ref(null)
 const selectedStream = ref(null)
 const hideReleased = ref(true)
+const selectedVersions = ref([])
 
 async function fetchRegistry() {
   loading.value = true
@@ -232,6 +251,22 @@ onMounted(fetchRegistry)
 
 function getGaDate(release) {
   return release.milestones?.ga || null
+}
+
+function versionLabel(release) {
+  var name = release.displayName || release.id
+  var parsed = parseReleaseName(name)
+  if (parsed) return parsed.major + '.' + parsed.minor + ' ' + parsed.milestone
+  return null
+}
+
+function toggleVersion(v) {
+  var idx = selectedVersions.value.indexOf(v)
+  if (idx === -1) {
+    selectedVersions.value = selectedVersions.value.concat(v)
+  } else {
+    selectedVersions.value = selectedVersions.value.filter(function (x) { return x !== v })
+  }
 }
 
 function nextMilestone(release) {
@@ -270,6 +305,36 @@ const streams = computed(() => {
   return Object.keys(set).sort()
 })
 
+const availableVersions = computed(() => {
+  var seen = {}
+  var list = []
+  var base = releases.value
+  if (selectedProduct.value) {
+    base = base.filter(r => getProduct(r) === selectedProduct.value)
+  }
+  for (var i = 0; i < base.length; i++) {
+    var v = versionLabel(base[i])
+    if (v && !seen[v]) {
+      seen[v] = true
+      list.push(v)
+    }
+  }
+  list.sort(function (a, b) {
+    var ma = /^(\d+)\.(\d+)\s+(EA(\d+)|GA)$/.exec(a)
+    var mb = /^(\d+)\.(\d+)\s+(EA(\d+)|GA)$/.exec(b)
+    if (!ma && !mb) return a.localeCompare(b)
+    if (!ma) return 1
+    if (!mb) return -1
+    var ca = parseInt(ma[1]) * 100 + parseInt(ma[2])
+    var cb = parseInt(mb[1]) * 100 + parseInt(mb[2])
+    if (ca !== cb) return cb - ca
+    var oa = ma[3] === 'GA' ? 99 : parseInt(ma[4])
+    var ob = mb[3] === 'GA' ? 99 : parseInt(mb[4])
+    return ob - oa
+  })
+  return list
+})
+
 const baseFilteredReleases = computed(() => {
   let list = releases.value
   if (selectedProduct.value) {
@@ -277,6 +342,12 @@ const baseFilteredReleases = computed(() => {
   }
   if (selectedStream.value) {
     list = list.filter(r => getStream(r) === selectedStream.value)
+  }
+  if (selectedVersions.value.length > 0) {
+    list = list.filter(r => {
+      var v = versionLabel(r)
+      return v && selectedVersions.value.indexOf(v) !== -1
+    })
   }
   return list
 })

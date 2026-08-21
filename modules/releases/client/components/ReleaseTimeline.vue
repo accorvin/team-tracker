@@ -27,15 +27,16 @@ function groupKey(release) {
   for (var i = 0; i < names.length; i++) {
     if (!names[i]) continue
     var parsed = parseReleaseName(names[i])
-    if (parsed) return parsed.major + '.' + parsed.minor + '-' + parsed.milestone
+    if (parsed) return parsed.product + '-' + parsed.major + '.' + parsed.minor + '-' + parsed.milestone
   }
   var cycle = extractCycle(release.id) || extractCycle(release.displayName)
   if (cycle) {
     var eaMatch = (release.id || '').match(/ea(\d+)/i)
     var milestone = eaMatch ? 'EA' + eaMatch[1] : 'GA'
-    return cycle + '-' + milestone
+    var product = getProduct(release)
+    return (product ? product + '-' : '') + cycle + '-' + milestone
   }
-  return 'other'
+  return release.displayName || release.id || 'other'
 }
 
 function cycleFromGroupLabel(label) {
@@ -44,7 +45,7 @@ function cycleFromGroupLabel(label) {
 }
 
 function groupLabelFromKey(key) {
-  var m = /^(\d+\.\d+)-(EA\d+|GA)$/.exec(key)
+  var m = /^(?:[a-z]+-)?(\d+\.\d+)-(EA\d+|GA)$/i.exec(key)
   if (m) return m[1] + ' ' + m[2]
   return key
 }
@@ -79,6 +80,8 @@ var allNodes = computed(function () {
     g.milestones.ga = earlierDate(g.milestones.ga, ms.ga)
     var product = getProduct(r)
     if (product) g.products[product] = true
+    if (!g.sourceReleases) g.sourceReleases = []
+    g.sourceReleases.push(r)
   }
 
   var list = []
@@ -98,18 +101,17 @@ var allNodes = computed(function () {
         date: date,
         isPast: days !== null && days < 0,
         isGa: msKey.key === 'ga',
-        productList: productList
+        productList: productList,
+        releases: grp.sourceReleases
       })
     }
   }
 
-  // Merge nodes from the same cycle that share a date — e.g., "3.6 EA1" GA
-  // and "3.6 GA" GA both on Sep 17 should produce one node, not two.
+  // Merge nodes from the same release that share a date.
   var merged = {}
   for (var mi = 0; mi < list.length; mi++) {
     var node = list[mi]
-    var cycle = cycleFromGroupLabel(node.groupLabel)
-    var mergeKey = cycle + '|' + node.date
+    var mergeKey = node.groupLabel + '|' + node.productList.join(',') + '|' + node.date
     if (!merged[mergeKey]) {
       merged[mergeKey] = node
     } else {
@@ -117,10 +119,12 @@ var allNodes = computed(function () {
       if (node.isGa && !existing.isGa) {
         node.productList = existing.productList.concat(node.productList)
           .filter(function (v, i, a) { return a.indexOf(v) === i }).sort()
+        node.releases = (existing.releases || []).concat(node.releases || [])
         merged[mergeKey] = node
       } else {
         existing.productList = existing.productList.concat(node.productList)
           .filter(function (v, i, a) { return a.indexOf(v) === i }).sort()
+        existing.releases = (existing.releases || []).concat(node.releases || [])
       }
     }
   }
@@ -170,7 +174,7 @@ var laneCount = computed(function () {
 })
 
 // Layout constants (shared between chartHeight and plugin)
-var laneBaseStem = 65
+var laneBaseStem = 64
 var subLaneOffset = 80
 var infraSpace = 60
 var lineHeight = 16
@@ -181,6 +185,7 @@ var TODAY_DOT_RADIUS = 8
 var TODAY_DOT_BORDER = 2
 var DOT_HALO_PAD = 1.5
 var PEEK_W = 10
+var CHART_MAX_HEIGHT = 450
 
 function hexToRgba(hex, alpha) {
   if (!hex || hex.charAt(0) !== '#' || hex.length < 7) return hex
@@ -192,70 +197,101 @@ function hexToRgba(hex, alpha) {
 
 var cycleSides = computed(function () {
   var n = allNodes.value
-  var counts = {}
-  var nearestFuture = {}
-  var futureCounts = {}
+  var glMeta = {}
   for (var i = 0; i < n.length; i++) {
-    var cycle = cycleFromGroupLabel(n[i].groupLabel)
-    counts[cycle] = (counts[cycle] || 0) + 1
-    if (!n[i].isPast) {
-      futureCounts[cycle] = (futureCounts[cycle] || 0) + 1
-      var d = parseDate(n[i].date)
-      if (d) {
-        var ts = d.getTime()
-        if (!nearestFuture[cycle] || ts < nearestFuture[cycle]) {
-          nearestFuture[cycle] = ts
-        }
-      }
-    }
+    var gl = n[i].groupLabel
+    if (!glMeta[gl]) glMeta[gl] = { ga: Infinity, earliest: Infinity, versioned: false }
+    var ver = cycleFromGroupLabel(gl)
+    if (/^\d+\.\d+$/.test(ver)) glMeta[gl].versioned = true
+    var d = parseDate(n[i].date)
+    if (!d) continue
+    var ts = d.getTime()
+    if (ts < glMeta[gl].earliest) glMeta[gl].earliest = ts
+    if (n[i].isGa && ts < glMeta[gl].ga) glMeta[gl].ga = ts
   }
-
-  // Pick the cycle with the most future milestones; nearest as tiebreaker
-  var upcomingCycle = null
-  var bestFutureCount = 0
-  var upcomingTs = Infinity
-  var futureCycles = Object.keys(nearestFuture)
-  for (var fi = 0; fi < futureCycles.length; fi++) {
-    var fc = futureCounts[futureCycles[fi]] || 0
-    var fts = nearestFuture[futureCycles[fi]]
-    if (fc > bestFutureCount || (fc === bestFutureCount && fts < upcomingTs)) {
-      bestFutureCount = fc
-      upcomingTs = fts
-      upcomingCycle = futureCycles[fi]
-    }
+  function sortVal(gl) {
+    var m = glMeta[gl]
+    return m.ga < Infinity ? m.ga : m.earliest
   }
-
-  var cycles = Object.keys(counts).sort(function (a, b) {
-    var diff = counts[b] - counts[a]
-    if (diff !== 0) return diff
-    return a < b ? -1 : a > b ? 1 : 0
-  })
+  var versioned = Object.keys(glMeta).filter(function (gl) { return glMeta[gl].versioned })
+  versioned.sort(function (a, b) { return sortVal(a) - sortVal(b) })
   var sides = {}
-  var aboveCount = 0
-  var belowCount = 0
-
-  // Force upcoming cycle above first
-  if (upcomingCycle) {
-    sides[upcomingCycle] = true
-    aboveCount += counts[upcomingCycle]
+  for (var vi = 0; vi < versioned.length; vi++) {
+    sides[versioned[vi]] = vi % 2 === 0
   }
-
-  for (var j = 0; j < cycles.length; j++) {
-    if (sides[cycles[j]] !== undefined) continue
-    if (aboveCount <= belowCount) {
-      sides[cycles[j]] = true
-      aboveCount += counts[cycles[j]]
-    } else {
-      sides[cycles[j]] = false
-      belowCount += counts[cycles[j]]
-    }
+  var nonVersioned = Object.keys(glMeta).filter(function (gl) { return !glMeta[gl].versioned })
+  for (var nvi = 0; nvi < nonVersioned.length; nvi++) {
+    sides[nonVersioned[nvi]] = false
   }
   return sides
 })
 
-function cycleIsAbove(cycle) {
-  return cycleSides.value[cycle] !== false
+var visibleProducts = computed(function () {
+  var seen = {}
+  var n = allNodes.value
+  for (var i = 0; i < n.length; i++) {
+    for (var j = 0; j < n[i].productList.length; j++) {
+      seen[n[i].productList[j]] = true
+    }
+  }
+  return Object.keys(seen).sort()
+})
+
+function productHex(p) { return PRODUCT_HEX[p] || DEFAULT_HEX }
+
+function cycleIsAbove(groupLabel) {
+  if (cycleSides.value[groupLabel] !== undefined) return cycleSides.value[groupLabel] !== false
+  return true
 }
+
+
+var stableCycleRowMap = computed(function () {
+  var n = allNodes.value
+  var cycleMeta = {}
+  for (var i = 0; i < n.length; i++) {
+    var above = cycleIsAbove(n[i].groupLabel)
+    var suffix = above ? '-a' : '-b'
+    var rowKey = n[i].groupLabel + suffix
+    var d = parseDate(n[i].date)
+    if (!d) continue
+    var ts = d.getTime()
+    if (!cycleMeta[rowKey]) {
+      cycleMeta[rowKey] = { earliestGa: Infinity, earliest: Infinity }
+    }
+    if (n[i].isGa && ts < cycleMeta[rowKey].earliestGa) {
+      cycleMeta[rowKey].earliestGa = ts
+    }
+    if (ts < cycleMeta[rowKey].earliest) {
+      cycleMeta[rowKey].earliest = ts
+    }
+  }
+  function sortKey(k) {
+    var m = cycleMeta[k]
+    return m.earliestGa < Infinity ? m.earliestGa : m.earliest
+  }
+  var aboveKeys = []
+  var versionedBelow = []
+  var nonVersionedBelow = []
+  var keys = Object.keys(cycleMeta)
+  for (var ki = 0; ki < keys.length; ki++) {
+    if (keys[ki].endsWith('-a')) {
+      aboveKeys.push(keys[ki])
+    } else {
+      var gl = keys[ki].slice(0, -2)
+      var ver = cycleFromGroupLabel(gl)
+      if (/^\d+\.\d+$/.test(ver)) versionedBelow.push(keys[ki])
+      else nonVersionedBelow.push(keys[ki])
+    }
+  }
+  aboveKeys.sort(function (a, b) { return sortKey(a) - sortKey(b) })
+  versionedBelow.sort(function (a, b) { return sortKey(a) - sortKey(b) })
+  nonVersionedBelow.sort(function (a, b) { return sortKey(a) - sortKey(b) })
+  var belowKeys = versionedBelow.concat(nonVersionedBelow)
+  var map = {}
+  for (var ai = 0; ai < aboveKeys.length; ai++) map[aboveKeys[ai]] = ai
+  for (var bi = 0; bi < belowKeys.length; bi++) map[belowKeys[bi]] = bi
+  return map
+})
 
 var layoutMetrics = computed(function () {
   var n = allNodes.value
@@ -272,38 +308,46 @@ var layoutMetrics = computed(function () {
   var rangeSpan = rangeMax - rangeMin
   if (rangeSpan <= 0) return { aboveSpace: defaultAbove, belowSpace: defaultBelow }
 
-  var cycleRowMapMetrics = {}
+  var rowMap = stableCycleRowMap.value
   var aboveRows = 0
   var belowRows = 0
-  for (var i = 0; i < n.length; i++) {
-    var cycle = cycleFromGroupLabel(n[i].groupLabel)
-    var above = cycleIsAbove(cycle)
-    var sideKey = cycle + (above ? '-a' : '-b')
-    if (!cycleRowMapMetrics[sideKey]) {
-      cycleRowMapMetrics[sideKey] = true
-      if (above) aboveRows++
-      else belowRows++
-    }
+  var rmKeys = Object.keys(rowMap)
+  for (var rmi = 0; rmi < rmKeys.length; rmi++) {
+    if (rmKeys[rmi].endsWith('-a')) aboveRows++
+    else belowRows++
   }
   aboveRows = Math.max(aboveRows, 1)
-  // Use safe offset: max of subLaneOffset and estimated max box height + gap
-  var estMaxBoxH = 5 * lineHeight + boxPad * 2
+  var estMaxBoxH = 3 * lineHeight + boxPad * 2
   var safeOff = Math.max(subLaneOffset, estMaxBoxH + 4 + 6)
   var aboveSpace = laneBaseStem + (aboveRows - 1) * safeOff + 70
   var belowSpace = belowRows > 0
     ? (laneBaseStem + (belowRows - 1) * safeOff + 70)
     : 0
+  var totalRequired = aboveSpace + (belowSpace > infraSpace ? belowSpace : infraSpace) + 40
+  if (totalRequired > CHART_MAX_HEIGHT) {
+    var extraRows = Math.max(0, aboveRows - 1) + Math.max(0, belowRows > 0 ? belowRows - 1 : 0)
+    if (extraRows > 0) {
+      var fixedSpace = 40 + laneBaseStem + 70 + (belowRows > 0 ? laneBaseStem + 70 : infraSpace)
+      safeOff = Math.max(20, (CHART_MAX_HEIGHT - fixedSpace) / extraRows)
+    }
+    aboveSpace = laneBaseStem + Math.max(0, aboveRows - 1) * safeOff + 70
+    belowSpace = belowRows > 0
+      ? laneBaseStem + Math.max(0, belowRows - 1) * safeOff + 70
+      : 0
+  }
   return { aboveSpace: aboveSpace, belowSpace: Math.max(belowSpace, infraSpace), safeOff: safeOff }
 })
 
 var chartHeight = computed(function () {
   var m = layoutMetrics.value
-  return Math.min(m.aboveSpace + m.belowSpace + 40, 450)
+  return Math.min(m.aboveSpace + m.belowSpace + 40, CHART_MAX_HEIGHT)
 })
 
 function fmtDate(dateStr) {
   return formatShort(dateStr, { year: true })
 }
+
+
 
 // Pure stacking logic — extracted for testability.
 // Takes an array of layout objects [{x, boxW, nd: {date, groupLabel}, above}]
@@ -313,8 +357,7 @@ function applyStacking(nodeLayouts, todayTs, peekThreshold) {
   var cycleStacks = {}
   for (var i = 0; i < nodeLayouts.length; i++) {
     if (!nodeLayouts[i]) continue
-    var ckey = cycleFromGroupLabel(nodeLayouts[i].nd.groupLabel)
-      + (nodeLayouts[i].above ? '-a' : '-b')
+    var ckey = nodeLayouts[i].subLane + (nodeLayouts[i].above ? '-a' : '-b')
     if (!cycleStacks[ckey]) cycleStacks[ckey] = []
     cycleStacks[ckey].push(i)
   }
@@ -390,7 +433,10 @@ var nextMilestoneLabel = computed(function () {
   for (var i = 0; i < n.length; i++) {
     var days = daysFromNow(n[i].date)
     if (days !== null && days >= 0) {
-      var desc = n[i].isGa ? n[i].groupLabel : n[i].groupLabel + ' ' + n[i].msLabel
+      var knownProducts = n[i].productList.filter(function (p) { return productLabel(p) !== p })
+      var productPrefix = knownProducts.length
+        ? knownProducts.map(productLabel).join('/') + ' ' : ''
+      var desc = productPrefix + n[i].groupLabel + ' ' + n[i].msLabel
       if (days === 0) return { desc: desc, daysText: 'today' }
       return { desc: desc, daysText: 'in ' + days + 'd' }
     }
@@ -399,6 +445,7 @@ var nextMilestoneLabel = computed(function () {
 })
 
 var showDimLines = ref(true)
+var isOverCard = ref(false)
 var isDark = ref(false)
 var _observer
 onMounted(function () {
@@ -600,6 +647,37 @@ function onPointerUp(event) {
   }
 }
 
+function onCardHover(e) {
+  if (_dragStart) return
+  var canvas = e.currentTarget.querySelector('canvas')
+  if (!canvas) { isOverCard.value = false; return }
+  var canvasRect = canvas.getBoundingClientRect()
+  var cx = e.clientX - canvasRect.left
+  var cy = e.clientY - canvasRect.top
+  for (var i = _cardHitBoxes.length - 1; i >= 0; i--) {
+    var box = _cardHitBoxes[i]
+    if (cx >= box.x && cx <= box.x + box.w && cy >= box.y && cy <= box.y + box.h) {
+      isOverCard.value = true
+      var prevHovered = _hoveredBox
+      _hoveredBox = box
+      if (prevHovered !== _hoveredBox) {
+        if (!prevHovered) _frontNodes.clear()
+        _frontNodes.add(box.nd)
+        if (prevHovered && prevHovered.nd !== box.nd) {
+          _frontNodes.delete(prevHovered.nd)
+        }
+        if (_chartInstance) _chartInstance.draw()
+      }
+      return
+    }
+  }
+  isOverCard.value = false
+  if (_hoveredBox) {
+    _hoveredBox = null
+    if (_chartInstance) _chartInstance.draw()
+  }
+}
+
 var chartData = computed(function () {
   var milestonePoints = []
   var _radii = []
@@ -688,6 +766,10 @@ function _pluginSetup(chart) {
   return { ctx: ctx, area: area, xScale: xScale, yMid: yMid, dark: dark, r: xRange.value }
 }
 
+var _cardHitBoxes = []
+var _hoveredBox = null
+var _frontNodes = new Set()
+
 var timelinePlugin = {
   id: 'releaseTimeline',
   beforeDatasetsDraw: function (chart) {
@@ -758,7 +840,14 @@ var timelinePlugin = {
         for (var nci = 0; nci < nodePxList.length; nci++) {
           if (Math.abs(wpx - nodePxList[nci]) < nodeClearance) { tooCloseToNode = true; break }
         }
-        if (tooCloseToNode) continue
+        if (tooCloseToNode) {
+          if (wk > 0) continue
+          var monthTooClose = false
+          for (var mci = 0; mci < nodePxList.length; mci++) {
+            if (Math.abs(wpx - nodePxList[mci]) < 15) { monthTooClose = true; break }
+          }
+          if (monthTooClose) continue
+        }
         if (wpx > area.left - 60 && wpx < area.right - 15) {
           ctx.globalAlpha = 1.0
           var halfH = (area.bottom - area.top) / 4
@@ -777,9 +866,9 @@ var timelinePlugin = {
           ctx.setLineDash([])
           var wMonthName = MONTH_NAMES[wMonth.getMonth()]
           if (spansYears && wMonth.getMonth() === 0 && wk === 0) wMonthName += ' ' + wMonth.getFullYear()
-          ctx.fillText(wMonthName, wpx, yMid + 30)
+          ctx.fillText(wMonthName, wpx, yMid + 10)
           if (showWeeks) {
-            ctx.fillText('Week ' + (wk + 1), wpx, yMid + 43)
+            ctx.fillText('Week ' + (wk + 1), wpx, yMid + 23)
           }
           ctx.globalAlpha = 1.0
         }
@@ -807,6 +896,7 @@ var timelinePlugin = {
     var _haloPad = 3
 
     ctx.save()
+    _cardHitBoxes = []
 
     // Redraw arrowhead zone to cover any Chart.js dots near the right edge
     var bgColor = dark ? '#1f2937' : '#ffffff'
@@ -821,11 +911,6 @@ var timelinePlugin = {
     ctx.closePath()
     ctx.fill()
 
-    // Per-cycle row assignment: each release cycle gets its own row
-    var cycleRowMap = {}
-    var aboveRowEdges = []
-    var belowRowEdges = []
-
     // First pass: compute box dimensions and assign rows by cycle
     var nodeLayouts = []
     var todayForStack = new Date()
@@ -839,7 +924,6 @@ var timelinePlugin = {
       var x = xScale.getPixelForValue(dt.getTime())
       if (x < area.left - 80 || x > area.right - 15) { nodeLayouts.push(null); continue }
 
-      // Measure text lines (group label as first line in box)
       var lines = []
       ctx.font = 'bold 13px ' + FONT
       lines.push({ text: nd.groupLabel, font: 'bold 13px ' + FONT, color: null, w: ctx.measureText(nd.groupLabel).width })
@@ -848,14 +932,8 @@ var timelinePlugin = {
       ctx.font = '12px ' + FONT
       lines.push({ text: fmtDate(nd.date), font: '12px ' + FONT, color: null, w: ctx.measureText(fmtDate(nd.date)).width })
 
-      // Product label rendered vertically on left side of GA boxes
       var sideLabel = null
       var sideLabelW = 0
-      if (nd.isGa && nd.productList.length) {
-        sideLabel = nd.productList.map(function (p) { return productLabel(p) })
-        ctx.font = 'bold 10px ' + FONT
-        sideLabelW = 14 * nd.productList.length + 4
-      }
 
       var maxW = 0
       for (var li = 0; li < lines.length; li++) {
@@ -864,20 +942,10 @@ var timelinePlugin = {
       var boxW = maxW + boxPad * 2 + sideLabelW
       var boxH = lines.length * lineHeight + boxPad * 2
 
-      var cycle = cycleFromGroupLabel(nd.groupLabel)
-      var above = cycleIsAbove(cycle)
-      var sideKey = cycle + (above ? '-a' : '-b')
-      var edges = above ? aboveRowEdges : belowRowEdges
-
-      var subLane
-      if (cycleRowMap[sideKey] !== undefined) {
-        subLane = cycleRowMap[sideKey]
-      } else {
-        subLane = edges.length
-        edges.push(0)
-        cycleRowMap[sideKey] = subLane
-      }
-      edges[subLane] = Math.max(edges[subLane], x + boxW / 2)
+      var above = cycleIsAbove(nd.groupLabel)
+      var sideKey = nd.groupLabel + (above ? '-a' : '-b')
+      var subLane = stableCycleRowMap.value[sideKey]
+      if (subLane === undefined) subLane = 0
 
       nodeLayouts.push({
         nd: nd, x: x, lines: lines,
@@ -899,7 +967,27 @@ var timelinePlugin = {
       nodeLayouts[sli].stemLen = laneBaseStem + nodeLayouts[sli].subLane * stableOff
     }
 
-    // (Stems are drawn AFTER cards/peeks so the card halo doesn't cover them)
+    // Second pass: draw stems BEFORE cards so card halos cover cross-row overlap
+    for (var ssj = 0; ssj < nodeLayouts.length; ssj++) {
+      var ssLay = nodeLayouts[ssj]
+      if (!ssLay) continue
+      var ssPrimary = ssLay.nd.productList.length
+        ? (PRODUCT_HEX[ssLay.nd.productList[0]] || DEFAULT_HEX)
+        : (ssLay.nd.isPast ? pastColor : futureColor)
+      var stemX = ssLay.x
+      ctx.beginPath()
+      ctx.strokeStyle = ssPrimary
+      ctx.lineWidth = 1
+      ctx.setLineDash([])
+      if (ssLay.above) {
+        ctx.moveTo(stemX, yMid - 6)
+        ctx.lineTo(stemX, yMid - ssLay.stemLen - 8)
+      } else {
+        ctx.moveTo(stemX, yMid + 6)
+        ctx.lineTo(stemX, yMid + ssLay.stemLen + 8)
+      }
+      ctx.stroke()
+    }
 
     // Third pass: draw boxes as card stacks
     // Sort: behind full-cards first (highest stackLevel), top cards last
@@ -909,6 +997,9 @@ var timelinePlugin = {
       if (nodeLayouts[boi]) boxRenderOrder.push(boi)
     }
     boxRenderOrder.sort(function (a, b) {
+      var aFront = _frontNodes.has(nodeLayouts[a].nd) ? 1 : 0
+      var bFront = _frontNodes.has(nodeLayouts[b].nd) ? 1 : 0
+      if (aFront !== bFront) return aFront - bFront
       var sl = (nodeLayouts[b].stackLevel || 0) - (nodeLayouts[a].stackLevel || 0)
       if (sl !== 0) return sl
       // Same stackLevel: draw farther-from-today first so closer cards paint on top
@@ -975,11 +1066,14 @@ var timelinePlugin = {
 
         // Top card: card-like appearance with shadow + glassy fill
         var dateColor = nd2.isPast ? mutedTextColor : (dark ? '#9ca3af' : '#6b7280')
-        layout2.lines[0].color = dark ? '#d1d5db' : '#374151'
-        layout2.lines[1].color = basePrimary2
-        layout2.lines[2].color = dateColor
-        for (var pi = 3; pi < layout2.lines.length; pi++) {
-          layout2.lines[pi].color = PRODUCT_HEX[nd2.productList[pi - 3]] || DEFAULT_HEX
+        for (var ci = 0; ci < layout2.lines.length; ci++) {
+          if (layout2.lines[ci].text === nd2.groupLabel) {
+            layout2.lines[ci].color = dark ? '#d1d5db' : '#374151'
+          } else if (layout2.lines[ci].text === nd2.msLabel) {
+            layout2.lines[ci].color = basePrimary2
+          } else {
+            layout2.lines[ci].color = dateColor
+          }
         }
 
         // Opaque halo: wider on right to cover 2nd card overlap
@@ -1025,53 +1119,42 @@ var timelinePlugin = {
 
         // Border
         drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
-        ctx.strokeStyle = dark ? 'rgba(75,85,99,0.6)' : 'rgba(203,213,225,0.8)'
+        var borderHex = nd2.productList.length ? (PRODUCT_HEX[nd2.productList[0]] || DEFAULT_HEX) : null
+        ctx.strokeStyle = borderHex
+          ? hexToRgba(borderHex, dark ? 0.6 : 0.5)
+          : (dark ? 'rgba(75,85,99,0.6)' : 'rgba(203,213,225,0.8)')
         ctx.lineWidth = 1
         ctx.stroke()
 
-        // Side label (vertical product name on GA boxes)
-        var textOffsetX = layout2.sideLabelW
-        if (layout2.sideLabel) {
-          var divX = boxX + layout2.sideLabelW
-          ctx.beginPath()
-          ctx.moveTo(divX, boxY + 6)
-          ctx.lineTo(divX, boxY + layout2.boxH - 6)
-          ctx.strokeStyle = dark ? 'rgba(75,85,99,0.4)' : 'rgba(209,213,219,0.6)'
-          ctx.lineWidth = 0.5
-          ctx.stroke()
-          var labelCy = boxY + layout2.boxH / 2
-          ctx.font = 'bold 10px ' + FONT
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'middle'
-          for (var pli = 0; pli < layout2.sideLabel.length; pli++) {
-            ctx.save()
-            var labelCx = boxX + 7 + pli * 14
-            ctx.translate(labelCx, labelCy)
-            ctx.rotate(-Math.PI / 2)
-            ctx.fillStyle = PRODUCT_HEX[nd2.productList[pli]] || DEFAULT_HEX
-            ctx.fillText(layout2.sideLabel[pli], 0, 0)
-            ctx.restore()
-          }
+        var textOffsetX = 0
+        if (nd2.productList.length) {
+          var tintHex = PRODUCT_HEX[nd2.productList[0]] || DEFAULT_HEX
+          drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
+          ctx.fillStyle = hexToRgba(tintHex, 0.08)
+          ctx.fill()
         }
 
         var textX = boxX + textOffsetX + (layout2.boxW - textOffsetX) / 2
         ctx.textAlign = 'center'
         ctx.textBaseline = 'top'
-        var applyFade = clipApplied && visibleWidth < layout2.boxW * 0.9
+        var applyFade = clipApplied && visibleWidth < layout2.boxW * 0.7
         for (var ti = 0; ti < layout2.lines.length; ti++) {
           ctx.font = layout2.lines[ti].font
+          var lineY = boxY + boxPad + ti * lineHeight
           if (applyFade && fadeOuterX !== null) {
-            var fadeGrad = ctx.createLinearGradient(fadeOuterX, 0, fadeInnerX, 0)
-            fadeGrad.addColorStop(0, layout2.lines[ti].color)
-            fadeGrad.addColorStop(1, hexToRgba(layout2.lines[ti].color, 0))
-            ctx.fillStyle = fadeGrad
-          } else {
-            ctx.fillStyle = layout2.lines[ti].color
-          }
-          ctx.fillText(layout2.lines[ti].text, textX, boxY + boxPad + ti * lineHeight)
+              var fadeGrad = ctx.createLinearGradient(fadeOuterX, 0, fadeInnerX, 0)
+              fadeGrad.addColorStop(0, layout2.lines[ti].color)
+              fadeGrad.addColorStop(0.7, layout2.lines[ti].color)
+              fadeGrad.addColorStop(1, hexToRgba(layout2.lines[ti].color, 0.4))
+              ctx.fillStyle = fadeGrad
+            } else {
+              ctx.fillStyle = layout2.lines[ti].color
+            }
+            ctx.fillText(layout2.lines[ti].text, textX, lineY)
         }
         ctx.globalAlpha = 1.0
         if (clipApplied) ctx.restore()
+        _cardHitBoxes.push({ x: boxX, y: boxY, w: layout2.boxW, h: layout2.boxH, nd: nd2 })
       } else {
         // Behind card: render as peek strip — one per stacked card.
         var topLayout = nodeLayouts[layout2.stackTopIdx]
@@ -1097,7 +1180,8 @@ var timelinePlugin = {
 
         deferredPeeks.push({
           x: peekStripX, y: peekStripY, w: PEEK_W, h: peekStripH,
-          isLeft: behindIsLeft, frontIdx: layout2.stackTopIdx, dotX: layout2.x
+          isLeft: behindIsLeft, frontIdx: layout2.stackTopIdx, dotX: layout2.x,
+          nd: nd2
         })
       }
     }
@@ -1142,6 +1226,10 @@ var timelinePlugin = {
       }
       ctx.fillStyle = peekGrad
       ctx.fill()
+      if (pk.nd.productList.length) {
+        ctx.fillStyle = hexToRgba(PRODUCT_HEX[pk.nd.productList[0]] || DEFAULT_HEX, 0.08)
+        ctx.fill()
+      }
       ctx.restore()
       // Border — open path, skip inner flat edge so it looks like a card edge
       ctx.beginPath()
@@ -1162,32 +1250,13 @@ var timelinePlugin = {
         ctx.arcTo(pk.x + pk.w, pk.y, pk.x + pk.w - peekR, pk.y, peekR)
         ctx.lineTo(pk.x, pk.y)
       }
-      ctx.strokeStyle = dark ? 'rgba(75,85,99,0.6)' : 'rgba(203,213,225,0.8)'
+      var peekBorderHex = pk.nd.productList.length ? (PRODUCT_HEX[pk.nd.productList[0]] || DEFAULT_HEX) : null
+      ctx.strokeStyle = peekBorderHex
+        ? hexToRgba(peekBorderHex, dark ? 0.6 : 0.5)
+        : (dark ? 'rgba(75,85,99,0.6)' : 'rgba(203,213,225,0.8)')
       ctx.lineWidth = 1
       ctx.stroke()
-    }
-
-    // Fifth pass: draw stems AFTER cards/peeks so the card's
-    // opaque halo never covers them.
-    // Every dot gets a stem at its real date position (layout.x).
-    // Stems are straight vertical — OK if they connect to front card's box.
-    for (var ssj = 0; ssj < nodeLayouts.length; ssj++) {
-      var ssLay = nodeLayouts[ssj]
-      if (!ssLay) continue
-      var ssPrimary = ssLay.nd.isPast ? pastColor : futureColor
-      var stemX = ssLay.x
-      ctx.beginPath()
-      ctx.strokeStyle = ssPrimary
-      ctx.lineWidth = 1
-      ctx.setLineDash([])
-      if (ssLay.above) {
-        ctx.moveTo(stemX, yMid - 6)
-        ctx.lineTo(stemX, yMid - ssLay.stemLen - 4)
-      } else {
-        ctx.moveTo(stemX, yMid + 6)
-        ctx.lineTo(stemX, yMid + ssLay.stemLen + 4)
-      }
-      ctx.stroke()
+      _cardHitBoxes.push({ x: pk.x, y: pk.y, w: pk.w, h: pk.h, nd: pk.nd })
     }
 
     // Draw milestone dots
@@ -1214,7 +1283,9 @@ var timelinePlugin = {
     for (var dri = 0; dri < dotOrder.length; dri++) {
       var dLayout = nodeLayouts[dotOrder[dri]]
       var dIdx = dotOrder[dri]
-      var dotColor = n[dIdx].isPast ? pastColor : futureColor
+      var dotColor = n[dIdx].productList.length
+        ? (PRODUCT_HEX[n[dIdx].productList[0]] || DEFAULT_HEX)
+        : (n[dIdx].isPast ? pastColor : futureColor)
       var dotDrawX = dLayout.x
       ctx.globalAlpha = 1.0
 
@@ -1254,72 +1325,132 @@ var timelinePlugin = {
       var dimColor = dark ? 'rgba(107,114,128,0.35)' : 'rgba(156,163,175,0.35)'
       var dimTextColor = dark ? 'rgba(107,114,128,0.55)' : 'rgba(156,163,175,0.65)'
 
-      var aboveDimPoints = []
-      var belowDimPoints = []
-      for (var di = 0; di < nodeLayouts.length; di++) {
-        var dl = nodeLayouts[di]
-        if (!dl) continue
-        var dDate = parseDate(dl.nd.date)
-        if (!dDate) continue
-        var pt = { x: dl.x, ts: dDate.getTime() }
-        if (dl.above) aboveDimPoints.push(pt)
-        else belowDimPoints.push(pt)
-      }
-
       var todayDim = new Date()
       todayDim.setHours(0, 0, 0, 0)
       var todayTsDim = todayDim.getTime()
-      if (todayTsDim >= r.min && todayTsDim <= r.max) {
-        var todayPxDim = xScale.getPixelForValue(todayTsDim)
-        var todayPtDim = { x: todayPxDim, ts: todayTsDim }
-        aboveDimPoints.push(todayPtDim)
-        belowDimPoints.push(todayPtDim)
+      var todayInView = todayTsDim >= r.min && todayTsDim <= r.max
+      var todayPxDim = todayInView ? xScale.getPixelForValue(todayTsDim) : null
+
+      var dimGroups = {}
+      for (var di = 0; di < nodeLayouts.length; di++) {
+        var dl = nodeLayouts[di]
+        if (!dl) continue
+        if (!/^\d+\.\d+$/.test(cycleFromGroupLabel(dl.nd.groupLabel))) continue
+        var dDate = parseDate(dl.nd.date)
+        if (!dDate) continue
+        var dimKey = dl.nd.groupLabel + (dl.above ? '-a' : '-b')
+        if (!dimGroups[dimKey]) dimGroups[dimKey] = { points: [], above: dl.above, productList: dl.nd.productList || [] }
+        dimGroups[dimKey].points.push({ x: dl.x, ts: dDate.getTime() })
       }
 
-      var dimSets = [
-        { points: aboveDimPoints, lineY: yMid - 14, textBase: 'bottom', textOff: -3 },
-        { points: belowDimPoints, lineY: yMid + 14, textBase: 'top', textOff: 2 }
-      ]
+      if (todayInView) {
+        var dgKeys = Object.keys(dimGroups)
+        for (var tdi = 0; tdi < dgKeys.length; tdi++) {
+          dimGroups[dgKeys[tdi]].points.push({ x: todayPxDim, ts: todayTsDim })
+        }
+      }
 
-      for (var dsi = 0; dsi < dimSets.length; dsi++) {
-        var ds = dimSets[dsi]
-        ds.points.sort(function (a, b) { return a.ts - b.ts })
-        for (var dj = 1; dj < ds.points.length; dj++) {
-          var diffDays = Math.round((ds.points[dj].ts - ds.points[dj - 1].ts) / DAY_MS)
-          var leftX = ds.points[dj - 1].x + dimGap
-          var rightX = ds.points[dj].x - dimGap
-          var dimMidX = (leftX + rightX) / 2
-          var dimLabelOverlapsToday = todayPxDim !== undefined
-            && Math.abs(dimMidX - todayPxDim) < 40
-            && ds.lineY > yMid
-          if (diffDays > 0 && rightX - leftX > 20 && !dimLabelOverlapsToday) {
-            ctx.globalAlpha = 1.0
-            ctx.strokeStyle = dimColor
-            ctx.fillStyle = dimColor
-            ctx.lineWidth = 0.5
-            ctx.setLineDash([])
-            ctx.beginPath()
-            ctx.moveTo(leftX, ds.lineY)
-            ctx.lineTo(rightX, ds.lineY)
-            ctx.stroke()
-            ctx.beginPath()
-            ctx.moveTo(leftX + arrowSize * 2, ds.lineY - arrowSize)
-            ctx.lineTo(leftX, ds.lineY)
-            ctx.lineTo(leftX + arrowSize * 2, ds.lineY + arrowSize)
-            ctx.stroke()
-            ctx.beginPath()
-            ctx.moveTo(rightX - arrowSize * 2, ds.lineY - arrowSize)
-            ctx.lineTo(rightX, ds.lineY)
-            ctx.lineTo(rightX - arrowSize * 2, ds.lineY + arrowSize)
-            ctx.stroke()
-            ctx.font = '10px ' + FONT
-            ctx.fillStyle = dimTextColor
-            ctx.textAlign = 'center'
-            ctx.textBaseline = ds.textBase
-            ctx.fillText(diffDays + 'd', (leftX + rightX) / 2, ds.lineY + ds.textOff)
-            ctx.globalAlpha = 1.0
+      var dimGroupKeys = Object.keys(dimGroups)
+
+      // Build all segments from viewport-filtered dim groups
+      var allDimSegs = []
+      for (var dgi = 0; dgi < dimGroupKeys.length; dgi++) {
+        var dg = dimGroups[dimGroupKeys[dgi]]
+        if (dg.points.length < 2) continue
+        dg.points.sort(function (a, b) { return a.ts - b.ts })
+        for (var dj = 1; dj < dg.points.length; dj++) {
+          var segDiffDays = Math.round((dg.points[dj].ts - dg.points[dj - 1].ts) / DAY_MS)
+          if (segDiffDays <= 0) continue
+          var segLeftX = dg.points[dj - 1].x + dimGap
+          var segRightX = dg.points[dj].x - dimGap
+          if (segRightX - segLeftX <= 20) continue
+          allDimSegs.push({
+            gi: dgi, above: dg.above,
+            left: segLeftX, right: segRightX,
+            diffDays: segDiffDays,
+            needsLabel: false,
+            leftIsToday: dg.points[dj - 1].ts === todayTsDim,
+            rightIsToday: dg.points[dj].ts === todayTsDim
+          })
+        }
+      }
+
+      // Per-segment overlap: mark segments that share horizontal space with a different group on same side
+      for (var osi = 0; osi < allDimSegs.length; osi++) {
+        for (var osj = 0; osj < allDimSegs.length; osj++) {
+          if (allDimSegs[osj].gi !== allDimSegs[osi].gi &&
+              allDimSegs[osj].above === allDimSegs[osi].above &&
+              allDimSegs[osj].left < allDimSegs[osi].right &&
+              allDimSegs[osi].left < allDimSegs[osj].right) {
+            allDimSegs[osi].needsLabel = true
+            break
           }
         }
+      }
+
+      // Render segments
+      for (var sri = 0; sri < allDimSegs.length; sri++) {
+        var seg = allDimSegs[sri]
+        var srDgKey = dimGroupKeys[seg.gi]
+        var srRowIdx = stableCycleRowMap.value[srDgKey] || 0
+        var srYOff = 36 + srRowIdx * 14
+        var srLineY = seg.above ? yMid - srYOff : yMid + srYOff
+        ctx.globalAlpha = 1.0
+        ctx.strokeStyle = dimColor
+        ctx.fillStyle = dimColor
+        ctx.lineWidth = 0.5
+        ctx.setLineDash([])
+
+        ctx.font = '10px ' + FONT
+        var srLabel = seg.diffDays + 'd'
+        if (seg.needsLabel) {
+          var srProducts = dimGroups[srDgKey].productList.filter(function (p) { return productLabel(p) !== p })
+          var srProductPrefix = srProducts.length ? srProducts.map(productLabel).join('/') + ' ' : ''
+          srLabel += ' (' + srProductPrefix + srDgKey.replace(/-[ab]$/, '') + ')'
+        }
+        var srLabelW = ctx.measureText(srLabel).width
+        var srLabelX = (seg.left + seg.right) / 2
+        var srGapHalf = srLabelW / 2 + 4
+
+        ctx.beginPath()
+        ctx.moveTo(seg.left, srLineY)
+        ctx.lineTo(srLabelX - srGapHalf, srLineY)
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(srLabelX + srGapHalf, srLineY)
+        ctx.lineTo(seg.right, srLineY)
+        ctx.stroke()
+
+        if (seg.leftIsToday) {
+          ctx.beginPath()
+          ctx.arc(seg.left, srLineY, arrowSize + 1, 0, Math.PI * 2)
+          ctx.fillStyle = dark ? '#f87171' : '#ef4444'
+          ctx.fill()
+        } else {
+          ctx.beginPath()
+          ctx.moveTo(seg.left + arrowSize * 2, srLineY - arrowSize)
+          ctx.lineTo(seg.left, srLineY)
+          ctx.lineTo(seg.left + arrowSize * 2, srLineY + arrowSize)
+          ctx.stroke()
+        }
+        if (seg.rightIsToday) {
+          ctx.beginPath()
+          ctx.arc(seg.right, srLineY, arrowSize + 1, 0, Math.PI * 2)
+          ctx.fillStyle = dark ? '#f87171' : '#ef4444'
+          ctx.fill()
+        } else {
+          ctx.beginPath()
+          ctx.moveTo(seg.right - arrowSize * 2, srLineY - arrowSize)
+          ctx.lineTo(seg.right, srLineY)
+          ctx.lineTo(seg.right - arrowSize * 2, srLineY + arrowSize)
+          ctx.stroke()
+        }
+
+        ctx.fillStyle = dimTextColor
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(srLabel, srLabelX, srLineY)
+        ctx.globalAlpha = 1.0
       }
     }
 
@@ -1355,7 +1486,7 @@ var timelinePlugin = {
       var haloW = Math.max(youW, nmlW) + 12
       var haloH = nmlText ? 30 : 16
       var haloX = todayX - haloW / 2
-      var haloY = yMid + 25
+      var haloY = yMid + 5
       ctx.fillStyle = dark ? '#1f2937' : '#ffffff'
       ctx.fillRect(haloX, haloY, haloW, haloH)
 
@@ -1363,16 +1494,26 @@ var timelinePlugin = {
       ctx.fillStyle = redColor
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
-      ctx.fillText(youText, todayX, yMid + 30)
+      ctx.fillText(youText, todayX, yMid + 10)
 
       if (nmlText) {
         ctx.font = '10px ' + FONT
         ctx.fillStyle = dark ? '#fca5a5' : '#dc2626'
-        ctx.fillText(nmlText, todayX, yMid + 43)
+        ctx.fillText(nmlText, todayX, yMid + 23)
       }
       ctx.globalAlpha = 1.0
     } else {
       _todayPx.value = null
+    }
+
+    if (_hoveredBox) {
+      ctx.save()
+      ctx.strokeStyle = dark ? 'rgba(96,165,250,0.5)' : 'rgba(59,130,246,0.4)'
+      ctx.lineWidth = 2
+      drawRoundedRect(ctx, _hoveredBox.x - 1, _hoveredBox.y - 1,
+                      _hoveredBox.w + 2, _hoveredBox.h + 2, 5)
+      ctx.stroke()
+      ctx.restore()
     }
 
     ctx.restore()
@@ -1400,12 +1541,14 @@ var timelinePlugin = {
       </div>
       <div
         class="relative"
-        :style="{ height: chartHeight + 'px', cursor: isZoomed ? 'grab' : 'default' }"
+        :style="{ height: chartHeight + 'px', cursor: isOverCard ? 'pointer' : (isZoomed ? 'grab' : 'default') }"
         @wheel="onWheel"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
         @pointercancel="onPointerUp"
+        @mousemove="onCardHover"
+        @mouseleave="isOverCard = false"
       >
         <Scatter :data="chartData" :options="chartOptions"
                  :plugins="[timelinePlugin]" />
@@ -1421,6 +1564,12 @@ var timelinePlugin = {
         <!-- Days view indicator -->
         <span class="absolute bottom-1 right-2 text-[10px] text-gray-400 dark:text-gray-500 tabular-nums pointer-events-none">
           {{ visibleDays }}d view
+        </span>
+      </div>
+      <div v-if="visibleProducts.length" class="flex items-center justify-center gap-4 mt-1.5 text-[10px] text-gray-500 dark:text-gray-400">
+        <span v-for="p in visibleProducts" :key="p" class="flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: productHex(p) }"></span>
+          {{ productLabel(p) }}
         </span>
       </div>
     </div>

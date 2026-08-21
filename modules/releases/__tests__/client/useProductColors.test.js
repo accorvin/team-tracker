@@ -27,13 +27,23 @@ describe('useProductColors', () => {
   it('returns known colors for rhelai', () => {
     var colors = productColors('rhelai')
     expect(colors).toBe(PRODUCT_COLORS.rhelai)
-    expect(colors.dot).toContain('teal')
+    expect(colors.dot).toContain('emerald')
   })
 
   it('returns known colors for rhaii', () => {
     var colors = productColors('rhaii')
     expect(colors).toBe(PRODUCT_COLORS.rhaii)
-    expect(colors.dot).toContain('sky')
+    expect(colors.dot).toContain('pink')
+  })
+
+  it('returns known colors for rhai', () => {
+    var c = productColors('rhai')
+    expect(c.bg).toContain('amber')
+    expect(c.border).toContain('amber')
+  })
+
+  it('PRODUCT_HEX includes rhai with correct hex color', () => {
+    expect(PRODUCT_HEX.rhai).toBe('#f59e0b')
   })
 
   it('returns DEFAULT_COLORS for unknown product', () => {
