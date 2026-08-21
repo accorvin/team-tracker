@@ -7,7 +7,7 @@
 
 const { loadConfig, saveConfig } = require('./config');
 const { evaluateHygiene, hygieneRules, RULE_CATEGORIES } = require('./hygiene-rules');
-const { fetchHygieneFeatures } = require('./jira-fetch');
+const { fetchHygieneFeatures, buildVersionReleaseMap } = require('./jira-fetch');
 const { logAudit } = require('../planning/audit-log');
 const { readRegistry } = require('../registry');
 
@@ -196,6 +196,16 @@ module.exports = async function registerHygieneRoutes(router, context) {
     var fetchAllJqlResults = jira.fetchAllJqlResults;
     var results = [];
 
+    // Resolve Jira version names → registry release ids so fix-version precedence
+    // can place each feature under its effective (committed) release.
+    var versionReleaseMap = buildVersionReleaseMap(registryReleases);
+    var activeReleaseIds = [];
+    for (var ari = 0; ari < registryReleases.length; ari++) {
+      if (registryReleases[ari].state !== 'archived' && registryReleases[ari].displayName) {
+        activeReleaseIds.push(registryReleases[ari].id);
+      }
+    }
+
     try {
       for (var vi = 0; vi < activeVersions.length; vi++) {
         var version = activeVersions[vi];
@@ -224,7 +234,12 @@ module.exports = async function registerHygieneRoutes(router, context) {
         }
 
         try {
-          var result = await fetchHygieneFeatures(jiraRequest, fetchAllJqlResults, version, config, onProgress, { jqlVersions: jqlVersions });
+          var result = await fetchHygieneFeatures(jiraRequest, fetchAllJqlResults, version, config, onProgress, {
+            jqlVersions: jqlVersions,
+            versionReleaseMap: versionReleaseMap,
+            activeReleaseIds: activeReleaseIds,
+            releaseId: relForVersion ? relForVersion.id : null
+          });
           var gaDate = relForVersion && relForVersion.milestones && (relForVersion.milestones.gaDate || relForVersion.milestones.ga);
           var versionReleased = false;
           var versionGaDate = null;
@@ -402,9 +417,11 @@ module.exports = async function registerHygieneRoutes(router, context) {
       var registry = await readRegistry(storage.readFromStorage);
       var registryReleases = registry.releases || [];
       var jqlVersions = null;
+      var refreshReleaseId = null;
       for (var rli = 0; rli < registryReleases.length; rli++) {
         var rl = registryReleases[rli];
         if (rl.displayName === version || rl.id === version) {
+          refreshReleaseId = rl.id;
           if (rl.fixVersions && rl.fixVersions.length > 0) {
             jqlVersions = rl.fixVersions;
           }
@@ -412,11 +429,26 @@ module.exports = async function registerHygieneRoutes(router, context) {
         }
       }
 
+      // Resolve Jira version names → registry release ids for effective-release
+      // membership (fix-version precedence).
+      var versionReleaseMap = buildVersionReleaseMap(registryReleases);
+      var activeReleaseIds = [];
+      for (var arj = 0; arj < registryReleases.length; arj++) {
+        if (registryReleases[arj].state !== 'archived' && registryReleases[arj].displayName) {
+          activeReleaseIds.push(registryReleases[arj].id);
+        }
+      }
+
       function onProgress(stage, detail) {
         refreshState.progress = { stage: stage, message: detail.message || stage };
       }
 
-      fetchHygieneFeatures(jiraRequest, fetchAllJqlResults, version, config, onProgress, { jqlVersions: jqlVersions })
+      fetchHygieneFeatures(jiraRequest, fetchAllJqlResults, version, config, onProgress, {
+        jqlVersions: jqlVersions,
+        versionReleaseMap: versionReleaseMap,
+        activeReleaseIds: activeReleaseIds,
+        releaseId: refreshReleaseId
+      })
         .then(async function(result) {
           // Enrich with version-released status from registry
           var registryReleases = registry.releases || [];

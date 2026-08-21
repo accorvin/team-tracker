@@ -25,6 +25,24 @@ const violations = computed(() =>
 
 const colorStatus = computed(() => props.feature?.colorStatus || null)
 
+const fixVersionLabel = computed(() => {
+  const v = props.feature?.fixVersions
+  return v && v.length ? v.join(', ') : '—'
+})
+
+const targetVersionLabel = computed(() => {
+  const v = props.feature?.targetVersions
+  return v && v.length ? v.join(', ') : '—'
+})
+
+// Fix Version is the source of truth once set; flag when the PM's Target Version
+// resolves to a different release (mirrors the target-fix-version-mismatch rule).
+const versionMismatch = computed(() =>
+  !!(props.feature?.fixReleaseId &&
+    props.feature?.targetReleaseId &&
+    props.feature.fixReleaseId !== props.feature.targetReleaseId)
+)
+
 const colorDotClass = computed(() => {
   const s = (colorStatus.value || '').toLowerCase()
   if (s === 'green') return 'bg-emerald-500'
@@ -140,8 +158,17 @@ onUnmounted(() => {
                 <dt v-if="feature?.priority" class="col-span-1 text-gray-500 dark:text-gray-400">Priority</dt>
                 <dd v-if="feature?.priority" class="col-span-2 text-gray-900 dark:text-gray-100">{{ feature.priority }}</dd>
 
-                <dt v-if="feature?.fixVersions && feature.fixVersions.length" class="col-span-1 text-gray-500 dark:text-gray-400">Target</dt>
-                <dd v-if="feature?.fixVersions && feature.fixVersions.length" class="col-span-2 text-gray-900 dark:text-gray-100 font-mono text-xs">{{ feature.fixVersions.join(', ') }}</dd>
+                <dt class="col-span-1 text-gray-500 dark:text-gray-400">Fix Version</dt>
+                <dd class="col-span-2 text-gray-900 dark:text-gray-100 font-mono text-xs">{{ fixVersionLabel }}</dd>
+
+                <dt class="col-span-1 text-gray-500 dark:text-gray-400">Target Version</dt>
+                <dd
+                  class="col-span-2 font-mono text-xs"
+                  :class="versionMismatch ? 'text-amber-600 dark:text-amber-400 font-semibold' : 'text-gray-900 dark:text-gray-100'"
+                >
+                  {{ targetVersionLabel }}
+                  <span v-if="versionMismatch" class="ml-1 font-sans not-italic text-[10px]">(differs from Fix Version)</span>
+                </dd>
 
                 <dt class="col-span-1 text-gray-500 dark:text-gray-400">Color</dt>
                 <dd class="col-span-2 flex items-center gap-1.5 text-gray-900 dark:text-gray-100">
