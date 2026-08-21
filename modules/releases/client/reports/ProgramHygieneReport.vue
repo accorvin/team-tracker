@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, inject } from 'vue'
 import { apiRequest } from '@shared/client/services/api.js'
 import { useReleaseSelector } from '../composables/useReleaseSelector.js'
+import { useReportFilters } from './composables/useReportFilters.js'
+import ReportFilterModal from './components/ReportFilterModal.vue'
 
 const nav = inject('moduleNav')
 
@@ -70,26 +72,103 @@ const activeVersions = computed(() => {
   return allVersions.value.filter(v => v.registryId && ids.has(v.registryId))
 })
 
-// ── Aggregated totals ──
+// ── Feature list (flattened across selected versions) ──
+
+const allFeaturesRaw = computed(() => {
+  const features = []
+  for (const ver of activeVersions.value) {
+    for (const f of (ver.features || [])) {
+      features.push({ ...f, version: ver.displayName || ver.versionId })
+    }
+  }
+  return features
+})
+
+// ── Field filters (shared report filter composable) ──
+
+const FILTER_FIELDS = [
+  { key: 'team', label: 'Team' },
+  { key: 'components', label: 'Component' },
+  { key: 'labels', label: 'Label' },
+  { key: 'assignee', label: 'Assignee' },
+  { key: 'issueType', label: 'Type' },
+  { key: 'priority', label: 'Priority' }
+]
+
+const filters = useReportFilters({
+  storageKeyPrefix: 'hygiene-report',
+  filterFields: FILTER_FIELDS
+})
+
+const knownComponents = ref([])
+const knownTeams = ref([])
+
+async function fetchFieldOptions() {
+  try {
+    const [components, teams] = await Promise.all([
+      apiRequest('/modules/team-tracker/field-options/component'), // eslint-disable-line org-pulse/no-cross-module-imports
+      apiRequest('/modules/team-tracker/field-options/jiraTeam') // eslint-disable-line org-pulse/no-cross-module-imports
+    ])
+    knownComponents.value = components.values || []
+    knownTeams.value = teams.values || []
+  } catch {
+    // Field options are non-fatal — fall back to values found in loaded features.
+  }
+}
+
+onMounted(fetchFieldOptions)
+
+// Dropdown option sets: curated master lists (component/team) unioned with
+// values present in the currently loaded features.
+const availableFilterValues = computed(() => {
+  const result = {}
+  for (const field of FILTER_FIELDS) {
+    const values = new Set()
+    if (field.key === 'components') {
+      knownComponents.value.forEach(v => values.add(v))
+    } else if (field.key === 'team') {
+      knownTeams.value.forEach(v => values.add(v))
+    }
+    for (const f of allFeaturesRaw.value) {
+      const val = f[field.key]
+      if (Array.isArray(val)) {
+        val.forEach(v => { if (v) values.add(v) })
+      } else if (val) {
+        values.add(val)
+      }
+    }
+    result[field.key] = [...values].sort()
+  }
+  return result
+})
+
+// The feature set after applying the field filters — everything below (summary
+// cards, charts, and both tables) is derived from this so filters apply across
+// the whole report.
+const allFeatures = computed(() => filters.filterItems(allFeaturesRaw.value))
+
+// ── Aggregated totals (from the filtered feature set) ──
 
 const totals = computed(() => {
   let totalFeatures = 0
   let featuresWithViolations = 0
+  let totalViolations = 0
   const violationsByRule = {}
   const violationsByTeam = {}
 
-  for (const ver of activeVersions.value) {
-    totalFeatures += ver.totalFeatures
-    featuresWithViolations += ver.featuresWithViolations
-    for (const [id, count] of Object.entries(ver.violationsByRule || {})) {
-      violationsByRule[id] = (violationsByRule[id] || 0) + count
-    }
-    for (const [team, count] of Object.entries(ver.violationsByTeam || {})) {
+  for (const f of allFeatures.value) {
+    totalFeatures++
+    const count = f.violationCount || 0
+    totalViolations += count
+    if (count > 0) {
+      featuresWithViolations++
+      const team = f.team || 'Unassigned'
       violationsByTeam[team] = (violationsByTeam[team] || 0) + count
     }
+    for (const vid of (f.violations || [])) {
+      violationsByRule[vid] = (violationsByRule[vid] || 0) + 1
+    }
   }
-
-  const totalViolations = Object.values(violationsByRule).reduce((a, b) => a + b, 0)
 
   return { totalFeatures, featuresWithViolations, totalViolations, violationsByRule, violationsByTeam }
 })
@@ -118,16 +197,6 @@ const sortedTeamViolations = computed(() => {
 const maxTeamCount = computed(() => sortedTeamViolations.value[0]?.count || 1)
 
 // ── Tab A: Feature-level table ──
-
-const allFeatures = computed(() => {
-  const features = []
-  for (const ver of activeVersions.value) {
-    for (const f of (ver.features || [])) {
-      features.push({ ...f, version: ver.displayName || ver.versionId })
-    }
-  }
-  return features
-})
 
 const popoverFeature = ref(null)
 const popoverStyle = ref({})
@@ -183,21 +252,19 @@ function sortIcon(key) {
 
 const teamAccountability = computed(() => {
   const teamMap = {}
-  for (const ver of activeVersions.value) {
-    for (const f of (ver.features || [])) {
-      const team = f.team || 'Unassigned'
-      if (!teamMap[team]) {
-        teamMap[team] = { team, totalFeatures: 0, featuresWithViolations: 0, totalViolations: 0, byCategory: {} }
-      }
-      teamMap[team].totalFeatures++
-      if (f.violationCount > 0) {
-        teamMap[team].featuresWithViolations++
-        teamMap[team].totalViolations += f.violationCount
-      }
-      for (const vid of (f.violations || [])) {
-        const cat = ruleDefinitions.value[vid]?.category || 'unknown'
-        teamMap[team].byCategory[cat] = (teamMap[team].byCategory[cat] || 0) + 1
-      }
+  for (const f of allFeatures.value) {
+    const team = f.team || 'Unassigned'
+    if (!teamMap[team]) {
+      teamMap[team] = { team, totalFeatures: 0, featuresWithViolations: 0, totalViolations: 0, byCategory: {} }
+    }
+    teamMap[team].totalFeatures++
+    if (f.violationCount > 0) {
+      teamMap[team].featuresWithViolations++
+      teamMap[team].totalViolations += f.violationCount
+    }
+    for (const vid of (f.violations || [])) {
+      const cat = ruleDefinitions.value[vid]?.category || 'unknown'
+      teamMap[team].byCategory[cat] = (teamMap[team].byCategory[cat] || 0) + 1
     }
   }
   return Object.values(teamMap).sort((a, b) => b.totalViolations - a.totalViolations)
@@ -251,9 +318,60 @@ const tabs = [
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <button
+                @click="filters.openFilterModal()"
+                data-testid="hygiene-report-filters-button"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-primary-300 dark:hover:border-primary-600 transition-colors"
+              >
+                <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+                </svg>
+                <span>Filters</span>
+                <span
+                  v-if="filters.activeFieldCount.value > 0"
+                  class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
+                >{{ filters.activeFieldCount.value }}</span>
+              </button>
+              <button
+                v-if="filters.hasActiveFilters.value"
+                @click="filters.clearAllFilters()"
+                class="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+              >Clear</button>
+              <button
                 @click="openModal"
                 class="px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
               >Select Release</button>
+            </div>
+          </div>
+
+          <!-- Active filters: every value shown, grouped by field, each removable -->
+          <div
+            v-if="filters.hasActiveFilters.value"
+            class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/50 flex items-start gap-x-3 gap-y-1.5 flex-wrap text-[11px]"
+          >
+            <span class="text-gray-400 dark:text-gray-500 shrink-0 py-0.5">Filtered by:</span>
+            <div
+              v-for="(values, field) in filters.activeFilterDisplay.value"
+              :key="field"
+              class="flex items-center gap-1 flex-wrap"
+            >
+              <span class="text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wide">{{ filters.filterFieldLabel(field) }}</span>
+              <span
+                v-for="val in values"
+                :key="val"
+                class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+              >
+                {{ val }}
+                <button
+                  type="button"
+                  @click="filters.toggleFilterValue(field, val)"
+                  :title="'Remove ' + filters.filterFieldLabel(field) + ' filter: ' + val"
+                  class="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
+                >
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
             </div>
           </div>
         </template>
@@ -635,5 +753,8 @@ const tabs = [
         </div>
       </div>
     </Teleport>
+
+    <!-- Field filter modal -->
+    <ReportFilterModal :filters="filters" :available-filter-values="availableFilterValues" />
   </div>
 </template>

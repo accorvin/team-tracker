@@ -369,35 +369,6 @@ describe('missing-docs-required', function () {
   })
 })
 
-describe('missing-target-end', function () {
-  var rule = findRule('missing-target-end')
-
-  it('triggers for Feature in progress with no target end', function () {
-    var feature = makeFeature({ status: 'In Progress', issueType: 'Feature', targetEnd: null })
-    expect(rule.check(feature, {})).toBe(true)
-  })
-
-  it('triggers for Feature in Refinement with no target end', function () {
-    var feature = makeFeature({ status: 'Refinement', issueType: 'Feature', targetEnd: null })
-    expect(rule.check(feature, {})).toBe(true)
-  })
-
-  it('does not trigger when target end is set', function () {
-    var feature = makeFeature({ status: 'In Progress', issueType: 'Feature', targetEnd: '2026-06-01' })
-    expect(rule.check(feature, {})).toBe(false)
-  })
-
-  it('does not trigger for non-Feature types', function () {
-    var feature = makeFeature({ status: 'In Progress', issueType: 'Initiative', targetEnd: null })
-    expect(rule.check(feature, {})).toBe(false)
-  })
-
-  it('does not trigger for inactive status', function () {
-    var feature = makeFeature({ status: 'Closed', issueType: 'Feature', targetEnd: null })
-    expect(rule.check(feature, {})).toBe(false)
-  })
-})
-
 describe('missing-rice-score', function () {
   var rule = findRule('missing-rice-score')
 
@@ -532,8 +503,8 @@ describe('evaluateHygiene', function () {
     expect(Array.isArray(violations)).toBe(true)
   })
 
-  it('all 15 rules are registered', function () {
-    expect(hygieneRules.length).toBe(15)
+  it('all 14 rules are registered', function () {
+    expect(hygieneRules.length).toBe(14)
   })
 })
 

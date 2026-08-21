@@ -200,22 +200,6 @@ const hygieneRules = [
     }
   },
   {
-    id: 'missing-target-end',
-    name: 'Missing Target End',
-    description: 'Features in Refinement or In Progress must have a Target End date set for planning and tracking purposes.',
-    remediation: 'Open the issue in Jira and set the Target End date field.',
-    category: 'metadata',
-    defaultEnabled: true,
-    check: (issue) => {
-      if (issue.issueType !== 'Feature') return false
-      if (!isInRefinement(issue) && !isInProgress(issue)) return false
-      return !issue.targetEnd
-    },
-    message: (issue) => {
-      return `This feature is in ${issue.status} but has no Target End date. Set the target end date for planning.`
-    }
-  },
-  {
     id: 'missing-rice-score',
     name: 'Missing RICE Score',
     description: 'Features in Refinement must have RICE score set. Features In Progress for non-grandfathered releases also require RICE score.',

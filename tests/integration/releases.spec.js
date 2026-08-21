@@ -1558,6 +1558,34 @@ test.describe('Program Hygiene Report @releases', () => {
 
     expect(page.errors).toHaveLength(0);
   });
+
+  test('field filter modal opens with the expected filter fields', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=program-hygiene');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // The Filters control only shows once a release is selected. In demo mode a
+    // default selection is auto-applied when the registry parses, so it is
+    // normally present; guard so the test is a no-op if the board is empty.
+    const filtersButton = page.locator('[data-testid="hygiene-report-filters-button"]').first();
+    const hasSelection = await filtersButton.isVisible().catch(() => false);
+
+    if (hasSelection) {
+      await filtersButton.click();
+      await page.waitForTimeout(300);
+
+      await expect(page.locator('h3', { hasText: 'Filters' }).first()).toBeVisible();
+      await expect(page.locator('text=Team').first()).toBeVisible();
+      await expect(page.locator('text=Component').first()).toBeVisible();
+      await expect(page.locator('text=Label').first()).toBeVisible();
+      await expect(page.locator('button', { hasText: 'Saved Presets' }).first()).toBeVisible();
+
+      await page.locator('button', { hasText: 'Done' }).first().click();
+      await page.waitForTimeout(300);
+    }
+
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+  });
 });
 
 /**

@@ -693,6 +693,9 @@ module.exports = async function registerHygieneRoutes(router, context) {
             status: feature.status,
             team: feature.team || 'Unassigned',
             assignee: feature.assignee || 'Unassigned',
+            components: feature.components || [],
+            labels: feature.labels || [],
+            priority: feature.priority || null,
             violationCount: violations.length,
             violations: violations.map(function(vv) { return vv.id; })
           });
