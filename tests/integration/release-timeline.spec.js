@@ -46,8 +46,11 @@ test.describe('Release Timeline @release-timeline @releases', () => {
     var canvas = page.locator('canvas');
     await expect(canvas).toBeVisible();
 
-    // The milestone countdown cards should be visible above the timeline
-    var countdownCards = page.locator('text=/\\d+ DAYS|Today/');
+    // The milestone countdown cards should be visible above the timeline.
+    // Match the card element directly — the day count and the "DAYS" label are
+    // separate nodes (and "DAYS" is CSS-uppercased "days"), so a text regex like
+    // /\d+ DAYS/ never matches a single element.
+    var countdownCards = page.locator('[data-testid="milestone-countdown-card"]');
     var cardCount = await countdownCards.count();
     expect(cardCount).toBeGreaterThan(0);
 
