@@ -81,11 +81,15 @@ function serializeField(field) {
     const first = field[0]
     if (first && first.name) return first.name
     if (first && first.value) return first.value
+    // Avoid stringifying a label-less object to "[object Object]"
+    if (first && typeof first === 'object') return null
     return String(first)
   }
   if (field.name) return field.name
   if (field.value) return field.value
   if (field.title) return field.title
+  // Object with no readable label — return null rather than "[object Object]"
+  if (typeof field === 'object') return null
   return String(field)
 }
 

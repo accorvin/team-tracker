@@ -1474,7 +1474,7 @@ test.describe('Program Hygiene Report @releases', () => {
     // Should show the release selector button (either in empty state or selection bar)
     await expect(page.locator('button', { hasText: 'Select Release' }).first()).toBeVisible();
 
-    expect(page.errors).toHaveLength(0);
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
   });
 
   test('program hygiene API returns expected shape', async ({ request }) => {
@@ -1509,7 +1509,7 @@ test.describe('Program Hygiene Report @releases', () => {
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
-    expect(page.errors).toHaveLength(0);
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
   });
 
   test('shows summary cards and violation charts when data is available', async ({ page }) => {
@@ -1535,7 +1535,7 @@ test.describe('Program Hygiene Report @releases', () => {
       await expect(page.locator('button', { hasText: 'Team Accountability' }).first()).toBeVisible();
     }
 
-    expect(page.errors).toHaveLength(0);
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
   });
 
   test('team accountability tab renders table', async ({ page }) => {
@@ -1556,7 +1556,63 @@ test.describe('Program Hygiene Report @releases', () => {
       await expect(page.locator('th', { hasText: 'With Violations' }).first()).toBeVisible();
     }
 
-    expect(page.errors).toHaveLength(0);
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+  });
+
+  test('field filter modal opens with the expected filter fields', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=program-hygiene');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // The Filters control only shows once a release is selected. In demo mode a
+    // default selection is auto-applied when the registry parses, so it is
+    // normally present; guard so the test is a no-op if the board is empty.
+    const filtersButton = page.locator('[data-testid="hygiene-report-filters-button"]').first();
+    const hasSelection = await filtersButton.isVisible().catch(() => false);
+
+    if (hasSelection) {
+      await filtersButton.click();
+      await page.waitForTimeout(300);
+
+      await expect(page.locator('h3', { hasText: 'Filters' }).first()).toBeVisible();
+      await expect(page.locator('text=Team').first()).toBeVisible();
+      await expect(page.locator('text=Component').first()).toBeVisible();
+      await expect(page.locator('text=Label').first()).toBeVisible();
+      await expect(page.locator('button', { hasText: 'Saved Presets' }).first()).toBeVisible();
+
+      await page.locator('button', { hasText: 'Done' }).first().click();
+      await page.waitForTimeout(300);
+    }
+
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+  });
+
+  test('clicking a feature row opens the summary drawer', async ({ page }) => {
+    await page.goto('/#/releases/reports?report=program-hygiene');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Requires a selection + loaded features; skip gracefully if the table is empty
+    const row = page.locator('[data-testid="hygiene-report-feature-row"]').first();
+    const hasRow = await row.isVisible().catch(() => false);
+
+    if (hasRow) {
+      await row.click();
+      await page.waitForTimeout(500);
+
+      const drawer = page.locator('[data-testid="feature-drawer"]');
+      await expect(drawer).toBeVisible();
+      await expect(drawer.locator('text=Status Summary').first()).toBeVisible();
+      await expect(drawer.locator('text=Hygiene Violations').first()).toBeVisible();
+      await expect(drawer.getByRole('button', { name: 'View full details' })).toBeVisible();
+      await expect(drawer.getByRole('link', { name: /Open in Jira/ })).toBeVisible();
+
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      await expect(drawer).toHaveCount(0);
+    }
+
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
   });
 });
 

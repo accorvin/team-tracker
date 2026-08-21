@@ -53,8 +53,8 @@ describe('serializeField', function () {
     expect(serializeField([42])).toBe('42')
   })
 
-  it('stringifies object without name or value', function () {
-    expect(serializeField({ id: 123 })).toBe('[object Object]')
+  it('returns null for a label-less object (avoids "[object Object]")', function () {
+    expect(serializeField({ id: 123 })).toBeNull()
   })
 
   it('stringifies a number', function () {
