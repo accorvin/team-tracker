@@ -1622,9 +1622,11 @@ test.describe('Feature Status filtering @releases', () => {
     await page.locator('[data-testid="hygiene-release-selector"]').first().click();
     await page.waitForTimeout(300);
 
-    await expect(page.locator('text=Product Family').first()).toBeVisible();
-    await expect(page.locator('text=Version').first()).toBeVisible();
-    await expect(page.locator('text=Phase').first()).toBeVisible();
+    // Exact matches — the drawer/hero copy contains "Fix Version"/"Target Version",
+    // so a loose `text=Version` would match those hidden strings instead.
+    await expect(page.getByText('Product Family', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Version', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Phase', { exact: true }).first()).toBeVisible();
 
     await expect(page.locator('button', { hasText: 'Cancel' }).first()).toBeVisible();
     await expect(page.locator('button', { hasText: 'Apply' }).first()).toBeVisible();

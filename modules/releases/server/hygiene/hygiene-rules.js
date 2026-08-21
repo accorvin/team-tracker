@@ -15,6 +15,9 @@
 const REFINEMENT_STATUSES = ['Refinement']
 const IN_PROGRESS_STATUSES = ['In Progress', 'Review', 'Testing']
 const TERMINAL_STATUSES = ['Release Pending', 'Closed', 'Resolved']
+// "Later" lifecycle phases — after engineering has committed a delivery date.
+// Once here, the Target Version (the PM ask) should match the Fix Version.
+const LATER_STATUSES = IN_PROGRESS_STATUSES.concat(TERMINAL_STATUSES)
 
 function isInRefinement(issue) {
   return REFINEMENT_STATUSES.includes(issue.status)
@@ -291,6 +294,25 @@ const hygieneRules = [
     },
     message: () => {
       return 'This issue has a fix version but no Target Version set. Set the Target Version to track when this work was initially requested.'
+    }
+  },
+  {
+    id: 'target-fix-version-mismatch',
+    name: 'Target/Fix Version Mismatch',
+    description: 'Once engineering commits a Fix Version, the Target Version should be updated to match it. When the two resolve to different releases in a later phase, the plan of record (Target) and the delivery commitment (Fix) disagree.',
+    remediation: 'Update the Target Version to match the committed Fix Version — Fix Version is the source of truth once set.',
+    category: 'metadata',
+    defaultEnabled: true,
+    check: (issue) => {
+      if (issue.issueType !== 'Feature' && issue.issueType !== 'Initiative') return false
+      if (!LATER_STATUSES.includes(issue.status)) return false
+      if (!issue.fixReleaseId || !issue.targetReleaseId) return false
+      return issue.fixReleaseId !== issue.targetReleaseId
+    },
+    message: (issue) => {
+      const target = (issue.targetVersions && issue.targetVersions[0]) || issue.targetReleaseId
+      const fix = (issue.fixVersions && issue.fixVersions[0]) || issue.fixReleaseId
+      return `Target Version (${target}) does not match the committed Fix Version (${fix}). Update the Target Version to align with the Fix Version.`
     }
   },
   {

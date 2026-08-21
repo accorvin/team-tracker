@@ -298,10 +298,27 @@ onMounted(() => {
 
 <template>
   <div>
-    <!-- Purpose -->
-    <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">
-      Tracks hygiene-rule compliance for features in the selected release.
-    </p>
+    <!-- Purpose + how-versions-are-matched explainer -->
+    <div class="mb-3 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+      <span>Tracks hygiene-rule compliance for features in the selected release.</span>
+      <span class="relative group inline-flex shrink-0">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+          aria-label="How features are matched to a release"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+          </svg>
+          How releases are matched
+        </button>
+        <span
+          class="pointer-events-none absolute left-0 top-full z-30 mt-1.5 hidden w-96 max-w-[90vw] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-xs font-normal leading-relaxed text-gray-600 dark:text-gray-300 shadow-lg group-hover:block group-focus-within:block"
+        >
+          A feature appears under a release based on its <strong class="text-gray-900 dark:text-gray-100">Fix Version</strong> — the release engineering has committed to deliver in. Until a Fix Version is set, its <strong class="text-gray-900 dark:text-gray-100">Target Version</strong> (the PM's requested release) is used instead. When both are set and point to different releases, the Fix Version wins and a hygiene violation flags the mismatch so the Target Version can be realigned.
+        </span>
+      </span>
+    </div>
 
     <!-- Compact toolbar: release selector · filters · stats · rules -->
     <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-2.5 mb-6">
