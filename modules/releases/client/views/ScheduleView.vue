@@ -52,6 +52,7 @@
         <div
           v-for="card in upcomingMilestoneCards"
           :key="card.releaseName + '-' + card.type"
+          data-testid="milestone-countdown-card"
           class="flex-1 min-w-[140px] bg-white dark:bg-gray-800 border rounded-lg text-center py-5 px-4 transition-all hover:shadow-md"
           :class="card.days <= 7
             ? 'border-blue-300 dark:border-blue-600'
