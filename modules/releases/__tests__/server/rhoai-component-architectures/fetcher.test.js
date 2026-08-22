@@ -145,8 +145,9 @@ describe('rhoai-component-architectures fetcher integration', () => {
     expect(res._json.maturity.warning).toContain('GitLab down')
   })
 
-  it('skips maturity when GITLAB_CEE_TOKEN is not set', async () => {
+  it('fetches maturity without token when GITLAB_CEE_TOKEN is not set', async () => {
     setupOctokit()
+    mockMaturityFetch.mockResolvedValueOnce(makeMaturityResponse(MATURITY_COMPONENTS))
 
     const storage = makeStorage({
       [REGISTRY_KEY]: { releases: [{ id: 'rhoai-3.5' }] }
@@ -165,9 +166,10 @@ describe('rhoai-component-architectures fetcher integration', () => {
     await handler(makeReq(), res)
 
     expect(res._json.status).toBe('ok')
-    expect(res._json.maturity.available).toBe(false)
-    expect(res._json.maturity.warning).toContain('GITLAB_CEE_TOKEN not configured')
-    expect(mockMaturityFetch).not.toHaveBeenCalled()
+    expect(res._json.maturity.available).toBe(true)
+    expect(mockMaturityFetch).toHaveBeenCalledTimes(1)
+    const [, fetchOptions] = mockMaturityFetch.mock.calls[0]
+    expect(fetchOptions.headers).toBeUndefined()
   })
 
   it('preserves cached maturity on partial failure', async () => {

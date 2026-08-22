@@ -132,20 +132,15 @@ function registerRhoaiComponentArchitecturesFetcher(router, context) {
     let allProductComponents = []
     let maturityWarning = null
 
-    if (gitlabCeeToken) {
-      try {
-        console.log('[rhoai-component-architectures] Fetching component maturity mapping from gitlab.cee.redhat.com')
-        const maturityResult = await fetchMaturityMapping(gitlabCeeToken)
-        mapping = maturityResult.mapping
-        allProductComponents = maturityResult.allProductComponents
-        console.log(`[rhoai-component-architectures] Maturity mapping: ${Object.keys(mapping).length} images across ${allProductComponents.length} product components`)
-      } catch (err) {
-        maturityWarning = `Component maturity fetch failed: ${err.message}`
-        console.warn('[rhoai-component-architectures]', maturityWarning)
-      }
-    } else {
-      maturityWarning = 'GITLAB_CEE_TOKEN not configured — skipping component maturity mapping'
-      console.log('[rhoai-component-architectures]', maturityWarning)
+    try {
+      console.log('[rhoai-component-architectures] Fetching component maturity mapping from gitlab.cee.redhat.com')
+      const maturityResult = await fetchMaturityMapping(gitlabCeeToken || undefined)
+      mapping = maturityResult.mapping
+      allProductComponents = maturityResult.allProductComponents
+      console.log(`[rhoai-component-architectures] Maturity mapping: ${Object.keys(mapping).length} images across ${allProductComponents.length} product components`)
+    } catch (err) {
+      maturityWarning = `Component maturity fetch failed: ${err.message}`
+      console.warn('[rhoai-component-architectures]', maturityWarning)
     }
 
     if (mapping) {

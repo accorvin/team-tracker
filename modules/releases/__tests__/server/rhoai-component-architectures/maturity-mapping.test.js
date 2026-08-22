@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { fetchMaturityMapping, applyMaturityMapping, _setFetch } = require('../../../server/rhoai-component-architectures/maturity-mapping')
+const { fetchMaturityMapping, applyMaturityMapping, _setFetch, MATURITY_URL } = require('../../../server/rhoai-component-architectures/maturity-mapping')
 
 const mockFetch = vi.fn()
 
@@ -92,6 +92,26 @@ describe('fetchMaturityMapping', () => {
       { name: 'AI Pipelines', owner: null, team: null },
       { name: 'Serving Orchestration', owner: 'jdoe', team: 'Model Serving' }
     ])
+  })
+
+  it('fetches without Authorization header when no token is provided', async () => {
+    mockFetch.mockResolvedValueOnce(makeMaturityResponse(SAMPLE_COMPONENTS))
+
+    const result = await fetchMaturityMapping()
+
+    const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1]
+    expect(lastCall[0]).toBe(MATURITY_URL)
+    expect(lastCall[1].headers).toBeUndefined()
+    expect(result.mapping['odh-kserve-controller-rhel9']).toBe('Serving Orchestration')
+  })
+
+  it('sends Authorization header when token is provided', async () => {
+    mockFetch.mockResolvedValueOnce(makeMaturityResponse(SAMPLE_COMPONENTS))
+
+    await fetchMaturityMapping('my-token')
+
+    const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1]
+    expect(lastCall[1].headers).toEqual({ 'Authorization': 'Bearer my-token' })
   })
 
   it('extracts image short name from full registry path', async () => {
