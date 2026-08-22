@@ -1644,6 +1644,46 @@ async function dismissHygieneWelcome(page) {
   }
 }
 
+test.describe('Feature Execution Tracking @releases', () => {
+  test.beforeEach(async ({ page }) => {
+    setupErrorTracking(page);
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    logCapturedErrors(page, testInfo);
+  });
+
+  test('should load Feature Tracking view with Docs Required filter', async ({ page }) => {
+    // Navigate to Execute view (Feature Tracking is the default tab)
+    await page.goto('/#/releases/execute');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Verify the "Docs Required" filter is present (it might be the active chip or the placeholder)
+    // The placeholder is "Docs Required", but when an option is selected it changes (e.g. "Docs Required: Not Set")
+    // We use a broader locator to find the dropdown container
+    const filterContainer = page.locator('text=Docs Required').first();
+    await expect(filterContainer).toBeVisible();
+
+    // Click to open the dropdown
+    await filterContainer.click();
+    await page.waitForTimeout(500);
+
+    // Verify the expected options are present
+    await expect(page.locator('text=Clear all').first()).toBeVisible();
+    await expect(page.locator('text=Yes').first()).toBeVisible();
+    await expect(page.locator('text=No').first()).toBeVisible();
+    await expect(page.locator('text=Not Set').first()).toBeVisible();
+
+    // Close the dropdown
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    // Verify no errors occurred
+    expect(page.errors).toHaveLength(0);
+  });
+});
+
 test.describe('Feature Status filtering @releases', () => {
   test.beforeEach(async ({ page }) => {
     setupErrorTracking(page);
