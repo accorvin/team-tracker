@@ -69,12 +69,19 @@ test.describe('Release Timeline @release-timeline @releases', () => {
     var labelBefore = await page.locator('text=/\\d+d view/').first().textContent();
     var daysBefore = parseInt(labelBefore.match(/(\d+)d/)[1]);
 
-    // Zoom in
-    var cx = box.x + box.width * 0.3;
+    // Zoom in — dispatch synthetic WheelEvent with explicit clientX/clientY
+    // (page.mouse.wheel may not set clientX/clientY in headless Chromium,
+    // causing the onWheel handler to early-return when checking chart bounds)
+    var cx = box.x + box.width * 0.5;
     var cy = box.y + box.height * 0.5;
     for (var i = 0; i < 10; i++) {
-      await page.mouse.move(cx, cy);
-      await page.mouse.wheel(0, -200);
+      await page.evaluate(({ x, y }) => {
+        var canvas = document.querySelector('canvas');
+        canvas.dispatchEvent(new WheelEvent('wheel', {
+          clientX: x, clientY: y, deltaX: 0, deltaY: -200,
+          bubbles: true, cancelable: true
+        }));
+      }, { x: cx, y: cy });
       await page.waitForTimeout(50);
     }
     await page.waitForTimeout(500);
@@ -102,10 +109,17 @@ test.describe('Release Timeline @release-timeline @releases', () => {
     // Get initial label
     var labelBefore = await page.locator('text=/\\d+d view/').first().textContent();
 
-    // Zoom in
+    // Zoom in — dispatch synthetic WheelEvent with explicit clientX/clientY
+    var cx = box.x + box.width * 0.5;
+    var cy = box.y + box.height * 0.5;
     for (var i = 0; i < 10; i++) {
-      await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
-      await page.mouse.wheel(0, -200);
+      await page.evaluate(({ x, y }) => {
+        var canvas = document.querySelector('canvas');
+        canvas.dispatchEvent(new WheelEvent('wheel', {
+          clientX: x, clientY: y, deltaX: 0, deltaY: -200,
+          bubbles: true, cancelable: true
+        }));
+      }, { x: cx, y: cy });
       await page.waitForTimeout(50);
     }
     await page.waitForTimeout(500);

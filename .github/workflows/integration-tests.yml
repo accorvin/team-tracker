@@ -57,11 +57,16 @@ jobs:
             releases:
               - 'modules/releases/server/execution/**'
               - 'modules/releases/server/planning/**'
+              - 'modules/releases/server/rhoai-component-architectures/**'
               - 'modules/releases/client/views/FeatureDetailView.vue'
+              - 'modules/releases/client/views/ScheduleView.vue'
               - 'modules/releases/client/execute/**'
               - 'modules/releases/client/plan/**'
+              - 'modules/releases/client/components/ReleaseTimeline.vue'
+              - 'modules/releases/client/reports/RhoaiComponentArchitecturesReport.vue'
               - 'tests/integration/execution-data.spec.js'
               - 'tests/integration/releases.spec.js'
+              - 'tests/integration/release-timeline.spec.js'
             tv-fv-delta:
               - 'modules/releases/server/tv-fv-delta/**'
               - 'modules/releases/server/index.js'
@@ -144,7 +149,7 @@ jobs:
           check_module "package-analysis" \
             "^(modules/product-builds/server/(analysis|index)\.js|modules/product-builds/client/views/PackageAnalysisView\.vue|tests/integration/package-analysis\.spec\.js)"
           check_module "releases" \
-            "^(modules/releases/server/(execution|planning)/|modules/releases/client/views/FeatureDetailView\.vue|modules/releases/client/(execute|plan)/|tests/integration/(execution-data|releases)\.spec\.js)"
+            "^(modules/releases/server/(execution|planning|rhoai-component-architectures)/|modules/releases/client/views/(FeatureDetailView|ScheduleView)\.vue|modules/releases/client/(execute|plan)/|modules/releases/client/components/ReleaseTimeline\.vue|modules/releases/client/reports/RhoaiComponentArchitecturesReport\.vue|tests/integration/(execution-data|releases|release-timeline)\.spec\.js)"
           check_module "tv-fv-delta" \
             "^(modules/releases/server/(tv-fv-delta/|index\.js)|modules/releases/client/views/TvFvDeltaView\.vue|modules/releases/client/composables/use.*(TvFv|ReleasePicker|ComponentBreakdown)\.js|modules/releases/client/components/(FeatureTable|ClickableCount)\.vue|tests/integration/tv-fv-delta\.spec\.js)"
           check_module "feature-pressure" \
