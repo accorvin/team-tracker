@@ -1669,17 +1669,20 @@ test.describe('Feature Execution Tracking @releases', () => {
     await filterContainer.click();
     await page.waitForTimeout(500);
 
-    // Verify the expected options are present
-    await expect(page.locator('text=Yes').first()).toBeVisible();
-    await expect(page.locator('text=No').first()).toBeVisible();
-    await expect(page.locator('text=Not Set').first()).toBeVisible();
+    // Locate the opened dropdown menu
+    const dropdownMenu = page.locator('.absolute.z-30').first();
+
+    // Verify the expected options are present inside the dropdown
+    await expect(dropdownMenu.locator('text=Yes').first()).toBeVisible();
+    await expect(dropdownMenu.locator('text=No').first()).toBeVisible();
+    await expect(dropdownMenu.locator('text=Not Set').first()).toBeVisible();
 
     // Select "Not Set"
-    await page.locator('text=Not Set').first().click();
+    await dropdownMenu.locator('text=Not Set').first().click();
     await page.waitForTimeout(300);
 
     // Now Clear all should be visible because an option is selected
-    await expect(page.locator('text=Clear all').first()).toBeVisible();
+    await expect(dropdownMenu.locator('text=Clear all').first()).toBeVisible();
 
     // Close the dropdown
     await page.keyboard.press('Escape');
