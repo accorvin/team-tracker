@@ -482,7 +482,7 @@ describe('RhoaiComponentArchitecturesReport', () => {
     await flushPromises()
 
     const jiraLinks = wrapper.findAll('a').filter(a =>
-      a.attributes('href')?.includes('redhat.atlassian.net') &&
+      a.attributes('href')?.startsWith('https://redhat.atlassian.net') &&
       a.attributes('href')?.includes('RHAI') &&
       a.text() === 'JIRA'
     )
