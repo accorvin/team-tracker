@@ -150,6 +150,17 @@ describe('ReleaseTimeline', () => {
     expect(label.daysText).toMatch(/\d+d/)
   })
 
+  it('YOU ARE HERE text starts below the today dot bottom edge', () => {
+    var releases = [
+      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2028-12-01' })
+    ]
+    var vm = mount(ReleaseTimeline, { props: { releases } }).vm
+    expect(vm.TODAY_TEXT_START).toBeDefined()
+    expect(vm.TODAY_DOT_RADIUS).toBeDefined()
+    var dotBottom = vm.TODAY_DOT_RADIUS + vm.TODAY_DOT_BORDER + vm.DOT_HALO_PAD
+    expect(vm.TODAY_TEXT_START).toBeGreaterThan(dotBottom)
+  })
+
   it('hides Chart.js dots (drawn by plugin for z-order control)', () => {
     var releases = [
       makeRelease('rhoai-3.5', {
@@ -638,20 +649,7 @@ describe('ReleaseTimeline', () => {
     expect(m.aboveSpace).toBeGreaterThanOrEqual(134)
   })
 
-  it('overlapping boxes in same cycle trigger stacking', () => {
-    // Two milestones from the same cycle 2 days apart should trigger overlap at zoom
-    var releases = [
-      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
-        codeFreeze: '2026-08-18', ga: '2026-08-20' })
-    ]
-    var wrapper = mount(ReleaseTimeline, { props: { releases } })
-    var nodes = wrapper.vm.nodes
-    // Both nodes belong to the same cycle "3.5"
-    expect(nodes).toHaveLength(2)
-    expect(nodes[0].groupLabel).toBe(nodes[1].groupLabel)
-  })
-
-  it('boxes use canvas shadow for card-like depth effect', () => {
+  it('card renders for a single release', () => {
     var releases = [
       makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-08-20' })
     ]
@@ -743,38 +741,6 @@ describe('ReleaseTimeline', () => {
     var sides = wrapper.vm.cycleSides
     expect(sides['Infrastructure Refresh']).toBe(false)
     expect(sides['3.6 GA']).toBe(true)
-  })
-
-  it('overlapping same-cycle nodes have distinct stack levels for peek rendering', () => {
-    // Three milestones very close together in the same cycle should each get a stackLevel
-    var releases = [
-      makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
-        codeFreeze: '2026-09-10', ga: '2026-09-12' }),
-      makeRelease('rhoai-3.6.EA2', { displayName: 'rhoai-3.6.EA2', shortname: 'rhoai',
-        ga: '2026-09-11' })
-    ]
-    var wrapper = mount(ReleaseTimeline, { props: { releases } })
-    var nodes = wrapper.vm.nodes
-    // All three dates (Sep 10, 11, 12) are in the same cycle "3.6" and very close
-    var cycle36 = nodes.filter(function (n) { return n.groupLabel.indexOf('3.6') === 0 })
-    expect(cycle36.length).toBe(3)
-  })
-
-  it('peek only triggers when behind card is fully under the top card', () => {
-    // Two milestones far apart should both render as full cards, not peeks
-    var releases = [
-      makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
-        codeFreeze: '2026-09-15' }),
-      makeRelease('rhoai-3.6.EA2', { displayName: 'rhoai-3.6.EA2', shortname: 'rhoai',
-        ga: '2026-10-15' })
-    ]
-    var wrapper = mount(ReleaseTimeline, { props: { releases } })
-    var nodes = wrapper.vm.nodes
-    // Two nodes from the same cycle but 30 days apart — boxes should not fully overlap
-    expect(nodes).toHaveLength(2)
-    var d0 = new Date(nodes[0].date).getTime()
-    var d1 = new Date(nodes[1].date).getTime()
-    expect(Math.abs(d1 - d0)).toBeGreaterThan(20 * 86400000)
   })
 
   it('different release types on same date produce separate nodes', () => {
@@ -878,24 +844,6 @@ describe('ReleaseTimeline', () => {
     expect(lanes['3.5']).not.toBe(lanes['3.6'])
   })
 
-  it('stacking only applies within same cycle — cross-cycle cards never stack', () => {
-    // 3.5 GA and 3.6 EA1 GA on close dates but different cycles
-    var releases = [
-      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
-        ga: '2026-08-19' }),
-      makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
-        ga: '2026-08-20' })
-    ]
-    var wrapper = mount(ReleaseTimeline, { props: { releases } })
-    var nodes = wrapper.vm.allNodes
-    // Both nodes exist as separate entries
-    expect(nodes).toHaveLength(2)
-    // They are from different cycles — verify different groupLabels
-    var labels = nodes.map(function (n) { return n.groupLabel })
-    expect(labels).toContain('3.5 GA')
-    expect(labels).toContain('3.6 EA1')
-  })
-
   it('same-date milestones from different products produce separate nodes', () => {
     var releases = [
       makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
@@ -931,89 +879,6 @@ describe('ReleaseTimeline', () => {
     vi.useRealTimers()
   })
 
-  it('close same-cycle milestones stack so stems never orphan beyond card edges', () => {
-    // When milestones are close enough to stack, ALL of them must either:
-    // 1. Be the front card (stackLevel 0, has its own card), or
-    // 2. Be stacked (peek), meaning their dot is within the front card's box
-    // This ensures no stem points to empty space beyond a card edge.
-    // Test across multiple simulated "zoom levels" by varying date spacing.
-    var spacings = [
-      { name: '0d (same day)', offset: 0 },
-      { name: '1d', offset: 1 },
-      { name: '2d', offset: 2 },
-      { name: '3d', offset: 3 }
-    ]
-    for (var si = 0; si < spacings.length; si++) {
-      var off = spacings[si].offset
-      var d1 = '2026-10-15'
-      var d2 = localIso(2026, 9, 15 + off)
-      var d3 = localIso(2026, 9, 15 + off * 2)
-      var releases = [
-        makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
-          ga: d1 }),
-        makeRelease('rhoai-3.6.EA2', { displayName: 'rhoai-3.6.EA2', shortname: 'rhoai',
-          ga: d2 }),
-        makeRelease('rhoai-3.6.GA', { displayName: 'rhoai-3.6.GA', shortname: 'rhoai',
-          ga: d3 })
-      ]
-      var wrapper = mount(ReleaseTimeline, { props: { releases } })
-      var nodes = wrapper.vm.allNodes
-      // All nodes from same cycle — verify they share cycle and would be in the same stack group
-      for (var ni = 0; ni < nodes.length; ni++) {
-        var cycle = nodes[ni].groupLabel.match(/^(\d+\.\d+)/)[1]
-        expect(cycle).toBe('3.6')
-      }
-      // Verify all dates are within a small range (close milestones)
-      if (off > 0) {
-        var dates = nodes.map(function (n) { return new Date(n.date).getTime() })
-        var range = Math.max.apply(null, dates) - Math.min.apply(null, dates)
-        expect(range).toBeLessThanOrEqual(off * 2 * 86400000)
-      }
-    }
-  })
-
-  it('widely spaced milestones never stack regardless of zoom', () => {
-    // Milestones 30+ days apart should never stack — they always render as full cards
-    var releases = [
-      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
-        planningFreeze: '2026-06-01', featureFreeze: '2026-07-15',
-        codeFreeze: '2026-08-20', ga: '2026-10-01' })
-    ]
-    var wrapper = mount(ReleaseTimeline, { props: { releases } })
-    var nodes = wrapper.vm.allNodes
-    expect(nodes).toHaveLength(4)
-    // All dates are 30+ days apart — at any zoom, dots will be far apart
-    for (var i = 1; i < nodes.length; i++) {
-      var gap = new Date(nodes[i].date).getTime() - new Date(nodes[i - 1].date).getTime()
-      expect(gap).toBeGreaterThan(25 * 86400000)
-    }
-  })
-
-  it('every node retains stem-rendering data even when stacked (hard rule: dot → stem)', () => {
-    // Hard rule: if there's a dot, there's a stem.
-    // Stacking must never remove nodes from allNodes or strip their date/groupLabel.
-    // This ensures the stem drawing pass always has data for every dot.
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-08-14T12:00:00'))
-    var releases = [
-      makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
-        ga: '2026-10-15' }),
-      makeRelease('rhoai-3.6.EA2', { displayName: 'rhoai-3.6.EA2', shortname: 'rhoai',
-        ga: '2026-10-16' }),
-      makeRelease('rhoai-3.6.GA', { displayName: 'rhoai-3.6.GA', shortname: 'rhoai',
-        ga: '2026-10-17' })
-    ]
-    var wrapper = mount(ReleaseTimeline, { props: { releases } })
-    var nodes = wrapper.vm.allNodes
-    expect(nodes).toHaveLength(3)
-    for (var i = 0; i < nodes.length; i++) {
-      expect(nodes[i].date).toBeTruthy()
-      expect(nodes[i].groupLabel).toBeTruthy()
-      expect(typeof nodes[i].isPast).toBe('boolean')
-    }
-    vi.useRealTimers()
-  })
-
   it('different release types on same date produce separate nodes per groupLabel', () => {
     var releases = [
       makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
@@ -1029,29 +894,6 @@ describe('ReleaseTimeline', () => {
     expect(oct15.length).toBe(3)
     var labels = oct15.map(function (n) { return n.groupLabel }).sort()
     expect(labels).toEqual(['3.6 EA1', '3.6 EA2', '3.6 GA'])
-  })
-
-  it('penetration-based stacking: cards only stack when dot is inside front card area', () => {
-    // Widely spaced milestones (30+ days) within the same cycle should never stack
-    // because the dot would never penetrate 30% into the front card's box.
-    var releases = [
-      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai',
-        planningFreeze: '2026-06-01', featureFreeze: '2026-07-15',
-        codeFreeze: '2026-09-01', ga: '2026-10-15' })
-    ]
-    var wrapper = mount(ReleaseTimeline, { props: { releases } })
-    var nodes = wrapper.vm.allNodes
-    expect(nodes).toHaveLength(4)
-    // All 4 milestones from same cycle 3.6
-    for (var i = 0; i < nodes.length; i++) {
-      expect(nodes[i].groupLabel).toMatch(/3\.6/)
-      expect(nodes[i].date).toBeTruthy()
-    }
-    // Dates span months — dots will be far apart at any zoom, so no stacking
-    var dates = nodes.map(function (n) { return new Date(n.date).getTime() })
-    for (var j = 1; j < dates.length; j++) {
-      expect(dates[j] - dates[j - 1]).toBeGreaterThan(30 * 86400000)
-    }
   })
 
   // ---- Comprehensive rendering invariant tests across zoom levels ----
@@ -1229,7 +1071,7 @@ describe('ReleaseTimeline', () => {
     })
   })
 
-  describe('stacking and peek invariants', () => {
+  describe('node invariants', () => {
     it('different release types on same date produce separate nodes (no phantom merge)', () => {
       var releases = [
         makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
@@ -1256,7 +1098,6 @@ describe('ReleaseTimeline', () => {
       ]
       var wrapper = mount(ReleaseTimeline, { props: { releases } })
       var nodes = wrapper.vm.allNodes
-      // 3 milestones across 3 days — all preserved
       expect(nodes).toHaveLength(3)
       var dates = nodes.map(function (n) { return n.date })
       expect(dates).toContain('2026-10-14')
@@ -1265,30 +1106,7 @@ describe('ReleaseTimeline', () => {
       vi.useRealTimers()
     })
 
-    it('widely spaced milestones (30+ days) never stack at any zoom', () => {
-      var configs = [
-        { pf: '2026-06-01', cf: '2026-07-15', ga: '2026-09-01' },
-        { pf: '2026-03-01', cf: '2026-05-15', ga: '2026-08-01' },
-        { pf: '2026-01-01', cf: '2026-04-01', ga: '2026-07-01' }
-      ]
-      for (var si = 0; si < configs.length; si++) {
-        var c = configs[si]
-        var releases = [
-          makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai',
-            planningFreeze: c.pf, codeFreeze: c.cf, ga: c.ga })
-        ]
-        var wrapper = mount(ReleaseTimeline, { props: { releases } })
-        var nodes = wrapper.vm.allNodes
-        expect(nodes).toHaveLength(3)
-        for (var i = 1; i < nodes.length; i++) {
-          var d0 = new Date(nodes[i - 1].date).getTime()
-          var d1 = new Date(nodes[i].date).getTime()
-          expect(d1 - d0).toBeGreaterThan(25 * 86400000)
-        }
-      }
-    })
-
-    it('stacking never removes nodes — allNodes count is stable', () => {
+    it('allNodes count is stable regardless of overlap', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2026-08-14T12:00:00'))
       var releases = [
@@ -1301,14 +1119,12 @@ describe('ReleaseTimeline', () => {
       ]
       var wrapper = mount(ReleaseTimeline, { props: { releases } })
       var allCount = wrapper.vm.allNodes.length
-      // Same releases with hidePast — allNodes count unchanged
       var wrapper2 = mount(ReleaseTimeline, { props: { releases, hidePast: true } })
       expect(wrapper2.vm.allNodes.length).toBe(allCount)
       vi.useRealTimers()
     })
 
-    it('cross-cycle close dates never stack even when dots overlap', () => {
-      // Two cycles with milestones on the same day must NOT stack
+    it('cross-cycle close dates produce separate nodes', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2026-08-14T12:00:00'))
       var releases = [
@@ -1320,10 +1136,8 @@ describe('ReleaseTimeline', () => {
       var wrapper = mount(ReleaseTimeline, { props: { releases } })
       var nodes = wrapper.vm.allNodes
       expect(nodes).toHaveLength(2)
-      // Different cycles — must stay separate
       var labels = nodes.map(function (n) { return n.groupLabel })
       expect(labels[0]).not.toBe(labels[1])
-      // Different lanes
       var lanes = wrapper.vm.cycleLanes
       expect(lanes['3.5']).not.toBe(lanes['3.6'])
       vi.useRealTimers()
@@ -1366,8 +1180,8 @@ describe('ReleaseTimeline', () => {
 
     it('all nodes are included in dot rendering (every card gets a dot)', () => {
       var layouts = [
-        { x: 100, boxW: 80, above: true, stemLen: 40, groupLabel: '3.6 EA1', stackLevel: 0 },
-        { x: 110, boxW: 80, above: true, stemLen: 40, groupLabel: '3.6 GA', stackLevel: 1, stackTopIdx: 0 }
+        { x: 100, boxW: 80, above: true, stemLen: 40, groupLabel: '3.6 EA1' },
+        { x: 110, boxW: 80, above: true, stemLen: 40, groupLabel: '3.6 GA' }
       ]
       var dotOrder = []
       for (var doi = 0; doi < layouts.length; doi++) {
@@ -1428,197 +1242,30 @@ describe('ReleaseTimeline', () => {
     })
   })
 
-  describe('stacking and peek strips (applyStacking + countPeekStrips)', () => {
-    function getVm() {
-      var releases = [
-        makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai', ga: '2026-10-15' })
-      ]
-      return mount(ReleaseTimeline, { props: { releases } }).vm
-    }
-    function makeLayout(x, groupLabel, date, boxW, product, subLane) {
-      return {
-        x: x, boxW: boxW || 120, above: true, stackLevel: 0,
-        subLane: subLane !== undefined ? subLane : 0,
-        nd: { date: date, groupLabel: groupLabel, productList: product ? [product] : [] }
+  it('above/below assignment is per-groupLabel, not per-node', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-14T12:00:00'))
+    var releases = [
+      makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
+        planningFreeze: '2026-06-01', codeFreeze: '2026-07-01', ga: '2026-08-19' }),
+      makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
+        codeFreeze: '2026-09-10', ga: '2026-10-15' }),
+      makeRelease('rhoai-3.6.EA2', { displayName: 'rhoai-3.6.EA2', shortname: 'rhoai',
+        ga: '2026-10-16' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var sides = wrapper.vm.cycleSides
+    var nodes = wrapper.vm.allNodes
+    for (var i = 0; i < nodes.length; i++) {
+      var expectedSide = sides[nodes[i].groupLabel]
+      expect(expectedSide).toBeDefined()
+      var gl = nodes[i].groupLabel
+      var sameNodes = nodes.filter(function (n) { return n.groupLabel === gl })
+      for (var j = 0; j < sameNodes.length; j++) {
+        expect(sides[sameNodes[j].groupLabel]).toBe(expectedSide)
       }
     }
-    var TODAY = new Date('2026-08-14').getTime()
-
-    it('2 nodes, far apart: no stacking, 0 peeks', () => {
-      var vm = getVm()
-      var layouts = [
-        makeLayout(100, '3.6 GA', '2026-09-17'),
-        makeLayout(300, '3.6 GA', '2026-10-01')
-      ]
-      vm.applyStacking(layouts, TODAY)
-      expect(layouts[0].stackLevel).toBe(0)
-      expect(layouts[1].stackLevel).toBe(0)
-      expect(vm.countPeekStrips(layouts)).toBe(0)
-    })
-
-    it('2 nodes, overlapping boxes but large visible edge: no stacking at default threshold', () => {
-      var vm = getVm()
-      // x=200 (140-260) and x=250 (190-310): overlap, but visible edge = 50px > PEEK_W
-      var layouts = [
-        makeLayout(200, '3.6 GA', '2026-09-15'),
-        makeLayout(250, '3.6 GA', '2026-09-17')
-      ]
-      vm.applyStacking(layouts, TODAY)
-      var stacked = layouts.filter(function (l) { return l.stackLevel > 0 })
-      expect(stacked.length).toBe(0)
-      expect(vm.countPeekStrips(layouts)).toBe(0)
-    })
-
-    it('2 nodes, close dots with overlapping boxes: stacks, 1 peek', () => {
-      var vm = getVm()
-      // Dots 5px apart — boxes overlap so stacking triggers
-      var layouts = [
-        makeLayout(200, '3.6 GA', '2026-09-16'),
-        makeLayout(205, '3.6 GA', '2026-09-17')
-      ]
-      vm.applyStacking(layouts, TODAY)
-      var stacked = layouts.filter(function (l) { return l.stackLevel > 0 })
-      expect(stacked.length).toBe(1)
-      expect(vm.countPeekStrips(layouts)).toBe(1)
-    })
-
-    it('3 nodes, 2 with same x: each stacked node gets its own peek', () => {
-      var vm = getVm()
-      // Two nodes at x=255 (visible=5 ≤ 10 → stack), GA at x=260 is front
-      var layouts = [
-        makeLayout(255, '3.6 GA', '2026-09-16'),
-        makeLayout(255, '3.6 GA', '2026-09-16'),
-        makeLayout(260, '3.6 GA', '2026-09-17')
-      ]
-      vm.applyStacking(layouts, TODAY)
-      var stackedCount = layouts.filter(function (l) { return l.stackLevel > 0 }).length
-      var peekCount = vm.countPeekStrips(layouts)
-      expect(peekCount).toBe(stackedCount)
-    })
-
-    it('3 nodes, tight overlap with visible ≤ PEEK_W: 2 stacked, 2 peeks', () => {
-      var vm = getVm()
-      // Nodes 5px apart: x=250(190-310), x=255(195-315), x=260(200-320)
-      // Front=x=260 (closest to today). Behind x=255: visible = 200-195 = 5 ≤ 10 → stacks
-      // Behind x=250: visible = 200-190 = 10 ≤ 10 → stacks
-      var layouts = [
-        makeLayout(250, '3.6 GA', '2026-09-10'),
-        makeLayout(255, '3.6 GA', '2026-09-14'),
-        makeLayout(260, '3.6 GA', '2026-09-17')
-      ]
-      vm.applyStacking(layouts, TODAY)
-      var stackedCount = layouts.filter(function (l) { return l.stackLevel > 0 }).length
-      expect(stackedCount).toBe(2)
-      expect(vm.countPeekStrips(layouts)).toBe(2)
-    })
-
-    it('peek count equals stacked node count (no dedup)', () => {
-      var vm = getVm()
-      // 4 nodes tightly packed: x=255,255,258,260 (all visible ≤ 10)
-      var layouts = [
-        makeLayout(255, '3.6 GA', '2026-09-10'),
-        makeLayout(255, '3.6 GA', '2026-09-10'),
-        makeLayout(258, '3.6 GA', '2026-09-13'),
-        makeLayout(260, '3.6 GA', '2026-09-17')
-      ]
-      vm.applyStacking(layouts, TODAY)
-      var stackedCount = layouts.filter(function (l) { return l.stackLevel > 0 }).length
-      var peekCount = vm.countPeekStrips(layouts)
-      expect(peekCount).toBe(stackedCount)
-    })
-
-    it('stacks on any box overlap regardless of dot distance', () => {
-      var vm = getVm()
-      // Dots only 5px apart (was prevented by old MIN_DOT_GAP=12)
-      // Boxes at x=200 (140-260) and x=205 (145-265) overlap → must stack
-      var layouts = [
-        makeLayout(200, '3.6 GA', '2026-09-16'),
-        makeLayout(205, '3.6 GA', '2026-09-17')
-      ]
-      vm.applyStacking(layouts, TODAY)
-      var stacked = layouts.filter(function (l) { return l.stackLevel > 0 })
-      expect(stacked.length).toBe(1)
-    })
-
-    it('stacks when visible edge ≤ peekThreshold', () => {
-      var vm = getVm()
-      // x=200 (140-260) and x=252 (192-312): visible = 192-140 = 52px
-      // At threshold=10 (default) → no stack. At threshold=60 → stack.
-      var layouts = [
-        makeLayout(200, '3.6 GA', '2026-09-10'),
-        makeLayout(252, '3.6 GA', '2026-09-17')
-      ]
-      vm.applyStacking(layouts, TODAY, 10)
-      expect(layouts[0].stackLevel).toBe(0)
-
-      layouts[0].stackLevel = 0
-      layouts[1].stackLevel = 0
-      vm.applyStacking(layouts, TODAY, 60)
-      var stacked = layouts.filter(function (l) { return l.stackLevel > 0 })
-      expect(stacked.length).toBe(1)
-    })
-
-    it('does not stack when boxes do not overlap', () => {
-      var vm = getVm()
-      // Boxes at x=100 (40-160) and x=300 (240-360) — 80px gap
-      var layouts = [
-        makeLayout(100, '3.6 GA', '2026-09-17'),
-        makeLayout(300, '3.6 GA', '2026-10-01')
-      ]
-      vm.applyStacking(layouts, TODAY)
-      expect(layouts[0].stackLevel).toBe(0)
-      expect(layouts[1].stackLevel).toBe(0)
-    })
-
-    it('different cycles do not stack with each other', () => {
-      var vm = getVm()
-      var layouts = [
-        makeLayout(200, '3.5 GA', '2026-09-16', undefined, undefined, 0),
-        makeLayout(250, '3.6 GA', '2026-09-17', undefined, undefined, 1)
-      ]
-      vm.applyStacking(layouts, TODAY)
-      expect(layouts[0].stackLevel).toBe(0)
-      expect(layouts[1].stackLevel).toBe(0)
-      expect(vm.countPeekStrips(layouts)).toBe(0)
-    })
-
-    it('above and below nodes from same cycle do not stack', () => {
-      var vm = getVm()
-      var layouts = [
-        makeLayout(200, '3.6 GA', '2026-09-16'),
-        { x: 250, boxW: 120, above: false, stackLevel: 0, subLane: 0,
-          nd: { date: '2026-09-17', groupLabel: '3.6 GA' } }
-      ]
-      vm.applyStacking(layouts, TODAY)
-      expect(layouts[0].stackLevel).toBe(0)
-      expect(layouts[1].stackLevel).toBe(0)
-    })
-
-    it('above/below assignment is per-groupLabel, not per-node', () => {
-      vi.useFakeTimers()
-      vi.setSystemTime(new Date('2026-08-14T12:00:00'))
-      var releases = [
-        makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai',
-          planningFreeze: '2026-06-01', codeFreeze: '2026-07-01', ga: '2026-08-19' }),
-        makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai',
-          codeFreeze: '2026-09-10', ga: '2026-10-15' }),
-        makeRelease('rhoai-3.6.EA2', { displayName: 'rhoai-3.6.EA2', shortname: 'rhoai',
-          ga: '2026-10-16' })
-      ]
-      var wrapper = mount(ReleaseTimeline, { props: { releases } })
-      var sides = wrapper.vm.cycleSides
-      var nodes = wrapper.vm.allNodes
-      for (var i = 0; i < nodes.length; i++) {
-        var expectedSide = sides[nodes[i].groupLabel]
-        expect(expectedSide).toBeDefined()
-        var gl = nodes[i].groupLabel
-        var sameNodes = nodes.filter(function (n) { return n.groupLabel === gl })
-        for (var j = 0; j < sameNodes.length; j++) {
-          expect(sides[sameNodes[j].groupLabel]).toBe(expectedSide)
-        }
-      }
-      vi.useRealTimers()
-    })
+    vi.useRealTimers()
   })
 
   describe('visual overlap protection', () => {
@@ -1633,16 +1280,14 @@ describe('ReleaseTimeline', () => {
       ]
       var wrapper = mount(ReleaseTimeline, { props: { releases } })
       var nodes = wrapper.vm.allNodes
-      // Both nodes exist — stacking only affects rendering, not data
       expect(nodes).toHaveLength(2)
       expect(nodes[0].date).toBe('2026-10-15')
       expect(nodes[1].date).toBe('2026-10-16')
       vi.useRealTimers()
     })
 
-    it('behind card is never orphaned: either full card or has peek', () => {
-      // At every spacing, a behind card must either render fully or generate a peek.
-      // This test verifies the data invariant: every node retains all rendering fields.
+    it('every node retains all rendering fields at any spacing', () => {
+      // This test verifies every node retains all rendering fields at any spacing.
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2026-08-14T12:00:00'))
       var offsets = [0, 1, 2, 3, 5, 7, 10, 14, 30]
@@ -1656,7 +1301,7 @@ describe('ReleaseTimeline', () => {
         ]
         var wrapper = mount(ReleaseTimeline, { props: { releases } })
         var nodes = wrapper.vm.allNodes
-        // Every node must have complete data for rendering (card or peek)
+        // Every node must have complete data for rendering
         for (var ni = 0; ni < nodes.length; ni++) {
           expect(nodes[ni].date).toBeTruthy()
           expect(nodes[ni].groupLabel).toMatch(/3\.6/)
@@ -1710,115 +1355,31 @@ describe('ReleaseTimeline', () => {
     vi.useRealTimers()
   })
 
-  describe('rendering contract — stem, dot, peek invariants', () => {
-    function getVm() {
-      var releases = [
-        makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai', ga: '2026-10-15' })
-      ]
-      return mount(ReleaseTimeline, { props: { releases } }).vm
-    }
+  describe('rendering contract', () => {
     function makeLayout(x, groupLabel, date, boxW, product, subLane) {
       return {
-        x: x, boxW: boxW || 120, above: true, stackLevel: 0,
+        x: x, boxW: boxW || 120, above: true,
         subLane: subLane !== undefined ? subLane : 0,
         nd: { date: date, groupLabel: groupLabel, productList: product ? [product] : [] }
       }
     }
-    var TODAY = new Date('2026-08-14').getTime()
 
     it('dots render at layout.x (real date position), not stemTargetX', () => {
-      var vm = getVm()
       var layouts = [
         makeLayout(200, '3.6 GA', '2026-09-10'),
         makeLayout(205, '3.6 GA', '2026-09-17')
       ]
-      vm.applyStacking(layouts, TODAY)
       for (var i = 0; i < layouts.length; i++) {
         expect(layouts[i].stemTargetX).toBeUndefined()
         expect(layouts[i].x).toBeDefined()
       }
     })
 
-    it('no stacking when visible edge > threshold', () => {
-      var vm = getVm()
-      // x=200 and x=250: visible = 190-140 = 50px > 10
-      var layouts = [
-        makeLayout(200, '3.6 GA', '2026-09-10'),
-        makeLayout(250, '3.6 GA', '2026-09-17')
-      ]
-      vm.applyStacking(layouts, TODAY, 10)
-      expect(layouts[0].stackLevel).toBe(0)
-      expect(layouts[1].stackLevel).toBe(0)
-    })
-
-    it('stacking when visible edge ≤ threshold', () => {
-      var vm = getVm()
-      // x=252 and x=260: visible = (260-60)-(252-60) = 200-192 = 8 ≤ 10
-      var layouts = [
-        makeLayout(252, '3.6 GA', '2026-09-10'),
-        makeLayout(260, '3.6 GA', '2026-09-17')
-      ]
-      vm.applyStacking(layouts, TODAY, 10)
-      var stacked = layouts.filter(function (l) { return l.stackLevel > 0 })
-      expect(stacked.length).toBe(1)
-    })
-
-    it('zoom-scaled threshold: same positions stack or not based on threshold', () => {
-      var vm = getVm()
-      // x=200 and x=240: visible = (240-60)-(200-60) = 180-140 = 40
-      var layouts = [
-        makeLayout(200, '3.6 GA', '2026-09-10'),
-        makeLayout(240, '3.6 GA', '2026-09-17')
-      ]
-      vm.applyStacking(layouts, TODAY, 10)
-      expect(layouts[0].stackLevel).toBe(0)
-
-      layouts[0].stackLevel = 0
-      layouts[1].stackLevel = 0
-      vm.applyStacking(layouts, TODAY, 45)
-      var stacked = layouts.filter(function (l) { return l.stackLevel > 0 })
-      expect(stacked.length).toBe(1)
-    })
-
-    it('peek count always equals stacked count', () => {
-      var vm = getVm()
-      // 3 tightly packed nodes: front=x=260, behind visible ≤ 10
-      var layouts = [
-        makeLayout(252, '3.6 GA', '2026-09-10'),
-        makeLayout(256, '3.6 GA', '2026-09-14'),
-        makeLayout(260, '3.6 GA', '2026-09-17')
-      ]
-      vm.applyStacking(layouts, TODAY, 10)
-      var stackedCount = layouts.filter(function (l) { return l.stackLevel > 0 }).length
-      expect(stackedCount).toBe(2)
-      expect(vm.countPeekStrips(layouts)).toBe(stackedCount)
-    })
-
-    it('cross-cycle never stacks even with overlapping boxes', () => {
-      var vm = getVm()
-      var layouts = [
-        makeLayout(258, '3.5 GA', '2026-09-10', undefined, undefined, 0),
-        makeLayout(260, '3.6 GA', '2026-09-17', undefined, undefined, 1)
-      ]
-      vm.applyStacking(layouts, TODAY, 10)
-      expect(layouts[0].stackLevel).toBe(0)
-      expect(layouts[1].stackLevel).toBe(0)
-    })
-
-    it('fully enclosed card (visible ≤ 0) stacks', () => {
-      var vm = getVm()
-      // x=260 and x=260: visible = 0 ≤ 10 → stacks
-      var layouts = [
-        makeLayout(260, '3.6 GA', '2026-09-10'),
-        makeLayout(260, '3.6 GA', '2026-09-17')
-      ]
-      vm.applyStacking(layouts, TODAY, 10)
-      var stacked = layouts.filter(function (l) { return l.stackLevel > 0 })
-      expect(stacked.length).toBe(1)
-    })
-
     it('hexToRgba converts hex color to rgba string', () => {
-      var vm = getVm()
+      var releases = [
+        makeRelease('rhoai-3.6.EA1', { displayName: 'rhoai-3.6.EA1', shortname: 'rhoai', ga: '2026-10-15' })
+      ]
+      var vm = mount(ReleaseTimeline, { props: { releases } }).vm
       var fn = vm.hexToRgba
       expect(fn('#374151', 0.5)).toBe('rgba(55,65,81,0.5)')
       expect(fn('#ff0000', 0)).toBe('rgba(255,0,0,0)')
@@ -1931,58 +1492,6 @@ describe('ReleaseTimeline', () => {
     var nodes = wrapper.vm.allNodes
     expect(nodes.length).toBe(1)
     expect(nodes[0].groupLabel).toBe('Infrastructure Refresh')
-  })
-
-  it('different products on different subLanes do not stack', () => {
-    var releases = [
-      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-10-15' })
-    ]
-    var vm = mount(ReleaseTimeline, { props: { releases } }).vm
-    var layouts = [
-      { x: 100, boxW: 120, above: true, stackLevel: 0, subLane: 0,
-        nd: { date: '2026-10-15', groupLabel: '3.6 GA', productList: ['rhoai'] } },
-      { x: 105, boxW: 120, above: true, stackLevel: 0, subLane: 1,
-        nd: { date: '2026-10-16', groupLabel: '3.6 GA', productList: ['rhelai'] } }
-    ]
-    vm.applyStacking(layouts, new Date('2026-08-14').getTime(), 10)
-    expect(layouts[0].stackTopIdx).toBeUndefined()
-    expect(layouts[1].stackTopIdx).toBeUndefined()
-  })
-
-  it('same subLane cross-product cards stack together (merge-mode scenario)', () => {
-    var releases = [
-      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-10-15' })
-    ]
-    var vm = mount(ReleaseTimeline, { props: { releases } }).vm
-    var layouts = [
-      { x: 200, boxW: 120, above: true, stackLevel: 0, subLane: 0,
-        nd: { date: '2026-09-15', groupLabel: '3.6 GA', productList: ['rhoai'] } },
-      { x: 205, boxW: 120, above: true, stackLevel: 0, subLane: 0,
-        nd: { date: '2026-09-15', groupLabel: '3.6 Code Freeze', productList: ['rhelai'] } }
-    ]
-    vm.applyStacking(layouts, new Date('2026-08-14').getTime(), 10)
-    var stacked = layouts.filter(function (l) { return l.stackLevel > 0 })
-    expect(stacked.length).toBe(1)
-    expect(stacked[0].stackTopIdx).toBe(0)
-  })
-
-  it('stacked card retains node data (groupLabel, msLabel, productList)', () => {
-    var releases = [
-      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-10-15' })
-    ]
-    var vm = mount(ReleaseTimeline, { props: { releases } }).vm
-    var layouts = [
-      { x: 200, boxW: 120, above: true, stackLevel: 0, subLane: 0,
-        nd: { date: '2026-09-15', groupLabel: '3.6 GA', productList: ['rhoai'], msLabel: 'Generally Available' } },
-      { x: 205, boxW: 120, above: true, stackLevel: 0, subLane: 0,
-        nd: { date: '2026-09-15', groupLabel: '3.6 EA2', productList: ['rhelai'], msLabel: 'Code Freeze' } }
-    ]
-    vm.applyStacking(layouts, new Date('2026-08-14').getTime(), 10)
-    var behind = layouts.filter(function (l) { return l.stackLevel > 0 })
-    expect(behind.length).toBe(1)
-    expect(behind[0].nd).toHaveProperty('groupLabel')
-    expect(behind[0].nd).toHaveProperty('msLabel')
-    expect(behind[0].nd).toHaveProperty('productList')
   })
 
   it('two versions distribute above and below', () => {
@@ -2099,7 +1608,7 @@ describe('ReleaseTimeline', () => {
     function futureDate(daysAhead) {
       var d = new Date()
       d.setDate(d.getDate() + daysAhead)
-      return d.toISOString().split('T')[0]
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
     }
 
     it('versioned groupLabels pass the dim line eligibility filter', () => {
@@ -2208,15 +1717,15 @@ describe('ReleaseTimeline', () => {
     it('nextMilestoneLabel includes product prefix and milestone for GA', () => {
       var releases = [
         makeRelease('rhoai-3.5', { displayName: '3.5 GA RHOAI RELEASE', shortname: 'rhoai',
-          ga: futureDate(1) })
+          ga: futureDate(3) })
       ]
       var wrapper = mount(ReleaseTimeline, { props: { releases } })
       var nml = wrapper.vm.nextMilestoneLabel
       expect(nml).not.toBeNull()
       expect(nml.desc).toContain('RHOAI')
       expect(nml.desc).toContain('3.5 GA')
-      expect(nml.desc).toContain('Generally Available')
-      expect(nml.daysText).toBe('in 1d')
+      expect(nml.msLabel).toBe('Generally Available')
+      expect(nml.daysText).toBe('in 3d')
     })
 
     it('nextMilestoneLabel includes product prefix for non-GA milestone', () => {
@@ -2228,7 +1737,7 @@ describe('ReleaseTimeline', () => {
       var nml = wrapper.vm.nextMilestoneLabel
       expect(nml).not.toBeNull()
       expect(nml.desc).toContain('RHOAI')
-      expect(nml.desc).toContain('Feature Freeze')
+      expect(nml.msLabel).toBe('Feature Freeze')
     })
 
     it('nextMilestoneLabel omits product prefix for non-product releases', () => {

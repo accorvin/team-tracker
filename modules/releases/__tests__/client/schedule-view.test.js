@@ -7,6 +7,10 @@ vi.mock('@shared/client/services/api.js', () => ({
 
 import { apiRequest } from '@shared/client/services/api.js'
 import ScheduleView from '../../client/views/ScheduleView.vue'
+
+function localDateStr(date) {
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0')
+}
 const ReleaseTimelineStub = { template: '<div class="timeline-stub"></div>', props: ['releases'] }
 
 function makeRelease(id, opts = {}) {
@@ -135,7 +139,7 @@ describe('ScheduleView', () => {
   it('shows global next milestone banner', async () => {
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + 5)
-    const dateStr = futureDate.toISOString().split('T')[0]
+    const dateStr = localDateStr(futureDate)
 
     apiRequest.mockResolvedValue({
       releases: [
@@ -160,7 +164,6 @@ describe('ScheduleView', () => {
     const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('All')
     expect(wrapper.text()).toContain('rhoai')
     expect(wrapper.text()).toContain('rhelai')
   })
@@ -185,6 +188,55 @@ describe('ScheduleView', () => {
     expect(wrapper.text()).not.toContain('RHELAI-1.0')
   })
 
+  it('product pills support multi-select with Clear button', async () => {
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5', { shortname: 'rhoai', ga: '2026-09-15' }),
+        makeRelease('rhelai-1.0', { shortname: 'rhelai', displayName: 'RHELAI-1.0', ga: '2026-10-01' }),
+        makeRelease('rhaii-1.0', { shortname: 'rhaii', displayName: 'RHAII-1.0', ga: '2026-11-01' })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+
+    var buttons = wrapper.findAll('button')
+    var rhoaiBtn = buttons.find(b => b.text() === 'rhoai')
+    var rhelaiBtn = buttons.find(b => b.text() === 'rhelai')
+    await rhoaiBtn.trigger('click')
+    await rhelaiBtn.trigger('click')
+
+    expect(wrapper.text()).toContain('RHOAI-3.5')
+    expect(wrapper.text()).toContain('RHELAI-1.0')
+    expect(wrapper.text()).not.toContain('RHAII-1.0')
+
+    var clearBtn = wrapper.findAll('button').find(b => b.text() === 'Clear')
+    expect(clearBtn).toBeTruthy()
+    await clearBtn.trigger('click')
+
+    expect(wrapper.text()).toContain('RHOAI-3.5')
+    expect(wrapper.text()).toContain('RHELAI-1.0')
+    expect(wrapper.text()).toContain('RHAII-1.0')
+  })
+
+  it('shows filter controls and empty message when filters produce no results', async () => {
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5', { shortname: 'rhoai', ga: '2024-01-01' }),
+        makeRelease('rhelai-1.0', { shortname: 'rhelai', displayName: 'RHELAI-1.0', ga: '2024-02-01' })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+
+    var rhoaiBtn = wrapper.findAll('button').find(b => b.text() === 'rhoai')
+    await rhoaiBtn.trigger('click')
+
+    expect(wrapper.text()).toContain('No releases match the current filters')
+    expect(wrapper.text()).toContain('rhoai')
+    expect(wrapper.text()).toContain('rhelai')
+    expect(wrapper.findAll('button').find(b => b.text() === 'Clear')).toBeTruthy()
+  })
+
   it('calls the correct API endpoint', async () => {
     apiRequest.mockResolvedValue({ releases: [] })
     mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
@@ -195,7 +247,7 @@ describe('ScheduleView', () => {
   it('shows countdown text for future milestones', async () => {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
-    const dateStr = tomorrow.toISOString().split('T')[0]
+    const dateStr = localDateStr(tomorrow)
 
     apiRequest.mockResolvedValue({
       releases: [
@@ -210,7 +262,7 @@ describe('ScheduleView', () => {
 
   it('shows "Today" for milestones due today', async () => {
     const today = new Date()
-    const dateStr = today.toISOString().split('T')[0]
+    const dateStr = localDateStr(today)
 
     apiRequest.mockResolvedValue({
       releases: [
@@ -226,7 +278,7 @@ describe('ScheduleView', () => {
   it('shows "d ago" for past milestones', async () => {
     const past = new Date()
     past.setDate(past.getDate() - 3)
-    const dateStr = past.toISOString().split('T')[0]
+    const dateStr = localDateStr(past)
 
     apiRequest.mockResolvedValue({
       releases: [
