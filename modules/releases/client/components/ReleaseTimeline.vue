@@ -286,10 +286,10 @@ var stableCycleRowMap = computed(function () {
   aboveKeys.sort(function (a, b) { return sortKey(a) - sortKey(b) })
   versionedBelow.sort(function (a, b) { return sortKey(a) - sortKey(b) })
   nonVersionedBelow.sort(function (a, b) { return sortKey(a) - sortKey(b) })
-  var belowKeys = versionedBelow.concat(nonVersionedBelow)
   var map = {}
-  for (var ai = 0; ai < aboveKeys.length; ai++) map[aboveKeys[ai]] = ai
-  for (var bi = 0; bi < belowKeys.length; bi++) map[belowKeys[bi]] = bi
+  for (var ai = 0; ai < aboveKeys.length; ai++) map[aboveKeys[ai]] = aboveKeys.length - 1 - ai
+  for (var bi = 0; bi < versionedBelow.length; bi++) map[versionedBelow[bi]] = versionedBelow.length - 1 - bi
+  for (var nbi = 0; nbi < nonVersionedBelow.length; nbi++) map[nonVersionedBelow[nbi]] = versionedBelow.length + nbi
   return map
 })
 
@@ -395,9 +395,14 @@ var fullRange = computed(function () {
   var first = parseDate(n[0].date)
   var last = parseDate(n[n.length - 1].date)
   if (!first || !last) return { min: 0, max: 1 }
-  var range = last.getTime() - first.getTime()
+  var today = new Date()
+  today.setHours(0, 0, 0, 0)
+  var todayTs = today.getTime()
+  var minTs = Math.min(first.getTime(), todayTs)
+  var maxTs = Math.max(last.getTime(), todayTs)
+  var range = maxTs - minTs
   var pad = Math.max(range * 0.05, 86400000 * 7)
-  return { min: first.getTime() - pad, max: last.getTime() + pad }
+  return { min: minTs - pad, max: maxTs + pad }
 })
 
 var DAY_MS = 86400000
@@ -428,9 +433,8 @@ var defaultRange = computed(function () {
     var windowSpan = DEFAULT_WINDOW_DAYS * DAY_MS
     var min = todayTs - padLeft
     var max = min + windowSpan
-    if (min < full.min) { min = full.min; max = min + windowSpan }
     if (max > full.max) { max = full.max; min = max - windowSpan }
-    if (min < full.min) min = full.min
+    if (min > todayTs - padLeft) min = todayTs - padLeft
     if (max <= min) return capRange(full, full)
     return { min: min, max: max }
   }
@@ -1307,6 +1311,32 @@ var timelinePlugin = {
                       _hoveredBox.w + 2, _hoveredBox.h + 2, 5)
       ctx.stroke()
       ctx.restore()
+
+      var hoverDays = daysFromNow(_hoveredBox.nd.date)
+      var hoverDaysText = hoverDays === null ? null
+        : hoverDays === 0 ? 'today'
+        : hoverDays > 0 ? 'in ' + hoverDays + 'd'
+        : Math.abs(hoverDays) + 'd ago'
+      if (hoverDaysText) {
+        ctx.save()
+        ctx.font = 'bold 10px ' + FONT
+        var badgeW = ctx.measureText(hoverDaysText).width + 8
+        var badgeH = 16
+        var badgeX = _hoveredBox.x - badgeW / 2
+        var badgeY = _hoveredBox.y - badgeH / 2
+        if (badgeX < area.left) badgeX = area.left
+        if (badgeX + badgeW > area.right) badgeX = area.right - badgeW
+        if (badgeY < area.top) badgeY = area.top
+        var badgeColor = hoverHex || (dark ? '#60a5fa' : '#3b82f6')
+        drawRoundedRect(ctx, badgeX, badgeY, badgeW, badgeH, 8)
+        ctx.fillStyle = badgeColor
+        ctx.fill()
+        ctx.fillStyle = '#ffffff'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(hoverDaysText, badgeX + badgeW / 2, badgeY + badgeH / 2)
+        ctx.restore()
+      }
     }
 
     ctx.restore()

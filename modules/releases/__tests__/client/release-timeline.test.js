@@ -626,6 +626,24 @@ describe('ReleaseTimeline', () => {
     expect(range.max - lastTs).toBeGreaterThanOrEqual(7 * 86400000)
   })
 
+  it('fullRange always includes today so pan can reach the today marker', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-23T00:00:00'))
+    try {
+      var todayTs = new Date('2026-08-23T00:00:00').getTime()
+      var releases = [
+        makeRelease('rhoai-3.5.ea1', { displayName: 'rhoai-3.5.EA1', shortname: 'rhoai', ga: '2026-09-15' }),
+        makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-11-24' })
+      ]
+      var wrapper = mount(ReleaseTimeline, { props: { releases, hidePast: true } })
+      var range = wrapper.vm.fullRange
+      expect(range.min).toBeLessThan(todayTs)
+      expect(range.max).toBeGreaterThan(todayTs)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('single dataset when all nodes are past or future (no today marker)', () => {
     var releases = [
       makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2090-06-17' })
@@ -684,6 +702,25 @@ describe('ReleaseTimeline', () => {
     expect(leftPortion).toBeLessThan(0.45)
     expect(leftPortion).toBeGreaterThan(0.15)
     vi.useRealTimers()
+  })
+
+  it('defaultRange includes today when hidePast is true and all milestones are far in the future', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-23T00:00:00'))
+    try {
+      var todayTs = new Date('2026-08-23T00:00:00').getTime()
+      var releases = [
+        makeRelease('rhoai-3.5.ea1', { displayName: 'rhoai-3.5.EA1', shortname: 'rhoai', ga: '2026-09-15' }),
+        makeRelease('rhoai-3.5.ea2', { displayName: 'rhoai-3.5.EA2', shortname: 'rhoai', ga: '2026-10-13' }),
+        makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-11-24' })
+      ]
+      var wrapper = mount(ReleaseTimeline, { props: { releases, hidePast: true } })
+      var range = wrapper.vm.defaultRange
+      expect(range.min).toBeLessThanOrEqual(todayTs)
+      expect(range.max).toBeGreaterThan(todayTs)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('layoutMetrics exposes safeOff for stable stem computation', () => {
@@ -1388,7 +1425,7 @@ describe('ReleaseTimeline', () => {
     })
   })
 
-  it('stableCycleRowMap assigns row 0 to cycle with earliest GA on same side', () => {
+  it('stableCycleRowMap assigns nearest row to cycle with latest GA on same side', () => {
     vi.useFakeTimers()
     try {
       vi.setSystemTime(new Date(2026, 7, 1))
@@ -1409,7 +1446,7 @@ describe('ReleaseTimeline', () => {
       var belowKeys = keys.filter(function (k) { return k.endsWith('-b') })
       var sameSide = aboveKeys.length >= 2 ? aboveKeys : belowKeys
       expect(sameSide.length).toBeGreaterThanOrEqual(2)
-      // Within same side, earlier GA should get lower row index
+      // Later GA gets lower row index (closer to axis)
       var sorted = sameSide.slice().sort(function (a, b) { return rowMap[a] - rowMap[b] })
       for (var i = 0; i < sorted.length - 1; i++) {
         expect(rowMap[sorted[i]]).toBeLessThan(rowMap[sorted[i + 1]])
@@ -1432,6 +1469,27 @@ describe('ReleaseTimeline', () => {
     var map1 = JSON.stringify(wrapper.vm.stableCycleRowMap)
     var map2 = JSON.stringify(wrapper.vm.stableCycleRowMap)
     expect(map1).toBe(map2)
+  })
+
+  it('latest cycle gets lowest row index (closest to axis)', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date(2026, 7, 1))
+      var releases = [
+        makeRelease('rhoai-3.4', { ga: '2026-09-01' }),
+        makeRelease('rhoai-3.5', { ga: '2026-11-01' }),
+        makeRelease('rhoai-3.6', { ga: '2027-02-01' })
+      ]
+      var wrapper = mount(ReleaseTimeline, { props: { releases, hidePast: false } })
+      var rowMap = wrapper.vm.stableCycleRowMap
+      var aboveKeys = Object.keys(rowMap).filter(function (k) { return k.endsWith('-a') })
+      var belowKeys = Object.keys(rowMap).filter(function (k) { return k.endsWith('-b') })
+      var sameSide = aboveKeys.length >= 2 ? aboveKeys : belowKeys
+      sameSide.sort(function (a, b) { return rowMap[a] - rowMap[b] })
+      expect(sameSide[0]).toMatch(/3\.6/)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('non-GA nodes have productList populated', () => {
@@ -1581,7 +1639,7 @@ describe('ReleaseTimeline', () => {
     expect(sides[nodes[0].groupLabel]).not.toBe(sides[nodes[1].groupLabel])
   })
 
-  it('non-versioned releases get highest below-axis row index', () => {
+  it('non-versioned releases get highest below-axis row index (farthest from axis)', () => {
     var releases = [
       makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-10-15' }),
       makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-11-15' }),
