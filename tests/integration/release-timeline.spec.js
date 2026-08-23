@@ -38,6 +38,70 @@ test.describe('Release Timeline @release-timeline @releases', () => {
     expect(page.errors).toHaveLength(0);
   });
 
+  test('today marker pulse dot is visible on the timeline', async ({ page }) => {
+    await page.goto('/#/releases/schedule');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // The "YOU ARE HERE" marker is a pulsing red dot overlay positioned by _todayPx
+    var todayPulse = page.locator('.animate-ping');
+    await expect(todayPulse).toBeVisible();
+
+    // The solid red dot next to the ping animation
+    var todayDot = page.locator('.bg-red-500, .dark\\:bg-red-400');
+    await expect(todayDot.first()).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('today marker is reachable after panning right and back', async ({ page }) => {
+    await page.goto('/#/releases/schedule');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    var canvas = page.locator('canvas');
+    var box = await canvas.boundingBox();
+
+    // Confirm today marker is visible initially
+    var todayPulse = page.locator('.animate-ping');
+    await expect(todayPulse).toBeVisible();
+
+    // Pan right (drag left) to move the view into the future
+    var startX = box.x + box.width * 0.7;
+    var endX = box.x + box.width * 0.1;
+    var cy = box.y + box.height * 0.5;
+    for (var i = 0; i < 3; i++) {
+      await page.mouse.move(startX, cy);
+      await page.mouse.down();
+      for (var s = 0; s < 10; s++) {
+        await page.mouse.move(startX + (endX - startX) * s / 10, cy);
+        await page.waitForTimeout(20);
+      }
+      await page.mouse.move(endX, cy);
+      await page.mouse.up();
+      await page.waitForTimeout(200);
+    }
+
+    // Pan back left (drag right) to return toward today
+    for (var j = 0; j < 4; j++) {
+      await page.mouse.move(endX, cy);
+      await page.mouse.down();
+      for (var s2 = 0; s2 < 10; s2++) {
+        await page.mouse.move(endX + (startX - endX) * s2 / 10, cy);
+        await page.waitForTimeout(20);
+      }
+      await page.mouse.move(startX, cy);
+      await page.mouse.up();
+      await page.waitForTimeout(200);
+    }
+    await page.waitForTimeout(500);
+
+    // Today marker must be reachable — it should be visible again
+    await expect(todayPulse).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
   test('timeline renders milestone cards above and below axis', async ({ page }) => {
     await page.goto('/#/releases/schedule');
     await page.waitForLoadState('networkidle');

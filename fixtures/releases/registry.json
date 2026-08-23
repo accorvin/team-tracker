@@ -48,10 +48,10 @@
       "displayName": "rhelai-3.5.EA1",
       "productPagesShortname": "rhelai",
       "milestones": {
-        "ga": "2026-06-23",
-        "codeFreeze": "2026-05-12",
+        "ga": "2026-09-21",
+        "codeFreeze": "2026-08-10",
         "featureFreeze": null,
-        "planningFreeze": "2026-04-17"
+        "planningFreeze": "2026-07-16"
       },
       "state": "active",
       "fixVersions": [
@@ -63,10 +63,10 @@
       "displayName": "rhelai-3.5.EA2",
       "productPagesShortname": "rhelai",
       "milestones": {
-        "ga": "2026-07-21",
-        "codeFreeze": "2026-06-10",
+        "ga": "2026-10-19",
+        "codeFreeze": "2026-09-08",
         "featureFreeze": null,
-        "planningFreeze": "2026-05-15"
+        "planningFreeze": "2026-08-13"
       },
       "state": "active",
       "fixVersions": [
@@ -78,10 +78,10 @@
       "displayName": "rhelai-3.5",
       "productPagesShortname": "rhelai",
       "milestones": {
-        "ga": "2026-08-25",
-        "codeFreeze": "2026-07-20",
-        "featureFreeze": "2026-07-17",
-        "planningFreeze": "2026-06-24"
+        "ga": "2026-11-23",
+        "codeFreeze": "2026-10-18",
+        "featureFreeze": "2026-10-15",
+        "planningFreeze": "2026-09-22"
       },
       "state": "active",
       "fixVersions": [
@@ -109,10 +109,10 @@
       "displayName": "rhaii-3.5.EA2",
       "productPagesShortname": "rhaii",
       "milestones": {
-        "ga": "2026-06-30",
-        "codeFreeze": "2026-06-10",
+        "ga": "2026-09-28",
+        "codeFreeze": "2026-09-08",
         "featureFreeze": null,
-        "planningFreeze": "2026-05-15"
+        "planningFreeze": "2026-08-13"
       },
       "state": "active",
       "fixVersions": [
@@ -140,10 +140,10 @@
       "displayName": "rhaii-3.5",
       "productPagesShortname": "rhaii",
       "milestones": {
-        "ga": "2026-08-06",
-        "codeFreeze": "2026-07-20",
-        "featureFreeze": "2026-07-17",
-        "planningFreeze": "2026-06-24"
+        "ga": "2026-11-04",
+        "codeFreeze": "2026-10-18",
+        "featureFreeze": "2026-10-15",
+        "planningFreeze": "2026-09-22"
       },
       "state": "active",
       "fixVersions": [
@@ -156,10 +156,10 @@
       "displayName": "rhoai-3.5.EA1",
       "productPagesShortname": "rhoai",
       "milestones": {
-        "ga": "2026-06-17",
-        "codeFreeze": "2026-05-15",
+        "ga": "2026-09-15",
+        "codeFreeze": "2026-08-13",
         "featureFreeze": null,
-        "planningFreeze": "2026-05-01"
+        "planningFreeze": "2026-07-30"
       },
       "state": "active",
       "fixVersions": [
@@ -171,10 +171,10 @@
       "displayName": "rhoai-3.5.EA2",
       "productPagesShortname": "rhoai",
       "milestones": {
-        "ga": "2026-07-15",
-        "codeFreeze": "2026-06-20",
+        "ga": "2026-10-13",
+        "codeFreeze": "2026-09-18",
         "featureFreeze": null,
-        "planningFreeze": "2026-05-15"
+        "planningFreeze": "2026-08-13"
       },
       "state": "active",
       "fixVersions": [
@@ -186,10 +186,10 @@
       "displayName": "rhoai-3.5",
       "productPagesShortname": "rhoai",
       "milestones": {
-        "ga": "2026-08-26",
-        "codeFreeze": "2026-07-31",
-        "featureFreeze": "2026-07-17",
-        "planningFreeze": "2026-06-24"
+        "ga": "2026-11-24",
+        "codeFreeze": "2026-10-29",
+        "featureFreeze": "2026-10-15",
+        "planningFreeze": "2026-09-22"
       },
       "state": "active",
       "fixVersions": [
