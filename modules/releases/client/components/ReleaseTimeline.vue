@@ -1144,9 +1144,7 @@ var timelinePlugin = {
             gi: dgi, above: dg.above,
             left: segLeftX, right: segRightX,
             diffDays: segDiffDays,
-            needsLabel: false,
-            leftIsToday: dg.points[dj - 1].ts === todayTsDim,
-            rightIsToday: dg.points[dj].ts === todayTsDim
+            needsLabel: false
           })
         }
       }
