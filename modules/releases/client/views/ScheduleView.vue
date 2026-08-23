@@ -35,9 +35,9 @@
       >Try again</button>
     </div>
 
-    <!-- Empty -->
+    <!-- Empty (no data from API) -->
     <div
-      v-else-if="!allSortedReleases.length"
+      v-else-if="!releases.length"
       class="text-center py-16 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
     >
       <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-1">No releases found</h3>
@@ -47,65 +47,25 @@
     </div>
 
     <template v-else>
-      <!-- Countdown cards -->
-      <div v-if="upcomingMilestoneCards.length" class="flex gap-4 mb-6 flex-wrap">
-        <div
-          v-for="card in upcomingMilestoneCards"
-          :key="card.releaseName + '-' + card.type"
-          data-testid="milestone-countdown-card"
-          class="flex-1 min-w-[140px] bg-white dark:bg-gray-800 border rounded-lg text-center py-5 px-4 transition-all hover:shadow-md"
-          :class="card.days <= 7
-            ? 'border-blue-300 dark:border-blue-600'
-            : 'border-gray-200 dark:border-gray-700'"
-        >
-          <div
-            class="text-[42px] font-bold leading-none tabular-nums"
-            :class="card.days <= 7
-              ? 'text-blue-600 dark:text-blue-400'
-              : 'text-gray-900 dark:text-gray-100'"
-          >
-            {{ card.days === 0 ? 'Today' : card.days }}
-          </div>
-          <div
-            v-if="card.days !== 0"
-            class="text-[11px] font-medium uppercase tracking-wider mt-1"
-            :class="card.days <= 7
-              ? 'text-blue-400 dark:text-blue-500'
-              : 'text-gray-400 dark:text-gray-500'"
-          >days</div>
-          <div class="text-[13px] font-semibold text-gray-700 dark:text-gray-300 mt-2">
-            {{ card.releaseName }}
-          </div>
-          <div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-            {{ card.label }} · {{ formatShort(card.date) }}
-          </div>
-          <div v-if="card.days <= 7" class="flex justify-center mt-2">
-            <span class="inline-flex h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
-          </div>
-        </div>
-      </div>
-
       <!-- Filters -->
       <div class="flex items-center justify-between mb-5 gap-4">
         <div class="flex flex-wrap gap-2">
-          <!-- Product filter pills -->
+          <!-- Product filter pills (multi-select) -->
           <template v-if="products.length > 1">
-            <button
-              @click="selectedProduct = null"
-              class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
-              :class="!selectedProduct
-                ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
-                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
-            >All</button>
             <button
               v-for="p in products"
               :key="p"
-              @click="selectedProduct = p"
+              @click="toggleProduct(p)"
               class="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
-              :class="selectedProduct === p
+              :class="selectedProducts.indexOf(p) !== -1
                 ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
                 : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'"
             >{{ p }}</button>
+            <button
+              v-if="selectedProducts.length > 0"
+              @click="selectedProducts = []"
+              class="px-3 py-1 rounded-full text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            >Clear</button>
           </template>
           <!-- Stream filter pills (single-product) -->
           <template v-else-if="streams.length > 1">
@@ -150,11 +110,57 @@
         >Clear</button>
       </div>
 
+      <!-- Countdown cards -->
+      <div v-if="upcomingMilestoneCards.length" class="flex gap-4 mb-6 flex-wrap">
+        <div
+          v-for="card in upcomingMilestoneCards"
+          :key="card.releaseName + '-' + card.type"
+          data-testid="milestone-countdown-card"
+          class="flex-1 min-w-[140px] bg-white dark:bg-gray-800 border rounded-lg text-center py-5 px-4 transition-all hover:shadow-md"
+          :class="card.days <= 7
+            ? 'border-blue-300 dark:border-blue-600'
+            : 'border-gray-200 dark:border-gray-700'"
+        >
+          <div
+            class="text-[42px] font-bold leading-none tabular-nums"
+            :class="card.days <= 7
+              ? 'text-blue-600 dark:text-blue-400'
+              : 'text-gray-900 dark:text-gray-100'"
+          >
+            {{ card.days === 0 ? 'Today' : card.days }}
+          </div>
+          <div
+            v-if="card.days !== 0"
+            class="text-[11px] font-medium uppercase tracking-wider mt-1"
+            :class="card.days <= 7
+              ? 'text-blue-400 dark:text-blue-500'
+              : 'text-gray-400 dark:text-gray-500'"
+          >days</div>
+          <div class="text-[13px] font-semibold text-gray-700 dark:text-gray-300 mt-2">
+            {{ card.releaseName }}
+          </div>
+          <div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+            {{ card.label }} · {{ formatShort(card.date) }}
+          </div>
+          <div v-if="card.days <= 7" class="flex justify-center mt-2">
+            <span class="inline-flex h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- No matching releases after filtering -->
+      <div
+        v-if="!allSortedReleases.length"
+        class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-6"
+      >
+        <p class="text-sm text-gray-500 dark:text-gray-400">No releases match the current filters.</p>
+      </div>
+
       <!-- Release Timeline -->
-      <ReleaseTimeline :releases="baseFilteredReleases" :hide-past="hideReleased" />
+      <ReleaseTimeline v-if="allSortedReleases.length" :releases="baseFilteredReleases" :hide-past="hideReleased" />
 
       <!-- Releases table -->
-      <div class="bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+      <div v-if="allSortedReleases.length" class="bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
@@ -226,7 +232,7 @@ function formatShort(dateStr) {
 const releases = ref([])
 const loading = ref(true)
 const error = ref(null)
-const selectedProduct = ref(null)
+const selectedProducts = ref([])
 const selectedStream = ref(null)
 const hideReleased = ref(true)
 const selectedVersions = ref([])
@@ -258,6 +264,15 @@ function versionLabel(release) {
   var parsed = parseReleaseName(name)
   if (parsed) return parsed.major + '.' + parsed.minor + ' ' + parsed.milestone
   return null
+}
+
+function toggleProduct(p) {
+  var idx = selectedProducts.value.indexOf(p)
+  if (idx === -1) {
+    selectedProducts.value = selectedProducts.value.concat(p)
+  } else {
+    selectedProducts.value = selectedProducts.value.filter(function (x) { return x !== p })
+  }
 }
 
 function toggleVersion(v) {
@@ -309,8 +324,8 @@ const availableVersions = computed(() => {
   var seen = {}
   var list = []
   var base = releases.value
-  if (selectedProduct.value) {
-    base = base.filter(r => getProduct(r) === selectedProduct.value)
+  if (selectedProducts.value.length > 0) {
+    base = base.filter(r => selectedProducts.value.indexOf(getProduct(r)) !== -1)
   }
   for (var i = 0; i < base.length; i++) {
     var v = versionLabel(base[i])
@@ -337,8 +352,8 @@ const availableVersions = computed(() => {
 
 const baseFilteredReleases = computed(() => {
   let list = releases.value
-  if (selectedProduct.value) {
-    list = list.filter(r => getProduct(r) === selectedProduct.value)
+  if (selectedProducts.value.length > 0) {
+    list = list.filter(r => selectedProducts.value.indexOf(getProduct(r)) !== -1)
   }
   if (selectedStream.value) {
     list = list.filter(r => getStream(r) === selectedStream.value)

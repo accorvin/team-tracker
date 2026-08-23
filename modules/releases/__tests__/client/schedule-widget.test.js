@@ -33,7 +33,7 @@ function makeRelease(id, opts = {}) {
 function futureDate(daysFromNow) {
   const d = new Date()
   d.setDate(d.getDate() + daysFromNow)
-  return d.toISOString().split('T')[0]
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
 }
 
 describe('ScheduleWidget', () => {
@@ -100,7 +100,7 @@ describe('ScheduleWidget', () => {
   it('excludes past milestones', async () => {
     const past = new Date()
     past.setDate(past.getDate() - 5)
-    const pastStr = past.toISOString().split('T')[0]
+    const pastStr = past.getFullYear() + '-' + String(past.getMonth() + 1).padStart(2, '0') + '-' + String(past.getDate()).padStart(2, '0')
 
     apiRequest.mockResolvedValue({
       releases: [
@@ -146,7 +146,8 @@ describe('ScheduleWidget', () => {
   })
 
   it('shows "Today" for milestones due today', async () => {
-    const today = new Date().toISOString().split('T')[0]
+    const d = new Date()
+    const today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
     apiRequest.mockResolvedValue({
       releases: [makeRelease('rhoai-3.5', { ga: today })]
     })

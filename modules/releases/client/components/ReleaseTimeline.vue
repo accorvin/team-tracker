@@ -184,7 +184,7 @@ var MILESTONE_DOT_BORDER = 2
 var TODAY_DOT_RADIUS = 8
 var TODAY_DOT_BORDER = 2
 var DOT_HALO_PAD = 1.5
-var PEEK_W = 10
+var TODAY_TEXT_START = Math.ceil(TODAY_DOT_RADIUS + TODAY_DOT_BORDER + DOT_HALO_PAD) + 4
 var CHART_MAX_HEIGHT = 450
 
 function hexToRgba(hex, alpha) {
@@ -348,84 +348,6 @@ function fmtDate(dateStr) {
 }
 
 
-
-// Pure stacking logic — extracted for testability.
-// Takes an array of layout objects [{x, boxW, nd: {date, groupLabel}, above}]
-// and todayTs. Mutates layouts in-place: sets stackLevel, stackTopIdx.
-function applyStacking(nodeLayouts, todayTs, peekThreshold) {
-  if (peekThreshold === undefined) peekThreshold = PEEK_W
-  var cycleStacks = {}
-  for (var i = 0; i < nodeLayouts.length; i++) {
-    if (!nodeLayouts[i]) continue
-    var ckey = nodeLayouts[i].subLane + (nodeLayouts[i].above ? '-a' : '-b')
-    if (!cycleStacks[ckey]) cycleStacks[ckey] = []
-    cycleStacks[ckey].push(i)
-  }
-  var stackKeys = Object.keys(cycleStacks)
-  for (var ski = 0; ski < stackKeys.length; ski++) {
-    var sideGroup = cycleStacks[stackKeys[ski]]
-    if (sideGroup.length <= 1) continue
-    sideGroup.sort(function (a, b) {
-      var dA = parseDate(nodeLayouts[a].nd.date)
-      var dB = parseDate(nodeLayouts[b].nd.date)
-      var distA = dA ? Math.abs(dA.getTime() - todayTs) : Infinity
-      var distB = dB ? Math.abs(dB.getTime() - todayTs) : Infinity
-      return distA - distB
-    })
-    var topCards = []
-    for (var sgi = 0; sgi < sideGroup.length; sgi++) {
-      var idx = sideGroup[sgi]
-      var lay = nodeLayouts[idx]
-      var myLeft = lay.x - lay.boxW / 2
-      var myRight = lay.x + lay.boxW / 2
-      var bestTop = -1
-      var bestDist = Infinity
-      for (var tci = 0; tci < topCards.length; tci++) {
-        var tc = topCards[tci]
-        var frontX = nodeLayouts[tc.idx].x
-        var dotDist = Math.abs(lay.x - frontX)
-        var shouldStack = false
-        if (myLeft < tc.right && myRight > tc.left) {
-          var visible
-          if (lay.x > frontX) {
-            visible = myRight - tc.right
-          } else {
-            visible = tc.left - myLeft
-          }
-          if (visible <= peekThreshold) {
-            shouldStack = true
-          }
-        }
-        if (shouldStack && dotDist < bestDist) {
-          bestDist = dotDist; bestTop = tci
-        }
-      }
-      if (bestTop >= 0) {
-        var front = topCards[bestTop]
-        front.stackCount++
-        lay.stackLevel = front.stackCount
-        lay.stackTopIdx = front.idx
-      } else {
-        topCards.push({ idx: idx, left: myLeft, right: myRight, stackCount: 0 })
-      }
-    }
-  }
-}
-
-// eslint-disable-next-line no-unused-vars
-function countPeekStrips(nodeLayouts) {
-  var count = 0
-  for (var i = 0; i < nodeLayouts.length; i++) {
-    var lay = nodeLayouts[i]
-    if (!lay || (lay.stackLevel || 0) === 0) continue
-    var topLayout = nodeLayouts[lay.stackTopIdx]
-    if (!topLayout) continue
-    count++
-  }
-  return count
-}
-
-
 var MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 var nextMilestoneLabel = computed(function () {
@@ -436,9 +358,10 @@ var nextMilestoneLabel = computed(function () {
       var knownProducts = n[i].productList.filter(function (p) { return productLabel(p) !== p })
       var productPrefix = knownProducts.length
         ? knownProducts.map(productLabel).join('/') + ' ' : ''
-      var desc = productPrefix + n[i].groupLabel + ' ' + n[i].msLabel
-      if (days === 0) return { desc: desc, daysText: 'today' }
-      return { desc: desc, daysText: 'in ' + days + 'd' }
+      var desc = productPrefix + n[i].groupLabel
+      var msLabel = n[i].msLabel
+      if (days === 0) return { desc: desc, msLabel: msLabel, daysText: 'today' }
+      return { desc: desc, msLabel: msLabel, daysText: 'in ' + days + 'd' }
     }
   }
   return null
@@ -950,14 +873,9 @@ var timelinePlugin = {
       nodeLayouts.push({
         nd: nd, x: x, lines: lines,
         boxW: boxW, boxH: boxH, subLane: subLane, above: above,
-        stackLevel: 0,
         sideLabel: sideLabel, sideLabelW: sideLabelW
       })
     }
-
-    var curVisibleDays = (r.max - r.min) / DAY_MS
-    var peekThreshold = PEEK_W * Math.max(1, curVisibleDays / DEFAULT_WINDOW_DAYS)
-    applyStacking(nodeLayouts, todayTsStack, peekThreshold)
 
     // Use stable offset from layoutMetrics (computed from ALL nodes, not just visible)
     var stableOff = layoutMetrics.value.safeOff || subLaneOffset
@@ -989,9 +907,7 @@ var timelinePlugin = {
       ctx.stroke()
     }
 
-    // Third pass: draw boxes as card stacks
-    // Sort: behind full-cards first (highest stackLevel), top cards last
-    // Peek edges are collected and drawn in a separate pass AFTER all cards
+    // Third pass: draw cards
     var boxRenderOrder = []
     for (var boi = 0; boi < nodeLayouts.length; boi++) {
       if (nodeLayouts[boi]) boxRenderOrder.push(boi)
@@ -1000,22 +916,18 @@ var timelinePlugin = {
       var aFront = _frontNodes.has(nodeLayouts[a].nd) ? 1 : 0
       var bFront = _frontNodes.has(nodeLayouts[b].nd) ? 1 : 0
       if (aFront !== bFront) return aFront - bFront
-      var sl = (nodeLayouts[b].stackLevel || 0) - (nodeLayouts[a].stackLevel || 0)
-      if (sl !== 0) return sl
-      // Same stackLevel: draw farther-from-today first so closer cards paint on top
+      // Draw farther-from-today first so closer cards paint on top
       var dA = parseDate(nodeLayouts[a].nd.date)
       var dB = parseDate(nodeLayouts[b].nd.date)
       var distA = dA ? Math.abs(dA.getTime() - todayTsStack) : Infinity
       var distB = dB ? Math.abs(dB.getTime() - todayTsStack) : Infinity
       return distB - distA
     })
-    var deferredPeeks = []
 
     for (var bri = 0; bri < boxRenderOrder.length; bri++) {
       var j2 = boxRenderOrder[bri]
       var layout2 = nodeLayouts[j2]
       var nd2 = layout2.nd
-      var stackLevel = layout2.stackLevel || 0
       var basePrimary2 = nd2.isPast ? pastColor : futureColor
       var boxX = layout2.x - layout2.boxW / 2
       var boxY
@@ -1025,238 +937,102 @@ var timelinePlugin = {
         boxY = yMid + layout2.stemLen + 4
       }
 
-      if (stackLevel === 0) {
-        // Clip at front card boundary if overlapping (front cards render later)
-        var clipApplied = false
-        for (var cli = bri + 1; cli < boxRenderOrder.length; cli++) {
-          var clipIdx = boxRenderOrder[cli]
-          var clipLay = nodeLayouts[clipIdx]
-          if (!clipLay || (clipLay.stackLevel || 0) > 0) continue
-          if (clipLay.subLane !== layout2.subLane || clipLay.above !== layout2.above) continue
-          var clipBoxL = clipLay.x - clipLay.boxW / 2
-          var clipBoxR = clipLay.x + clipLay.boxW / 2
-          if (clipBoxL < boxX + layout2.boxW && clipBoxR > boxX) {
-            ctx.save()
-            ctx.beginPath()
-            if (clipLay.x > layout2.x) {
-              ctx.rect(0, 0, clipBoxL - 1, ctx.canvas.height)
-            } else {
-              ctx.rect(clipBoxR + 1, 0, ctx.canvas.width, ctx.canvas.height)
-            }
-            ctx.clip()
-            clipApplied = true
-            break
-          }
-        }
-
-        var fadeOuterX = null
-        var fadeInnerX = null
-        var visibleWidth = layout2.boxW
-        if (clipApplied) {
+      // Clip at front card boundary if overlapping (front cards render later)
+      var clipApplied = false
+      for (var cli = bri + 1; cli < boxRenderOrder.length; cli++) {
+        var clipIdx = boxRenderOrder[cli]
+        var clipLay = nodeLayouts[clipIdx]
+        if (!clipLay) continue
+        if (clipLay.subLane !== layout2.subLane || clipLay.above !== layout2.above) continue
+        var clipBoxL = clipLay.x - clipLay.boxW / 2
+        var clipBoxR = clipLay.x + clipLay.boxW / 2
+        if (clipBoxL < boxX + layout2.boxW && clipBoxR > boxX) {
+          ctx.save()
+          ctx.beginPath()
           if (clipLay.x > layout2.x) {
-            visibleWidth = clipBoxL - 1 - boxX
-            fadeOuterX = boxX
-            fadeInnerX = clipBoxL - 1
+            ctx.rect(0, 0, clipBoxL - 1, ctx.canvas.height)
           } else {
-            visibleWidth = (boxX + layout2.boxW) - (clipBoxR + 1)
-            fadeOuterX = boxX + layout2.boxW
-            fadeInnerX = clipBoxR + 1
+            ctx.rect(clipBoxR + 1, 0, ctx.canvas.width, ctx.canvas.height)
           }
+          ctx.clip()
+          clipApplied = true
+          break
         }
-
-        // Top card: card-like appearance with shadow + glassy fill
-        var dateColor = nd2.isPast ? mutedTextColor : (dark ? '#9ca3af' : '#6b7280')
-        for (var ci = 0; ci < layout2.lines.length; ci++) {
-          if (layout2.lines[ci].text === nd2.groupLabel) {
-            layout2.lines[ci].color = dark ? '#d1d5db' : '#374151'
-          } else if (layout2.lines[ci].text === nd2.msLabel) {
-            layout2.lines[ci].color = basePrimary2
-          } else {
-            layout2.lines[ci].color = dateColor
-          }
-        }
-
-        // Opaque halo: wider on right to cover 2nd card overlap
-        var cardPad = 2
-        var cardPadRight = 2
-        ctx.fillStyle = dark ? '#1f2937' : '#ffffff'
-        ctx.fillRect(boxX - cardPad, boxY - cardPad, layout2.boxW + cardPad + cardPadRight, layout2.boxH + cardPad * 2)
-
-        // Drop shadow
-        ctx.save()
-        ctx.shadowColor = dark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.15)'
-        ctx.shadowBlur = 8
-        ctx.shadowOffsetX = 2
-        ctx.shadowOffsetY = 3
-        drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
-        ctx.fillStyle = dark ? '#1f2937' : '#ffffff'
-        ctx.fill()
-        ctx.restore()
-
-
-        // Glassy gradient fill
-        drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
-        var glassGrad = ctx.createLinearGradient(boxX, boxY, boxX, boxY + layout2.boxH)
-        if (dark) {
-          glassGrad.addColorStop(0, 'rgba(55,65,81,0.97)')
-          glassGrad.addColorStop(0.35, 'rgba(40,50,65,0.92)')
-          glassGrad.addColorStop(1, 'rgba(17,24,39,0.95)')
-        } else {
-          glassGrad.addColorStop(0, 'rgba(255,255,255,0.99)')
-          glassGrad.addColorStop(0.35, 'rgba(248,250,252,0.95)')
-          glassGrad.addColorStop(1, 'rgba(241,245,249,0.97)')
-        }
-        ctx.fillStyle = glassGrad
-        ctx.fill()
-
-        // Top highlight line (gloss)
-        ctx.beginPath()
-        ctx.moveTo(boxX + 4, boxY + 1)
-        ctx.lineTo(boxX + layout2.boxW - 4, boxY + 1)
-        ctx.strokeStyle = dark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.8)'
-        ctx.lineWidth = 1
-        ctx.stroke()
-
-        // Border
-        drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
-        var borderHex = nd2.productList.length ? (PRODUCT_HEX[nd2.productList[0]] || DEFAULT_HEX) : null
-        ctx.strokeStyle = borderHex
-          ? hexToRgba(borderHex, dark ? 0.6 : 0.5)
-          : (dark ? 'rgba(75,85,99,0.6)' : 'rgba(203,213,225,0.8)')
-        ctx.lineWidth = 1
-        ctx.stroke()
-
-        var textOffsetX = 0
-        if (nd2.productList.length) {
-          var tintHex = PRODUCT_HEX[nd2.productList[0]] || DEFAULT_HEX
-          drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
-          ctx.fillStyle = hexToRgba(tintHex, 0.08)
-          ctx.fill()
-        }
-
-        var textX = boxX + textOffsetX + (layout2.boxW - textOffsetX) / 2
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'top'
-        var applyFade = clipApplied && visibleWidth < layout2.boxW * 0.7
-        for (var ti = 0; ti < layout2.lines.length; ti++) {
-          ctx.font = layout2.lines[ti].font
-          var lineY = boxY + boxPad + ti * lineHeight
-          if (applyFade && fadeOuterX !== null) {
-              var fadeGrad = ctx.createLinearGradient(fadeOuterX, 0, fadeInnerX, 0)
-              fadeGrad.addColorStop(0, layout2.lines[ti].color)
-              fadeGrad.addColorStop(0.7, layout2.lines[ti].color)
-              fadeGrad.addColorStop(1, hexToRgba(layout2.lines[ti].color, 0.4))
-              ctx.fillStyle = fadeGrad
-            } else {
-              ctx.fillStyle = layout2.lines[ti].color
-            }
-            ctx.fillText(layout2.lines[ti].text, textX, lineY)
-        }
-        ctx.globalAlpha = 1.0
-        if (clipApplied) ctx.restore()
-        _cardHitBoxes.push({ x: boxX, y: boxY, w: layout2.boxW, h: layout2.boxH, nd: nd2 })
-      } else {
-        // Behind card: render as peek strip — one per stacked card.
-        var topLayout = nodeLayouts[layout2.stackTopIdx]
-        if (!topLayout) continue
-
-        var behindIsLeft = layout2.x < topLayout.x
-        var peekStripY
-        if (topLayout.above) {
-          peekStripY = yMid - topLayout.stemLen - 4 - topLayout.boxH
-        } else {
-          peekStripY = yMid + topLayout.stemLen + 4
-        }
-        var peekStripH = topLayout.boxH
-
-        var peekStripX
-        if (behindIsLeft) {
-          var topLeftPk = topLayout.x - topLayout.boxW / 2 - 2
-          peekStripX = topLeftPk - PEEK_W * stackLevel
-        } else {
-          var topRightPk = topLayout.x + topLayout.boxW / 2 + 2
-          peekStripX = topRightPk + PEEK_W * (stackLevel - 1)
-        }
-
-        deferredPeeks.push({
-          x: peekStripX, y: peekStripY, w: PEEK_W, h: peekStripH,
-          isLeft: behindIsLeft, frontIdx: layout2.stackTopIdx, dotX: layout2.x,
-          nd: nd2
-        })
       }
-    }
 
-    // Fourth pass: draw deferred peek strips ON TOP of all cards
-    for (var dpi = 0; dpi < deferredPeeks.length; dpi++) {
-      var pk = deferredPeeks[dpi]
-      var peekR = 4
-      // Draw a thin standalone card strip with rounded outer corners
-      ctx.save()
-      ctx.shadowColor = dark ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.10)'
-      ctx.shadowBlur = 3
-      ctx.shadowOffsetX = pk.isLeft ? 1 : -1
-      ctx.shadowOffsetY = 1
-      ctx.beginPath()
-      if (pk.isLeft) {
-        // Rounded on left side, flat on right
-        ctx.moveTo(pk.x + peekR, pk.y)
-        ctx.lineTo(pk.x + pk.w, pk.y)
-        ctx.lineTo(pk.x + pk.w, pk.y + pk.h)
-        ctx.lineTo(pk.x + peekR, pk.y + pk.h)
-        ctx.arcTo(pk.x, pk.y + pk.h, pk.x, pk.y + pk.h - peekR, peekR)
-        ctx.lineTo(pk.x, pk.y + peekR)
-        ctx.arcTo(pk.x, pk.y, pk.x + peekR, pk.y, peekR)
-      } else {
-        // Rounded on right side, flat on left
-        ctx.moveTo(pk.x, pk.y)
-        ctx.lineTo(pk.x + pk.w - peekR, pk.y)
-        ctx.arcTo(pk.x + pk.w, pk.y, pk.x + pk.w, pk.y + peekR, peekR)
-        ctx.lineTo(pk.x + pk.w, pk.y + pk.h - peekR)
-        ctx.arcTo(pk.x + pk.w, pk.y + pk.h, pk.x + pk.w - peekR, pk.y + pk.h, peekR)
-        ctx.lineTo(pk.x, pk.y + pk.h)
+      var fadeOuterX = null
+      var fadeInnerX = null
+      var visibleWidth = layout2.boxW
+      if (clipApplied) {
+        if (clipLay.x > layout2.x) {
+          visibleWidth = clipBoxL - 1 - boxX
+          fadeOuterX = boxX
+          fadeInnerX = clipBoxL - 1
+        } else {
+          visibleWidth = (boxX + layout2.boxW) - (clipBoxR + 1)
+          fadeOuterX = boxX + layout2.boxW
+          fadeInnerX = clipBoxR + 1
+        }
       }
-      ctx.closePath()
-      var peekGrad = ctx.createLinearGradient(pk.x, pk.y, pk.x, pk.y + pk.h)
-      if (dark) {
-        peekGrad.addColorStop(0, 'rgba(55,65,81,0.97)')
-        peekGrad.addColorStop(1, 'rgba(17,24,39,0.95)')
-      } else {
-        peekGrad.addColorStop(0, 'rgba(255,255,255,0.99)')
-        peekGrad.addColorStop(1, 'rgba(248,250,252,0.95)')
+
+      // Card text colours
+      var dateColor = nd2.isPast ? mutedTextColor : (dark ? '#9ca3af' : '#6b7280')
+      for (var ci = 0; ci < layout2.lines.length; ci++) {
+        if (layout2.lines[ci].text === nd2.groupLabel) {
+          layout2.lines[ci].color = dark ? '#d1d5db' : '#374151'
+        } else if (layout2.lines[ci].text === nd2.msLabel) {
+          layout2.lines[ci].color = basePrimary2
+        } else {
+          layout2.lines[ci].color = dateColor
+        }
       }
-      ctx.fillStyle = peekGrad
+
+      // Opaque halo: wider on right to cover 2nd card overlap
+      var cardPad = 2
+      var cardPadRight = 2
+      ctx.fillStyle = dark ? '#1f2937' : '#ffffff'
+      ctx.fillRect(boxX - cardPad, boxY - cardPad, layout2.boxW + cardPad + cardPadRight, layout2.boxH + cardPad * 2)
+
+      // Card fill
+      drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
+      ctx.fillStyle = dark ? '#1f2937' : '#ffffff'
       ctx.fill()
-      if (pk.nd.productList.length) {
-        ctx.fillStyle = hexToRgba(PRODUCT_HEX[pk.nd.productList[0]] || DEFAULT_HEX, 0.08)
-        ctx.fill()
-      }
-      ctx.restore()
-      // Border — open path, skip inner flat edge so it looks like a card edge
-      ctx.beginPath()
-      if (pk.isLeft) {
-        // Draw: top → left arc → left edge → bottom arc → bottom (skip right edge)
-        ctx.moveTo(pk.x + pk.w, pk.y)
-        ctx.lineTo(pk.x + peekR, pk.y)
-        ctx.arcTo(pk.x, pk.y, pk.x, pk.y + peekR, peekR)
-        ctx.lineTo(pk.x, pk.y + pk.h - peekR)
-        ctx.arcTo(pk.x, pk.y + pk.h, pk.x + peekR, pk.y + pk.h, peekR)
-        ctx.lineTo(pk.x + pk.w, pk.y + pk.h)
-      } else {
-        // Draw: bottom → right arc → right edge → top arc → top (skip left edge)
-        ctx.moveTo(pk.x, pk.y + pk.h)
-        ctx.lineTo(pk.x + pk.w - peekR, pk.y + pk.h)
-        ctx.arcTo(pk.x + pk.w, pk.y + pk.h, pk.x + pk.w, pk.y + pk.h - peekR, peekR)
-        ctx.lineTo(pk.x + pk.w, pk.y + peekR)
-        ctx.arcTo(pk.x + pk.w, pk.y, pk.x + pk.w - peekR, pk.y, peekR)
-        ctx.lineTo(pk.x, pk.y)
-      }
-      var peekBorderHex = pk.nd.productList.length ? (PRODUCT_HEX[pk.nd.productList[0]] || DEFAULT_HEX) : null
-      ctx.strokeStyle = peekBorderHex
-        ? hexToRgba(peekBorderHex, dark ? 0.6 : 0.5)
-        : (dark ? 'rgba(75,85,99,0.6)' : 'rgba(203,213,225,0.8)')
+
+      // Border matching card shade
+      drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
+      ctx.strokeStyle = dark ? 'rgba(55,65,81,0.6)' : 'rgba(226,232,240,0.9)'
       ctx.lineWidth = 1
       ctx.stroke()
-      _cardHitBoxes.push({ x: pk.x, y: pk.y, w: pk.w, h: pk.h, nd: pk.nd })
+
+      var textOffsetX = 0
+      if (nd2.productList.length) {
+        var tintHex = PRODUCT_HEX[nd2.productList[0]] || DEFAULT_HEX
+        drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
+        ctx.fillStyle = hexToRgba(tintHex, 0.08)
+        ctx.fill()
+      }
+
+      var textX = boxX + textOffsetX + (layout2.boxW - textOffsetX) / 2
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
+      var applyFade = clipApplied && visibleWidth < layout2.boxW * 0.7
+      for (var ti = 0; ti < layout2.lines.length; ti++) {
+        ctx.font = layout2.lines[ti].font
+        var lineY = boxY + boxPad + ti * lineHeight
+        if (applyFade && fadeOuterX !== null) {
+          var fadeGrad = ctx.createLinearGradient(fadeOuterX, 0, fadeInnerX, 0)
+          fadeGrad.addColorStop(0, layout2.lines[ti].color)
+          fadeGrad.addColorStop(0.7, layout2.lines[ti].color)
+          fadeGrad.addColorStop(1, hexToRgba(layout2.lines[ti].color, 0.4))
+          ctx.fillStyle = fadeGrad
+        } else {
+          ctx.fillStyle = layout2.lines[ti].color
+        }
+        ctx.fillText(layout2.lines[ti].text, textX, lineY)
+      }
+      ctx.globalAlpha = 1.0
+      if (clipApplied) ctx.restore()
+      _cardHitBoxes.push({ x: boxX, y: boxY, w: layout2.boxW, h: layout2.boxH, nd: nd2 })
     }
 
     // Draw milestone dots
@@ -1273,7 +1049,7 @@ var timelinePlugin = {
       if (distA !== distB) return distB - distA
       var subDiff = nodeLayouts[b].subLane - nodeLayouts[a].subLane
       if (subDiff !== 0) return subDiff
-      return (nodeLayouts[b].stackLevel || 0) - (nodeLayouts[a].stackLevel || 0)
+      return 0
     })
     var dotPxPositions = []
     for (var dpj = 0; dpj < dotOrder.length; dpj++) {
@@ -1368,9 +1144,7 @@ var timelinePlugin = {
             gi: dgi, above: dg.above,
             left: segLeftX, right: segRightX,
             diffDays: segDiffDays,
-            needsLabel: false,
-            leftIsToday: dg.points[dj - 1].ts === todayTsDim,
-            rightIsToday: dg.points[dj].ts === todayTsDim
+            needsLabel: false
           })
         }
       }
@@ -1402,54 +1176,56 @@ var timelinePlugin = {
         ctx.setLineDash([])
 
         ctx.font = '10px ' + FONT
-        var srLabel = seg.diffDays + 'd'
+        var srShortLabel = seg.diffDays + 'd'
+        var srFullLabel = srShortLabel
         if (seg.needsLabel) {
           var srProducts = dimGroups[srDgKey].productList.filter(function (p) { return productLabel(p) !== p })
           var srProductPrefix = srProducts.length ? srProducts.map(productLabel).join('/') + ' ' : ''
-          srLabel += ' (' + srProductPrefix + srDgKey.replace(/-[ab]$/, '') + ')'
+          srFullLabel += ' (' + srProductPrefix + srDgKey.replace(/-[ab]$/, '') + ')'
         }
-        var srLabelW = ctx.measureText(srLabel).width
         var srLabelX = (seg.left + seg.right) / 2
+        var segWidth = seg.right - seg.left
+
+        var srFullW = ctx.measureText(srFullLabel).width
+        var srShortW = ctx.measureText(srShortLabel).width
+        var srLabel = srFullW + 8 <= segWidth ? srFullLabel : srShortLabel
+        var srLabelW = srLabel === srFullLabel ? srFullW : srShortW
         var srGapHalf = srLabelW / 2 + 4
+        var srFits = srLabelW + 8 <= segWidth
 
-        ctx.beginPath()
-        ctx.moveTo(seg.left, srLineY)
-        ctx.lineTo(srLabelX - srGapHalf, srLineY)
-        ctx.stroke()
-        ctx.beginPath()
-        ctx.moveTo(srLabelX + srGapHalf, srLineY)
-        ctx.lineTo(seg.right, srLineY)
-        ctx.stroke()
-
-        if (seg.leftIsToday) {
+        if (srFits) {
           ctx.beginPath()
-          ctx.arc(seg.left, srLineY, arrowSize + 1, 0, Math.PI * 2)
-          ctx.fillStyle = dark ? '#f87171' : '#ef4444'
-          ctx.fill()
-        } else {
-          ctx.beginPath()
-          ctx.moveTo(seg.left + arrowSize * 2, srLineY - arrowSize)
-          ctx.lineTo(seg.left, srLineY)
-          ctx.lineTo(seg.left + arrowSize * 2, srLineY + arrowSize)
+          ctx.moveTo(seg.left, srLineY)
+          ctx.lineTo(srLabelX - srGapHalf, srLineY)
           ctx.stroke()
-        }
-        if (seg.rightIsToday) {
           ctx.beginPath()
-          ctx.arc(seg.right, srLineY, arrowSize + 1, 0, Math.PI * 2)
-          ctx.fillStyle = dark ? '#f87171' : '#ef4444'
-          ctx.fill()
-        } else {
-          ctx.beginPath()
-          ctx.moveTo(seg.right - arrowSize * 2, srLineY - arrowSize)
+          ctx.moveTo(srLabelX + srGapHalf, srLineY)
           ctx.lineTo(seg.right, srLineY)
-          ctx.lineTo(seg.right - arrowSize * 2, srLineY + arrowSize)
+          ctx.stroke()
+        } else {
+          ctx.beginPath()
+          ctx.moveTo(seg.left, srLineY)
+          ctx.lineTo(seg.right, srLineY)
           ctx.stroke()
         }
 
-        ctx.fillStyle = dimTextColor
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText(srLabel, srLabelX, srLineY)
+        ctx.beginPath()
+        ctx.moveTo(seg.left + arrowSize * 2, srLineY - arrowSize)
+        ctx.lineTo(seg.left, srLineY)
+        ctx.lineTo(seg.left + arrowSize * 2, srLineY + arrowSize)
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(seg.right - arrowSize * 2, srLineY - arrowSize)
+        ctx.lineTo(seg.right, srLineY)
+        ctx.lineTo(seg.right - arrowSize * 2, srLineY + arrowSize)
+        ctx.stroke()
+
+        if (srFits) {
+          ctx.fillStyle = dimTextColor
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(srLabel, srLabelX, srLineY)
+        }
         ctx.globalAlpha = 1.0
       }
     }
@@ -1465,11 +1241,19 @@ var timelinePlugin = {
       var redColor = dark ? '#f87171' : '#ef4444'
 
       ctx.globalAlpha = todayFade
-      var todayHaloR = TODAY_DOT_RADIUS + TODAY_DOT_BORDER + DOT_HALO_PAD
+
+      // Dashed vertical line spanning card rows
+      var m = layoutMetrics.value
+      var lineHalfH = Math.max(m.aboveSpace, m.belowSpace) * 0.5
+      ctx.save()
+      ctx.setLineDash([4, 6])
+      ctx.strokeStyle = dark ? 'rgba(248,113,113,0.3)' : 'rgba(239,68,68,0.25)'
+      ctx.lineWidth = 1
       ctx.beginPath()
-      ctx.arc(todayX, yMid, todayHaloR, 0, Math.PI * 2)
-      ctx.fillStyle = bgColor
-      ctx.fill()
+      ctx.moveTo(todayX, yMid - lineHalfH)
+      ctx.lineTo(todayX, yMid + lineHalfH)
+      ctx.stroke()
+      ctx.restore()
 
       _todayPx.value = todayFade > 0.05 ? { x: todayX, y: yMid, opacity: todayFade } : null
 
@@ -1477,16 +1261,19 @@ var timelinePlugin = {
       ctx.font = 'bold 11px ' + FONT
       var youW = ctx.measureText(youText).width
       var nml = nextMilestoneLabel.value
-      var nmlText = nml ? (nml.desc + ' ' + nml.daysText) : null
-      var nmlW = 0
-      if (nmlText) {
+      var nmlLine1 = nml ? nml.desc : null
+      var nmlLine2 = nml ? (nml.msLabel + ' ' + nml.daysText) : null
+      var nmlW1 = 0
+      var nmlW2 = 0
+      if (nmlLine1) {
         ctx.font = '10px ' + FONT
-        nmlW = ctx.measureText(nmlText).width
+        nmlW1 = ctx.measureText(nmlLine1).width
+        nmlW2 = ctx.measureText(nmlLine2).width
       }
-      var haloW = Math.max(youW, nmlW) + 12
-      var haloH = nmlText ? 30 : 16
+      var haloW = Math.max(youW, nmlW1, nmlW2) + 12
+      var haloH = nmlLine1 ? 42 : 16
       var haloX = todayX - haloW / 2
-      var haloY = yMid + 5
+      var haloY = yMid + TODAY_TEXT_START
       ctx.fillStyle = dark ? '#1f2937' : '#ffffff'
       ctx.fillRect(haloX, haloY, haloW, haloH)
 
@@ -1494,12 +1281,13 @@ var timelinePlugin = {
       ctx.fillStyle = redColor
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
-      ctx.fillText(youText, todayX, yMid + 10)
+      ctx.fillText(youText, todayX, yMid + TODAY_TEXT_START + 5)
 
-      if (nmlText) {
+      if (nmlLine1) {
         ctx.font = '10px ' + FONT
         ctx.fillStyle = dark ? '#fca5a5' : '#dc2626'
-        ctx.fillText(nmlText, todayX, yMid + 23)
+        ctx.fillText(nmlLine1, todayX, yMid + TODAY_TEXT_START + 18)
+        ctx.fillText(nmlLine2, todayX, yMid + TODAY_TEXT_START + 30)
       }
       ctx.globalAlpha = 1.0
     } else {
@@ -1507,8 +1295,13 @@ var timelinePlugin = {
     }
 
     if (_hoveredBox) {
+      var hoverHex = _hoveredBox.nd.productList.length
+        ? (PRODUCT_HEX[_hoveredBox.nd.productList[0]] || DEFAULT_HEX)
+        : null
       ctx.save()
-      ctx.strokeStyle = dark ? 'rgba(96,165,250,0.5)' : 'rgba(59,130,246,0.4)'
+      ctx.strokeStyle = hoverHex
+        ? hexToRgba(hoverHex, dark ? 0.7 : 0.6)
+        : (dark ? 'rgba(96,165,250,0.5)' : 'rgba(59,130,246,0.4)')
       ctx.lineWidth = 2
       drawRoundedRect(ctx, _hoveredBox.x - 1, _hoveredBox.y - 1,
                       _hoveredBox.w + 2, _hoveredBox.h + 2, 5)

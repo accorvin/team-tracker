@@ -1,6 +1,6 @@
 {
   "fetchedAt": "2026-04-25T14:30:00.000Z",
-  "version": "3.5",
+  "version": "rhoai-3.5",
   "demoMode": true,
   "features": {
     "RHAISTRAT-1168": {
