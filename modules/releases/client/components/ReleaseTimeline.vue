@@ -317,7 +317,7 @@ var layoutMetrics = computed(function () {
     else belowRows++
   }
   aboveRows = Math.max(aboveRows, 1)
-  var estMaxBoxH = 3 * lineHeight + boxPad * 2
+  var estMaxBoxH = 4 * lineHeight + boxPad * 2
   var safeOff = Math.max(subLaneOffset, estMaxBoxH + 4 + 6)
   var aboveSpace = laneBaseStem + (aboveRows - 1) * safeOff + 70
   var belowSpace = belowRows > 0
@@ -858,6 +858,11 @@ var timelinePlugin = {
       lines.push({ text: nd.msLabel, font: '13px ' + FONT, color: null, w: ctx.measureText(nd.msLabel).width })
       ctx.font = '12px ' + FONT
       lines.push({ text: fmtDate(nd.date), font: '12px ' + FONT, color: null, w: ctx.measureText(fmtDate(nd.date)).width })
+      if (nd.productList.length) {
+        ctx.font = 'bold 11px ' + FONT
+        var prodText = nd.productList.map(function (p) { return productLabel(p) }).join(' · ')
+        lines.push({ text: prodText, font: 'bold 11px ' + FONT, color: null, w: ctx.measureText(prodText).width, isProductLabel: true })
+      }
 
       var sideLabel = null
       var sideLabelW = 0
@@ -986,6 +991,10 @@ var timelinePlugin = {
           layout2.lines[ci].color = dark ? '#d1d5db' : '#374151'
         } else if (layout2.lines[ci].text === nd2.msLabel) {
           layout2.lines[ci].color = basePrimary2
+        } else if (layout2.lines[ci].isProductLabel) {
+          layout2.lines[ci].color = nd2.productList.length === 1
+            ? (PRODUCT_HEX[nd2.productList[0]] || DEFAULT_HEX)
+            : (dark ? '#9ca3af' : '#6b7280')
         } else {
           layout2.lines[ci].color = dateColor
         }
