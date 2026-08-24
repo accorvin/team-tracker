@@ -916,7 +916,7 @@ test.describe('Releases FPDoR Readiness @releases', () => {
     expect(item).toHaveProperty('group');
     expect(['mandatory', 'criteria']).toContain(item.group);
     expect(item.source).toBe('jira');
-    expect(['passed', 'failed', 'not-checked']).toContain(item.state);
+    expect(['passed', 'failed', 'not-checked', 'not-applicable']).toContain(item.state);
 
     expect(sample).toHaveProperty('readinessGates');
     expect(sample.readinessGates).toHaveProperty('fpDorPassed');
