@@ -892,7 +892,7 @@ var timelinePlugin = {
       nodeLayouts[sli].stemLen = laneBaseStem + nodeLayouts[sli].subLane * stableOff
     }
 
-    // Second pass: draw stems BEFORE cards so card halos cover cross-row overlap
+    // Second pass: draw stems BEFORE cards so cards paint on top
     for (var ssj = 0; ssj < nodeLayouts.length; ssj++) {
       var ssLay = nodeLayouts[ssj]
       if (!ssLay) continue
