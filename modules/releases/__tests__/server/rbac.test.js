@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 const { createRoleRegistry } = require('../../../../shared/server/role-registry');
 const { createRoleStore } = require('../../../../shared/server/role-store');
@@ -42,7 +42,7 @@ describe('role store: planning-manager assignment and revocation', () => {
   it('assigns planning-manager role to a user', async () => {
     const registry = createTestRoleRegistry();
     const storage = createMockStorage();
-    const roleStore = createRoleStore(storage.readFromStorage, storage.writeToStorage, { roleRegistry: registry });
+    const roleStore = createRoleStore(storage.readFromStorage, storage.writeToStorage, { roleRegistry: registry, auditLog: { appendAuditEntry: vi.fn() } });
 
     const result = await roleStore.assignRole('manager@redhat.com', 'planning-manager', 'admin@redhat.com');
     expect(result.email).toBe('manager@redhat.com');
@@ -52,7 +52,7 @@ describe('role store: planning-manager assignment and revocation', () => {
   it('confirms hasRole returns true after assignment', async () => {
     const registry = createTestRoleRegistry();
     const storage = createMockStorage();
-    const roleStore = createRoleStore(storage.readFromStorage, storage.writeToStorage, { roleRegistry: registry });
+    const roleStore = createRoleStore(storage.readFromStorage, storage.writeToStorage, { roleRegistry: registry, auditLog: { appendAuditEntry: vi.fn() } });
 
     await roleStore.assignRole('manager@redhat.com', 'planning-manager', 'admin@redhat.com');
     expect(await roleStore.hasRole('manager@redhat.com', 'planning-manager')).toBe(true);
@@ -61,7 +61,7 @@ describe('role store: planning-manager assignment and revocation', () => {
   it('revokes planning-manager role from a user', async () => {
     const registry = createTestRoleRegistry();
     const storage = createMockStorage();
-    const roleStore = createRoleStore(storage.readFromStorage, storage.writeToStorage, { roleRegistry: registry });
+    const roleStore = createRoleStore(storage.readFromStorage, storage.writeToStorage, { roleRegistry: registry, auditLog: { appendAuditEntry: vi.fn() } });
 
     await roleStore.assignRole('manager@redhat.com', 'planning-manager', 'admin@redhat.com');
     const result = await roleStore.revokeRole('manager@redhat.com', 'planning-manager', 'admin@redhat.com');
@@ -72,7 +72,7 @@ describe('role store: planning-manager assignment and revocation', () => {
   it('throws when revoking a role the user does not have', async () => {
     const registry = createTestRoleRegistry();
     const storage = createMockStorage();
-    const roleStore = createRoleStore(storage.readFromStorage, storage.writeToStorage, { roleRegistry: registry });
+    const roleStore = createRoleStore(storage.readFromStorage, storage.writeToStorage, { roleRegistry: registry, auditLog: { appendAuditEntry: vi.fn() } });
 
     await expect(
       roleStore.revokeRole('nobody@redhat.com', 'planning-manager', 'admin@redhat.com')
@@ -82,7 +82,7 @@ describe('role store: planning-manager assignment and revocation', () => {
   it('does not affect other roles when assigning planning-manager', async () => {
     const registry = createTestRoleRegistry();
     const storage = createMockStorage();
-    const roleStore = createRoleStore(storage.readFromStorage, storage.writeToStorage, { roleRegistry: registry });
+    const roleStore = createRoleStore(storage.readFromStorage, storage.writeToStorage, { roleRegistry: registry, auditLog: { appendAuditEntry: vi.fn() } });
 
     await roleStore.assignRole('user@redhat.com', 'admin', 'system');
     await roleStore.assignRole('user@redhat.com', 'planning-manager', 'system');
@@ -94,7 +94,7 @@ describe('role store: planning-manager assignment and revocation', () => {
 describe('requireRole("planning-manager") middleware', () => {
   function createMiddleware() {
     const storage = createMockStorage();
-    const roleStore = createRoleStore(storage.readFromStorage, storage.writeToStorage);
+    const roleStore = createRoleStore(storage.readFromStorage, storage.writeToStorage, { auditLog: { appendAuditEntry: vi.fn() } });
     const { requireRole } = createAuthMiddleware(
       storage.readFromStorage,
       storage.writeToStorage,
