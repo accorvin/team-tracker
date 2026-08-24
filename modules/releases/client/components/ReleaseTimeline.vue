@@ -317,7 +317,7 @@ var layoutMetrics = computed(function () {
     else belowRows++
   }
   aboveRows = Math.max(aboveRows, 1)
-  var estMaxBoxH = 3 * lineHeight + boxPad * 2
+  var estMaxBoxH = 4 * lineHeight + boxPad * 2
   var safeOff = Math.max(subLaneOffset, estMaxBoxH + 4 + 6)
   var aboveSpace = laneBaseStem + (aboveRows - 1) * safeOff + 70
   var belowSpace = belowRows > 0
