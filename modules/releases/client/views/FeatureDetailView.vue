@@ -500,7 +500,7 @@ onMounted(() => {
           <span
             class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold"
             :class="fpdorData.allApplicablePassed ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'"
-          >{{ fpdorData.passedCount }}/{{ fpdorData.applicableCount != null ? fpdorData.applicableCount : fpdorData.totalCount }}</span>
+          >{{ fpdorData.passedCount }}/{{ fpdorData.totalCount || 17 }}</span>
         </div>
         <p class="text-xs text-gray-400 dark:text-gray-500 mb-3">
           Source of truth:

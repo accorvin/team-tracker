@@ -70,8 +70,7 @@ function exportFeatureReadinessCsv(features) {
       label: 'FPDoR',
       getter: function(f) {
         if (!f.fpdor) return ''
-        var applicable = f.fpdor.applicableCount != null ? f.fpdor.applicableCount : f.fpdor.totalCount
-        return f.fpdor.passedCount + '/' + applicable
+        return f.fpdor.passedCount + '/' + (f.fpdor.totalCount || 17)
       }
     },
     { label: 'Failed FPDoR Items', getter: function(f) { return failedFpdorNames(f).join('; ') } },

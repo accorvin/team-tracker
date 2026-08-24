@@ -211,12 +211,11 @@ const criteriaFpdorItems = computed(() => {
 
 const fpdorSummary = computed(() => {
   var fpdor = props.feature?.fpdor
-  if (!fpdor) return { passedCount: 0, totalCount: 0, applicableCount: 0, allPassed: false }
-  var applicable = fpdor.applicableCount != null ? fpdor.applicableCount : fpdor.totalCount
+  if (!fpdor) return { passedCount: 0, totalCount: 0, allPassed: false }
+  var total = fpdor.totalCount || 17
   return {
     passedCount: fpdor.passedCount || 0,
-    totalCount: fpdor.totalCount || 0,
-    applicableCount: applicable,
+    totalCount: total,
     allPassed: !!fpdor.allApplicablePassed
   }
 })
@@ -440,7 +439,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           <section v-if="fpdorItems" class="px-4 py-4">
             <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">
               FPDoR Readiness
-              <span class="font-normal ml-1" :class="fpdorSummary.allPassed ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'">({{ fpdorSummary.passedCount }}/{{ fpdorSummary.applicableCount }} applicable passed)</span>
+              <span class="font-normal ml-1" :class="fpdorSummary.allPassed ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'">({{ fpdorSummary.passedCount }}/{{ fpdorSummary.totalCount }} passed)</span>
             </p>
             <p class="text-[10px] text-gray-400 dark:text-gray-500 mb-3">
               Source of truth:

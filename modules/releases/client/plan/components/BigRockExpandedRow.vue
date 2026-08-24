@@ -223,7 +223,7 @@ var outcomeGroups = computed(function() {
                       :class="PLANNING_STATUS_CLASSES[f.planningStatus] || ''"
                     >{{ PLANNING_STATUS_LABELS[f.planningStatus] || f.planningStatus }}</span>
                     <span v-if="f.fpdor" class="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
-                      FPDoR {{ f.fpdor.passedCount }}/{{ f.fpdor.evaluatedCount }}
+                      FPDoR {{ f.fpdor.passedCount }}/{{ f.fpdor.totalCount || 17 }}
                     </span>
                     <span v-if="f.planningChecks" class="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
                       {{ f.planningChecks.passedCount }}/{{ f.planningChecks.totalCount }}
@@ -337,7 +337,7 @@ var outcomeGroups = computed(function() {
                   :class="PLANNING_STATUS_CLASSES[f.planningStatus] || ''"
                 >{{ PLANNING_STATUS_LABELS[f.planningStatus] || f.planningStatus }}</span>
                 <span v-if="f.fpdor" class="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
-                      FPDoR {{ f.fpdor.passedCount }}/{{ f.fpdor.evaluatedCount }}
+                      FPDoR {{ f.fpdor.passedCount }}/{{ f.fpdor.totalCount || 17 }}
                     </span>
                     <span v-if="f.planningChecks" class="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
                   {{ f.planningChecks.passedCount }}/{{ f.planningChecks.totalCount }}

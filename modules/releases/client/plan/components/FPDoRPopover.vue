@@ -21,8 +21,8 @@ var hasContent = computed(function() {
 
 var badgeLabel = computed(function() {
   if (!props.fpdor) return '—'
-  var applicable = props.fpdor.applicableCount != null ? props.fpdor.applicableCount : props.fpdor.totalCount
-  return props.fpdor.passedCount + '/' + applicable
+  var total = props.fpdor.totalCount != null ? props.fpdor.totalCount : 17
+  return props.fpdor.passedCount + '/' + total
 })
 
 var failSeverity = computed(function() {
@@ -35,7 +35,7 @@ var badgeClass = computed(function() {
 
 var badgeTitle = computed(function() {
   if (!props.fpdor) return ''
-  if (!failSeverity.value) return 'Ready — all applicable FPDoR items pass'
+  if (!failSeverity.value) return 'Ready — all FPDoR items pass'
   return 'Not Ready — worst fail severity: ' + severityLabel(failSeverity.value)
 })
 

@@ -44,7 +44,7 @@ function computeReadiness(feature) {
   var pastRefinement = !!feature.status && EARLY_STATUSES.indexOf(feature.status) === -1
   var noBlockingViolations = !hasBlockingViolations(feature.violations)
 
-  // N/A (pass === null) does not fail readiness; only explicit fails block ready.
+  // N/A items (state not-applicable) count as pass; only explicit fails block ready.
   var isReady = !!fpdor.allApplicablePassed
 
   var gates = {
