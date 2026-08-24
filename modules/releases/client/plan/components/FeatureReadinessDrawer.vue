@@ -8,7 +8,9 @@ import {
   pathChipClass,
   pathChipTitle
 } from '../utils/fpdor-severity.js'
+import { partitionFpdorItemsForDisplay } from '../utils/fpdor-display.js'
 import AlignmentPopover from './AlignmentPopover.vue'
+import FPDoRChecklistSections from './FPDoRChecklistSections.vue'
 
 const props = defineProps({
   feature: { type: Object, default: null },
@@ -199,16 +201,6 @@ const fpdorItems = computed(() => {
   return fpdor.items
 })
 
-const mandatoryFpdorItems = computed(() => {
-  if (!fpdorItems.value) return []
-  return fpdorItems.value.filter(item => item.group === 'mandatory')
-})
-
-const criteriaFpdorItems = computed(() => {
-  if (!fpdorItems.value) return []
-  return fpdorItems.value.filter(item => item.group !== 'mandatory')
-})
-
 const fpdorSummary = computed(() => {
   var fpdor = props.feature?.fpdor
   if (!fpdor) return { passedCount: 0, totalCount: 0, allPassed: false }
@@ -227,7 +219,8 @@ const fpdorConfluenceUrl = computed(() => {
 
 const failedFpdorActions = computed(() => {
   if (!fpdorItems.value) return []
-  return fpdorItems.value
+  var failed = partitionFpdorItemsForDisplay(fpdorItems.value).failed
+  return failed
     .filter(item => item.pass === false && FPDOR_TO_HYGIENE[item.name])
     .map(item => ({ name: item.name, action: FPDOR_TO_HYGIENE[item.name], detail: item.detail }))
 })
@@ -446,49 +439,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               <a :href="fpdorConfluenceUrl" target="_blank" rel="noopener noreferrer" class="text-primary-600 dark:text-primary-400 hover:underline">Planning Phase DoR</a>
             </p>
 
-            <div v-if="mandatoryFpdorItems.length" class="mb-4">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Mandatory Jira fields</p>
-              <div class="space-y-2">
-                <div v-for="item in mandatoryFpdorItems" :key="item.name" class="flex items-start gap-2 text-xs">
-                  <svg v-if="item.pass === true" class="w-3.5 h-3.5 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <svg v-else-if="item.pass === false" class="w-3.5 h-3.5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  <svg v-else class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
-                  </svg>
-                  <div class="flex-1 min-w-0">
-                    <span :class="item.pass === true ? 'text-gray-700 dark:text-gray-300' : item.pass === false ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'">{{ item.name }}</span>
-                    <span v-if="item.humanVerified" class="inline-flex items-center ml-1 px-1 py-0 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" title="Human verified via strat-creator sign-off">Verified</span>
-                    <div v-if="item.detail" class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{{ item.detail }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="criteriaFpdorItems.length">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Criteria</p>
-              <div class="space-y-2">
-                <div v-for="item in criteriaFpdorItems" :key="item.name" class="flex items-start gap-2 text-xs">
-                  <svg v-if="item.pass === true" class="w-3.5 h-3.5 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <svg v-else-if="item.pass === false" class="w-3.5 h-3.5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  <svg v-else class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
-                  </svg>
-                  <div class="flex-1 min-w-0">
-                    <span :class="item.pass === true ? 'text-gray-700 dark:text-gray-300' : item.pass === false ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'">{{ item.name }}</span>
-                    <span v-if="item.humanVerified" class="inline-flex items-center ml-1 px-1 py-0 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" title="Human verified via strat-creator sign-off">Verified</span>
-                    <div v-if="item.detail" class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{{ item.detail }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <FPDoRChecklistSections v-if="fpdorItems" :items="fpdorItems" />
 
             <!-- Actions for failed FPDoR items -->
             <div v-if="failedFpdorActions.length > 0" class="mt-4 p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">

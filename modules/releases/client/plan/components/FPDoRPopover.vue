@@ -7,6 +7,7 @@ import {
   severityBadgeClass,
   severityLabel
 } from '../utils/fpdor-severity.js'
+import FPDoRChecklistSections from './FPDoRChecklistSections.vue'
 
 var props = defineProps({
   fpdor: { type: Object, default: null },
@@ -48,14 +49,9 @@ var isCommitted = computed(function() {
   return props.confidence === 'committed'
 })
 
-var mandatoryItems = computed(function() {
+var checklistItems = computed(function() {
   if (!props.fpdor || !props.fpdor.items) return []
-  return props.fpdor.items.filter(function(i) { return i.group === 'mandatory' })
-})
-
-var criteriaItems = computed(function() {
-  if (!props.fpdor || !props.fpdor.items) return []
-  return props.fpdor.items.filter(function(i) { return i.group !== 'mandatory' })
+  return props.fpdor.items
 })
 
 var confluenceUrl = computed(function() {
@@ -114,48 +110,9 @@ var confluenceUrl = computed(function() {
         </button>
       </div>
 
-      <!-- Body — grouped checklist -->
-      <div class="px-3 py-2 max-h-72 overflow-y-auto space-y-3">
-        <div v-if="mandatoryItems.length">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">Mandatory fields</p>
-          <div class="space-y-1">
-            <div v-for="item in mandatoryItems" :key="item.name" class="flex items-start gap-2">
-              <svg v-if="item.pass === true" class="w-3.5 h-3.5 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              <svg v-else-if="item.pass === false" class="w-3.5 h-3.5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              <svg v-else class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
-              </svg>
-              <div class="min-w-0">
-                <span :class="item.pass === true ? 'text-gray-700 dark:text-gray-300' : item.pass === false ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'">{{ item.name }}</span>
-                <div v-if="item.detail" class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 truncate">{{ item.detail }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div v-if="criteriaItems.length">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">Criteria</p>
-          <div class="space-y-1">
-            <div v-for="item in criteriaItems" :key="item.name" class="flex items-start gap-2">
-              <svg v-if="item.pass === true" class="w-3.5 h-3.5 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              <svg v-else-if="item.pass === false" class="w-3.5 h-3.5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              <svg v-else class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
-              </svg>
-              <div class="min-w-0">
-                <span :class="item.pass === true ? 'text-gray-700 dark:text-gray-300' : item.pass === false ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'">{{ item.name }}</span>
-                <div v-if="item.detail" class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 truncate">{{ item.detail }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <!-- Body — fail-first checklist by severity -->
+      <div class="px-3 py-2 max-h-72 overflow-y-auto">
+        <FPDoRChecklistSections :items="checklistItems" compact />
       </div>
 
       <!-- Footer — readiness vs commitment kept separate -->
