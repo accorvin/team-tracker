@@ -159,12 +159,32 @@
                   <span v-if="!(issue.components || []).length" class="text-gray-400 dark:text-gray-500">—</span>
                 </div>
               </td>
+              <td class="px-3 py-2.5 align-top hidden lg:table-cell text-xs text-gray-700 dark:text-gray-300">
+                <span v-if="issue.customerAffected" :title="issue.customerAffected">{{ issue.customerAffected }}</span>
+                <span v-else class="text-gray-400 dark:text-gray-500">—</span>
+              </td>
               <td class="px-3 py-2.5 align-top">
                 <span
                   class="inline-block max-w-full truncate px-2 py-0.5 text-xs font-medium rounded-full"
                   :class="statusClasses(issue.statusCategory)"
                   :title="issue.status"
                 >{{ issue.status }}</span>
+              </td>
+              <td class="px-3 py-2.5 align-top hidden sm:table-cell">
+                <span
+                  v-if="(issue.affectedVersions || []).length"
+                  class="text-gray-700 dark:text-gray-300 text-xs truncate block"
+                  :title="(issue.affectedVersions || []).join(', ')"
+                >{{ (issue.affectedVersions || []).join(', ') }}</span>
+                <span v-else class="text-gray-400 dark:text-gray-500">—</span>
+              </td>
+              <td class="px-3 py-2.5 align-top hidden md:table-cell whitespace-nowrap text-xs tabular-nums">
+                <span v-if="daysAgo(issue.created) != null" :class="ageTint(daysAgo(issue.created))">{{ daysAgo(issue.created) }}d</span>
+                <span v-else class="text-gray-400 dark:text-gray-500">—</span>
+              </td>
+              <td class="px-3 py-2.5 align-top hidden md:table-cell whitespace-nowrap text-xs tabular-nums">
+                <span v-if="daysAgo(issue.updated) != null" :class="ageTint(daysAgo(issue.updated))">{{ daysAgo(issue.updated) }}d</span>
+                <span v-else class="text-gray-400 dark:text-gray-500">—</span>
               </td>
               <td class="px-3 py-2.5 align-top hidden sm:table-cell whitespace-nowrap">
                 <span class="inline-flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
@@ -316,13 +336,17 @@ onBeforeUnmount(function() {
 })
 
 var columns = [
-  { key: 'key', label: 'Key', widthClass: 'w-44' },
+  { key: 'key', label: 'Key', widthClass: 'w-32' },
   { key: 'summary', label: 'Issue' },
-  { key: 'component', label: 'Components', widthClass: 'w-40', hideClass: 'hidden md:table-cell' },
-  { key: 'status', label: 'Status', widthClass: 'w-28' },
-  { key: 'priority', label: 'Priority', widthClass: 'w-24', hideClass: 'hidden sm:table-cell' },
-  { key: 'hasSfdcCases', label: 'SFDC', widthClass: 'w-14', hideClass: 'hidden sm:table-cell' },
-  { key: 'created', label: 'Created', widthClass: 'w-24', hideClass: 'hidden lg:table-cell' }
+  { key: 'component', label: 'Components', widthClass: 'w-28', hideClass: 'hidden md:table-cell' },
+  { key: 'customerAffected', label: 'Customer Affected', widthClass: 'w-20', hideClass: 'hidden lg:table-cell' },
+  { key: 'status', label: 'Status', widthClass: 'w-24' },
+  { key: 'affectedVersions', label: 'Affected Version', widthClass: 'w-20', hideClass: 'hidden sm:table-cell' },
+  { key: 'age', label: 'Age', widthClass: 'w-14', hideClass: 'hidden md:table-cell' },
+  { key: 'stale', label: 'Stale', widthClass: 'w-14', hideClass: 'hidden md:table-cell' },
+  { key: 'priority', label: 'Priority', widthClass: 'w-20', hideClass: 'hidden sm:table-cell' },
+  { key: 'hasSfdcCases', label: 'SFDC', widthClass: 'w-12', hideClass: 'hidden sm:table-cell' },
+  { key: 'created', label: 'Created', widthClass: 'w-20', hideClass: 'hidden lg:table-cell' }
 ]
 
 var filters = reactive(emptyFilters())
@@ -361,7 +385,7 @@ function toggleSort(key) {
     sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
   } else {
     sortKey.value = key
-    sortDir.value = key === 'created' || key === 'updated' ? 'desc' : 'asc'
+    sortDir.value = key === 'created' || key === 'updated' || key === 'age' || key === 'stale' ? 'desc' : 'asc'
   }
   page.value = 1
 }
@@ -377,5 +401,19 @@ function toggleExpand(key) {
 
 function componentChips(issue) {
   return visibleChips(issue.components)
+}
+
+function daysAgo(dateStr) {
+  if (!dateStr) return null
+  var ms = Date.now() - new Date(dateStr).getTime()
+  return Math.max(0, Math.floor(ms / 86400000))
+}
+
+function ageTint(days) {
+  if (days == null) return 'text-gray-400 dark:text-gray-500'
+  if (days >= 180) return 'text-red-600 dark:text-red-400 font-semibold'
+  if (days >= 90) return 'text-amber-600 dark:text-amber-400 font-medium'
+  if (days >= 30) return 'text-yellow-600 dark:text-yellow-400'
+  return 'text-gray-700 dark:text-gray-300'
 }
 </script>

@@ -501,8 +501,9 @@ module.exports = async function registerPlanningRoutes(router, context) {
    *     description: >
    *       Returns cached BU/SSA feedback issues (AIBU_Feedback / AISSA_Feedback labels).
    *       Each issue includes resolved (resolutiondate), inProgressAt (first changelog
-   *       transition into an in-progress status) for process-efficiency metrics, and
-   *       hasSfdcCases (boolean, derived via JQL since the field is encrypted at rest).
+   *       transition into an in-progress status) for process-efficiency metrics,
+   *       affectedVersions (array of version names from Jira's "Affects Version/s" field),
+   *       and hasSfdcCases (boolean, derived via JQL since the field is encrypted at rest).
    *       Data is cached server-side for 15 minutes. Pass ?refresh=true to force a live
    *       Jira fetch and update the cache.
    *     parameters:
@@ -548,6 +549,7 @@ module.exports = async function registerPlanningRoutes(router, context) {
       inProgressAt: extractFirstInProgressAt(raw.changelog),
       components: (f.components || []).map(function(c) { return c.name }),
       fixVersions: (f.fixVersions || []).map(function(v) { return v.name }),
+      affectedVersions: (f.versions || []).map(function(v) { return v.name }),
       labels: allLabels,
       feedbackLabels: feedbackLabels,
       url: 'https://issues.redhat.com/browse/' + raw.key
@@ -582,7 +584,7 @@ module.exports = async function registerPlanningRoutes(router, context) {
 
   async function fetchBuFeedbackFromJira() {
     var jql = 'labels IN ("AIBU_Feedback", "AISSA_Feedback") ORDER BY createdDate DESC'
-    var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels,resolutiondate'
+    var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,versions,labels,resolutiondate'
 
     var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 200, expand: 'changelog' })
     var sfdcPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter > 0')
@@ -656,7 +658,7 @@ module.exports = async function registerPlanningRoutes(router, context) {
     var projectList = SFDC_PROJECTS.map(function(p) { return '"' + p + '"' }).join(', ')
     var scopeJql = 'project IN (' + projectList + ') AND SFDC_Cases_Counter > 0'
     var jql = scopeJql + ' ORDER BY priority DESC, createdDate DESC'
-    var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,labels,resolutiondate'
+    var fields = 'summary,status,issuetype,assignee,reporter,priority,resolution,created,updated,duedate,components,fixVersions,versions,labels,resolutiondate'
 
     var rawPromise = jiraClient.fetchAllJqlResults(jql, fields, { maxResults: 500 })
     var feedbackPromise = fetchKeySet('labels IN ("AIBU_Feedback", "AISSA_Feedback") AND SFDC_Cases_Counter > 0')
@@ -720,7 +722,8 @@ module.exports = async function registerPlanningRoutes(router, context) {
    *     description: >
    *       Returns issues (any status) with SFDC Cases Counter populated from RHOAIENG,
    *       RHAIENG, INFERENG, and RHOAISUP projects. Each issue includes hasFeedbackLabel
-   *       (boolean) indicating overlap with the BU feedback report. Cached for 15 minutes.
+   *       (boolean) indicating overlap with the BU feedback report, and affectedVersions
+   *       (array of version names from Jira's "Affects Version/s" field). Cached for 15 minutes.
    *     parameters:
    *       - in: query
    *         name: refresh
