@@ -336,17 +336,17 @@ onBeforeUnmount(function() {
 })
 
 var columns = [
-  { key: 'key', label: 'Key', widthClass: 'w-44' },
+  { key: 'key', label: 'Key', widthClass: 'w-32' },
   { key: 'summary', label: 'Issue' },
-  { key: 'component', label: 'Components', widthClass: 'w-40', hideClass: 'hidden md:table-cell' },
-  { key: 'customerAffected', label: 'Customer Affected', widthClass: 'w-28', hideClass: 'hidden md:table-cell' },
-  { key: 'status', label: 'Status', widthClass: 'w-28' },
-  { key: 'affectedVersions', label: 'Affected Version', widthClass: 'w-28', hideClass: 'hidden sm:table-cell' },
-  { key: 'age', label: 'Age', widthClass: 'w-16', hideClass: 'hidden md:table-cell' },
-  { key: 'stale', label: 'Stale', widthClass: 'w-16', hideClass: 'hidden md:table-cell' },
-  { key: 'priority', label: 'Priority', widthClass: 'w-24', hideClass: 'hidden sm:table-cell' },
-  { key: 'hasSfdcCases', label: 'SFDC', widthClass: 'w-14', hideClass: 'hidden sm:table-cell' },
-  { key: 'created', label: 'Created', widthClass: 'w-32', hideClass: 'hidden lg:table-cell' }
+  { key: 'component', label: 'Components', widthClass: 'w-28', hideClass: 'hidden md:table-cell' },
+  { key: 'customerAffected', label: 'Customer Affected', widthClass: 'w-20', hideClass: 'hidden lg:table-cell' },
+  { key: 'status', label: 'Status', widthClass: 'w-24' },
+  { key: 'affectedVersions', label: 'Affected Version', widthClass: 'w-20', hideClass: 'hidden sm:table-cell' },
+  { key: 'age', label: 'Age', widthClass: 'w-14', hideClass: 'hidden md:table-cell' },
+  { key: 'stale', label: 'Stale', widthClass: 'w-14', hideClass: 'hidden md:table-cell' },
+  { key: 'priority', label: 'Priority', widthClass: 'w-20', hideClass: 'hidden sm:table-cell' },
+  { key: 'hasSfdcCases', label: 'SFDC', widthClass: 'w-12', hideClass: 'hidden sm:table-cell' },
+  { key: 'created', label: 'Created', widthClass: 'w-20', hideClass: 'hidden lg:table-cell' }
 ]
 
 var filters = reactive(emptyFilters())
