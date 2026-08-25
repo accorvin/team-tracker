@@ -14,13 +14,9 @@ var groups = computed(function() {
   return partitionFpdorItemsForDisplay(props.items)
 })
 
-var iconClass = computed(function() {
-  return props.compact ? 'w-3.5 h-3.5' : 'w-3.5 h-3.5'
-})
+var iconClass = 'w-3.5 h-3.5'
 
-var rowClass = computed(function() {
-  return props.compact ? 'text-xs' : 'text-xs'
-})
+var rowClass = 'text-xs'
 
 function itemNameClass(item) {
   if (item.pass === false) return 'text-gray-800 dark:text-gray-200 font-medium'
