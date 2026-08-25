@@ -159,6 +159,10 @@
                   <span v-if="!(issue.components || []).length" class="text-gray-400 dark:text-gray-500">—</span>
                 </div>
               </td>
+              <td class="px-3 py-2.5 align-top hidden md:table-cell text-xs text-gray-700 dark:text-gray-300">
+                <span v-if="issue.customerAffected" :title="issue.customerAffected">{{ issue.customerAffected }}</span>
+                <span v-else class="text-gray-400 dark:text-gray-500">—</span>
+              </td>
               <td class="px-3 py-2.5 align-top">
                 <span
                   class="inline-block max-w-full truncate px-2 py-0.5 text-xs font-medium rounded-full"
@@ -335,6 +339,7 @@ var columns = [
   { key: 'key', label: 'Key', widthClass: 'w-44' },
   { key: 'summary', label: 'Issue' },
   { key: 'component', label: 'Components', widthClass: 'w-40', hideClass: 'hidden md:table-cell' },
+  { key: 'customerAffected', label: 'Customer Affected', widthClass: 'w-28', hideClass: 'hidden md:table-cell' },
   { key: 'status', label: 'Status', widthClass: 'w-28' },
   { key: 'affectedVersions', label: 'Affected Version', widthClass: 'w-28', hideClass: 'hidden sm:table-cell' },
   { key: 'age', label: 'Age', widthClass: 'w-16', hideClass: 'hidden md:table-cell' },
