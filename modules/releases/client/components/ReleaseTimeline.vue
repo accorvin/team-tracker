@@ -843,6 +843,9 @@ var timelinePlugin = {
     var todayForStack = new Date()
     todayForStack.setHours(0, 0, 0, 0)
     var todayTsStack = todayForStack.getTime()
+    var todayTs = todayTsStack
+    var todayX = xScale.getPixelForValue(todayTs)
+    var todayFade = (todayX < area.left - 20 || todayX > area.right + 20) ? 0 : 1
 
     for (var i = 0; i < n.length; i++) {
       var nd = n[i]
@@ -894,7 +897,7 @@ var timelinePlugin = {
       nodeLayouts[sli].stemLen = laneBaseStem + nodeLayouts[sli].subLane * stableOff
     }
 
-    // Second pass: draw stems BEFORE cards so card halos cover cross-row overlap
+    // Second pass: draw stems BEFORE cards so cards paint on top
     for (var ssj = 0; ssj < nodeLayouts.length; ssj++) {
       var ssLay = nodeLayouts[ssj]
       if (!ssLay) continue
@@ -914,6 +917,25 @@ var timelinePlugin = {
         ctx.lineTo(stemX, yMid + ssLay.stemLen + 8)
       }
       ctx.stroke()
+    }
+
+    // Today dashed line (drawn before cards so cards render on top)
+    if (todayFade > 0) {
+      var m = layoutMetrics.value
+      var lineHalfH = Math.max(m.aboveSpace, m.belowSpace) * 0.5
+      var todayGapR = TODAY_DOT_RADIUS + TODAY_DOT_BORDER + DOT_HALO_PAD + 6
+      ctx.save()
+      ctx.globalAlpha = todayFade
+      ctx.setLineDash([4, 6])
+      ctx.strokeStyle = dark ? 'rgba(248,113,113,0.3)' : 'rgba(239,68,68,0.25)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(todayX, yMid - lineHalfH)
+      ctx.lineTo(todayX, yMid - todayGapR)
+      ctx.moveTo(todayX, yMid + todayGapR)
+      ctx.lineTo(todayX, yMid + lineHalfH)
+      ctx.stroke()
+      ctx.restore()
     }
 
     // Third pass: draw cards
@@ -1000,18 +1022,12 @@ var timelinePlugin = {
         }
       }
 
-      // Opaque halo: wider on right to cover 2nd card overlap
-      var cardPad = 2
-      var cardPadRight = 2
-      ctx.fillStyle = dark ? '#1f2937' : '#ffffff'
-      ctx.fillRect(boxX - cardPad, boxY - cardPad, layout2.boxW + cardPad + cardPadRight, layout2.boxH + cardPad * 2)
-
       // Card fill
       drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
       ctx.fillStyle = dark ? '#1f2937' : '#ffffff'
       ctx.fill()
 
-      // Border matching card shade
+      // Card border
       drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
       ctx.strokeStyle = dark ? 'rgba(55,65,81,0.6)' : 'rgba(226,232,240,0.9)'
       ctx.lineWidth = 1
@@ -1244,29 +1260,11 @@ var timelinePlugin = {
     }
 
 
-    // Today marker (rendered last so it's always on top)
-    var today = new Date()
-    today.setHours(0, 0, 0, 0)
-    var todayTs = today.getTime()
-    var todayX = xScale.getPixelForValue(todayTs)
-    var todayFade = (todayX < area.left - 20 || todayX > area.right + 20) ? 0 : 1
+    // Today marker label (rendered last so text stays on top)
     if (todayFade > 0) {
       var redColor = dark ? '#f87171' : '#ef4444'
 
       ctx.globalAlpha = todayFade
-
-      // Dashed vertical line spanning card rows
-      var m = layoutMetrics.value
-      var lineHalfH = Math.max(m.aboveSpace, m.belowSpace) * 0.5
-      ctx.save()
-      ctx.setLineDash([4, 6])
-      ctx.strokeStyle = dark ? 'rgba(248,113,113,0.3)' : 'rgba(239,68,68,0.25)'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.moveTo(todayX, yMid - lineHalfH)
-      ctx.lineTo(todayX, yMid + lineHalfH)
-      ctx.stroke()
-      ctx.restore()
 
       _todayPx.value = todayFade > 0.05 ? { x: todayX, y: yMid, opacity: todayFade } : null
 
