@@ -159,7 +159,7 @@
                   <span v-if="!(issue.components || []).length" class="text-gray-400 dark:text-gray-500">—</span>
                 </div>
               </td>
-              <td class="px-3 py-2.5 align-top hidden md:table-cell text-xs text-gray-700 dark:text-gray-300">
+              <td class="px-3 py-2.5 align-top hidden lg:table-cell text-xs text-gray-700 dark:text-gray-300">
                 <span v-if="issue.customerAffected" :title="issue.customerAffected">{{ issue.customerAffected }}</span>
                 <span v-else class="text-gray-400 dark:text-gray-500">—</span>
               </td>
