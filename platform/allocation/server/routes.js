@@ -12,9 +12,10 @@ const { allocationKey } = require('./config');
 // Normalise the team-store API across two generations of the core package:
 //  - core ≤ 2.0.x: factory pattern — module.exports = { createTeamStore, extractBoardId, … }
 //  - core ≥ 2.0.64 (npm): standalone functions — module.exports = { readTeams, updateTeamFields, … }
-function _getTeamStore(storage) {
+// auditLog is required by createTeamStore ≥ 2.0.70; pass it through when available.
+function _getTeamStore(storage, auditLog) {
   if (typeof _teamStoreModule.createTeamStore === 'function') {
-    return _teamStoreModule.createTeamStore(storage);
+    return _teamStoreModule.createTeamStore(storage, { auditLog });
   }
   return {
     readTeams: () => _teamStoreModule.readTeams(storage),
@@ -31,7 +32,7 @@ const ALLOCATION_MODES = ['points', 'counts'];
 module.exports = function registerAllocationRoutes(router, context) {
   const { storage, requireScope } = context;
   const { readFromStorage, writeToStorage } = storage;
-  const teamStore = _getTeamStore(storage);
+  const teamStore = context.teamStore || _getTeamStore(storage, context.auditLog);
 
   const DEMO_MODE = process.env.DEMO_MODE === 'true';
 
