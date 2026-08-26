@@ -16,11 +16,11 @@ import { refreshAllocation, getRefreshStatus } from '../services/allocation-api'
  *
  * @param {Object} [opts]
  * @param {number} [opts.pollIntervalMs] - Poll cadence (default 3000).
- * @param {number} [opts.maxPolls] - Safety cap on poll attempts (default 60 ≈ 3 min).
+ * @param {number} [opts.maxPolls] - Safety cap on poll attempts (default 120 ≈ 6 min).
  */
 export function useAllocationRefresh(opts = {}) {
   const pollIntervalMs = opts.pollIntervalMs ?? 3000
-  const maxPolls = opts.maxPolls ?? 60
+  const maxPolls = opts.maxPolls ?? 120
 
   const refreshing = ref(false)
   // 'idle' | 'starting' | 'running' | 'done' | 'cooldown' | 'unavailable' | 'error'
@@ -59,6 +59,36 @@ export function useAllocationRefresh(opts = {}) {
     return false
   }
 
+  async function resumeRefresh({ onComplete } = {}) {
+    if (refreshing.value) return { status: 'busy' }
+    const status = await readStatusSafe()
+    if (!status) return { status: 'unknown' }
+
+    if (status.running) {
+      refreshing.value = true
+      phase.value = 'running'
+      message.value = 'A refresh is already in progress…'
+      try {
+        const ok = await pollUntilComplete(status.completedAt || null)
+        if (onComplete) await onComplete()
+        phase.value = ok ? 'done' : 'error'
+        message.value = ok
+          ? 'Done — data updated.'
+          : 'The refresh is still running. You can check again shortly.'
+        return { status: ok ? 'completed' : 'still_running' }
+      } finally {
+        refreshing.value = false
+      }
+    }
+
+    if (status.completedAt && status.lastResult?.status === 'success' && onComplete) {
+      await onComplete()
+      phase.value = 'done'
+      message.value = 'Loaded the latest refresh results.'
+    }
+    return { status: 'idle' }
+  }
+
   /**
    * @param {Object} [args]
    * @param {string|null} [args.teamId] - Refresh a single team (self-service). Omit for a full, admin-only refresh.
@@ -90,7 +120,7 @@ export function useAllocationRefresh(opts = {}) {
         // A run finished within the cooldown window, so the latest data is
         // already on disk — just reload it.
         phase.value = 'done'
-        message.value = 'Just refreshed a moment ago — loading the latest data.'
+        message.value = `Just refreshed a moment ago — loading the latest data${res.retryAfter ? ` (try again in ${res.retryAfter}s)` : ''}.`
         if (onComplete) await onComplete()
         return res
       }
@@ -110,7 +140,7 @@ export function useAllocationRefresh(opts = {}) {
         message.value = 'Done — data updated.'
       } else {
         phase.value = 'error'
-        message.value = 'The refresh is taking longer than expected. Please check back shortly.'
+        message.value = 'The refresh is still running. You can check again shortly.'
       }
       return res
     } catch {
@@ -122,5 +152,5 @@ export function useAllocationRefresh(opts = {}) {
     }
   }
 
-  return { refreshing, phase, message, triggerRefresh }
+  return { refreshing, phase, message, triggerRefresh, resumeRefresh }
 }

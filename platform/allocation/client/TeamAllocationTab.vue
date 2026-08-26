@@ -330,7 +330,7 @@ const isConfigured = computed(() =>
   teamAllocationMode.value === 'points' || teamAllocationMode.value === 'counts'
 )
 
-const { refreshing, message: refreshMessage, triggerRefresh } = useAllocationRefresh()
+const { refreshing, message: refreshMessage, triggerRefresh, resumeRefresh } = useAllocationRefresh()
 
 // --- Computed ---
 const allocationBoards = computed(() => {
@@ -491,7 +491,7 @@ async function loadSprints() {
 
   loadingSprints.value = true
   try {
-    const data = await getBoardSprints(board.boardId, board.sprintFilter)
+    const data = await getBoardSprints(board.boardId, props.teamId, board.sprintFilter)
     sprints.value = Array.isArray(data) ? data : (data.sprints || [])
     // `synced: false` means the board has no data file yet (never refreshed).
     boardSynced.value = Array.isArray(data) ? true : data.synced !== false
@@ -621,5 +621,6 @@ onMounted(() => {
   }
   // …then fetch the authoritative setting + edit permission.
   loadSettings()
+  resumeRefresh({ onComplete: loadSprints })
 })
 </script>
