@@ -186,6 +186,162 @@ describe('RhoaiComponentArchitecturesReport', () => {
     expect(card.text()).toContain('unknown')
   })
 
+  it('warning count messages live in a table <caption>, not confused with header/content', async () => {
+    const components = [
+      makeComp('odh-kserve-controller', 'Serving Orchestration'),
+      makeComp('odh-unknown', null)
+    ]
+    mockData.value = makeData(components, {
+      allProductComponents: [pcObj('Data Connect Hub'), pcObj('Serving Orchestration')]
+    })
+
+    const wrapper = mountReport()
+    await flushPromises()
+
+    const expected = {
+      '#not-found-in-konflux': 'not found in Konflux',
+      '#unknown-product-component': 'not matched to a Product Component'
+    }
+    for (const [id, text] of Object.entries(expected)) {
+      const card = wrapper.find(id)
+      expect(card.exists()).toBe(true)
+      // The count message is a <caption> of the table — semantically the table's
+      // title, so it is part of the table but cannot be a column header or a row.
+      const caption = card.find('table caption')
+      expect(caption.exists()).toBe(true)
+      expect(caption.text()).toContain(text)
+      // Rendered at the top and amber-tinted so it reads as a notice.
+      expect(caption.classes()).toContain('caption-top')
+      expect(caption.classes()).toContain('bg-amber-50')
+      // It is a <caption>, never a <th>/<td> (would be confused with data/header).
+      expect(caption.element.tagName).toBe('CAPTION')
+      expect(caption.element.closest('thead')).toBeNull()
+      expect(caption.find('th').exists()).toBe(false)
+      expect(caption.find('td').exists()).toBe(false)
+      // Carries a warning icon to reinforce it is a notice, not data.
+      expect(caption.find('svg').exists()).toBe(true)
+    }
+  })
+
+  it('every table header cell is sticky so headers follow while scrolling', async () => {
+    const components = [
+      makeComp('odh-kserve-controller', 'Serving Orchestration'),
+      makeComp('odh-unknown', null)
+    ]
+    mockData.value = makeData(components, {
+      allProductComponents: [pcObj('Data Connect Hub'), pcObj('Serving Orchestration')]
+    })
+
+    const wrapper = mountReport()
+    await flushPromises()
+
+    // Sticky must be on the <th> cells (browsers do not reliably honor sticky on
+    // <thead>), so guard that every header cell in every table carries it.
+    const ths = wrapper.findAll('table thead th')
+    expect(ths.length).toBeGreaterThan(0)
+    for (const th of ths) {
+      expect(th.classes()).toContain('sticky')
+      expect(th.classes()).toContain('top-0')
+    }
+  })
+
+  it('Component Image header links to konflux-central on the selected branch', async () => {
+    mockData.value = makeData([makeComp('odh-kserve-controller', 'Serving')], {
+      allProductComponents: [pcObj('Serving')]
+    })
+    const wrapper = mountReport()
+    await flushPromises()
+
+    const branch = wrapper.find('select').element.value
+    expect(branch).toBeTruthy()
+    const link = wrapper.findAll('table thead th a')
+      .find(a => a.text().includes('Component Image'))
+    expect(link).toBeTruthy()
+    expect(link.attributes('href')).toBe(
+      `https://github.com/red-hat-data-services/konflux-central/tree/${branch}`
+    )
+  })
+
+  it('renders without crashing when a component has no architectures object', async () => {
+    // Regression: real konflux-central data can contain components with a missing
+    // architectures key; indexing into it crashed the whole report (RHOAIENG-84746).
+    const broken = { name: 'odh-no-arch', productComponent: 'Serving', image: 'quay.io/rhoai/x' }
+    // No `architectures` property at all.
+    mockData.value = makeData([broken], {
+      allProductComponents: [pcObj('Serving')]
+    })
+    const wrapper = mountReport()
+    await flushPromises()
+
+    // Report renders the grouped table; the arch cells fall back to the em dash.
+    expect(wrapper.find('table').exists()).toBe(true)
+    expect(wrapper.text()).toContain('odh-no-arch')
+  })
+
+  it('renders the flat table without crashing when a component has no architectures object', async () => {
+    // Regression (RHOAIENG-84746): the flat table path (no maturity data) also
+    // indexes comp.architectures[arch] and must tolerate a missing key.
+    const broken = { name: 'odh-flat-no-arch', productComponent: null, image: 'quay.io/rhoai/x' }
+    mockData.value = makeData([broken], { maturityAvailable: false, allProductComponents: [] })
+
+    const wrapper = mountReport()
+    await flushPromises()
+
+    // No maturity data => flat table (no Product Component column).
+    const headers = wrapper.findAll('th')
+    expect(headers.some(h => h.text().includes('Product Component'))).toBe(false)
+    expect(wrapper.find('table').exists()).toBe(true)
+    expect(wrapper.text()).toContain('odh-flat-no-arch')
+  })
+
+  it('renders the unknown-product-component section without crashing when a component has no architectures object', async () => {
+    // Regression (RHOAIENG-84746): the unmapped-components table is a third path
+    // that indexes comp.architectures[arch]; it must tolerate a missing key too.
+    const mapped = makeComp('odh-kserve-controller', 'Serving Orchestration')
+    const unmappedBroken = { name: 'odh-unmapped-no-arch', productComponent: null, image: 'quay.io/rhoai/y' }
+    mockData.value = makeData([mapped, unmappedBroken], {
+      allProductComponents: [pcObj('Serving Orchestration')]
+    })
+
+    const wrapper = mountReport()
+    await flushPromises()
+
+    const card = wrapper.find('#unknown-product-component')
+    expect(card.exists()).toBe(true)
+    expect(card.text()).toContain('odh-unmapped-no-arch')
+  })
+
+  it('renders without crashing when architectures is explicitly null', async () => {
+    // Real upstream data is more likely to emit `architectures: null` than to omit
+    // the key entirely; the optional-chaining guards must handle both.
+    const broken = { name: 'odh-null-arch', productComponent: 'Serving', image: 'quay.io/rhoai/z', architectures: null }
+    mockData.value = makeData([broken], {
+      allProductComponents: [pcObj('Serving')]
+    })
+
+    const wrapper = mountReport()
+    await flushPromises()
+
+    expect(wrapper.find('table').exists()).toBe(true)
+    expect(wrapper.text()).toContain('odh-null-arch')
+  })
+
+  it('renders without crashing when allProductComponents contains a null entry', async () => {
+    // Defensive: a degenerate maturity payload with a null entry must not throw
+    // while building the product-component map.
+    const components = [makeComp('odh-kserve-controller', 'Serving Orchestration')]
+    mockData.value = makeData(components, {
+      allProductComponents: [null, pcObj('Serving Orchestration'), pcObj('Data Connect Hub')]
+    })
+
+    const wrapper = mountReport()
+    await flushPromises()
+
+    expect(wrapper.find('table').exists()).toBe(true)
+    // The valid entries still render (Data Connect Hub is unmatched in Konflux).
+    expect(wrapper.text()).toContain('Data Connect Hub')
+  })
+
   it('empty product components shown in separate card with unknown', async () => {
     const components = [
       makeComp('odh-kserve-controller', 'Serving Orchestration')
@@ -642,5 +798,105 @@ describe('RhoaiComponentArchitecturesReport', () => {
     const headers = wrapper.findAll('th')
     expect(headers.some(h => h.text().includes('Component Image'))).toBe(true)
     expect(headers.some(h => h.text().includes('Component in Konflux'))).toBe(false)
+  })
+
+  it('branch selector shows latest branch first (descending release order)', async () => {
+    const comp = makeComp('odh-kserve-controller', null)
+    const branchData = {
+      reportAvailable: true,
+      components: [comp],
+      summary: { totalComponents: 1, fullMultiArch: 0, withExceptions: 0, withIncompatible: 0, withNotBuilt: 1 }
+    }
+    mockData.value = {
+      fetchedAt: '2026-08-18T12:00:00.000Z',
+      source: { owner: 'red-hat-data-services', repo: 'konflux-central' },
+      branches: {
+        'rhoai-3.5': branchData,
+        'rhoai-3.5-ea.1': branchData,
+        'rhoai-3.6-ea.1': branchData,
+        'rhoai-3.5-ea.2': branchData
+      },
+      maturity: { available: false, fetchedAt: null, warning: null, allProductComponents: [] },
+      recommendedBranch: null
+    }
+
+    const wrapper = mountReport()
+    await flushPromises()
+
+    const options = wrapper.findAll('select option')
+    const labels = options.map(o => o.text())
+    // Latest release at the top; within a version EA precedes its GA.
+    expect(labels).toEqual(['rhoai-3.6-ea.1', 'rhoai-3.5', 'rhoai-3.5-ea.2', 'rhoai-3.5-ea.1'])
+    // Default selection (no recommendedBranch) is the latest branch.
+    expect(wrapper.find('select').element.value).toBe('rhoai-3.6-ea.1')
+  })
+
+  it('top-level report sections have generous vertical spacing', async () => {
+    mockData.value = makeData([makeComp('odh-kserve-controller', 'Serving')], {
+      allProductComponents: [pcObj('Serving')]
+    })
+    const wrapper = mountReport()
+    await flushPromises()
+
+    // The data container stacks the summary cards, matrix, and extra tables.
+    // Guard the gap so it can't silently shrink back to a cramped value.
+    const summaryGrid = wrapper.find('.grid')
+    const sectionContainer = summaryGrid.element.parentElement
+    const spacingClass = [...sectionContainer.classList].find(c => /^space-y-\d+$/.test(c))
+    expect(spacingClass).toBeTruthy()
+    const gap = Number(spacingClass.replace('space-y-', ''))
+    expect(gap).toBeGreaterThanOrEqual(10)
+  })
+
+  it('main table thead has sticky positioning', async () => {
+    mockData.value = makeData([makeComp('odh-kserve-controller', 'Serving')], {
+      allProductComponents: [pcObj('Serving')]
+    })
+    const wrapper = mountReport()
+    await flushPromises()
+
+    const thead = wrapper.find('table thead')
+    expect(thead.classes()).toContain('sticky')
+    expect(thead.classes()).toContain('top-0')
+  })
+
+  it('every table scroll container caps height with a fixed rem so it reliably scrolls internally', async () => {
+    // Regression: a viewport-relative cap (max-h-[calc(100vh-16rem)]) is huge on
+    // large monitors, so short tables never scrolled internally and their sticky
+    // headers (scoped to this box) never pinned. A fixed rem cap guarantees the
+    // box scrolls once the table exceeds it, so headers actually follow.
+    const components = [
+      makeComp('odh-kserve-controller', 'Serving Orchestration'),
+      makeComp('odh-unknown', null)
+    ]
+    mockData.value = makeData(components, {
+      allProductComponents: [pcObj('Data Connect Hub'), pcObj('Serving Orchestration')]
+    })
+    const wrapper = mountReport()
+    await flushPromises()
+
+    const scrollDivs = wrapper.findAll('table').map(t => t.element.parentElement)
+    expect(scrollDivs.length).toBeGreaterThan(0)
+    for (const scrollDiv of scrollDivs) {
+      expect(scrollDiv.className).toContain('overflow-auto')
+      // Fixed rem cap (e.g. max-h-[32rem]) — never a viewport-relative calc.
+      expect(scrollDiv.className).toMatch(/max-h-\[\d+rem\]/)
+      expect(scrollDiv.className).not.toMatch(/max-h-\[calc\(100vh/)
+    }
+  })
+
+  it('corner header cells have dual-axis sticky when maturity data exists', async () => {
+    mockData.value = makeData([makeComp('odh-kserve-controller', 'Serving')], {
+      allProductComponents: [pcObj('Serving')]
+    })
+    const wrapper = mountReport()
+    await flushPromises()
+
+    const ths = wrapper.findAll('table thead th')
+    expect(ths[0].classes()).toContain('sticky')
+    expect(ths[0].classes()).toContain('left-0')
+    expect(ths[0].classes()).toContain('top-0')
+    expect(ths[1].classes()).toContain('sticky')
+    expect(ths[1].classes()).toContain('top-0')
   })
 })

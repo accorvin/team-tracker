@@ -31,16 +31,17 @@ function registryIdToBranch(id) {
   return `rhoai-${version}-ea.${eaNum}`
 }
 
-function sortBranchesDesc(branches) {
+function parseBranch(name) {
+  const m = name.replace(/^rhoai-/, '').match(/^(\d+)\.(\d+)(?:-ea\.(\d+))?$/)
+  if (!m) return { major: 0, minor: 0, eaNum: 0 }
+  return { major: +m[1], minor: +m[2], eaNum: m[3] ? +m[3] : Infinity }
+}
+
+// Latest release first; within a version EA precedes its GA (GA has eaNum Infinity).
+function sortBranches(branches) {
   return [...branches].sort((a, b) => {
-    const partsA = a.replace(/^rhoai-/, '').split(/[.-]/).map(Number)
-    const partsB = b.replace(/^rhoai-/, '').split(/[.-]/).map(Number)
-    for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
-      const va = partsA[i] || 0
-      const vb = partsB[i] || 0
-      if (va !== vb) return vb - va
-    }
-    return 0
+    const pa = parseBranch(a), pb = parseBranch(b)
+    return (pb.major - pa.major) || (pb.minor - pa.minor) || (pb.eaNum - pa.eaNum)
   })
 }
 
@@ -54,7 +55,7 @@ function branchesFromRegistry(registry) {
       if (branch) seen.add(branch)
     }
   }
-  return sortBranchesDesc([...seen])
+  return sortBranches([...seen])
 }
 
 async function fetchBranchReport(octokit, branch) {
@@ -70,15 +71,18 @@ async function fetchBranchReport(octokit, branch) {
     const report = yaml.load(content)
 
     report.components = (report.components || []).map(comp => {
+      // Always guarantee an architectures object so the client never indexes
+      // into null/undefined (a missing architectures key crashes the report).
       if (comp.imageName) {
-        return comp
+        return { ...comp, architectures: comp.architectures || {} }
       }
       const originalName = comp.name
       return {
         ...comp,
         name: stripRhelSuffix(originalName),
         imageName: originalName,
-        image: `quay.io/rhoai/${originalName}`
+        image: `quay.io/rhoai/${originalName}`,
+        architectures: comp.architectures || {}
       }
     })
 
@@ -132,20 +136,15 @@ function registerRhoaiComponentArchitecturesFetcher(router, context) {
     let allProductComponents = []
     let maturityWarning = null
 
-    if (gitlabCeeToken) {
-      try {
-        console.log('[rhoai-component-architectures] Fetching component maturity mapping from gitlab.cee.redhat.com')
-        const maturityResult = await fetchMaturityMapping(gitlabCeeToken)
-        mapping = maturityResult.mapping
-        allProductComponents = maturityResult.allProductComponents
-        console.log(`[rhoai-component-architectures] Maturity mapping: ${Object.keys(mapping).length} images across ${allProductComponents.length} product components`)
-      } catch (err) {
-        maturityWarning = `Component maturity fetch failed: ${err.message}`
-        console.warn('[rhoai-component-architectures]', maturityWarning)
-      }
-    } else {
-      maturityWarning = 'GITLAB_CEE_TOKEN not configured — skipping component maturity mapping'
-      console.log('[rhoai-component-architectures]', maturityWarning)
+    try {
+      console.log('[rhoai-component-architectures] Fetching component maturity mapping from gitlab.cee.redhat.com')
+      const maturityResult = await fetchMaturityMapping(gitlabCeeToken || undefined)
+      mapping = maturityResult.mapping
+      allProductComponents = maturityResult.allProductComponents
+      console.log(`[rhoai-component-architectures] Maturity mapping: ${Object.keys(mapping).length} images across ${allProductComponents.length} product components`)
+    } catch (err) {
+      maturityWarning = `Component maturity fetch failed: ${err.message}`
+      console.warn('[rhoai-component-architectures]', maturityWarning)
     }
 
     if (mapping) {
@@ -249,6 +248,8 @@ module.exports = {
   REGISTRY_KEY,
   registryIdToBranch,
   branchesFromRegistry,
+  parseBranch,
+  sortBranches,
   fetchBranchReport,
   stripRhelSuffix,
   _setOctokit
