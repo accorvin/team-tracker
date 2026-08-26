@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { clampStemToCard } from '../timeline-geometry.js'
+import { clampStemToCard, pointInCircle } from '../timeline-geometry.js'
 
 // Mirrors the pixel geometry used in ReleaseTimeline.vue:
 //   above node: stem top = yMid - stemLen - 8, card bottom = yMid - stemLen - 4
@@ -56,5 +56,31 @@ describe('clampStemToCard', function () {
     expect(above.bottom).toBeGreaterThanOrEqual(above.top)
     var below = clampStemToCard(stem, card, false)
     expect(below.bottom).toBeGreaterThanOrEqual(below.top)
+  })
+})
+
+describe('pointInCircle (milestone-dot hit test)', function () {
+  // Dot centered at (200, 300) with a 10px hit radius.
+  var cx = 200
+  var cy = 300
+  var r = 10
+
+  it('hits at the exact center', function () {
+    expect(pointInCircle(cx, cy, cx, cy, r)).toBe(true)
+  })
+
+  it('hits just inside the radius (orthogonal and diagonal)', function () {
+    expect(pointInCircle(cx + 9, cy, cx, cy, r)).toBe(true)
+    expect(pointInCircle(cx, cy - 9, cx, cy, r)).toBe(true)
+    expect(pointInCircle(cx + 6, cy + 6, cx, cy, r)).toBe(true) // dist ≈ 8.49
+  })
+
+  it('hits exactly on the boundary', function () {
+    expect(pointInCircle(cx + r, cy, cx, cy, r)).toBe(true)
+  })
+
+  it('misses just outside the radius', function () {
+    expect(pointInCircle(cx + 11, cy, cx, cy, r)).toBe(false)
+    expect(pointInCircle(cx + 8, cy + 8, cx, cy, r)).toBe(false) // dist ≈ 11.3
   })
 })

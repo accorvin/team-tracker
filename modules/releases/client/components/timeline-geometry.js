@@ -31,3 +31,20 @@ export function clampStemToCard(stem, card, above) {
   if (bottom < top) bottom = top
   return { top: top, bottom: bottom }
 }
+
+/**
+ * Circular hit test — true if point (px, py) is within radius r of (cx, cy).
+ * Used for milestone-dot hover detection.
+ *
+ * @param {number} px  Point X.
+ * @param {number} py  Point Y.
+ * @param {number} cx  Circle center X.
+ * @param {number} cy  Circle center Y.
+ * @param {number} r   Circle radius.
+ * @returns {boolean}
+ */
+export function pointInCircle(px, py, cx, cy, r) {
+  var dx = px - cx
+  var dy = py - cy
+  return dx * dx + dy * dy <= r * r
+}
