@@ -77,6 +77,8 @@ Dynamic secrets: `GITLAB_*_TOKEN` — per-instance GitLab tokens configured via 
 | `PRODUCT_PAGES_CLIENT_SECRET` | No | auth | OAuth client secret for Product Pages |
 | `PRODUCT_PAGES_TOKEN` | No | auth (exclusive) | Personal token fallback for local dev |
 | `FEATURE_TRAFFIC_GITLAB_TOKEN` | No | | GitLab PAT for CI artifact fetching |
+| `DRAFT_PLANS_GITLAB_TOKEN` | No | | GitLab PAT for Draft Plans fetch from `release-planning-data` (project 81798612 on gitlab.com; overrides `GITLAB_TOKEN`) |
+| `GITLAB_CEE_TOKEN` | No | | GitLab PAT for gitlab.cee.redhat.com (`read_api`); RHOAI component architecture data |
 | `SMARTSHEET_API_TOKEN` | No | | SmartSheet API token for release discovery |
 
 ### ai-impact
