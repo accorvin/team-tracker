@@ -7,6 +7,10 @@ const { buildSprintSummary, buildTeamSummary, buildOrgSummary } = require('./cla
  */
 const ALLOWED_ISSUE_TYPES = ['Bug', 'Task', 'Story', 'Spike', 'Vulnerability', 'Weakness'];
 
+function sprintIndexKey(boardId, teamId) {
+  return `sprints/board-${boardId}-team-${teamId}.json`;
+}
+
 /**
  * Process a single scrum board: fetch sprints and issues, classify, write to storage.
  */
@@ -97,7 +101,7 @@ async function processBoard({ board, teamId, allocationMode, strategy, hardRefre
   }
 
   // Write sprint index for this board
-  await writeStorage(`sprints/board-${board.boardId}.json`, {
+  await writeStorage(sprintIndexKey(board.boardId, teamId), {
     boardId: board.boardId,
     boardName: board.name,
     teamId,
@@ -179,7 +183,7 @@ async function processKanbanBoard({ board, teamId, allocationMode, strategy, fet
 
   await writeStorage(`sprints/${syntheticSprintId}.json`, sprintData);
 
-  await writeStorage(`sprints/board-${board.boardId}.json`, {
+  await writeStorage(sprintIndexKey(board.boardId, teamId), {
     boardId: board.boardId,
     boardName: board.name,
     teamId,

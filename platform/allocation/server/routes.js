@@ -564,6 +564,12 @@ module.exports = function registerAllocationRoutes(router, context) {
    *         schema:
    *           type: string
    *       - in: query
+   *         name: teamId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Team owning the board index
+   *       - in: query
    *         name: sprintFilter
    *         schema:
    *           type: string
@@ -579,15 +585,26 @@ module.exports = function registerAllocationRoutes(router, context) {
         return res.status(400).json({ error: 'Invalid request parameter' });
       }
 
-      // If sprintFilter query param, try filter-specific index first
-      const sprintFilter = req.query.sprintFilter;
-      if (sprintFilter) {
-        const filterKey = sprintFilter.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        const filtered = await allocRead(`sprints/board-${boardId}-${filterKey}.json`);
-        if (filtered) return res.json({ synced: true, ...filtered });
+      const { teamId } = req.query;
+      if (!isValidTeamId(teamId)) {
+        return res.status(400).json({ error: 'Invalid request parameter' });
       }
 
-      const data = await allocRead(`sprints/board-${boardId}.json`);
+      const sprintFilter = req.query.sprintFilter;
+      const scopedKey = `sprints/board-${boardId}-team-${teamId}.json`;
+      let data = await allocRead(scopedKey);
+      // Read the legacy index only when it belongs to this team. This supports
+      // migration without allowing a shared board's other team's index through.
+      if (!data) {
+        const legacy = await allocRead(`sprints/board-${boardId}.json`);
+        if (legacy?.teamId === teamId) data = legacy;
+      }
+      if (data && sprintFilter?.trim()) {
+        const filterLower = sprintFilter.trim().toLowerCase();
+        data = { ...data, sprints: (data.sprints || []).filter(s =>
+          String(s.name || '').toLowerCase().includes(filterLower)
+        ) };
+      }
       if (!data) {
         // No index file for this board yet — it has never been synced from Jira.
         // `synced: false` lets the client distinguish this from a synced board

@@ -17,7 +17,7 @@ vi.mock('../../client/composables/useAllocationStrategy', () => ({
 vi.mock('../../client/composables/useAllocationRefresh', async () => {
   const { ref } = await import('vue')
   return {
-    useAllocationRefresh: () => ({ refreshing: ref(false), message: ref(''), triggerRefresh: vi.fn() })
+    useAllocationRefresh: () => ({ refreshing: ref(false), message: ref(''), triggerRefresh: vi.fn(), resumeRefresh: vi.fn() })
   }
 })
 
@@ -63,7 +63,7 @@ describe('TeamAllocationTab board selection', () => {
     })
     await flushPromises()
 
-    expect(getBoardSprints).toHaveBeenCalledWith(1103, undefined)
+    expect(getBoardSprints).toHaveBeenCalledWith(1103, 'team_1', undefined)
     expect(wrapper.text()).toContain('detected as a')
     expect(wrapper.text()).toContain('Scrum board')
   })
@@ -125,7 +125,7 @@ describe('TeamAllocationTab board selection', () => {
     await wrapper.setProps({ teamDetail: { boards: [{ url: 'x/boards/1103', name: 'AI Hub Board', boardId: 1103 }] } })
     await flushPromises()
 
-    expect(getBoardSprints).toHaveBeenCalledWith(1103, undefined)
+    expect(getBoardSprints).toHaveBeenCalledWith(1103, 'team_1', undefined)
     expect(wrapper.text()).toContain('Scrum board')
   })
 
