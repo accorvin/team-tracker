@@ -1178,7 +1178,7 @@ var timelinePlugin = {
       _dotHitBoxes.push({
         x: dotDrawX, y: yMid,
         r: MILESTONE_DOT_RADIUS + MILESTONE_DOT_BORDER + DOT_HIT_TOL,
-        nd: n[dIdx]
+        color: dotColor, nd: n[dIdx]
       })
     }
 
@@ -1393,11 +1393,27 @@ var timelinePlugin = {
         ctx.stroke()
         break
       }
-      // Highlight the milestone dot with a ring in the same stroke
+      // Highlight the milestone dot: a solid (non-transparent) backing fills the
+      // gap between the dot and the ring, then the dot and ring are drawn on top.
       var dotRingR = MILESTONE_DOT_RADIUS + MILESTONE_DOT_BORDER + DOT_HALO_PAD + 1
       for (var dhi = 0; dhi < _dotHitBoxes.length; dhi++) {
         var dhBox = _dotHitBoxes[dhi]
         if (dhBox.nd !== _hoveredBox.nd) continue
+        // Solid backing (white in light mode, dark surface in dark mode)
+        ctx.beginPath()
+        ctx.arc(dhBox.x, dhBox.y, dotRingR, 0, Math.PI * 2)
+        ctx.fillStyle = bgColor
+        ctx.fill()
+        // Redraw the dot on top of the backing
+        ctx.beginPath()
+        ctx.arc(dhBox.x, dhBox.y, MILESTONE_DOT_RADIUS + MILESTONE_DOT_BORDER, 0, Math.PI * 2)
+        ctx.fillStyle = dotBorderColor
+        ctx.fill()
+        ctx.beginPath()
+        ctx.arc(dhBox.x, dhBox.y, MILESTONE_DOT_RADIUS, 0, Math.PI * 2)
+        ctx.fillStyle = dhBox.color
+        ctx.fill()
+        // Ring in the same stroke as the card border
         ctx.beginPath()
         ctx.arc(dhBox.x, dhBox.y, dotRingR, 0, Math.PI * 2)
         ctx.stroke()
