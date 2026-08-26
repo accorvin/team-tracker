@@ -9,10 +9,11 @@ function _setFetch(fn) {
 }
 
 async function fetchMaturityMapping(token) {
-  const response = await _fetch(MATURITY_URL, {
-    headers: { 'Authorization': `Bearer ${token}` },
-    signal: AbortSignal.timeout(30000),
-  })
+  const options = { signal: AbortSignal.timeout(30000) }
+  if (token) {
+    options.headers = { 'Authorization': `Bearer ${token}` }
+  }
+  const response = await _fetch(MATURITY_URL, options)
 
   if (!response.ok) {
     if (response.status === 401) {

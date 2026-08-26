@@ -98,7 +98,7 @@
     </div>
 
     <!-- Data -->
-    <div v-else class="space-y-6">
+    <div v-else class="space-y-10">
       <!-- Maturity warning banner -->
       <div v-if="data.maturity?.warning" class="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-700 dark:text-amber-300">
         <AlertTriangle :size="14" class="flex-shrink-0" />
@@ -201,21 +201,22 @@
           </span>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div class="overflow-x-auto">
+        <div class="overflow-auto max-h-[32rem]" style="scrollbar-width: thin">
           <table class="w-full text-sm">
-            <thead>
+            <thead class="sticky top-0 z-30">
               <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-200 dark:bg-gray-900/80">
-                <th v-if="hasMaturityData" class="text-left px-4 py-3 font-semibold text-gray-700 dark:text-gray-300 sticky left-0 bg-gray-200 dark:bg-gray-900/80 z-20 min-w-[160px]">
+                <th v-if="hasMaturityData" class="text-left px-4 py-3 font-semibold text-gray-700 dark:text-gray-300 sticky left-0 top-0 bg-gray-200 dark:bg-gray-900/80 z-40 min-w-[160px]">
                   Product Component
                 </th>
-                <th class="text-left px-4 py-3 font-semibold text-gray-700 dark:text-gray-300 z-10" :class="hasMaturityData ? 'sticky left-[160px] bg-gray-200 dark:bg-gray-900/80' : 'sticky left-0 bg-gray-200 dark:bg-gray-900/80'">
-                  <a v-if="hasMaturityData" href="https://github.com/red-hat-data-services/konflux-central" target="_blank" rel="noopener noreferrer"
-                     class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:underline">
+                <th class="text-left px-4 py-3 font-semibold text-gray-700 dark:text-gray-300 z-40" :class="hasMaturityData ? 'sticky left-[160px] top-0 bg-gray-200 dark:bg-gray-900/80' : 'sticky left-0 top-0 bg-gray-200 dark:bg-gray-900/80'">
+                  <a v-if="hasMaturityData" :href="konfluxBranchUrl" target="_blank" rel="noopener noreferrer"
+                     class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:underline"
+                     :title="`Browse konflux-central on the ${selectedBranch} branch`">
                     Component Image
                   </a>
                   <span v-else>Component Image</span>
                 </th>
-                <th v-for="arch in ARCHS" :key="arch" class="text-center px-4 py-3 font-semibold text-gray-700 dark:text-gray-300 w-28">{{ arch }}</th>
+                <th v-for="arch in ARCHS" :key="arch" class="text-center px-4 py-3 font-semibold text-gray-700 dark:text-gray-300 w-28 sticky top-0 z-20 bg-gray-200 dark:bg-gray-900/80">{{ arch }}</th>
               </tr>
             </thead>
             <tbody>
@@ -294,23 +295,23 @@
                         :key="arch"
                         class="text-center px-4 py-2.5"
                       >
-                        <span v-if="comp.architectures[arch]?.status === 'supported'" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400" title="Supported">
+                        <span v-if="comp.architectures?.[arch]?.status === 'supported'" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400" title="Supported">
                           <Check :size="14" />
                         </span>
-                        <span v-else-if="comp.architectures[arch]?.status === 'incompatible'" class="text-xs font-medium text-gray-400 dark:text-gray-500" :title="'Incompatible: ' + (comp.architectures[arch]?.accelerator || 'N/A')">
+                        <span v-else-if="comp.architectures?.[arch]?.status === 'incompatible'" class="text-xs font-medium text-gray-400 dark:text-gray-500" :title="'Incompatible: ' + (comp.architectures?.[arch]?.accelerator || 'N/A')">
                           N/A
                         </span>
                         <a
-                          v-else-if="comp.architectures[arch]?.status === 'exception'"
-                          :href="comp.architectures[arch]?.issueUrl || '#'"
+                          v-else-if="comp.architectures?.[arch]?.status === 'exception'"
+                          :href="comp.architectures?.[arch]?.issueUrl || '#'"
                           target="_blank"
                           rel="noopener noreferrer"
                           class="inline-flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline"
-                          :title="comp.architectures[arch]?.reason || 'Exception'"
+                          :title="comp.architectures?.[arch]?.reason || 'Exception'"
                         >
-                          {{ comp.architectures[arch]?.issueKey || 'EXC' }}
+                          {{ comp.architectures?.[arch]?.issueKey || 'EXC' }}
                         </a>
-                        <span v-else-if="comp.architectures[arch]?.status === 'not_built'" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/40 text-red-500 dark:text-red-400" title="Not built for this architecture">
+                        <span v-else-if="comp.architectures?.[arch]?.status === 'not_built'" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/40 text-red-500 dark:text-red-400" title="Not built for this architecture">
                           <Minus :size="14" />
                         </span>
                         <span v-else class="text-gray-300 dark:text-gray-600">&mdash;</span>
@@ -356,23 +357,23 @@
                     :key="arch"
                     class="text-center px-4 py-2.5"
                   >
-                    <span v-if="comp.architectures[arch]?.status === 'supported'" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400" title="Supported">
+                    <span v-if="comp.architectures?.[arch]?.status === 'supported'" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400" title="Supported">
                       <Check :size="14" />
                     </span>
-                    <span v-else-if="comp.architectures[arch]?.status === 'incompatible'" class="text-xs font-medium text-gray-400 dark:text-gray-500" :title="'Incompatible: ' + (comp.architectures[arch]?.accelerator || 'N/A')">
+                    <span v-else-if="comp.architectures?.[arch]?.status === 'incompatible'" class="text-xs font-medium text-gray-400 dark:text-gray-500" :title="'Incompatible: ' + (comp.architectures?.[arch]?.accelerator || 'N/A')">
                       N/A
                     </span>
                     <a
-                      v-else-if="comp.architectures[arch]?.status === 'exception'"
-                      :href="comp.architectures[arch]?.issueUrl || '#'"
+                      v-else-if="comp.architectures?.[arch]?.status === 'exception'"
+                      :href="comp.architectures?.[arch]?.issueUrl || '#'"
                       target="_blank"
                       rel="noopener noreferrer"
                       class="inline-flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline"
-                      :title="comp.architectures[arch]?.reason || 'Exception'"
+                      :title="comp.architectures?.[arch]?.reason || 'Exception'"
                     >
-                      {{ comp.architectures[arch]?.issueKey || 'EXC' }}
+                      {{ comp.architectures?.[arch]?.issueKey || 'EXC' }}
                     </a>
-                    <span v-else-if="comp.architectures[arch]?.status === 'not_built'" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/40 text-red-500 dark:text-red-400" title="Not built for this architecture">
+                    <span v-else-if="comp.architectures?.[arch]?.status === 'not_built'" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/40 text-red-500 dark:text-red-400" title="Not built for this architecture">
                       <Minus :size="14" />
                     </span>
                     <span v-else class="text-gray-300 dark:text-gray-600">&mdash;</span>
@@ -390,18 +391,19 @@
       <div v-if="hasMaturityData && emptyProductComponents.length > 0"
            id="not-found-in-konflux"
            class="bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-800 overflow-hidden">
-        <div class="px-4 py-3 border-b border-amber-200 dark:border-amber-800">
-          <h4 class="text-sm font-semibold text-amber-700 dark:text-amber-300">
-            {{ emptyProductComponentCount }} component{{ emptyProductComponentCount > 1 ? 's' : '' }} not found in Konflux
-          </h4>
-        </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-auto max-h-[32rem]" style="scrollbar-width: thin">
           <table class="w-full text-sm">
-            <thead>
+            <caption class="caption-top text-left px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+              <span class="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300">
+                <AlertTriangle :size="14" class="flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                {{ emptyProductComponentCount }} component{{ emptyProductComponentCount > 1 ? 's' : '' }} not found in Konflux
+              </span>
+            </caption>
+            <thead class="sticky top-0 z-10">
               <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-200 dark:bg-gray-900/80">
-                <th class="text-left px-4 py-2 font-semibold text-gray-700 dark:text-gray-300 min-w-[160px]">Product Component</th>
-                <th class="text-left px-4 py-2 font-semibold text-gray-700 dark:text-gray-300">Component Image</th>
-                <th v-for="arch in ARCHS" :key="arch" class="text-center px-4 py-2 font-semibold text-gray-700 dark:text-gray-300 w-28">{{ arch }}</th>
+                <th class="text-left px-4 py-2 font-semibold text-gray-700 dark:text-gray-300 min-w-[160px] sticky top-0 z-20 bg-gray-200 dark:bg-gray-900/80">Product Component</th>
+                <th class="text-left px-4 py-2 font-semibold text-gray-700 dark:text-gray-300 sticky top-0 z-20 bg-gray-200 dark:bg-gray-900/80">Component Image</th>
+                <th v-for="arch in ARCHS" :key="arch" class="text-center px-4 py-2 font-semibold text-gray-700 dark:text-gray-300 w-28 sticky top-0 z-20 bg-gray-200 dark:bg-gray-900/80">{{ arch }}</th>
               </tr>
             </thead>
             <tbody>
@@ -469,18 +471,19 @@
       <div v-if="hasMaturityData && unmappedComponents.length > 0"
            id="unknown-product-component"
            class="bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-800 overflow-hidden">
-        <div class="px-4 py-3 border-b border-amber-200 dark:border-amber-800">
-          <h4 class="text-sm font-semibold text-amber-700 dark:text-amber-300">
-            {{ unmappedCount }} Konflux component{{ unmappedCount > 1 ? 's' : '' }} not matched to a Product Component
-          </h4>
-        </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-auto max-h-[32rem]" style="scrollbar-width: thin">
           <table class="w-full text-sm">
-            <thead>
+            <caption class="caption-top text-left px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+              <span class="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300">
+                <AlertTriangle :size="14" class="flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                {{ unmappedCount }} Konflux component{{ unmappedCount > 1 ? 's' : '' }} not matched to a Product Component
+              </span>
+            </caption>
+            <thead class="sticky top-0 z-10">
               <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-200 dark:bg-gray-900/80">
-                <th class="text-left px-4 py-2 font-semibold text-gray-700 dark:text-gray-300 min-w-[160px]">Product Component</th>
-                <th class="text-left px-4 py-2 font-semibold text-gray-700 dark:text-gray-300">Component Image</th>
-                <th v-for="arch in ARCHS" :key="arch" class="text-center px-4 py-2 font-semibold text-gray-700 dark:text-gray-300 w-28">{{ arch }}</th>
+                <th class="text-left px-4 py-2 font-semibold text-gray-700 dark:text-gray-300 min-w-[160px] sticky top-0 z-20 bg-gray-200 dark:bg-gray-900/80">Product Component</th>
+                <th class="text-left px-4 py-2 font-semibold text-gray-700 dark:text-gray-300 sticky top-0 z-20 bg-gray-200 dark:bg-gray-900/80">Component Image</th>
+                <th v-for="arch in ARCHS" :key="arch" class="text-center px-4 py-2 font-semibold text-gray-700 dark:text-gray-300 w-28 sticky top-0 z-20 bg-gray-200 dark:bg-gray-900/80">{{ arch }}</th>
               </tr>
             </thead>
             <tbody>
@@ -519,23 +522,23 @@
                   :key="arch"
                   class="text-center px-4 py-2.5"
                 >
-                  <span v-if="comp.architectures[arch]?.status === 'supported'" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400" title="Supported">
+                  <span v-if="comp.architectures?.[arch]?.status === 'supported'" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400" title="Supported">
                     <Check :size="14" />
                   </span>
-                  <span v-else-if="comp.architectures[arch]?.status === 'incompatible'" class="text-xs font-medium text-gray-400 dark:text-gray-500" :title="'Incompatible: ' + (comp.architectures[arch]?.accelerator || 'N/A')">
+                  <span v-else-if="comp.architectures?.[arch]?.status === 'incompatible'" class="text-xs font-medium text-gray-400 dark:text-gray-500" :title="'Incompatible: ' + (comp.architectures?.[arch]?.accelerator || 'N/A')">
                     N/A
                   </span>
                   <a
-                    v-else-if="comp.architectures[arch]?.status === 'exception'"
-                    :href="comp.architectures[arch]?.issueUrl || '#'"
+                    v-else-if="comp.architectures?.[arch]?.status === 'exception'"
+                    :href="comp.architectures?.[arch]?.issueUrl || '#'"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="inline-flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline"
-                    :title="comp.architectures[arch]?.reason || 'Exception'"
+                    :title="comp.architectures?.[arch]?.reason || 'Exception'"
                   >
-                    {{ comp.architectures[arch]?.issueKey || 'EXC' }}
+                    {{ comp.architectures?.[arch]?.issueKey || 'EXC' }}
                   </a>
-                  <span v-else-if="comp.architectures[arch]?.status === 'not_built'" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/40 text-red-500 dark:text-red-400" title="Not built for this architecture">
+                  <span v-else-if="comp.architectures?.[arch]?.status === 'not_built'" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/40 text-red-500 dark:text-red-400" title="Not built for this architecture">
                     <Minus :size="14" />
                   </span>
                   <span v-else class="text-gray-300 dark:text-gray-600">&mdash;</span>
@@ -582,17 +585,17 @@ const { data, loading, error, refreshing, loadData, refresh } = useRhoaiComponen
 const selectedBranch = ref(null)
 const searchQuery = ref('')
 
+function parseBranch(name) {
+  const m = name.replace(/^rhoai-/, '').match(/^(\d+)\.(\d+)(?:-ea\.(\d+))?$/)
+  if (!m) return { major: 0, minor: 0, eaNum: 0 }
+  return { major: +m[1], minor: +m[2], eaNum: m[3] ? +m[3] : Infinity }
+}
+
 const branchOptions = computed(() => {
   if (!data.value?.branches) return []
   return Object.keys(data.value.branches).sort((a, b) => {
-    const pa = a.replace(/^rhoai-/, '').split(/[.-]/).map(Number)
-    const pb = b.replace(/^rhoai-/, '').split(/[.-]/).map(Number)
-    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-      const va = pa[i] || 0
-      const vb = pb[i] || 0
-      if (va !== vb) return vb - va
-    }
-    return 0
+    const pa = parseBranch(a), pb = parseBranch(b)
+    return (pb.major - pa.major) || (pb.minor - pa.minor) || (pb.eaNum - pa.eaNum)
   })
 })
 
@@ -624,6 +627,7 @@ const allProductComponentMap = computed(() => {
   const rawEntries = data.value?.maturity?.allProductComponents || []
   const map = new Map()
   for (const entry of rawEntries) {
+    if (!entry) continue
     const name = typeof entry === 'string' ? entry : entry.name
     if (name && !map.has(name)) {
       map.set(name, {
@@ -685,6 +689,12 @@ const emptyProductComponentCount = computed(() => emptyProductComponents.value.l
 const sourceUrl = computed(() => {
   if (!data.value?.source || !selectedBranch.value) return null
   return `https://github.com/${data.value.source.owner}/${data.value.source.repo}/blob/${selectedBranch.value}/multi-arch-report.yaml`
+})
+
+const konfluxBranchUrl = computed(() => {
+  const branch = selectedBranch.value
+  const base = 'https://github.com/red-hat-data-services/konflux-central'
+  return branch ? `${base}/tree/${branch}` : base
 })
 
 function quayUrl(image) {
