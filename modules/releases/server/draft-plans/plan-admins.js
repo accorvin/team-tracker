@@ -13,7 +13,12 @@ var { normalizeEmail: normalizeEmailForAuth } = require('../../../../shared/serv
 var DEFAULT_PLAN_ADMIN_EMAILS = ['emarion@redhat.com', 'trozell@redhat.com']
 
 /** Preview gate: who can see the Draft Plans tab and call draft-plans APIs. */
-var DEFAULT_VIEWER_EMAILS = ['emarion@redhat.com']
+var DEFAULT_VIEWER_EMAILS = [
+  'emarion@redhat.com',
+  'ahinek@redhat.com',
+  'yluria@redhat.com',
+  'jgraham@redhat.com'
+]
 
 var DEFAULT_PLAN_ADMIN_NAMES_BY_EMAIL = {
   'emarion@redhat.com': 'Emarion',
