@@ -131,11 +131,6 @@ export function mergeExecuteFeatures(opts) {
     if (hasFamilyFilter && hy && fam && !familySet[fam] && !trackingByKey[key] && !execByKey[key]) {
       continue
     }
-    if (hasFamilyFilter && hy && fam && !familySet[fam] && !trackingByKey[key]) {
-      // Hygiene record for a family outside the selector — skip unless execution also has it
-      // (execution is already version-scoped by the caller).
-      if (!execByKey[key]) continue
-    }
     var mergedProduct = trackingProductByKey[key] || (hy && hy._family) || OTHER_PRODUCT
     mergedByKey[key] = mergeOne(trackingByKey[key], hy, execByKey[key], String(mergedProduct).toLowerCase())
   }
