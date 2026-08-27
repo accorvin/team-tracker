@@ -173,6 +173,7 @@ const fromDecomposer = computed(() => nav.params.value.fromDecomposer)
 const fromPlan = computed(() => nav.params.value.from === 'plan')
 const fromPlanFeatures = computed(() => nav.params.value.from === 'plan-features')
 const fromFeatureStatus = computed(() => nav.params.value.from === 'feature-status')
+const fromExecute = computed(() => nav.params.value.from === 'execute' || fromFeatureStatus.value)
 const fromHygieneReport = computed(() => nav.params.value.from === 'hygiene-report')
 const fromCapacityReport = computed(() => nav.params.value.from === 'capacity-report')
 const fromForYou = computed(() => nav.params.value.from === 'sotu' || nav.params.value.from === 'state-of-the-union')
@@ -201,9 +202,13 @@ function goBack() {
     if (nav.params.value.modalPhase) params.modalPhase = nav.params.value.modalPhase
     if (nav.params.value.modalField) params.modalField = nav.params.value.modalField
     nav.navigateTo('reports', params)
-  } else if (fromFeatureStatus.value) {
-    const params = { tab: 'feature-status' }
+  } else if (fromExecute.value) {
+    const params = {}
+    const view = nav.params.value.view || (fromFeatureStatus.value ? 'board' : undefined)
+    if (view) params.view = view
     if (nav.params.value.version) params.version = nav.params.value.version
+    if (nav.params.value.products) params.products = nav.params.value.products
+    else if (nav.params.value.families) params.products = nav.params.value.families
     if (nav.params.value.product) params.product = nav.params.value.product
     nav.navigateTo('execute', params)
   } else {
@@ -414,7 +419,7 @@ onMounted(() => {
       class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-1"
       @click="goBack"
     >
-      &larr; {{ fromForYou ? 'Back to State of the Union' : fromRfe ? 'Back to RFE Review' : fromFeatureReview ? 'Back to Feature Review' : fromDecomposer ? 'Back to Feature Decomposer' : fromPlanFeatures ? 'Back to Features List' : fromPlan ? 'Back to Plan' : fromHygieneReport ? 'Back to Hygiene Report' : fromCapacityReport ? 'Back to Program Level Release Report' : fromFeatureStatus ? 'Back to Feature Status' : 'Back to Execute' }}
+      &larr; {{ fromForYou ? 'Back to State of the Union' : fromRfe ? 'Back to RFE Review' : fromFeatureReview ? 'Back to Feature Review' : fromDecomposer ? 'Back to Feature Decomposer' : fromPlanFeatures ? 'Back to Features List' : fromPlan ? 'Back to Plan' : fromHygieneReport ? 'Back to Hygiene Report' : fromCapacityReport ? 'Back to Program Level Release Report' : fromExecute ? 'Back to Execute' : 'Back to Execute' }}
     </button>
 
     <!-- Loading -->

@@ -35,22 +35,36 @@ export function isFeatureCompleteForSignals(feature) {
  * @param {object[]} features - Array of feature index entries
  * @returns {object[]} Signal group objects with id, title, features, etc.
  */
+/**
+ * Traffic-signal bucket for a single feature. Returns null when the feature
+ * does not match a bucket (should not happen for well-formed records).
+ *
+ * @param {object} f
+ * @returns {string|null}
+ */
+export function signalIdForFeature(f) {
+  if (!f) return null
+  if (isFeatureCompleteForSignals(f)) return 'complete'
+  const health = effectiveHealth(f)
+  if (health === 'RED' && (f.blockerCount || 0) > 0) return 'blocked'
+  if (health === 'RED') return 'red-other'
+  if (health === 'YELLOW' && !(f.completionPct > 0) && f.statusCategory !== 'In Progress') {
+    return 'not-started'
+  }
+  if (health === 'YELLOW') return 'at-risk'
+  if (health === 'GREEN') return 'on-track'
+  return null
+}
+
 export function categorizeFeatures(features) {
   const all = features || []
   // Jira done-delivery or pipeline 100% — stale pipeline health should not override.
-  const complete = all.filter(isFeatureCompleteForSignals)
-  const active = all.filter(f => !isFeatureCompleteForSignals(f))
-
-  const blocked = active.filter(f => effectiveHealth(f) === 'RED' && f.blockerCount > 0)
-  const redOther = active.filter(f => effectiveHealth(f) === 'RED' && f.blockerCount === 0)
-  // "Not Started" requires both pipeline (completionPct 0) and Jira (not "In Progress") agreement.
-  const notStarted = active.filter(f =>
-    effectiveHealth(f) === 'YELLOW' && f.completionPct === 0 && f.statusCategory !== 'In Progress'
-  )
-  const atRisk = active.filter(f =>
-    effectiveHealth(f) === 'YELLOW' && (f.completionPct > 0 || f.statusCategory === 'In Progress')
-  )
-  const onTrack = active.filter(f => effectiveHealth(f) === 'GREEN')
+  const complete = all.filter(f => signalIdForFeature(f) === 'complete')
+  const blocked = all.filter(f => signalIdForFeature(f) === 'blocked')
+  const redOther = all.filter(f => signalIdForFeature(f) === 'red-other')
+  const notStarted = all.filter(f => signalIdForFeature(f) === 'not-started')
+  const atRisk = all.filter(f => signalIdForFeature(f) === 'at-risk')
+  const onTrack = all.filter(f => signalIdForFeature(f) === 'on-track')
 
   return [
     {
@@ -130,4 +144,52 @@ export function effectiveHealth(f) {
   if (f.health) return f.health
   if (f.statusCategory === 'In Progress') return 'GREEN'
   return 'YELLOW'
+}
+
+/**
+ * Roll up currently displayed features for the Signals progress strip.
+ * Done / Active / Backlog are feature-level statusCategory counts (not child issues).
+ *
+ * @param {object[]} features
+ * @returns {{
+ *   total: number,
+ *   done: number,
+ *   inProgress: number,
+ *   todo: number,
+ *   blockers: number,
+ *   totalEpics: number,
+ *   totalIssues: number,
+ *   avgCompletion: number
+ * }}
+ */
+export function summarizeSignalFeatures(features) {
+  var all = features || []
+  var total = all.length
+  var done = 0
+  var inProgress = 0
+  var todo = 0
+  var blockers = 0
+  var totalEpics = 0
+  var totalIssues = 0
+  var completionSum = 0
+  for (var i = 0; i < total; i++) {
+    var f = all[i] || {}
+    if (f.statusCategory === 'Done') done++
+    else if (f.statusCategory === 'In Progress') inProgress++
+    else todo++
+    blockers += f.blockerCount || 0
+    totalEpics += f.epicCount || 0
+    totalIssues += f.issueCount || 0
+    completionSum += f.completionPct || 0
+  }
+  return {
+    total: total,
+    done: done,
+    inProgress: inProgress,
+    todo: todo,
+    blockers: blockers,
+    totalEpics: totalEpics,
+    totalIssues: totalIssues,
+    avgCompletion: total > 0 ? Math.round(completionSum / total) : 0
+  }
 }

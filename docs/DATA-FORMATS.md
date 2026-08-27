@@ -1381,6 +1381,29 @@ Admin-configurable settings for GitLab CI artifact fetching and Jira sync.
 - `artifactPath` is the directory prefix stripped from zip entry paths (e.g., `output/index.json` becomes `index.json`).
 - `jiraEnrichment.enabled` enables periodic Jira sync of feature data (12h default cadence). The sync fetches all RHAISTRAT features from Jira as the authoritative source.
 
+## Releases — Feature Tracking Config (`data/releases/execution/feature-tracking-config.json`)
+
+Gear settings for the Execute workspace: portfolio version names, per-product Jira fixVersion strings, and optional planning-freeze overrides.
+
+```json
+{
+  "releases": {
+    "2.15": {
+      "products": {
+        "rhoai": "rhoai-3.5",
+        "rhelai": "rhelai-3.5"
+      },
+      "planningFreezeOverride": "2026-06-15"
+    }
+  }
+}
+```
+
+**Notes:**
+- Keys under `releases` are portfolio versions shown as Execute version chips.
+- `products` maps family (`rhoai` / `rhelai` / `rhaii`) to the Jira fixVersion name used for hygiene and execution lookups.
+- `planningFreezeOverride` is an optional `YYYY-MM-DD` date; when set it wins over Product Pages.
+
 ## Releases — Execution Last Enrichment (`data/releases/execution/last-enrichment.json`)
 
 Metadata from the most recent Jira sync.
