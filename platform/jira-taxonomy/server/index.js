@@ -12,7 +12,7 @@
  */
 
 const crypto = require('crypto');
-const { createAuditLog } = require('../../../shared/server/audit-log');
+const { appendAuditEntry } = require('../../../shared/server/audit-log');
 
 // Google Form: "RHAI Component Request"
 // Form ID: 19eEmOqZ1_VA5U0oibZprzr1rgn5b3Jsa9Vk3XSa0ysE
@@ -44,7 +44,6 @@ module.exports = function registerJiraTaxonomyRoutes(router, context) {
   const requireScope = context.requireScope;
   const readFromStorage = storage.readFromStorage;
   const writeToStorage = storage.writeToStorage;
-  const auditLog = createAuditLog(storage);
   var DEMO_MODE = process.env.DEMO_MODE === 'true';
 
   /**
@@ -240,7 +239,7 @@ module.exports = function registerJiraTaxonomyRoutes(router, context) {
         if (demoEntry) demoEntry.googleFormStatus = 'success';
         await writeToStorage(SUBMISSIONS_LOG_KEY, demoLog);
 
-        auditLog.appendAuditEntry({
+        appendAuditEntry(storage, {
           action: 'components.request-submitted',
           actor: submitterEmail,
           entityType: 'component-request',
@@ -298,7 +297,7 @@ module.exports = function registerJiraTaxonomyRoutes(router, context) {
       await writeToStorage(SUBMISSIONS_LOG_KEY, updatedLog);
 
       // Audit log
-      auditLog.appendAuditEntry({
+      appendAuditEntry(storage, {
         action: 'components.request-submitted',
         actor: submitterEmail,
         entityType: 'component-request',
