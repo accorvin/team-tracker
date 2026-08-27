@@ -102,8 +102,9 @@ export const viewOwners = {
   // These override the view-level owner when a specific tab is active.
 
   // releases > execute
-  'releases/execute/feature-list':                 'Alex Corvin',
-  'releases/execute/feature-status':               'Saiesh Prabhu',
+  'releases/execute/board':                        'Saiesh Prabhu',
+  'releases/execute/signals':                      'Alex Corvin',
+  'releases/execute/table':                        'Alex Corvin',
 
   // releases > plan
   'releases/plan/bu-feedback':                     'Saiesh Prabhu',

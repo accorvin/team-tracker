@@ -2,8 +2,28 @@ import { describe, it, expect } from 'vitest';
 import {
   categorizeFeatures,
   effectiveHealth,
-  isFeatureCompleteForSignals
+  isFeatureCompleteForSignals,
+  signalIdForFeature,
+  summarizeSignalFeatures
 } from '../../../client/execute/helpers/signal-groups';
+
+describe('signalIdForFeature', function () {
+  it('returns complete for 100% completion', function () {
+    expect(signalIdForFeature({ completionPct: 100, health: 'GREEN' })).toBe('complete')
+  })
+
+  it('returns blocked for RED health with blockers', function () {
+    expect(signalIdForFeature({ completionPct: 40, health: 'RED', blockerCount: 1 })).toBe('blocked')
+  })
+
+  it('returns at-risk for YELLOW in progress', function () {
+    expect(signalIdForFeature({
+      completionPct: 20,
+      health: 'YELLOW',
+      statusCategory: 'In Progress'
+    })).toBe('at-risk')
+  })
+})
 
 function findGroup(groups, id) {
   return groups.find(g => g.id === id);
@@ -231,3 +251,69 @@ describe('isFeatureCompleteForSignals', () => {
     expect(isFeatureCompleteForSignals(undefined)).toBe(false);
   });
 });
+
+describe('summarizeSignalFeatures', () => {
+  it('returns zeros for an empty list', () => {
+    expect(summarizeSignalFeatures([])).toEqual({
+      total: 0,
+      done: 0,
+      inProgress: 0,
+      todo: 0,
+      blockers: 0,
+      totalEpics: 0,
+      totalIssues: 0,
+      avgCompletion: 0
+    })
+  })
+
+  it('rolls up status, epics, issues, blockers, and average completion', () => {
+    const stats = summarizeSignalFeatures([
+      {
+        key: 'A',
+        statusCategory: 'Done',
+        completionPct: 100,
+        epicCount: 2,
+        issueCount: 10,
+        blockerCount: 0
+      },
+      {
+        key: 'B',
+        statusCategory: 'In Progress',
+        completionPct: 40,
+        epicCount: 1,
+        issueCount: 5,
+        blockerCount: 3
+      },
+      {
+        key: 'C',
+        statusCategory: 'To Do',
+        completionPct: 0,
+        epicCount: 0,
+        issueCount: 1,
+        blockerCount: 0
+      }
+    ])
+    expect(stats).toEqual({
+      total: 3,
+      done: 1,
+      inProgress: 1,
+      todo: 1,
+      blockers: 3,
+      totalEpics: 3,
+      totalIssues: 16,
+      avgCompletion: 47
+    })
+  })
+
+  it('treats missing statusCategory as backlog', () => {
+    const stats = summarizeSignalFeatures([
+      { key: 'X', completionPct: 10, epicCount: 4, issueCount: 8 }
+    ])
+    expect(stats.todo).toBe(1)
+    expect(stats.done).toBe(0)
+    expect(stats.inProgress).toBe(0)
+    expect(stats.totalEpics).toBe(4)
+    expect(stats.totalIssues).toBe(8)
+    expect(stats.avgCompletion).toBe(10)
+  })
+})

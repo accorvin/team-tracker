@@ -1617,15 +1617,14 @@ test.describe('Program Hygiene Report @releases', () => {
 });
 
 /**
- * Feature Status tab (Execute view)
+ * Feature Execution workspace (Execute view)
  *
- * The Feature Status kanban board uses the shared release selector (product
- * family + version + phase) and the shared report filter modal (team,
- * component, label, assignee, type, priority) — the same controls as the
- * Program Level Release Report. These tests verify those controls render and
- * open correctly.
+ * The three former Execute tabs (Feature Tracking, Feature List, Feature Status)
+ * are one workspace with Table / Kanban / Signals view modes. Legacy
+ * `?tab=feature-status` URLs map to Kanban. The shared release selector and
+ * hygiene filter/rules controls remain on this page.
  */
-// The Feature Status view degrades gracefully from two benign, environment-
+// The workspace degrades gracefully from two benign, environment-
 // specific responses in demo mode: curated field-options sets have no demo
 // fixtures (404) and /hygiene/config requires planning-manager access (403).
 // Both are handled in-app, so ignore benign resource-load failures here while
@@ -1644,7 +1643,7 @@ async function dismissHygieneWelcome(page) {
   }
 }
 
-test.describe('Feature Status filtering @releases', () => {
+test.describe('Feature Execution workspace @releases', () => {
   test.beforeEach(async ({ page }) => {
     setupErrorTracking(page);
   });
@@ -1653,43 +1652,67 @@ test.describe('Feature Status filtering @releases', () => {
     logCapturedErrors(page, testInfo);
   });
 
-  test('tab loads with the condensed toolbar controls', async ({ page }) => {
+  test('legacy feature-status tab loads Kanban with toolbar controls', async ({ page }) => {
     await page.goto('/#/releases/execute?tab=feature-status');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await dismissHygieneWelcome(page);
 
-    // Purpose subtitle keeps the page's intent discoverable
-    await expect(page.locator('text=Tracks hygiene-rule compliance').first()).toBeVisible();
+    await expect(page.getByText('Feature Execution').first()).toBeVisible();
+    await expect(page.getByText('hygiene-rule compliance').first()).toBeVisible();
 
-    // Compact toolbar: release selector + always-present "Hygiene rules" entry point
     await expect(page.locator('[data-testid="hygiene-release-selector"]').first()).toBeVisible();
     await expect(page.locator('[data-testid="hygiene-rules-button"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid="execute-view-board"]').first()).toBeVisible();
 
     expect(unexpectedHygieneErrors(page)).toHaveLength(0);
   });
 
-  test('release selector modal opens with family, version, and phase', async ({ page }) => {
+  test('view toggle switches Table, Kanban, and Signals', async ({ page }) => {
+    await page.goto('/#/releases/execute');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+    await dismissHygieneWelcome(page);
+
+    await expect(page.locator('[data-testid="execute-view-toggle"]').first()).toBeVisible();
+
+    await page.locator('[data-testid="execute-view-board"]').first().click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('[data-testid="execute-view-board"]').first()).toHaveAttribute('aria-selected', 'true');
+
+    await page.locator('[data-testid="execute-view-signals"]').first().click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('[data-testid="execute-view-signals"]').first()).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('[data-testid="execute-kpi-cards"]')).toHaveCount(0);
+    const signalsSummary = page.locator('[data-testid="signals-progress-summary"]');
+    if (await signalsSummary.count()) {
+      await expect(signalsSummary.first()).toBeVisible();
+      await expect(signalsSummary.first().getByText('Features')).toBeVisible();
+      await expect(signalsSummary.first().getByText('Epics')).toBeVisible();
+    }
+
+    await page.locator('[data-testid="execute-view-table"]').first().click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('[data-testid="execute-view-table"]').first()).toHaveAttribute('aria-selected', 'true');
+    const kpiCards = page.locator('[data-testid="execute-kpi-cards"]');
+    if (await kpiCards.count()) {
+      await expect(kpiCards.first()).toBeVisible();
+    }
+
+    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+  });
+
+  test('toolbar shows gear-driven version chips without a registry modal', async ({ page }) => {
     await page.goto('/#/releases/execute?tab=feature-status');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await dismissHygieneWelcome(page);
 
-    await page.locator('[data-testid="hygiene-release-selector"]').first().click();
-    await page.waitForTimeout(300);
-
-    // Exact matches — the drawer/hero copy contains "Fix Version"/"Target Version",
-    // so a loose `text=Version` would match those hidden strings instead.
-    await expect(page.getByText('Product Family', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Version', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Phase', { exact: true }).first()).toBeVisible();
-
-    await expect(page.locator('button', { hasText: 'Cancel' }).first()).toBeVisible();
-    await expect(page.locator('button', { hasText: 'Apply' }).first()).toBeVisible();
-
-    // Close via Escape
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
+    await expect(page.locator('[data-testid="hygiene-release-selector"]').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'All versions' })).toHaveCount(0);
+    await expect(page.getByText('Product Family', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Phase', { exact: true })).toHaveCount(0);
+    await expect(page.locator('button', { hasText: 'Apply' })).toHaveCount(0);
 
     expect(unexpectedHygieneErrors(page)).toHaveLength(0);
   });
@@ -1717,8 +1740,8 @@ test.describe('Feature Status filtering @releases', () => {
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await dismissHygieneWelcome(page);
 
-    // The Filters control only shows once a release is selected. In demo mode a
-    // default selection is auto-applied, so it should normally be present.
+    // The Filters control only shows once a gear-configured release is selected.
+    // A default version is auto-applied when tracking settings have releases.
     const filtersButton = page.locator('[data-testid="hygiene-filters-button"]').first();
     const hasSelection = await filtersButton.isVisible().catch(() => false);
 
