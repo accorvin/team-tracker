@@ -341,9 +341,14 @@ var layoutMetrics = computed(function () {
   return { aboveSpace: aboveSpace, belowSpace: Math.max(belowSpace, infraSpace), safeOff: safeOff }
 })
 
+// Fixed chart height so the timeline box never resizes when the release
+// selection changes (e.g. picking an older EA version). Row layout is always
+// shrunk to fit within CHART_MAX_HEIGHT (see layoutMetrics), so a constant
+// height never overflows — it only removes the vertical "jumping" between
+// selections. The axis position within the box stays proportional via the
+// y-scale (belowSpace/aboveSpace ratio in chartOptions).
 var chartHeight = computed(function () {
-  var m = layoutMetrics.value
-  return Math.min(m.aboveSpace + m.belowSpace + 40, CHART_MAX_HEIGHT)
+  return CHART_MAX_HEIGHT
 })
 
 function fmtDate(dateStr) {
