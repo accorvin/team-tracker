@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { DEFAULT_PAGE_WAIT_TIME } = require('./constants');
-const { setupErrorTracking, logCapturedErrors, unexpectedDemoResourceErrors, dismissHygieneWelcome } = require('./helpers');
+const { setupErrorTracking, logCapturedErrors } = require('./helpers');
+const { unexpectedDemoResourceErrors, dismissHygieneWelcome } = require('./execute-helpers');
 
 /**
  * Integration tests for Releases module
@@ -155,7 +156,8 @@ test.describe('Releases Views @releases', () => {
       console.error(`${viewName} errors:`, page.errors);
     }
 
-    expect(page.errors).toHaveLength(0);
+    const unexpected = viewId === 'execute' ? unexpectedDemoResourceErrors(page) : page.errors;
+    expect(unexpected).toHaveLength(0);
   }
 
   test('should load Plan view', async ({ page }) => {

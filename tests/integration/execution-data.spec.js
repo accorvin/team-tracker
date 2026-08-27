@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { DEFAULT_PAGE_WAIT_TIME } = require('./constants');
-const { setupErrorTracking, logCapturedErrors, unexpectedDemoResourceErrors, dismissHygieneWelcome } = require('./helpers');
+const { setupErrorTracking, logCapturedErrors } = require('./helpers');
+const { unexpectedDemoResourceErrors, dismissHygieneWelcome } = require('./execute-helpers');
 
 /**
  * Integration tests for Execution Feature Data Unification
