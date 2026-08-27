@@ -5,7 +5,7 @@ import { Chart as ChartJS, LinearScale, PointElement, Tooltip } from 'chart.js'
 import { parseReleaseName, extractCycle, productLabel } from '../composables/useReleaseFamily.js'
 import { parseDate, daysFromNow, formatShort, getProduct } from '../composables/useScheduleHelpers.js'
 import { PRODUCT_HEX, DEFAULT_HEX } from '../composables/useProductColors.js'
-import { clampStemToCard } from './timeline-geometry.js'
+import { clampStemToCard, pointInCircle } from './timeline-geometry.js'
 
 ChartJS.register(LinearScale, PointElement, Tooltip)
 
@@ -188,6 +188,7 @@ var DOT_HALO_PAD = 1.5
 var TODAY_TEXT_START = Math.ceil(TODAY_DOT_RADIUS + TODAY_DOT_BORDER + DOT_HALO_PAD) + 4
 var CHART_MAX_HEIGHT = 450
 var STEM_HIT_TOL = 6
+var DOT_HIT_TOL = 4
 
 function hexToRgba(hex, alpha) {
   if (!hex || hex.charAt(0) !== '#' || hex.length < 7) return hex
@@ -622,6 +623,15 @@ function onCardHover(e) {
     }
   }
 
+  // Then milestone dots on the axis — resolve to the same node's card
+  for (var di = _dotHitBoxes.length - 1; di >= 0; di--) {
+    var dbox = _dotHitBoxes[di]
+    if (pointInCircle(cx, cy, dbox.x, dbox.y, dbox.r)) {
+      var dotCardBox = _cardBoxForNode(dbox.nd)
+      if (dotCardBox) { _setHoveredBox(dotCardBox); return }
+    }
+  }
+
   // Fall back to stems — resolve to the same node's card so the tip matches
   for (var si = _stemHitBoxes.length - 1; si >= 0; si--) {
     var sbox = _stemHitBoxes[si]
@@ -724,6 +734,7 @@ function _pluginSetup(chart) {
 
 var _cardHitBoxes = []
 var _stemHitBoxes = []
+var _dotHitBoxes = []
 var _hoveredBox = null
 var _frontNodes = new Set()
 
@@ -855,6 +866,7 @@ var timelinePlugin = {
     ctx.save()
     _cardHitBoxes = []
     _stemHitBoxes = []
+    _dotHitBoxes = []
 
     // Redraw arrowhead zone to cover any Chart.js dots near the right edge
     var bgColor = dark ? '#1f2937' : '#ffffff'
@@ -1162,6 +1174,12 @@ var timelinePlugin = {
       ctx.fillStyle = dotColor
       ctx.fill()
       ctx.globalAlpha = 1.0
+
+      _dotHitBoxes.push({
+        x: dotDrawX, y: yMid,
+        r: MILESTONE_DOT_RADIUS + MILESTONE_DOT_BORDER + DOT_HIT_TOL,
+        color: dotColor, nd: n[dIdx]
+      })
     }
 
     // Dimension lines
@@ -1372,6 +1390,32 @@ var timelinePlugin = {
         ctx.beginPath()
         ctx.moveTo(shX, shEnds.top)
         ctx.lineTo(shX, shEnds.bottom)
+        ctx.stroke()
+        break
+      }
+      // Highlight the milestone dot: a solid (non-transparent) backing fills the
+      // gap between the dot and the ring, then the dot and ring are drawn on top.
+      var dotRingR = MILESTONE_DOT_RADIUS + MILESTONE_DOT_BORDER + DOT_HALO_PAD + 1
+      for (var dhi = 0; dhi < _dotHitBoxes.length; dhi++) {
+        var dhBox = _dotHitBoxes[dhi]
+        if (dhBox.nd !== _hoveredBox.nd) continue
+        // Solid backing (white in light mode, dark surface in dark mode)
+        ctx.beginPath()
+        ctx.arc(dhBox.x, dhBox.y, dotRingR, 0, Math.PI * 2)
+        ctx.fillStyle = bgColor
+        ctx.fill()
+        // Redraw the dot on top of the backing
+        ctx.beginPath()
+        ctx.arc(dhBox.x, dhBox.y, MILESTONE_DOT_RADIUS + MILESTONE_DOT_BORDER, 0, Math.PI * 2)
+        ctx.fillStyle = dotBorderColor
+        ctx.fill()
+        ctx.beginPath()
+        ctx.arc(dhBox.x, dhBox.y, MILESTONE_DOT_RADIUS, 0, Math.PI * 2)
+        ctx.fillStyle = dhBox.color
+        ctx.fill()
+        // Ring in the same stroke as the card border
+        ctx.beginPath()
+        ctx.arc(dhBox.x, dhBox.y, dotRingR, 0, Math.PI * 2)
         ctx.stroke()
         break
       }
