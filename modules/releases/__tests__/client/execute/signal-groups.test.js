@@ -201,6 +201,15 @@ describe('categorizeFeatures', () => {
     const groups = categorizeFeatures(features);
     expect(findGroup(groups, 'complete').features).toHaveLength(1);
   });
+
+  it('excludes dropped features from signal buckets when live features exist', () => {
+    const groups = categorizeFeatures([
+      { key: 'LIVE', completionPct: 40, health: 'GREEN', statusCategory: 'In Progress' },
+      { key: 'GONE', scopeChange: 'dropped', completionPct: 0, health: 'RED', blockerCount: 2 }
+    ]);
+    expect(findGroup(groups, 'on-track').features.map(function (f) { return f.key })).toEqual(['LIVE']);
+    expect(findGroup(groups, 'blocked')).toBeUndefined();
+  });
 });
 
 describe('isFeatureCompleteForSignals', () => {
@@ -315,5 +324,26 @@ describe('summarizeSignalFeatures', () => {
     expect(stats.totalEpics).toBe(4)
     expect(stats.totalIssues).toBe(8)
     expect(stats.avgCompletion).toBe(10)
+  })
+
+  it('excludes dropped features from the live total', () => {
+    const stats = summarizeSignalFeatures([
+      { key: 'LIVE', statusCategory: 'In Progress', completionPct: 50, epicCount: 1, issueCount: 2, blockerCount: 1 },
+      { key: 'GONE', scopeChange: 'dropped', statusCategory: 'To Do', completionPct: 0, epicCount: 9, issueCount: 9, blockerCount: 9 }
+    ])
+    expect(stats.total).toBe(1)
+    expect(stats.inProgress).toBe(1)
+    expect(stats.todo).toBe(0)
+    expect(stats.totalEpics).toBe(1)
+    expect(stats.totalIssues).toBe(2)
+    expect(stats.blockers).toBe(1)
+  })
+
+  it('keeps dropped rows when the list is dropped-only', () => {
+    const stats = summarizeSignalFeatures([
+      { key: 'GONE', scopeChange: 'dropped', statusCategory: 'To Do' }
+    ])
+    expect(stats.total).toBe(1)
+    expect(stats.todo).toBe(1)
   })
 })

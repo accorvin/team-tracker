@@ -1400,7 +1400,7 @@ Gear settings for the Execute workspace: portfolio version names, per-product Ji
 ```
 
 **Notes:**
-- Keys under `releases` are portfolio versions shown as Execute version chips.
+- Keys under `releases` are portfolio versions shown as Execute version chips, ordered by planning freeze date (earliest first). User `planningFreezeOverride` wins over Product Pages.
 - `products` maps family (`rhoai` / `rhelai` / `rhaii`) to the Jira fixVersion name used for hygiene and execution lookups.
 - `planningFreezeOverride` is an optional `YYYY-MM-DD` date; when set it wins over Product Pages.
 

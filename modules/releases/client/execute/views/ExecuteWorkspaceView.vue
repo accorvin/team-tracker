@@ -3,7 +3,7 @@ import { ref, computed, onMounted, inject, nextTick } from 'vue'
 import { apiRequest, getApiBase } from '@shared/client/services/api.js'
 import { useReportFilters } from '../../reports/composables/useReportFilters.js'
 import { useExecuteWorkspace } from '../composables/useExecuteWorkspace.js'
-import { signalIdForFeature } from '../helpers/signal-groups.js'
+import { signalIdForFeature, liveExecuteFeatures } from '../helpers/signal-groups.js'
 import {
   STORAGE_KEY as PICKER_STORAGE_KEY,
   listTrackingVersions,
@@ -60,7 +60,8 @@ const refreshing = ref(false)
 const settingsOpen = ref(false)
 const trackingConfig = ref({ releases: {} })
 
-const trackingVersions = computed(() => listTrackingVersions(trackingConfig.value))
+const freezeDatesByVersion = ref({})
+const trackingVersions = computed(() => listTrackingVersions(trackingConfig.value, freezeDatesByVersion.value))
 const availableProducts = computed(() => productsForVersion(trackingConfig.value, selectedVersion.value))
 const hasSelection = computed(() => !!selectedVersion.value && trackingVersions.value.indexOf(selectedVersion.value) >= 0)
 
@@ -170,6 +171,8 @@ const overlayFilteredFeatures = computed(() => {
   }
   return list
 })
+
+const liveOverlayFeatures = computed(() => liveExecuteFeatures(overlayFilteredFeatures.value))
 
 const filteredKeySet = computed(() => {
   const set = {}
@@ -348,7 +351,7 @@ function restoreSelection() {
   if (params.products || params.families) {
     stored.products = parseProductsFromParams(params.products, params.families)
   }
-  applySelection(reconcileSelection(trackingConfig.value, stored))
+  applySelection(reconcileSelection(trackingConfig.value, stored, freezeDatesByVersion.value))
 }
 
 async function reload(opts) {
@@ -396,8 +399,23 @@ async function fetchTrackingConfig() {
   } catch (e) { void e }
 }
 
+async function fetchFreezeDates() {
+  try {
+    const data = await apiRequest('/modules/releases/execution/tracking/versions')
+    const map = {}
+    const rows = (data && data.versions) || []
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]
+      if (row && row.version) map[row.version] = row.planningFreezeDate || null
+    }
+    freezeDatesByVersion.value = map
+  } catch {
+    freezeDatesByVersion.value = {}
+  }
+}
+
 onMounted(async () => {
-  await fetchTrackingConfig()
+  await Promise.all([fetchTrackingConfig(), fetchFreezeDates()])
   restoreSelection()
   persistSelection()
   await reload()
@@ -418,10 +436,11 @@ async function handleRefresh() {
 async function onSettingsSaved(newConfig) {
   trackingConfig.value = newConfig
   settingsOpen.value = false
+  await fetchFreezeDates()
   applySelection(reconcileSelection(newConfig, {
     version: selectedVersion.value,
     products: selectedProducts.value
-  }))
+  }, freezeDatesByVersion.value))
   persistSelection()
   await reload({ refreshTracking: true })
 }
@@ -516,7 +535,7 @@ onMounted(loadRuleCategories)
             :data-testid="'execute-view-' + mode.id"
             class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
             :class="viewMode === mode.id
-              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+              ? 'bg-orange-500 dark:bg-orange-600 text-white shadow-sm'
               : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
             @click="setViewMode(mode.id)"
           >{{ mode.label }}</button>
@@ -722,13 +741,13 @@ onMounted(loadRuleCategories)
 
       <KanbanBoard
         v-else-if="viewMode === 'board'"
-        :features="overlayFilteredFeatures"
+        :features="liveOverlayFeatures"
         @feature-click="handleFeatureClick"
       />
 
       <FeatureSignalsBoard
         v-else-if="viewMode === 'signals'"
-        :features="overlayFilteredFeatures"
+        :features="liveOverlayFeatures"
         :selected-signals="[]"
         @select="handleFeatureClick"
       />

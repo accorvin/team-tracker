@@ -1,9 +1,10 @@
 /**
  * Join tracking, hygiene, and execution feature records by Jira key.
  *
- * Missing overlays are left empty (null / [] / 0) so Table, Board, and Signals
- * can share one feature list without dropping records that exist in only one
- * source.
+ * Membership is tracking-only (current Features plus dropped). Hygiene and
+ * execution are overlays on those keys. Missing overlays are left empty
+ * (null / [] / 0). Rows that exist only in hygiene or execution are omitted
+ * so Table, Board, and Signals share one list that matches tracking JQL.
  */
 
 var OTHER_PRODUCT = 'other'
@@ -66,12 +67,6 @@ function mergeOne(tracking, hygiene, execution, product) {
   }
 }
 
-function familyOf(hygiene, trackingProduct) {
-  if (trackingProduct) return String(trackingProduct).toLowerCase()
-  if (hygiene && hygiene._family) return String(hygiene._family).toLowerCase()
-  return null
-}
-
 /**
  * @param {object} opts
  * @param {object[]} [opts.trackingGroups]
@@ -114,28 +109,15 @@ export function mergeExecuteFeatures(opts) {
     }
   }
 
-  var allKeys = {}
-  var hk = Object.keys(hygieneByKey)
-  for (var hi = 0; hi < hk.length; hi++) allKeys[hk[hi]] = true
-  var tk = Object.keys(trackingByKey)
-  for (var ti = 0; ti < tk.length; ti++) allKeys[tk[ti]] = true
-  var ek = Object.keys(execByKey)
-  for (var ei = 0; ei < ek.length; ei++) allKeys[ek[ei]] = true
-
   var mergedByKey = {}
-  var keys = Object.keys(allKeys)
+  var keys = Object.keys(trackingByKey)
   for (var ki = 0; ki < keys.length; ki++) {
     var key = keys[ki]
     var hy = hygieneByKey[key] || null
-    var fam = familyOf(hy, trackingProductByKey[key])
-    if (hasFamilyFilter && hy && fam && !familySet[fam] && !trackingByKey[key] && !execByKey[key]) {
-      continue
-    }
-    var mergedProduct = trackingProductByKey[key] || (hy && hy._family) || OTHER_PRODUCT
+    var mergedProduct = trackingProductByKey[key] || OTHER_PRODUCT
     mergedByKey[key] = mergeOne(trackingByKey[key], hy, execByKey[key], String(mergedProduct).toLowerCase())
   }
 
-  var used = {}
   var groups = []
   for (var gi = 0; gi < keptTrackingGroups.length; gi++) {
     var src = keptTrackingGroups[gi]
@@ -145,7 +127,6 @@ export function mergeExecuteFeatures(opts) {
       var srcKey = srcFeats[sj] && srcFeats[sj].key
       if (!srcKey || !mergedByKey[srcKey]) continue
       mergedFeats.push(mergedByKey[srcKey])
-      used[srcKey] = true
     }
     var liveCount = 0
     for (var lc = 0; lc < mergedFeats.length; lc++) {
@@ -159,52 +140,6 @@ export function mergeExecuteFeatures(opts) {
       featureCount: liveCount,
       features: mergedFeats
     })
-  }
-
-  var leftoversByProduct = {}
-  var leftoverKeys = Object.keys(mergedByKey)
-  for (var li = 0; li < leftoverKeys.length; li++) {
-    var lkey = leftoverKeys[li]
-    if (used[lkey]) continue
-    var leftover = mergedByKey[lkey]
-    var lp = leftover.product || OTHER_PRODUCT
-    if (!leftoversByProduct[lp]) leftoversByProduct[lp] = []
-    leftoversByProduct[lp].push(leftover)
-  }
-
-  var leftoverProducts = Object.keys(leftoversByProduct)
-  leftoverProducts.sort()
-  for (var lpIdx = 0; lpIdx < leftoverProducts.length; lpIdx++) {
-    var p = leftoverProducts[lpIdx]
-    var extra = leftoversByProduct[p]
-    var existing = null
-    for (var eg = 0; eg < groups.length; eg++) {
-      if (groups[eg].product === p) {
-        existing = groups[eg]
-        break
-      }
-    }
-    if (existing) {
-      existing.features = existing.features.concat(extra)
-      var extraLive = 0
-      for (var el = 0; el < extra.length; el++) {
-        if (extra[el].scopeChange !== 'dropped') extraLive++
-      }
-      existing.featureCount += extraLive
-    } else {
-      var newLive = 0
-      for (var nl = 0; nl < extra.length; nl++) {
-        if (extra[nl].scopeChange !== 'dropped') newLive++
-      }
-      groups.push({
-        label: p === OTHER_PRODUCT ? 'Other' : p.toUpperCase(),
-        product: p,
-        releaseNumber: '',
-        planningFreezeDate: null,
-        featureCount: newLive,
-        features: extra
-      })
-    }
   }
 
   var features = Object.keys(mergedByKey).map(function (k) { return mergedByKey[k] })

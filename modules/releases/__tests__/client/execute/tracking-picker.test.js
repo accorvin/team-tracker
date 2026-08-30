@@ -24,10 +24,38 @@ function sampleConfig() {
 }
 
 describe('listTrackingVersions', function () {
-  it('returns gear keys newest-first and ignores empty keys', function () {
+  it('returns gear keys newest-first when freeze dates are unknown', function () {
     expect(listTrackingVersions(sampleConfig())).toEqual(['3.7', '3.6', '3.5.EA1'])
     expect(listTrackingVersions({ releases: {} })).toEqual([])
     expect(listTrackingVersions(null)).toEqual([])
+  })
+
+  it('sorts by planning freeze date earliest first', function () {
+    expect(listTrackingVersions(sampleConfig(), {
+      '3.7': '2026-10-01',
+      '3.6': '2026-06-15',
+      '3.5.EA1': '2026-03-01'
+    })).toEqual(['3.5.EA1', '3.6', '3.7'])
+  })
+
+  it('uses gear overrides over API freeze dates and puts undated versions last', function () {
+    var config = {
+      releases: {
+        '3.6.EA2': { products: {}, planningFreezeOverride: '2026-08-01' },
+        '3.6.EA1': { products: {} },
+        '3.6': { products: {} },
+        '3.5.EA2': { products: {}, planningFreezeOverride: '2026-03-01' },
+        '3.5.EA1': { products: {} },
+        '3.5': { products: {} }
+      }
+    }
+    expect(listTrackingVersions(config, {
+      '3.6.EA2': '2099-01-01',
+      '3.6.EA1': '2026-05-01',
+      '3.6': '2026-09-01',
+      '3.5.EA1': '2026-02-01',
+      '3.5': '2026-04-01'
+    })).toEqual(['3.5.EA1', '3.5.EA2', '3.5', '3.6.EA1', '3.6.EA2', '3.6'])
   })
 })
 
@@ -91,6 +119,17 @@ describe('reconcileSelection', function () {
     expect(reconcileSelection(sampleConfig(), {})).toEqual({
       version: '3.7',
       products: ['rhoai', 'rhaii']
+    })
+  })
+
+  it('defaults to the earliest freeze date when dates are known', function () {
+    expect(reconcileSelection(sampleConfig(), {}, {
+      '3.7': '2026-10-01',
+      '3.6': '2026-06-15',
+      '3.5.EA1': '2026-03-01'
+    })).toEqual({
+      version: '3.5.EA1',
+      products: ['rhoai']
     })
   })
 

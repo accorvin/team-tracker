@@ -1700,6 +1700,46 @@ test.describe('Feature Execution workspace @releases', () => {
     expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 
+  test('version chips are ordered by planning freeze date earliest first', async ({ page, request }) => {
+    await page.goto('/#/releases/execute');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+    await dismissHygieneWelcome(page);
+
+    const chips = page.locator('[data-testid="hygiene-release-selector"] button');
+    await expect(chips.first()).toBeVisible();
+    const labels = (await chips.allTextContents()).map((t) => t.trim()).filter(Boolean);
+
+    const [configRes, versionsRes] = await Promise.all([
+      request.get('/api/modules/releases/execution/tracking/config'),
+      request.get('/api/modules/releases/execution/tracking/versions')
+    ]);
+    const config = await configRes.json();
+    const versionRows = (await versionsRes.json()).versions || [];
+    const apiDates = {};
+    for (const row of versionRows) {
+      if (row && row.version) apiDates[row.version] = row.planningFreezeDate || null;
+    }
+    function freezeFor(version) {
+      const entry = config.releases && config.releases[version];
+      if (entry && entry.planningFreezeOverride) return entry.planningFreezeOverride;
+      return apiDates[version] || null;
+    }
+    const expected = Object.keys(config.releases || {})
+      .filter((k) => String(k).trim())
+      .sort((a, b) => {
+        const da = freezeFor(a);
+        const db = freezeFor(b);
+        if (da && db) return da.localeCompare(db);
+        if (da && !db) return -1;
+        if (!da && db) return 1;
+        return String(b).localeCompare(String(a), undefined, { numeric: true });
+      });
+    expect(labels).toEqual(expected);
+
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
+  });
+
   test('hygiene rules modal is reachable from the toolbar', async ({ page }) => {
     await page.goto('/#/releases/execute?tab=feature-status');
     await page.waitForLoadState('networkidle');
