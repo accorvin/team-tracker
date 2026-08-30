@@ -310,7 +310,7 @@ function currentSpecs() {
   return buildReleaseSpecs(trackingConfig.value, {
     version: selectedVersion.value,
     products: selectedProducts.value
-  })
+  }, freezeDatesByVersion.value)
 }
 
 function persistSelection() {
