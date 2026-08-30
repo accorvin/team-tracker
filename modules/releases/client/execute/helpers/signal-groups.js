@@ -56,8 +56,24 @@ export function signalIdForFeature(f) {
   return null
 }
 
+/**
+ * Live tracking Features (excludes dropped). If the list is dropped-only
+ * (Dropped KPI filter), keep those rows so the view is not emptied.
+ *
+ * @param {object[]} features
+ * @returns {object[]}
+ */
+export function liveExecuteFeatures(features) {
+  var all = features || []
+  var live = []
+  for (var i = 0; i < all.length; i++) {
+    if (all[i] && all[i].scopeChange !== 'dropped') live.push(all[i])
+  }
+  return live.length > 0 ? live : all
+}
+
 export function categorizeFeatures(features) {
-  const all = features || []
+  const all = liveExecuteFeatures(features)
   // Jira done-delivery or pipeline 100% — stale pipeline health should not override.
   const complete = all.filter(f => signalIdForFeature(f) === 'complete')
   const blocked = all.filter(f => signalIdForFeature(f) === 'blocked')
@@ -163,7 +179,7 @@ export function effectiveHealth(f) {
  * }}
  */
 export function summarizeSignalFeatures(features) {
-  var all = features || []
+  var all = liveExecuteFeatures(features)
   var total = all.length
   var done = 0
   var inProgress = 0

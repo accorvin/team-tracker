@@ -78,7 +78,7 @@ describe('mergeExecuteFeatures', function () {
     expect(result.groups[0].features[0].key).toBe('RHAISTRAT-1')
   })
 
-  it('keeps hygiene-only and execution-only records', function () {
+  it('omits hygiene-only and execution-only records', function () {
     var result = mergeExecuteFeatures({
       trackingGroups: [],
       hygieneFeatures: {
@@ -87,14 +87,8 @@ describe('mergeExecuteFeatures', function () {
       executionFeatures: [execFeature({ key: 'EXE-1', summary: 'Exec only' })]
     })
 
-    var keys = result.features.map(function (f) { return f.key }).sort()
-    expect(keys).toEqual(['EXE-1', 'HYG-1'])
-    var hyg = result.features.find(function (f) { return f.key === 'HYG-1' })
-    expect(hyg.violations).toHaveLength(1)
-    expect(hyg.completionPct).toBe(null)
-    var exe = result.features.find(function (f) { return f.key === 'EXE-1' })
-    expect(exe.completionPct).toBe(40)
-    expect(exe.violations).toEqual([])
+    expect(result.features).toEqual([])
+    expect(result.groups).toEqual([])
   })
 
   it('filters tracking groups to selected families', function () {
@@ -120,7 +114,7 @@ describe('mergeExecuteFeatures', function () {
     expect(result.groups.map(function (g) { return g.product })).toEqual(['rhoai'])
   })
 
-  it('marks blocked when any source reports a blocker', function () {
+  it('marks blocked when tracking or an overlay on a tracking key reports a blocker', function () {
     var fromTracking = mergeExecuteFeatures({
       trackingGroups: [{
         product: 'rhoai',
@@ -131,15 +125,25 @@ describe('mergeExecuteFeatures', function () {
     })
     expect(fromTracking.features[0].isBlocked).toBe(true)
 
-    var fromExec = mergeExecuteFeatures({
+    var fromExecOverlay = mergeExecuteFeatures({
+      trackingGroups: [{
+        product: 'rhoai',
+        features: [trackingFeature({ key: 'RHAISTRAT-1', isBlocked: false })]
+      }],
+      hygieneFeatures: {},
+      executionFeatures: [execFeature({ key: 'RHAISTRAT-1', blockerCount: 2 })]
+    })
+    expect(fromExecOverlay.features[0].isBlocked).toBe(true)
+
+    var execOnly = mergeExecuteFeatures({
       trackingGroups: [],
       hygieneFeatures: {},
       executionFeatures: [execFeature({ blockerCount: 2 })]
     })
-    expect(fromExec.features[0].isBlocked).toBe(true)
+    expect(execOnly.features).toEqual([])
   })
 
-  it('appends leftover hygiene features onto the matching product group', function () {
+  it('does not append leftover hygiene features onto the matching product group', function () {
     var result = mergeExecuteFeatures({
       trackingGroups: [{
         product: 'rhoai',
@@ -153,7 +157,9 @@ describe('mergeExecuteFeatures', function () {
     })
 
     expect(result.groups).toHaveLength(1)
-    var keys = result.groups[0].features.map(function (f) { return f.key }).sort()
-    expect(keys).toEqual(['H-1', 'T-1'])
+    var keys = result.groups[0].features.map(function (f) { return f.key })
+    expect(keys).toEqual(['T-1'])
+    expect(result.features.map(function (f) { return f.key })).toEqual(['T-1'])
+    expect(result.groups[0].featureCount).toBe(1)
   })
 })

@@ -38,12 +38,35 @@ function filledProducts(config, version) {
   return ordered
 }
 
-export function listTrackingVersions(config) {
+function versionNameDesc(a, b) {
+  return String(b).localeCompare(String(a), undefined, { numeric: true })
+}
+
+function freezeDateForVersion(config, version, freezeDates) {
+  var entry = config && config.releases && config.releases[version]
+  if (entry && entry.planningFreezeOverride) return entry.planningFreezeOverride
+  if (freezeDates && freezeDates[version]) return freezeDates[version]
+  return null
+}
+
+/**
+ * Gear version keys ordered by planning freeze date, earliest first.
+ * User override wins over Product Pages / API dates; undated versions sort last.
+ *
+ * @param {object} config
+ * @param {Record<string, string|null>} [freezeDates]
+ */
+export function listTrackingVersions(config, freezeDates) {
   var releases = (config && config.releases) || {}
   return Object.keys(releases)
     .filter(function (k) { return String(k).trim() })
     .sort(function (a, b) {
-      return String(b).localeCompare(String(a), undefined, { numeric: true })
+      var da = freezeDateForVersion(config, a, freezeDates)
+      var db = freezeDateForVersion(config, b, freezeDates)
+      if (da && db) return da.localeCompare(db)
+      if (da && !db) return -1
+      if (!da && db) return 1
+      return versionNameDesc(a, b)
     })
 }
 
@@ -78,11 +101,12 @@ function specsForVersion(config, version, productFilter) {
 /**
  * @param {object} config tracking config `{ releases: { [version]: { products } } }`
  * @param {{ version?: string, products?: string[] }} selection
+ * @param {Record<string, string|null>} [freezeDates]
  * @returns {{ portfolioVersion: string, family: string|null, jiraName: string|null }[]}
  */
-export function buildReleaseSpecs(config, selection) {
+export function buildReleaseSpecs(config, selection, freezeDates) {
   var sel = selection || {}
-  var versions = listTrackingVersions(config)
+  var versions = listTrackingVersions(config, freezeDates)
   var version = sel.version
   if (!version || versions.indexOf(version) < 0) return []
   return specsForVersion(config, version, sel.products)
@@ -99,11 +123,13 @@ export function parseProductsFromParams(productsParam, familiesParam) {
 
 /**
  * Drop deleted versions / products and fill defaults from gear config.
+ * Default version is the earliest planning freeze when dates are known.
  * @param {object} config
  * @param {{ version?: string, products?: string[] }} stored
+ * @param {Record<string, string|null>} [freezeDates]
  */
-export function reconcileSelection(config, stored) {
-  var versions = listTrackingVersions(config)
+export function reconcileSelection(config, stored, freezeDates) {
+  var versions = listTrackingVersions(config, freezeDates)
   stored = stored || {}
   if (versions.length === 0) {
     return { version: '', products: [] }
