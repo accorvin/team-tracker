@@ -8,7 +8,7 @@ const PLANNER_URL = 'https://htmlpreview.github.io/?https://github.com/yuvalluri
       :src="PLANNER_URL"
       style="width: 100%; height: 100%; border: none;"
       title="AI-First Release Planner"
-      allow="clipboard-read; clipboard-write"
+      sandbox="allow-scripts"
     />
   </div>
 </template>
