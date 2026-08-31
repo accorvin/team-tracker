@@ -55,7 +55,6 @@ AND status not in (Closed, Resolved)
 AND ('Release Blocker' != Rejected OR 'Release Blocker' is EMPTY)
 AND <VERSION_CLAUSE>
 AND priority in (Blocker)
-AND priority in (Blocker)
 ```
 
 Resolved blockers:
