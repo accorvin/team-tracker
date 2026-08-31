@@ -1862,3 +1862,61 @@ test.describe('RHOAI Component Architectures Report @releases', () => {
     expect(body).toHaveProperty('maturity');
   });
 });
+
+/**
+ * AI Planner tab (Plan view)
+ *
+ * Verify the AI Planner tab is visible in the Plan sub-nav, becomes active
+ * on click, and renders the iframe that embeds the release planning dashboard.
+ */
+test.describe('Releases AI Planner tab @releases', () => {
+  test.beforeEach(async ({ page }) => {
+    setupErrorTracking(page);
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    logCapturedErrors(page, testInfo);
+  });
+
+  test('should show AI Planner tab under Plan', async ({ page }) => {
+    await page.goto('/#/releases/plan');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const aiPlannerTab = page.locator('button', { hasText: 'AI Planner' });
+    await expect(aiPlannerTab).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('clicking AI Planner tab renders the iframe', async ({ page }) => {
+    await page.goto('/#/releases/plan');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const aiPlannerTab = page.locator('button', { hasText: 'AI Planner' });
+    await aiPlannerTab.click();
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const iframe = page.locator('iframe[title="AI-First Release Planner"]');
+    await expect(iframe).toBeVisible();
+
+    const src = await iframe.getAttribute('src');
+    expect(src).toContain('rhai-release-planner');
+
+    const errors = page.errors.filter(e => !e.message.includes('cross-origin subframe'));
+    expect(errors).toHaveLength(0);
+  });
+
+  test('AI Planner deep link activates the tab', async ({ page }) => {
+    await page.goto('/#/releases/plan?tab=ai-planner');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const iframe = page.locator('iframe[title="AI-First Release Planner"]');
+    await expect(iframe).toBeVisible();
+
+    const errors = page.errors.filter(e => !e.message.includes('cross-origin subframe'));
+    expect(errors).toHaveLength(0);
+  });
+});
