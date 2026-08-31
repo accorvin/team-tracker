@@ -560,6 +560,7 @@ onMounted(async () => {
     await loadMetrics(initial)
     if (data.value && data.value.component_readiness) {
       selectedComponents.value = [...(data.value.component_readiness.all_components || [])]
+      selectedPhases.value = [...(data.value.component_readiness.phases || []).map(p => p.phase)]
     }
   }
 })
@@ -573,7 +574,7 @@ async function handleVersionChange() {
     await loadMetrics(selectedVersion.value)
     if (data.value && data.value.component_readiness) {
       selectedComponents.value = [...(data.value.component_readiness.all_components || [])]
-      selectedPhases.value = []
+      selectedPhases.value = [...(data.value.component_readiness.phases || []).map(p => p.phase)]
     }
   }
 }
