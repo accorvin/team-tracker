@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { DEFAULT_PAGE_WAIT_TIME } = require('./constants');
 const { setupErrorTracking, logCapturedErrors } = require('./helpers');
+const { unexpectedDemoResourceErrors, dismissHygieneWelcome } = require('./execute-helpers');
 
 /**
  * Integration tests for Execution Feature Data Unification
@@ -185,47 +186,48 @@ test.describe('Execution Feature Data Unification @releases', () => {
       await page.goto('/#/releases/execute');
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+      await dismissHygieneWelcome(page);
 
-      // Verify the main content loaded
-      const mainContent = page.locator('main, [role="main"], .min-h-screen').first();
-      await expect(mainContent).toBeVisible();
+      await expect(page.getByText('Feature Execution').first()).toBeVisible();
+      await expect(page.locator('[data-testid="execute-view-toggle"]').first()).toBeVisible();
 
-      // The execute view uses a signals grid layout (div tiles) by default,
-      // or table rows in list mode — check for either pattern
-      const hasTable = await page.locator('table tbody tr').count() > 0;
-      const hasCards = await page.locator('[class*="card"], [class*="feature"]').count() > 0;
-      const hasList = await page.locator('ul li, ol li').count() > 0;
-      const hasSignalTiles = await page.locator('.cursor-pointer.hover\\:shadow-md').count() > 0;
-      const hasGridItems = await page.locator('[class*="grid"] [class*="cursor-pointer"]').count() > 0;
-      expect(hasTable || hasCards || hasList || hasSignalTiles || hasGridItems).toBe(true);
+      // Default view is Table; Signals tiles or the empty-gear prompt are also valid
+      const hasTable = await page.locator('[data-testid="execute-feature-row"]').count() > 0
+        || await page.locator('table tbody tr').count() > 0;
+      const hasSignalTiles = await page.locator('[data-testid="signal-feature-tile"]').count() > 0;
+      const hasEmptyGear = await page.getByText('Open settings (gear) to add a release.').count() > 0;
+      const hasKanban = await page.locator('[data-testid="hygiene-feature-card"]').count() > 0;
+      expect(hasTable || hasSignalTiles || hasEmptyGear || hasKanban).toBe(true);
 
-      expect(page.errors).toHaveLength(0);
+      expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
     });
 
     test('Feature detail page loads without errors', async ({ page }) => {
       await page.goto('/#/releases/execute');
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+      await dismissHygieneWelcome(page);
 
-      // Find and click the first feature link/row to navigate to detail
-      const featureLink = page.locator('a[href*="feature-detail"], tr[class*="cursor"], [data-key]').first();
+      const featureRow = page.locator('[data-testid="execute-feature-row"]').first();
+      if (await featureRow.isVisible().catch(() => false)) {
+        await featureRow.click();
+        await page.waitForTimeout(400);
 
-      if (await featureLink.count() > 0) {
-        await featureLink.click();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+        const drawer = page.locator('[data-testid="feature-drawer"]');
+        if (await drawer.isVisible().catch(() => false)) {
+          await drawer.getByRole('button', { name: 'View full details' }).click();
+          await page.waitForLoadState('networkidle');
+          await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+        }
 
-        // Verify detail page rendered without errors
         const mainContent = page.locator('main, [role="main"], .min-h-screen').first();
         await expect(mainContent).toBeVisible();
-
-        // Should have some content (headings, fields, etc.)
         const hasHeadings = await page.locator('h1, h2, h3').count() > 0;
         const hasContent = await page.locator('dt, dd, [class*="detail"], [class*="field"]').count() > 0;
         expect(hasHeadings || hasContent).toBe(true);
       }
 
-      expect(page.errors).toHaveLength(0);
+      expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
     });
   });
 });

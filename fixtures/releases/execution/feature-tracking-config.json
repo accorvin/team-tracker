@@ -1,0 +1,16 @@
+{
+  "releases": {
+    "2.15": {
+      "products": {
+        "rhoai": "rhoai-3.5",
+        "rhelai": "rhelai-3.5"
+      },
+      "planningFreezeOverride": "2026-06-15"
+    },
+    "2.14": {
+      "products": {
+        "rhoai": "rhoai-2.14"
+      }
+    }
+  }
+}

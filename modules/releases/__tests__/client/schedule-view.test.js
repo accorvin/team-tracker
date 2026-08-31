@@ -291,6 +291,117 @@ describe('ScheduleView', () => {
     expect(wrapper.text()).toContain('3d ago')
   })
 
+  it('keeps milestone tiles visible for an already-released version (past milestone fallback)', async () => {
+    const past = new Date()
+    past.setDate(past.getDate() - 5)
+    const dateStr = localDateStr(past)
+
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5-ea1', {
+          displayName: '3.5 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: dateStr
+        })
+      ]
+    })
+    const wrapper = mount(ScheduleView, {
+      props: {},
+      global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } }
+    })
+    await flushPromises()
+
+    // Show released rows so the past-only version is present.
+    const hideReleased = wrapper.find('input[type="checkbox"]')
+    await hideReleased.setValue(false)
+    await flushPromises()
+
+    const cards = wrapper.findAll('[data-testid="milestone-countdown-card"]')
+    expect(cards.length).toBeGreaterThan(0)
+    expect(wrapper.text()).toContain('days ago')
+    expect(wrapper.text()).toContain('5')
+  })
+
+  it('auto-unticks "Hide released" when a released version pill is selected', async () => {
+    const past = new Date()
+    past.setDate(past.getDate() - 5)
+    const pastStr = localDateStr(past)
+    const future = new Date()
+    future.setDate(future.getDate() + 30)
+    const futureStr = localDateStr(future)
+
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5-ea1', {
+          displayName: '3.5 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: pastStr
+        }),
+        makeRelease('rhoai-3.6-ea1', {
+          displayName: '3.6 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: futureStr
+        })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+
+    // "Hide released" is on by default.
+    const hideReleased = wrapper.find('input[type="checkbox"]')
+    expect(hideReleased.element.checked).toBe(true)
+
+    // Selecting the released version pill should untick it and keep the view populated.
+    const ea1 = wrapper.findAll('button').find(b => b.text().trim() === '3.5 EA1')
+    expect(ea1).toBeTruthy()
+    await ea1.trigger('click')
+    await flushPromises()
+
+    expect(hideReleased.element.checked).toBe(false)
+    expect(wrapper.text()).not.toContain('No releases match the current filters')
+    const rows = getReleaseRows(wrapper)
+    expect(rows.length).toBe(1)
+    expect(wrapper.text()).toContain('3.5 EA1 RHOAI RELEASE')
+    expect(wrapper.findAll('[data-testid="milestone-countdown-card"]').length).toBeGreaterThan(0)
+  })
+
+  it('does not untick "Hide released" when the selected version is unreleased', async () => {
+    const future = new Date()
+    future.setDate(future.getDate() + 30)
+    const futureStr = localDateStr(future)
+
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.6-ea1', {
+          displayName: '3.6 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: futureStr
+        }),
+        makeRelease('rhoai-3.7-ea1', {
+          displayName: '3.7 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: '2028-06-10'
+        })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+
+    const hideReleased = wrapper.find('input[type="checkbox"]')
+    expect(hideReleased.element.checked).toBe(true)
+
+    const ea1 = wrapper.findAll('button').find(b => b.text().trim() === '3.6 EA1')
+    await ea1.trigger('click')
+    await flushPromises()
+
+    // Unreleased selection leaves the toggle untouched.
+    expect(hideReleased.element.checked).toBe(true)
+  })
+
+  it('shows an N/A tile when a release has no dated milestones', async () => {
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5', {})
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+
+    const cards = wrapper.findAll('[data-testid="milestone-countdown-card"]')
+    expect(cards.length).toBe(1)
+    expect(cards[0].text()).toContain('N/A')
+  })
+
   it('refresh button re-fetches registry', async () => {
     apiRequest.mockResolvedValue({ releases: [makeRelease('rhoai-3.5', { ga: '2026-09-15' })] })
     const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })

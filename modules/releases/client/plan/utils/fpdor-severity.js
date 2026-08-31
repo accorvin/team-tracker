@@ -2,6 +2,8 @@
  * Fail-severity overlay for Confluence FPDoR items (display/triage only).
  * Ready remains: all applicable items pass. Severity does not redefine Ready.
  *
+ * Display sort order (fail-first groups) lives in fpdor-display.js.
+ *
  * Mapped from Erle's ranked list (2026-08-07), remapped to Confluence item names.
  */
 

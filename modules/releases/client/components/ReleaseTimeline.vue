@@ -5,6 +5,7 @@ import { Chart as ChartJS, LinearScale, PointElement, Tooltip } from 'chart.js'
 import { parseReleaseName, extractCycle, productLabel } from '../composables/useReleaseFamily.js'
 import { parseDate, daysFromNow, formatShort, getProduct } from '../composables/useScheduleHelpers.js'
 import { PRODUCT_HEX, DEFAULT_HEX } from '../composables/useProductColors.js'
+import { clampStemToCard, pointInCircle } from './timeline-geometry.js'
 
 ChartJS.register(LinearScale, PointElement, Tooltip)
 
@@ -186,6 +187,8 @@ var TODAY_DOT_BORDER = 2
 var DOT_HALO_PAD = 1.5
 var TODAY_TEXT_START = Math.ceil(TODAY_DOT_RADIUS + TODAY_DOT_BORDER + DOT_HALO_PAD) + 4
 var CHART_MAX_HEIGHT = 450
+var STEM_HIT_TOL = 6
+var DOT_HIT_TOL = 4
 
 function hexToRgba(hex, alpha) {
   if (!hex || hex.charAt(0) !== '#' || hex.length < 7) return hex
@@ -338,9 +341,14 @@ var layoutMetrics = computed(function () {
   return { aboveSpace: aboveSpace, belowSpace: Math.max(belowSpace, infraSpace), safeOff: safeOff }
 })
 
+// Fixed chart height so the timeline box never resizes when the release
+// selection changes (e.g. picking an older EA version). Row layout is always
+// shrunk to fit within CHART_MAX_HEIGHT (see layoutMetrics), so a constant
+// height never overflows — it only removes the vertical "jumping" between
+// selections. The axis position within the box stays proportional via the
+// y-scale (belowSpace/aboveSpace ratio in chartOptions).
 var chartHeight = computed(function () {
-  var m = layoutMetrics.value
-  return Math.min(m.aboveSpace + m.belowSpace + 40, CHART_MAX_HEIGHT)
+  return CHART_MAX_HEIGHT
 })
 
 function fmtDate(dateStr) {
@@ -574,35 +582,71 @@ function onPointerUp(event) {
   }
 }
 
+function _setHoveredBox(box) {
+  if (!box) {
+    isOverCard.value = false
+    if (_hoveredBox) {
+      _hoveredBox = null
+      if (_chartInstance) _chartInstance.draw()
+    }
+    return
+  }
+  isOverCard.value = true
+  var prevHovered = _hoveredBox
+  _hoveredBox = box
+  if (prevHovered !== _hoveredBox) {
+    if (!prevHovered) _frontNodes.clear()
+    _frontNodes.add(box.nd)
+    if (prevHovered && prevHovered.nd !== box.nd) {
+      _frontNodes.delete(prevHovered.nd)
+    }
+    if (_chartInstance) _chartInstance.draw()
+  }
+}
+
+function _cardBoxForNode(nd) {
+  for (var i = 0; i < _cardHitBoxes.length; i++) {
+    if (_cardHitBoxes[i].nd === nd) return _cardHitBoxes[i]
+  }
+  return null
+}
+
 function onCardHover(e) {
   if (_dragStart) return
   var canvas = e.currentTarget.querySelector('canvas')
-  if (!canvas) { isOverCard.value = false; return }
+  if (!canvas) { _setHoveredBox(null); return }
   var canvasRect = canvas.getBoundingClientRect()
   var cx = e.clientX - canvasRect.left
   var cy = e.clientY - canvasRect.top
+
+  // Cards take priority (they render on top of stems)
   for (var i = _cardHitBoxes.length - 1; i >= 0; i--) {
     var box = _cardHitBoxes[i]
     if (cx >= box.x && cx <= box.x + box.w && cy >= box.y && cy <= box.y + box.h) {
-      isOverCard.value = true
-      var prevHovered = _hoveredBox
-      _hoveredBox = box
-      if (prevHovered !== _hoveredBox) {
-        if (!prevHovered) _frontNodes.clear()
-        _frontNodes.add(box.nd)
-        if (prevHovered && prevHovered.nd !== box.nd) {
-          _frontNodes.delete(prevHovered.nd)
-        }
-        if (_chartInstance) _chartInstance.draw()
-      }
+      _setHoveredBox(box)
       return
     }
   }
-  isOverCard.value = false
-  if (_hoveredBox) {
-    _hoveredBox = null
-    if (_chartInstance) _chartInstance.draw()
+
+  // Then milestone dots on the axis — resolve to the same node's card
+  for (var di = _dotHitBoxes.length - 1; di >= 0; di--) {
+    var dbox = _dotHitBoxes[di]
+    if (pointInCircle(cx, cy, dbox.x, dbox.y, dbox.r)) {
+      var dotCardBox = _cardBoxForNode(dbox.nd)
+      if (dotCardBox) { _setHoveredBox(dotCardBox); return }
+    }
   }
+
+  // Fall back to stems — resolve to the same node's card so the tip matches
+  for (var si = _stemHitBoxes.length - 1; si >= 0; si--) {
+    var sbox = _stemHitBoxes[si]
+    if (cx >= sbox.x && cx <= sbox.x + sbox.w && cy >= sbox.y && cy <= sbox.y + sbox.h) {
+      var cardBox = _cardBoxForNode(sbox.nd)
+      if (cardBox) { _setHoveredBox(cardBox); return }
+    }
+  }
+
+  _setHoveredBox(null)
 }
 
 var chartData = computed(function () {
@@ -694,6 +738,8 @@ function _pluginSetup(chart) {
 }
 
 var _cardHitBoxes = []
+var _stemHitBoxes = []
+var _dotHitBoxes = []
 var _hoveredBox = null
 var _frontNodes = new Set()
 
@@ -824,6 +870,8 @@ var timelinePlugin = {
 
     ctx.save()
     _cardHitBoxes = []
+    _stemHitBoxes = []
+    _dotHitBoxes = []
 
     // Redraw arrowhead zone to cover any Chart.js dots near the right edge
     var bgColor = dark ? '#1f2937' : '#ffffff'
@@ -843,6 +891,9 @@ var timelinePlugin = {
     var todayForStack = new Date()
     todayForStack.setHours(0, 0, 0, 0)
     var todayTsStack = todayForStack.getTime()
+    var todayTs = todayTsStack
+    var todayX = xScale.getPixelForValue(todayTs)
+    var todayFade = (todayX < area.left - 20 || todayX > area.right + 20) ? 0 : 1
 
     for (var i = 0; i < n.length; i++) {
       var nd = n[i]
@@ -894,7 +945,7 @@ var timelinePlugin = {
       nodeLayouts[sli].stemLen = laneBaseStem + nodeLayouts[sli].subLane * stableOff
     }
 
-    // Second pass: draw stems BEFORE cards so card halos cover cross-row overlap
+    // Second pass: draw stems BEFORE cards so cards paint on top
     for (var ssj = 0; ssj < nodeLayouts.length; ssj++) {
       var ssLay = nodeLayouts[ssj]
       if (!ssLay) continue
@@ -902,18 +953,47 @@ var timelinePlugin = {
         ? (PRODUCT_HEX[ssLay.nd.productList[0]] || DEFAULT_HEX)
         : (ssLay.nd.isPast ? pastColor : futureColor)
       var stemX = ssLay.x
+      var stemTop, stemBottom
       ctx.beginPath()
       ctx.strokeStyle = ssPrimary
       ctx.lineWidth = 1
       ctx.setLineDash([])
       if (ssLay.above) {
-        ctx.moveTo(stemX, yMid - 6)
-        ctx.lineTo(stemX, yMid - ssLay.stemLen - 8)
+        stemTop = yMid - ssLay.stemLen - 8
+        stemBottom = yMid - 6
+        ctx.moveTo(stemX, stemBottom)
+        ctx.lineTo(stemX, stemTop)
       } else {
-        ctx.moveTo(stemX, yMid + 6)
-        ctx.lineTo(stemX, yMid + ssLay.stemLen + 8)
+        stemTop = yMid + 6
+        stemBottom = yMid + ssLay.stemLen + 8
+        ctx.moveTo(stemX, stemTop)
+        ctx.lineTo(stemX, stemBottom)
       }
       ctx.stroke()
+      _stemHitBoxes.push({
+        x: stemX - STEM_HIT_TOL, y: stemTop,
+        w: STEM_HIT_TOL * 2, h: stemBottom - stemTop,
+        above: ssLay.above, nd: ssLay.nd
+      })
+    }
+
+    // Today dashed line (drawn before cards so cards render on top)
+    if (todayFade > 0) {
+      var m = layoutMetrics.value
+      var lineHalfH = Math.max(m.aboveSpace, m.belowSpace) * 0.5
+      var todayGapR = TODAY_DOT_RADIUS + TODAY_DOT_BORDER + DOT_HALO_PAD + 6
+      ctx.save()
+      ctx.globalAlpha = todayFade
+      ctx.setLineDash([4, 6])
+      ctx.strokeStyle = dark ? 'rgba(248,113,113,0.3)' : 'rgba(239,68,68,0.25)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(todayX, yMid - lineHalfH)
+      ctx.lineTo(todayX, yMid - todayGapR)
+      ctx.moveTo(todayX, yMid + todayGapR)
+      ctx.lineTo(todayX, yMid + lineHalfH)
+      ctx.stroke()
+      ctx.restore()
     }
 
     // Third pass: draw cards
@@ -1000,18 +1080,12 @@ var timelinePlugin = {
         }
       }
 
-      // Opaque halo: wider on right to cover 2nd card overlap
-      var cardPad = 2
-      var cardPadRight = 2
-      ctx.fillStyle = dark ? '#1f2937' : '#ffffff'
-      ctx.fillRect(boxX - cardPad, boxY - cardPad, layout2.boxW + cardPad + cardPadRight, layout2.boxH + cardPad * 2)
-
       // Card fill
       drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
       ctx.fillStyle = dark ? '#1f2937' : '#ffffff'
       ctx.fill()
 
-      // Border matching card shade
+      // Card border
       drawRoundedRect(ctx, boxX, boxY, layout2.boxW, layout2.boxH, 4)
       ctx.strokeStyle = dark ? 'rgba(55,65,81,0.6)' : 'rgba(226,232,240,0.9)'
       ctx.lineWidth = 1
@@ -1105,6 +1179,12 @@ var timelinePlugin = {
       ctx.fillStyle = dotColor
       ctx.fill()
       ctx.globalAlpha = 1.0
+
+      _dotHitBoxes.push({
+        x: dotDrawX, y: yMid,
+        r: MILESTONE_DOT_RADIUS + MILESTONE_DOT_BORDER + DOT_HIT_TOL,
+        color: dotColor, nd: n[dIdx]
+      })
     }
 
     // Dimension lines
@@ -1244,29 +1324,11 @@ var timelinePlugin = {
     }
 
 
-    // Today marker (rendered last so it's always on top)
-    var today = new Date()
-    today.setHours(0, 0, 0, 0)
-    var todayTs = today.getTime()
-    var todayX = xScale.getPixelForValue(todayTs)
-    var todayFade = (todayX < area.left - 20 || todayX > area.right + 20) ? 0 : 1
+    // Today marker label (rendered last so text stays on top)
     if (todayFade > 0) {
       var redColor = dark ? '#f87171' : '#ef4444'
 
       ctx.globalAlpha = todayFade
-
-      // Dashed vertical line spanning card rows
-      var m = layoutMetrics.value
-      var lineHalfH = Math.max(m.aboveSpace, m.belowSpace) * 0.5
-      ctx.save()
-      ctx.setLineDash([4, 6])
-      ctx.strokeStyle = dark ? 'rgba(248,113,113,0.3)' : 'rgba(239,68,68,0.25)'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.moveTo(todayX, yMid - lineHalfH)
-      ctx.lineTo(todayX, yMid + lineHalfH)
-      ctx.stroke()
-      ctx.restore()
 
       _todayPx.value = todayFade > 0.05 ? { x: todayX, y: yMid, opacity: todayFade } : null
 
@@ -1316,9 +1378,52 @@ var timelinePlugin = {
         ? hexToRgba(hoverHex, dark ? 0.7 : 0.6)
         : (dark ? 'rgba(96,165,250,0.5)' : 'rgba(59,130,246,0.4)')
       ctx.lineWidth = 2
+      ctx.setLineDash([])
       drawRoundedRect(ctx, _hoveredBox.x - 1, _hoveredBox.y - 1,
                       _hoveredBox.w + 2, _hoveredBox.h + 2, 5)
       ctx.stroke()
+      // Highlight the connecting stem with the same stroke as the card border
+      for (var shi = 0; shi < _stemHitBoxes.length; shi++) {
+        var shBox = _stemHitBoxes[shi]
+        if (shBox.nd !== _hoveredBox.nd) continue
+        var shX = shBox.x + STEM_HIT_TOL
+        var shEnds = clampStemToCard(
+          { top: shBox.y, bottom: shBox.y + shBox.h },
+          { y: _hoveredBox.y, h: _hoveredBox.h },
+          shBox.above
+        )
+        ctx.beginPath()
+        ctx.moveTo(shX, shEnds.top)
+        ctx.lineTo(shX, shEnds.bottom)
+        ctx.stroke()
+        break
+      }
+      // Highlight the milestone dot: a solid (non-transparent) backing fills the
+      // gap between the dot and the ring, then the dot and ring are drawn on top.
+      var dotRingR = MILESTONE_DOT_RADIUS + MILESTONE_DOT_BORDER + DOT_HALO_PAD + 1
+      for (var dhi = 0; dhi < _dotHitBoxes.length; dhi++) {
+        var dhBox = _dotHitBoxes[dhi]
+        if (dhBox.nd !== _hoveredBox.nd) continue
+        // Solid backing (white in light mode, dark surface in dark mode)
+        ctx.beginPath()
+        ctx.arc(dhBox.x, dhBox.y, dotRingR, 0, Math.PI * 2)
+        ctx.fillStyle = bgColor
+        ctx.fill()
+        // Redraw the dot on top of the backing
+        ctx.beginPath()
+        ctx.arc(dhBox.x, dhBox.y, MILESTONE_DOT_RADIUS + MILESTONE_DOT_BORDER, 0, Math.PI * 2)
+        ctx.fillStyle = dotBorderColor
+        ctx.fill()
+        ctx.beginPath()
+        ctx.arc(dhBox.x, dhBox.y, MILESTONE_DOT_RADIUS, 0, Math.PI * 2)
+        ctx.fillStyle = dhBox.color
+        ctx.fill()
+        // Ring in the same stroke as the card border
+        ctx.beginPath()
+        ctx.arc(dhBox.x, dhBox.y, dotRingR, 0, Math.PI * 2)
+        ctx.stroke()
+        break
+      }
       ctx.restore()
 
       var hoverDays = daysFromNow(_hoveredBox.nd.date)

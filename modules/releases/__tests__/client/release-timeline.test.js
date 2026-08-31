@@ -298,7 +298,7 @@ describe('ReleaseTimeline', () => {
     expect(wrapper.vm.laneCount).toBe(2)
   })
 
-  it('scales chart height with visible node count', () => {
+  it('keeps a constant chart height regardless of visible node count', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-13T00:00:00'))
     try {
@@ -316,7 +316,9 @@ describe('ReleaseTimeline', () => {
           planningFreeze: '2026-08-28', codeFreeze: '2026-09-01', ga: '2026-09-05' })
       ]
       var wrapper2 = mount(ReleaseTimeline, { props: { releases: releases2 } })
-      expect(wrapper2.vm.chartHeight).toBeGreaterThan(singleHeight)
+      // The timeline box must not resize when the selection (node count) changes.
+      expect(wrapper2.vm.chartHeight).toBe(singleHeight)
+      expect(singleHeight).toBe(450)
     } finally {
       vi.useRealTimers()
     }
@@ -353,6 +355,34 @@ describe('ReleaseTimeline', () => {
 
     var wrapper2 = mount(ReleaseTimeline, { props: { releases, hidePast: true } })
     expect(wrapper2.vm.chartHeight).toBe(heightWithPast)
+  })
+
+  it('chart height is identical for a single release and many releases (no box resize on selection)', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-13T00:00:00'))
+    try {
+      var one = [
+        makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2026-09-19' })
+      ]
+      var many = [
+        makeRelease('rhoai-3.4', { displayName: 'rhoai-3.4', shortname: 'rhoai',
+          planningFreeze: '2026-04-01', ga: '2026-07-01' }),
+        makeRelease('rhelai-3.4', { displayName: 'rhelai-3.4', shortname: 'rhelai',
+          planningFreeze: '2026-04-05', ga: '2026-07-05' }),
+        makeRelease('rhaii-3.4', { displayName: 'rhaii-3.4', shortname: 'rhaii',
+          planningFreeze: '2026-04-10', ga: '2026-07-10' }),
+        makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai',
+          planningFreeze: '2027-01-01', ga: '2027-05-19' }),
+        makeRelease('rhelai-3.6', { displayName: 'rhelai-3.6', shortname: 'rhelai',
+          planningFreeze: '2027-01-05', ga: '2027-05-25' })
+      ]
+      var wrapperOne = mount(ReleaseTimeline, { props: { releases: one } })
+      var wrapperMany = mount(ReleaseTimeline, { props: { releases: many } })
+      expect(wrapperOne.vm.chartHeight).toBe(wrapperMany.vm.chartHeight)
+      expect(wrapperOne.vm.chartHeight).toBe(450)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('allNodes contains all nodes regardless of hidePast', () => {
@@ -425,10 +455,8 @@ describe('ReleaseTimeline', () => {
       var wrapper = mount(ReleaseTimeline, { props: { releases, hidePast: true } })
       var heightAtDefault = wrapper.vm.chartHeight
 
-      // chartHeight depends only on layoutMetrics (allNodes), not on zoom/xRange
-      // Verify it equals layoutMetrics-derived value regardless of visible days
-      var m = wrapper.vm.layoutMetrics
-      expect(heightAtDefault).toBe(Math.min(m.aboveSpace + m.belowSpace + 40, 450))
+      // chartHeight is a fixed constant independent of zoom/xRange and node count
+      expect(heightAtDefault).toBe(450)
       expect(heightAtDefault).toBeGreaterThan(0)
     } finally {
       vi.useRealTimers()
@@ -592,9 +620,9 @@ describe('ReleaseTimeline', () => {
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     var m = wrapper.vm.layoutMetrics
     var h = wrapper.vm.chartHeight
-    // chartHeight = min(aboveSpace + belowSpace + 40, 450)
-    expect(h).toBe(Math.min(m.aboveSpace + m.belowSpace + 40, 450))
-    expect(h).toBeLessThanOrEqual(450)
+    // Height is a fixed 450 and must still accommodate the required row space.
+    expect(h).toBe(450)
+    expect(h).toBeGreaterThanOrEqual(m.aboveSpace + m.belowSpace + 40)
     expect(h).toBeGreaterThan(0)
   })
 
@@ -1101,9 +1129,10 @@ describe('ReleaseTimeline', () => {
       expect(m.aboveSpace).toBeGreaterThan(0)
       expect(m.belowSpace).toBeGreaterThan(0)
       expect(m.safeOff).toBeGreaterThan(0)
-      // chartHeight is deterministic from layoutMetrics
+      // chartHeight is a fixed constant that still fits the required row space
       var h = wrapper.vm.chartHeight
-      expect(h).toBe(Math.min(m.aboveSpace + m.belowSpace + 40, 450))
+      expect(h).toBe(450)
+      expect(h).toBeGreaterThanOrEqual(m.aboveSpace + m.belowSpace + 40)
       vi.useRealTimers()
     })
   })
@@ -1367,9 +1396,9 @@ describe('ReleaseTimeline', () => {
         var wrapper = mount(ReleaseTimeline, { props: { releases } })
         var m = wrapper.vm.layoutMetrics
         var h = wrapper.vm.chartHeight
-        // Height must accommodate both above and below spaces plus axis padding
-        expect(h).toBe(Math.min(m.aboveSpace + m.belowSpace + 40, 450))
-        expect(h).toBeGreaterThan(0)
+        // Fixed height must still accommodate both above and below spaces plus padding
+        expect(h).toBe(450)
+        expect(h).toBeGreaterThanOrEqual(m.aboveSpace + m.belowSpace + 40)
         expect(m.aboveSpace).toBeGreaterThan(0)
         expect(m.belowSpace).toBeGreaterThan(0)
       }

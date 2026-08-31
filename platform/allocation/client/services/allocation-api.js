@@ -18,9 +18,10 @@ export async function updateTeamAllocationSettings(teamId, allocationMode) {
   })
 }
 
-export async function getBoardSprints(boardId, sprintFilter) {
-  const params = sprintFilter ? `?sprintFilter=${encodeURIComponent(sprintFilter)}` : ''
-  return apiRequest(`${BASE}/board/${encodeURIComponent(boardId)}/sprints${params}`)
+export async function getBoardSprints(boardId, teamId, sprintFilter) {
+  const params = new URLSearchParams({ teamId })
+  if (sprintFilter) params.set('sprintFilter', sprintFilter)
+  return apiRequest(`${BASE}/board/${encodeURIComponent(boardId)}/sprints?${params}`)
 }
 
 // Live, unfiltered sprint list from Jira — used to preview a name filter.
@@ -76,4 +77,3 @@ export async function getGlobalAllocationSummary() {
 export async function getAllocationStrategy() {
   return apiRequest(`${BASE}/strategy`)
 }
-

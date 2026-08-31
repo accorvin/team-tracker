@@ -1411,7 +1411,8 @@ describe('buildFeatureReadiness', function() {
       var engItem = result.fpdor.items.find(function(i) { return i.name === 'Cross-team deps' })
       expect(engItem.pass).toBe(true)
       expect(docsItem.pass).toBe(false)
-      expect(uxdItem.pass).toBeNull()
+      expect(uxdItem.pass).toBe(true)
+      expect(uxdItem.state).toBe('not-applicable')
     })
 
     it('cross-team deps fails with single eng component and no dependency signal', function() {
@@ -1538,7 +1539,8 @@ describe('buildFeatureReadiness', function() {
     it('feature human sign-off is N/A for Legacy features', function() {
       var result = computeReadiness(readyFeature({ labels: [] }))
       var signOff = result.fpdor.items.find(function(i) { return i.name === 'Feature human sign-off' })
-      expect(signOff.pass).toBeNull()
+      expect(signOff.pass).toBe(true)
+      expect(signOff.state).toBe('not-applicable')
     })
 
     it('feature human sign-off passes via strat-creator-human* for AI First', function() {
@@ -1685,10 +1687,11 @@ describe('buildFeatureReadiness', function() {
       expect(signOff.detail).toContain('rp-qg1-pass')
     })
 
-    it('UXD is not-checked without UXD component or N/A note', function() {
+    it('UXD is N/A without UXD component or N/A note', function() {
       var result = computeReadiness(readyFeature({ components: ['Platform', 'Serving', 'Documentation'], docsRequired: 'Yes' }))
       var uxdItem = result.fpdor.items.find(function(i) { return i.name === 'UXD' })
-      expect(uxdItem.pass).toBeNull()
+      expect(uxdItem.pass).toBe(true)
+      expect(uxdItem.state).toBe('not-applicable')
     })
 
     it('UXD passes with UXD component', function() {
@@ -1780,7 +1783,7 @@ describe('buildFeatureReadiness', function() {
       expect(acItem.detail).toContain('Success Criteria')
     })
 
-    it('architectural alignment is not-checked without signals', function() {
+    it('architectural alignment is N/A without signals', function() {
       var result = computeReadiness(readyFeature({
         scores: {},
         labels: [],
@@ -1797,7 +1800,8 @@ describe('buildFeatureReadiness', function() {
         }
       }))
       var archItem = result.fpdor.items.find(function(i) { return i.name === 'Architectural alignment' })
-      expect(archItem.pass).toBeNull()
+      expect(archItem.pass).toBe(true)
+      expect(archItem.state).toBe('not-applicable')
     })
 
     it('architectural alignment passes when architecture not required', function() {
@@ -1824,6 +1828,7 @@ describe('buildFeatureReadiness', function() {
     it('FPDoR has 17 items total', function() {
       var result = computeReadiness(readyFeature())
       expect(result.fpdor.totalCount).toBe(17)
+      expect(result.fpdor.applicableCount).toBe(17)
       expect(result.fpdor.items).toHaveLength(17)
     })
   })

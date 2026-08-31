@@ -371,7 +371,7 @@
                 <div><span class="font-medium">Planning Incomplete</span> — feature has unresolved planning hard blockers (missing components, PM, release type, epics, or RFE).</div>
               </div>
             </div>
-            <p class="text-gray-500 dark:text-gray-400 text-xs">Risk levels are computed automatically by the health pipeline based on milestone dates, feature progress, and dependency data from Jira. They refresh periodically via the scheduled sync. Detailed per-feature risk data is available on the <a href="#" @click.prevent="nav.navigateTo('execute', { tab: 'feature-list' })" class="text-primary-600 dark:text-primary-400 hover:underline">Feature List</a>.</p>
+            <p class="text-gray-500 dark:text-gray-400 text-xs">Risk levels are computed automatically by the health pipeline based on milestone dates, feature progress, and dependency data from Jira. They refresh periodically via the scheduled sync. Detailed per-feature risk data is available on the <a href="#" @click.prevent="nav.navigateTo('execute', { view: 'signals' })" class="text-primary-600 dark:text-primary-400 hover:underline">Feature Execution</a> Signals view.</p>
           </div>
         </div>
 

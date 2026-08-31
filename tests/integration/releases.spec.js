@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { DEFAULT_PAGE_WAIT_TIME } = require('./constants');
 const { setupErrorTracking, logCapturedErrors } = require('./helpers');
+const { unexpectedDemoResourceErrors, dismissHygieneWelcome } = require('./execute-helpers');
 
 /**
  * Integration tests for Releases module
@@ -49,7 +50,7 @@ test.describe('Releases Module @releases', () => {
       console.log(`  ${req.method} ${req.url}`);
     });
 
-    expect(page.errors).toHaveLength(0);
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 
 });
@@ -155,7 +156,8 @@ test.describe('Releases Views @releases', () => {
       console.error(`${viewName} errors:`, page.errors);
     }
 
-    expect(page.errors).toHaveLength(0);
+    const unexpected = viewId === 'execute' ? unexpectedDemoResourceErrors(page) : page.errors;
+    expect(unexpected).toHaveLength(0);
   }
 
   test('should load Plan view', async ({ page }) => {
@@ -924,7 +926,7 @@ test.describe('Releases FPDoR Readiness @releases', () => {
     expect(item).toHaveProperty('group');
     expect(['mandatory', 'criteria']).toContain(item.group);
     expect(item.source).toBe('jira');
-    expect(['passed', 'failed', 'not-checked']).toContain(item.state);
+    expect(['passed', 'failed', 'not-checked', 'not-applicable']).toContain(item.state);
 
     expect(sample).toHaveProperty('readinessGates');
     expect(sample.readinessGates).toHaveProperty('fpDorPassed');
@@ -1474,7 +1476,7 @@ test.describe('Program Hygiene Report @releases', () => {
     // Should show the release selector button (either in empty state or selection bar)
     await expect(page.locator('button', { hasText: 'Select Release' }).first()).toBeVisible();
 
-    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 
   test('program hygiene API returns expected shape', async ({ request }) => {
@@ -1509,7 +1511,7 @@ test.describe('Program Hygiene Report @releases', () => {
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
-    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 
   test('shows summary cards and violation charts when data is available', async ({ page }) => {
@@ -1535,7 +1537,7 @@ test.describe('Program Hygiene Report @releases', () => {
       await expect(page.locator('button', { hasText: 'Team Accountability' }).first()).toBeVisible();
     }
 
-    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 
   test('team accountability tab renders table', async ({ page }) => {
@@ -1556,7 +1558,7 @@ test.describe('Program Hygiene Report @releases', () => {
       await expect(page.locator('th', { hasText: 'With Violations' }).first()).toBeVisible();
     }
 
-    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 
   test('field filter modal opens with the expected filter fields', async ({ page }) => {
@@ -1584,7 +1586,7 @@ test.describe('Program Hygiene Report @releases', () => {
       await page.waitForTimeout(300);
     }
 
-    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 
   test('clicking a feature row opens the summary drawer', async ({ page }) => {
@@ -1612,39 +1614,19 @@ test.describe('Program Hygiene Report @releases', () => {
       await expect(drawer).toHaveCount(0);
     }
 
-    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 });
 
 /**
- * Feature Status tab (Execute view)
+ * Feature Execution workspace (Execute view)
  *
- * The Feature Status kanban board uses the shared release selector (product
- * family + version + phase) and the shared report filter modal (team,
- * component, label, assignee, type, priority) — the same controls as the
- * Program Level Release Report. These tests verify those controls render and
- * open correctly.
+ * The three former Execute tabs (Feature Tracking, Feature List, Feature Status)
+ * are one workspace with Table / Kanban / Signals view modes. Legacy
+ * `?tab=feature-status` URLs map to Kanban. The shared release selector and
+ * hygiene filter/rules controls remain on this page.
  */
-// The Feature Status view degrades gracefully from two benign, environment-
-// specific responses in demo mode: curated field-options sets have no demo
-// fixtures (404) and /hygiene/config requires planning-manager access (403).
-// Both are handled in-app, so ignore benign resource-load failures here while
-// still catching real JS exceptions and other unexpected console errors.
-function unexpectedHygieneErrors(page) {
-  return (page.errors || []).filter(
-    e => !(e.type === 'console.error' && /Failed to load resource.*\b40[134]\b/.test(e.message))
-  );
-}
-
-async function dismissHygieneWelcome(page) {
-  const modal = page.locator('[data-testid="hygiene-welcome-modal"]').first();
-  if (await modal.isVisible().catch(() => false)) {
-    await modal.locator('button', { hasText: 'Got it' }).first().click().catch(() => {});
-    await modal.waitFor({ state: 'hidden' }).catch(() => {});
-  }
-}
-
-test.describe('Feature Status filtering @releases', () => {
+test.describe('Feature Execution workspace @releases', () => {
   test.beforeEach(async ({ page }) => {
     setupErrorTracking(page);
   });
@@ -1653,45 +1635,109 @@ test.describe('Feature Status filtering @releases', () => {
     logCapturedErrors(page, testInfo);
   });
 
-  test('tab loads with the condensed toolbar controls', async ({ page }) => {
+  test('legacy feature-status tab loads Kanban with toolbar controls', async ({ page }) => {
     await page.goto('/#/releases/execute?tab=feature-status');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await dismissHygieneWelcome(page);
 
-    // Purpose subtitle keeps the page's intent discoverable
-    await expect(page.locator('text=Tracks hygiene-rule compliance').first()).toBeVisible();
+    await expect(page.getByText('Feature Execution').first()).toBeVisible();
+    await expect(page.getByText('hygiene-rule compliance').first()).toBeVisible();
 
-    // Compact toolbar: release selector + always-present "Hygiene rules" entry point
     await expect(page.locator('[data-testid="hygiene-release-selector"]').first()).toBeVisible();
     await expect(page.locator('[data-testid="hygiene-rules-button"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid="execute-view-board"]').first()).toBeVisible();
 
-    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 
-  test('release selector modal opens with family, version, and phase', async ({ page }) => {
+  test('view toggle switches Table, Kanban, and Signals', async ({ page }) => {
+    await page.goto('/#/releases/execute');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+    await dismissHygieneWelcome(page);
+
+    await expect(page.locator('[data-testid="execute-view-toggle"]').first()).toBeVisible();
+
+    await page.locator('[data-testid="execute-view-board"]').first().click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('[data-testid="execute-view-board"]').first()).toHaveAttribute('aria-selected', 'true');
+
+    await page.locator('[data-testid="execute-view-signals"]').first().click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('[data-testid="execute-view-signals"]').first()).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('[data-testid="execute-kpi-cards"]')).toHaveCount(0);
+    const signalsSummary = page.locator('[data-testid="signals-progress-summary"]');
+    if (await signalsSummary.count()) {
+      await expect(signalsSummary.first()).toBeVisible();
+      await expect(signalsSummary.first().getByText('Features')).toBeVisible();
+      await expect(signalsSummary.first().getByText('Epics')).toBeVisible();
+    }
+
+    await page.locator('[data-testid="execute-view-table"]').first().click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('[data-testid="execute-view-table"]').first()).toHaveAttribute('aria-selected', 'true');
+    const kpiCards = page.locator('[data-testid="execute-kpi-cards"]');
+    if (await kpiCards.count()) {
+      await expect(kpiCards.first()).toBeVisible();
+    }
+
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
+  });
+
+  test('toolbar shows gear-driven version chips without a registry modal', async ({ page }) => {
     await page.goto('/#/releases/execute?tab=feature-status');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await dismissHygieneWelcome(page);
 
-    await page.locator('[data-testid="hygiene-release-selector"]').first().click();
-    await page.waitForTimeout(300);
+    await expect(page.locator('[data-testid="hygiene-release-selector"]').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'All versions' })).toHaveCount(0);
+    await expect(page.getByText('Product Family', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Phase', { exact: true })).toHaveCount(0);
+    await expect(page.locator('button', { hasText: 'Apply' })).toHaveCount(0);
 
-    // Exact matches — the drawer/hero copy contains "Fix Version"/"Target Version",
-    // so a loose `text=Version` would match those hidden strings instead.
-    await expect(page.getByText('Product Family', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Version', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Phase', { exact: true }).first()).toBeVisible();
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
+  });
 
-    await expect(page.locator('button', { hasText: 'Cancel' }).first()).toBeVisible();
-    await expect(page.locator('button', { hasText: 'Apply' }).first()).toBeVisible();
+  test('version chips are ordered by planning freeze date earliest first', async ({ page, request }) => {
+    await page.goto('/#/releases/execute');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+    await dismissHygieneWelcome(page);
 
-    // Close via Escape
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
+    const chips = page.locator('[data-testid="hygiene-release-selector"] button');
+    await expect(chips.first()).toBeVisible();
+    const labels = (await chips.allTextContents()).map((t) => t.trim()).filter(Boolean);
 
-    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+    const [configRes, versionsRes] = await Promise.all([
+      request.get('/api/modules/releases/execution/tracking/config'),
+      request.get('/api/modules/releases/execution/tracking/versions')
+    ]);
+    const config = await configRes.json();
+    const versionRows = (await versionsRes.json()).versions || [];
+    const apiDates = {};
+    for (const row of versionRows) {
+      if (row && row.version) apiDates[row.version] = row.planningFreezeDate || null;
+    }
+    function freezeFor(version) {
+      const entry = config.releases && config.releases[version];
+      if (entry && entry.planningFreezeOverride) return entry.planningFreezeOverride;
+      return apiDates[version] || null;
+    }
+    const expected = Object.keys(config.releases || {})
+      .filter((k) => String(k).trim())
+      .sort((a, b) => {
+        const da = freezeFor(a);
+        const db = freezeFor(b);
+        if (da && db) return da.localeCompare(db);
+        if (da && !db) return -1;
+        if (!da && db) return 1;
+        return String(b).localeCompare(String(a), undefined, { numeric: true });
+      });
+    expect(labels).toEqual(expected);
+
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 
   test('hygiene rules modal is reachable from the toolbar', async ({ page }) => {
@@ -1708,7 +1754,7 @@ test.describe('Feature Status filtering @releases', () => {
     // Welcome/rules modal exposes a Hygiene Rules tab for discoverability
     await expect(page.locator('text=Hygiene Rules').first()).toBeVisible();
 
-    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 
   test('field filter modal opens with the expected filter fields', async ({ page }) => {
@@ -1717,8 +1763,8 @@ test.describe('Feature Status filtering @releases', () => {
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
     await dismissHygieneWelcome(page);
 
-    // The Filters control only shows once a release is selected. In demo mode a
-    // default selection is auto-applied, so it should normally be present.
+    // The Filters control only shows once a gear-configured release is selected.
+    // A default version is auto-applied when tracking settings have releases.
     const filtersButton = page.locator('[data-testid="hygiene-filters-button"]').first();
     const hasSelection = await filtersButton.isVisible().catch(() => false);
 
@@ -1733,12 +1779,11 @@ test.describe('Feature Status filtering @releases', () => {
       await expect(page.locator('text=Assignee').first()).toBeVisible();
       await expect(page.locator('button', { hasText: 'Saved Presets' }).first()).toBeVisible();
 
-      // Close the modal
-      await page.locator('button', { hasText: 'Done' }).first().click();
+      await page.getByRole('button', { name: 'Done', exact: true }).click();
       await page.waitForTimeout(300);
     }
 
-    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 
   test('clicking a feature card opens the summary drawer', async ({ page }) => {
@@ -1774,7 +1819,7 @@ test.describe('Feature Status filtering @releases', () => {
       await expect(drawer).toHaveCount(0);
     }
 
-    expect(unexpectedHygieneErrors(page)).toHaveLength(0);
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
   });
 });
 

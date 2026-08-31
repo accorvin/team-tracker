@@ -144,6 +144,9 @@ export function filterIssues(issues, filters) {
 
 function sortValue(issue, key) {
   if (key === 'component') return (issue.components || []).join(', ')
+  if (key === 'affectedVersions') return (issue.affectedVersions || []).join(', ')
+  if (key === 'age') return issue.created ? new Date(issue.created).getTime() : 0
+  if (key === 'stale') return issue.updated ? new Date(issue.updated).getTime() : 0
   if (key === 'source') return (issue.feedbackLabels || []).join(', ')
   if (key === 'hasSfdcCases') return issue.sfdcCasesCount || (issue.hasSfdcCases ? 1 : 0)
   return issue[key] || ''

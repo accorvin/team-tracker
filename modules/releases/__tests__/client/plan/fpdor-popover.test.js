@@ -12,11 +12,11 @@ describe('FPDoRPopover severity badge', function() {
   it('uses green when all applicable items pass, even if committed', function() {
     var wrapper = mountPopover({
       passedCount: 17,
-      applicableCount: 17,
+      totalCount: 17,
       allApplicablePassed: true,
       items: [
         { name: 'Target Version', pass: true, group: 'mandatory' },
-        { name: 'UXD', pass: null, group: 'criteria' }
+        { name: 'UXD', pass: true, state: 'not-applicable', group: 'criteria' }
       ]
     }, 'committed')
 
@@ -28,7 +28,7 @@ describe('FPDoRPopover severity badge', function() {
   it('uses red for critical fails regardless of Fix Version / committed', function() {
     var wrapper = mountPopover({
       passedCount: 16,
-      applicableCount: 17,
+      totalCount: 17,
       allApplicablePassed: false,
       items: [
         { name: 'Target Version', pass: false, group: 'mandatory' },
@@ -43,7 +43,7 @@ describe('FPDoRPopover severity badge', function() {
   it('uses orange for high severity worst fail', function() {
     var wrapper = mountPopover({
       passedCount: 16,
-      applicableCount: 17,
+      totalCount: 17,
       allApplicablePassed: false,
       items: [
         { name: 'Docs impact', pass: false, group: 'mandatory' },

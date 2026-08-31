@@ -72,7 +72,7 @@ describe('processBoard', () => {
     // Should write sprint data and sprint index
     const writeCalls = deps.writeStorage.mock.calls;
     expect(writeCalls.some(c => c[0] === 'sprints/100.json')).toBe(true);
-    expect(writeCalls.some(c => c[0] === 'sprints/board-42.json')).toBe(true);
+    expect(writeCalls.some(c => c[0] === 'sprints/board-42-team-team_abc.json')).toBe(true);
 
     // Sprint data should include teamId
     const sprintDataCall = writeCalls.find(c => c[0] === 'sprints/100.json');
@@ -222,7 +222,7 @@ describe('processKanbanBoard', () => {
     // Should write sprint data and sprint index
     const writeCalls = deps.writeStorage.mock.calls;
     expect(writeCalls.some(c => c[0] === 'sprints/kanban-50.json')).toBe(true);
-    expect(writeCalls.some(c => c[0] === 'sprints/board-50.json')).toBe(true);
+    expect(writeCalls.some(c => c[0] === 'sprints/board-50-team-team_abc.json')).toBe(true);
   });
 
   it('strips ORDER BY from JQL and adds date constraint', async () => {

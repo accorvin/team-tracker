@@ -13,6 +13,30 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <div class="relative" ref="exportDropdownRef">
+          <button
+            type="button"
+            @click="toggleExportMenu"
+            :disabled="groups.length === 0 || loadingData"
+            class="px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors"
+            :class="groups.length === 0 || loadingData
+              ? 'text-gray-300 dark:text-gray-600 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 cursor-not-allowed'
+              : 'text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
+            title="Export filtered data"
+          >Export</button>
+          <div v-if="exportDropdownOpen" class="absolute right-0 z-50 mt-1 w-40 rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg py-1" role="menu">
+            <button
+              role="menuitem"
+              @click="handleExportCsv"
+              class="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >CSV (.csv)</button>
+            <button
+              role="menuitem"
+              @click="handleExportMarkdown"
+              class="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >Markdown (.md)</button>
+          </div>
+        </div>
         <button
           @click="pillarPanelOpen = true"
           class="p-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
@@ -493,6 +517,10 @@ import {
   visibleVersionNames,
   afterRequestedSplit
 } from '../utils/alignment-rollup.js'
+import {
+  exportComponentLoadCsv,
+  exportComponentLoadMarkdown
+} from '../utils/component-load-export.js'
 
 const nav = inject('moduleNav', null)
 const jiraBaseUrl = 'https://issues.redhat.com/browse'
@@ -571,6 +599,57 @@ var pmOwnerDropdownRef = ref(null)
 var pmOwnerSearch = ref('')
 
 var savedSort = ref({ column: null, direction: 'asc' })
+
+var exportDropdownOpen = ref(false)
+var exportDropdownRef = ref(null)
+
+function toggleExportMenu() { exportDropdownOpen.value = !exportDropdownOpen.value }
+function closeExportMenu() { exportDropdownOpen.value = false }
+
+function buildComponentToPillarMap() {
+  var map = {}
+  var pillars = pillarConfig.value.pillars || []
+  for (var pi = 0; pi < pillars.length; pi++) {
+    var pillar = pillars[pi]
+    var comps = pillar.components || []
+    for (var ci = 0; ci < comps.length; ci++) {
+      var name = typeof comps[ci] === 'string' ? comps[ci] : (comps[ci] && comps[ci].name) || ''
+      if (!name) continue
+      if (map[name]) {
+        map[name] += '; ' + pillar.name
+      } else {
+        map[name] = pillar.name
+      }
+    }
+  }
+  return map
+}
+
+function getExportArgs() {
+  return {
+    groups: clientFilteredGroups.value,
+    rollup: alignmentRollup.value,
+    summary: {
+      requested: totalRequested.value,
+      committed: totalCommitted.value,
+      delivered: deliveredDisplay.value,
+      blocked: totalBlocked.value + (blockedPercent.value != null ? ' (' + blockedPercent.value + '%)' : '')
+    },
+    componentToPillar: buildComponentToPillarMap()
+  }
+}
+
+function handleExportCsv() {
+  closeExportMenu()
+  var args = getExportArgs()
+  exportComponentLoadCsv(args.groups, args.rollup, args.summary, args.componentToPillar)
+}
+
+function handleExportMarkdown() {
+  closeExportMenu()
+  var args = getExportArgs()
+  exportComponentLoadMarkdown(args.groups, args.rollup, args.summary, args.componentToPillar)
+}
 
 var availableProducts = ['RHOAI', 'RHELAI', 'RHAII']
 
@@ -1199,6 +1278,7 @@ function handleClickOutside(e) {
   if (releaseTypeDropdownRef.value && !releaseTypeDropdownRef.value.contains(e.target)) { releaseTypeDropdownOpen.value = false }
   if (delOwnerDropdownRef.value && !delOwnerDropdownRef.value.contains(e.target)) { delOwnerDropdownOpen.value = false; delOwnerSearch.value = '' }
   if (pmOwnerDropdownRef.value && !pmOwnerDropdownRef.value.contains(e.target)) { pmOwnerDropdownOpen.value = false; pmOwnerSearch.value = '' }
+  if (exportDropdownRef.value && !exportDropdownRef.value.contains(e.target)) { exportDropdownOpen.value = false }
 }
 
 function handleExpandAll() { if (tableRef.value) tableRef.value.expandAll() }

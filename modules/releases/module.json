@@ -74,7 +74,7 @@
       },
       {
         "key": "GITLAB_CEE_TOKEN",
-        "description": "GitLab PAT for gitlab.cee.redhat.com (read_api scope). Used to fetch component maturity data.",
+        "description": "GitLab PAT for gitlab.cee.redhat.com (read_api scope). Optional — maturity data is fetched without authentication by default. Provide a token for improved rate limits.",
         "required": false
       }
     ]
