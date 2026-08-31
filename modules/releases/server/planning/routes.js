@@ -503,7 +503,9 @@ module.exports = async function registerPlanningRoutes(router, context) {
    *       Each issue includes resolved (resolutiondate), inProgressAt (first changelog
    *       transition into an in-progress status) for process-efficiency metrics,
    *       affectedVersions (array of version names from Jira's "Affects Version/s" field),
-   *       and hasSfdcCases (boolean, derived via JQL since the field is encrypted at rest).
+   *       hasSfdcCases (boolean, derived via JQL since the field is encrypted at rest),
+   *       and customerAffected (comma-separated customer names extracted from
+   *       "customer: <name>" patterns in issue comments).
    *       Data is cached server-side for 15 minutes. Pass ?refresh=true to force a live
    *       Jira fetch and update the cache.
    *     parameters:
