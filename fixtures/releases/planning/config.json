@@ -10,7 +10,9 @@
           "pillar": "Inference",
           "state": "continue from 3.4",
           "owner": "",
-          "outcomeKeys": ["RHAISTRAT-1513"],
+          "outcomeKeys": [
+            "RHAISTRAT-1513"
+          ],
           "notes": "",
           "description": ""
         },
@@ -21,7 +23,9 @@
           "pillar": "Agents",
           "state": "continue from 3.4",
           "owner": "",
-          "outcomeKeys": ["RHAISTRAT-1312"],
+          "outcomeKeys": [
+            "RHAISTRAT-1312"
+          ],
           "notes": "",
           "description": ""
         },
@@ -54,7 +58,10 @@
           "pillar": "Inference",
           "state": "continue from 3.4",
           "owner": "",
-          "outcomeKeys": ["RHAISTRAT-1515", "RHAISTRAT-1403"],
+          "outcomeKeys": [
+            "RHAISTRAT-1515",
+            "RHAISTRAT-1403"
+          ],
           "notes": "",
           "description": ""
         },
@@ -65,7 +72,9 @@
           "pillar": "Platform",
           "state": "",
           "owner": "",
-          "outcomeKeys": ["RHAISTRAT-1480"],
+          "outcomeKeys": [
+            "RHAISTRAT-1480"
+          ],
           "notes": "",
           "description": ""
         },
@@ -76,7 +85,9 @@
           "pillar": "Data",
           "state": "continue from 3.4",
           "owner": "",
-          "outcomeKeys": ["RHAISTRAT-1498"],
+          "outcomeKeys": [
+            "RHAISTRAT-1498"
+          ],
           "notes": "",
           "description": ""
         },
@@ -87,7 +98,9 @@
           "pillar": "Platform",
           "state": "continue from 3.4",
           "owner": "",
-          "outcomeKeys": ["RHAISTRAT-1339"],
+          "outcomeKeys": [
+            "RHAISTRAT-1339"
+          ],
           "notes": "",
           "description": ""
         },
@@ -98,7 +111,10 @@
           "pillar": "Platform",
           "state": "continue from 3.4",
           "owner": "",
-          "outcomeKeys": ["RHAISTRAT-1517", "RHAISTRAT-1446"],
+          "outcomeKeys": [
+            "RHAISTRAT-1517",
+            "RHAISTRAT-1446"
+          ],
           "notes": "",
           "description": ""
         },
@@ -109,7 +125,10 @@
           "pillar": "Platform",
           "state": "new for 3.5",
           "owner": "",
-          "outcomeKeys": ["RHAISTRAT-1516", "RHAISTRAT-898"],
+          "outcomeKeys": [
+            "RHAISTRAT-1516",
+            "RHAISTRAT-898"
+          ],
           "notes": "",
           "description": ""
         },
@@ -120,7 +139,9 @@
           "pillar": "Data",
           "state": "continue from 3.4",
           "owner": "",
-          "outcomeKeys": ["RHAISTRAT-188"],
+          "outcomeKeys": [
+            "RHAISTRAT-188"
+          ],
           "notes": "",
           "description": ""
         },
@@ -156,6 +177,154 @@
           "outcomeKeys": [],
           "notes": "No specific outcome key listed",
           "description": ""
+        }
+      ]
+    },
+    "3.6": {
+      "release": "3.6",
+      "bigRocks": [
+        {
+          "priority": 1,
+          "name": "MaaS",
+          "fullName": "MaaS (3.6)",
+          "pillar": "Inference",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "36 features scored by ML model"
+        },
+        {
+          "priority": 2,
+          "name": "AI Hub incl MCP",
+          "fullName": "AI Hub incl MCP (3.6)",
+          "pillar": "Platform",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "17 features scored by ML model"
+        },
+        {
+          "priority": 3,
+          "name": "Bring Your Own Agent",
+          "fullName": "Bring Your Own Agent (3.6)",
+          "pillar": "Agents",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "15 features scored by ML model"
+        },
+        {
+          "priority": 4,
+          "name": "Gen AI Studio",
+          "fullName": "Gen AI Studio (3.6)",
+          "pillar": "Agents",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "14 features scored by ML model"
+        },
+        {
+          "priority": 5,
+          "name": "AutoRAG",
+          "fullName": "AutoRAG (3.6)",
+          "pillar": "Data",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "13 features scored by ML model"
+        },
+        {
+          "priority": 6,
+          "name": "GPUaaS",
+          "fullName": "GPUaaS (3.6)",
+          "pillar": "Inference",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "11 features scored by ML model"
+        },
+        {
+          "priority": 7,
+          "name": "AutoML",
+          "fullName": "AutoML (3.6)",
+          "pillar": "Data",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "10 features scored by ML model"
+        },
+        {
+          "priority": 8,
+          "name": "Tool Calling",
+          "fullName": "Tool Calling (3.6)",
+          "pillar": "Agents",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "9 features scored by ML model"
+        },
+        {
+          "priority": 9,
+          "name": "llm-d Platform",
+          "fullName": "llm-d Platform (3.6)",
+          "pillar": "Inference",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "8 features scored by ML model"
+        },
+        {
+          "priority": 10,
+          "name": "Red Hat AI Factory with NVIDIA Rubin",
+          "fullName": "Red Hat AI Factory with NVIDIA Rubin (3.6)",
+          "pillar": "Platform",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "8 features scored by ML model"
+        },
+        {
+          "priority": 11,
+          "name": "Eval Hub",
+          "fullName": "Eval Hub (3.6)",
+          "pillar": "Data",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "5 features scored by ML model"
+        },
+        {
+          "priority": 12,
+          "name": "Multitenancy",
+          "fullName": "Multitenancy (3.6)",
+          "pillar": "Platform",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "3 features scored by ML model"
+        },
+        {
+          "priority": 13,
+          "name": "AI Safety x Model Validation",
+          "fullName": "AI Safety x Model Validation (3.6)",
+          "pillar": "Data",
+          "state": "planned for 3.6",
+          "owner": "",
+          "outcomeKeys": [],
+          "notes": "",
+          "description": "2 features scored by ML model"
         }
       ]
     }
