@@ -1,5 +1,6 @@
 <script setup>
-const PLANNER_URL = 'https://htmlpreview.github.io/?https://github.com/yuvalluria/rhai-release-planner/blob/main/index.html'
+// Pinned to specific commit — update via PR to rhai-org-pulse
+const PLANNER_URL = 'https://htmlpreview.github.io/?https://github.com/yuvalluria/rhai-release-planner/blob/4f078969d0b7d32e27e78fee1fb2e68f3b58d170/index.html'
 </script>
 
 <template>
