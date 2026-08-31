@@ -24,6 +24,9 @@ vi.mock('../../../client/plan/views/BuFeedbackView.vue', function() {
 vi.mock('../../../client/plan/views/PmHubView.vue', function() {
   return { default: { name: 'PmHubView', template: '<div>PM Hub</div>' } }
 })
+vi.mock('../../../client/plan/views/AIPlanner.vue', function() {
+  return { default: { name: 'AIPlanner', template: '<div><iframe title="AI-First Release Planner" src="https://htmlpreview.github.io/?https://github.com/yuvalluria/rhai-release-planner/blob/main/index.html" /></div>' } }
+})
 
 import { apiRequest } from '@shared/client/services/api'
 
@@ -77,5 +80,49 @@ describe('PlanView Draft Plans gate', function() {
 
     expect(wrapper.text()).not.toContain('Draft Plans Body')
     expect(wrapper.text()).toContain('Big Rocks')
+  })
+})
+
+describe('PlanView AI Planner tab', function() {
+  beforeEach(function() {
+    vi.clearAllMocks()
+  })
+
+  afterEach(function() {
+    vi.clearAllMocks()
+  })
+
+  it('shows AI Planner tab in nav', async function() {
+    apiRequest.mockResolvedValue({ canViewDraftPlans: false })
+    var wrapper = mountPlanView()
+    await flushPromises()
+    await nextTick()
+
+    expect(wrapper.text()).toContain('AI Planner')
+  })
+
+  it('renders AIPlanner component when ai-planner tab is active', async function() {
+    apiRequest.mockResolvedValue({ canViewDraftPlans: false })
+    var wrapper = mountPlanView({ tab: 'ai-planner' })
+    await flushPromises()
+    await nextTick()
+
+    expect(wrapper.find('iframe[title="AI-First Release Planner"]').exists()).toBe(true)
+  })
+
+  it('switches to AI Planner when tab button is clicked', async function() {
+    apiRequest.mockResolvedValue({ canViewDraftPlans: false })
+    var wrapper = mountPlanView()
+    await flushPromises()
+    await nextTick()
+
+    var buttons = wrapper.findAll('button')
+    var aiPlannerBtn = buttons.find(function(b) { return b.text() === 'AI Planner' })
+    expect(aiPlannerBtn).toBeDefined()
+
+    await aiPlannerBtn.trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('iframe[title="AI-First Release Planner"]').exists()).toBe(true)
   })
 })

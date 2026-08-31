@@ -1,0 +1,14 @@
+<script setup>
+const PLANNER_URL = 'https://htmlpreview.github.io/?https://github.com/yuvalluria/rhai-release-planner/blob/main/index.html'
+</script>
+
+<template>
+  <div class="ai-planner-container" style="width: 100%; height: calc(100vh - 120px);">
+    <iframe
+      :src="PLANNER_URL"
+      style="width: 100%; height: 100%; border: none;"
+      title="AI-First Release Planner"
+      allow="clipboard-read; clipboard-write"
+    />
+  </div>
+</template>

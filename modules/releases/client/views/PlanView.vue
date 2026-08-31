@@ -21,6 +21,7 @@
       <DraftPlansView v-else-if="activeTab === 'draft-plans' && canViewDraftPlans" />
       <BuFeedbackView v-else-if="activeTab === 'bu-feedback'" />
       <PmHubView v-else-if="activeTab === 'pm-hub'" />
+      <AIPlanner v-else-if="activeTab === 'ai-planner'" />
     </div>
   </div>
 </template>
@@ -33,6 +34,7 @@ import FeatureReadinessView from '../plan/views/FeatureReadinessView.vue'
 import DraftPlansView from '../plan/views/DraftPlansView.vue'
 import BuFeedbackView from '../plan/views/BuFeedbackView.vue'
 import PmHubView from '../plan/views/PmHubView.vue'
+import AIPlanner from '../plan/views/AIPlanner.vue'
 
 var ALL_TABS = [
   { id: 'outcomes', label: 'Big Rocks' },
@@ -40,6 +42,7 @@ var ALL_TABS = [
   { id: 'feature-readiness', label: 'Features List (1-n)' },
   { id: 'draft-plans', label: 'Draft Plans' },
   { id: 'bu-feedback', label: 'Field and BU Feedback' },
+  { id: 'ai-planner', label: 'AI Planner' },
 ]
 
 var canViewDraftPlans = ref(false)
