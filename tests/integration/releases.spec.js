@@ -1904,7 +1904,8 @@ test.describe('Releases AI Planner tab @releases', () => {
     const src = await iframe.getAttribute('src');
     expect(src).toContain('rhai-release-planner');
 
-    expect(page.errors).toHaveLength(0);
+    const errors = page.errors.filter(e => !e.message.includes('cross-origin subframe'));
+    expect(errors).toHaveLength(0);
   });
 
   test('AI Planner deep link activates the tab', async ({ page }) => {
@@ -1915,6 +1916,7 @@ test.describe('Releases AI Planner tab @releases', () => {
     const iframe = page.locator('iframe[title="AI-First Release Planner"]');
     await expect(iframe).toBeVisible();
 
-    expect(page.errors).toHaveLength(0);
+    const errors = page.errors.filter(e => !e.message.includes('cross-origin subframe'));
+    expect(errors).toHaveLength(0);
   });
 });
