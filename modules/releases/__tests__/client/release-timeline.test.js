@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
+import { ref } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
+import fs from 'node:fs'
+import path from 'node:path'
+import registryFixture from '../../../../fixtures/releases/registry.json'
+import trackingConfigFixture from '../../../../fixtures/releases/execution/feature-tracking-config.json'
 
 vi.mock('@shared/client/services/api.js', () => ({
   apiRequest: vi.fn()
@@ -2115,5 +2120,186 @@ describe('ReleaseTimeline', () => {
     var aboveKeys = Object.keys(map).filter(function (k) { return k.endsWith('-a') })
     var belowKeys = Object.keys(map).filter(function (k) { return k.endsWith('-b') })
     expect(Math.max(aboveKeys.length, belowKeys.length)).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('ReleaseTimeline → Execute deep-link', () => {
+  function fakeNav() {
+    return { params: ref({}), updateParams: vi.fn(), navigateTo: vi.fn() }
+  }
+
+  function nodeWithLabel(wrapper, matcher) {
+    return wrapper.vm.nodes.find(function (n) { return matcher.test(n.groupLabel) })
+  }
+
+  it('versionForNode maps an EA node to "<major>.<minor>.EA<n>"', () => {
+    var releases = [
+      makeRelease('rhoai-3.5.EA1', { displayName: 'rhoai-3.5.EA1', shortname: 'rhoai',
+        planningFreeze: '2026-06-01', ga: '2026-06-17' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var eaNode = nodeWithLabel(wrapper, /EA1/)
+    expect(eaNode).toBeTruthy()
+    expect(wrapper.vm.versionForNode(eaNode)).toBe('3.5.EA1')
+  })
+
+  it('versionForNode maps a GA node to "<major>.<minor>" (GA stripped)', () => {
+    var releases = [
+      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-11-19' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var gaNode = nodeWithLabel(wrapper, /3\.6/)
+    expect(gaNode).toBeTruthy()
+    expect(wrapper.vm.versionForNode(gaNode)).toBe('3.6')
+  })
+
+  it('versionForNode returns null for a node with no parseable releases', () => {
+    var wrapper = mount(ReleaseTimeline, { props: { releases: [] } })
+    expect(wrapper.vm.versionForNode(null)).toBe(null)
+    expect(wrapper.vm.versionForNode({ releases: [{ displayName: 'not-a-release', id: 'x' }] })).toBe(null)
+  })
+
+  it('openExecuteForNode navigates to the execute Kanban board with the version and product params', () => {
+    var releases = [
+      makeRelease('rhoai-3.5.EA1', { displayName: 'rhoai-3.5.EA1', shortname: 'rhoai', ga: '2026-06-17' })
+    ]
+    var nav = fakeNav()
+    var wrapper = mount(ReleaseTimeline, {
+      props: { releases },
+      global: { provide: { moduleNav: nav } }
+    })
+    var eaNode = nodeWithLabel(wrapper, /EA1/)
+    wrapper.vm.openExecuteForNode(eaNode)
+    expect(nav.navigateTo).toHaveBeenCalledWith('execute', {
+      version: '3.5.EA1', view: 'board', tab: 'board', products: 'rhoai'
+    })
+  })
+
+  it('openExecuteForNode carries the card product so Execute lands on the matching pill', () => {
+    var releases = [
+      makeRelease('rhaii-3.6.EA1', { displayName: 'rhaii-3.6.EA1', shortname: 'rhaii', ga: '2027-03-04' })
+    ]
+    var nav = fakeNav()
+    var wrapper = mount(ReleaseTimeline, {
+      props: { releases },
+      global: { provide: { moduleNav: nav } }
+    })
+    var eaNode = nodeWithLabel(wrapper, /EA1/)
+    wrapper.vm.openExecuteForNode(eaNode)
+    expect(nav.navigateTo).toHaveBeenCalledWith('execute', {
+      version: '3.6.EA1', view: 'board', tab: 'board', products: 'rhaii'
+    })
+  })
+
+  it('openExecuteForNode omits the products param when the node has no product', () => {
+    var nav = fakeNav()
+    var wrapper = mount(ReleaseTimeline, {
+      props: { releases: [] },
+      global: { provide: { moduleNav: nav } }
+    })
+    // Hand-built node that resolves to a version but carries no productList.
+    wrapper.vm.openExecuteForNode({
+      releases: [{ displayName: 'rhoai-3.5.EA1', id: 'rhoai-3.5.EA1' }],
+      productList: []
+    })
+    expect(nav.navigateTo).toHaveBeenCalledWith('execute', {
+      version: '3.5.EA1', view: 'board', tab: 'board'
+    })
+  })
+
+  it('openExecuteForNode joins multiple card products into the products param', () => {
+    var nav = fakeNav()
+    var wrapper = mount(ReleaseTimeline, {
+      props: { releases: [] },
+      global: { provide: { moduleNav: nav } }
+    })
+    // Hand-built node resolving to a version but carrying multiple products.
+    // Real timeline nodes are per-product (productList length 1), so this shape
+    // only arises if grouping ever changes — this guards the join(',') path.
+    wrapper.vm.openExecuteForNode({
+      releases: [{ displayName: 'rhoai-3.6.EA1', id: 'rhoai-3.6.EA1' }],
+      productList: ['rhelai', 'rhoai']
+    })
+    expect(nav.navigateTo).toHaveBeenCalledWith('execute', {
+      version: '3.6.EA1', view: 'board', tab: 'board', products: 'rhelai,rhoai'
+    })
+  })
+
+  it('openExecuteForNode is a no-op when moduleNav is not provided', () => {
+    var releases = [
+      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-11-19' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var node = nodeWithLabel(wrapper, /3\.6/)
+    expect(function () { wrapper.vm.openExecuteForNode(node) }).not.toThrow()
+  })
+
+  it('openExecuteForNode does not navigate when the version is unresolved', () => {
+    var nav = fakeNav()
+    var wrapper = mount(ReleaseTimeline, {
+      props: { releases: [] },
+      global: { provide: { moduleNav: nav } }
+    })
+    wrapper.vm.openExecuteForNode({ releases: [{ displayName: 'not-a-release', id: 'x' }] })
+    expect(nav.navigateTo).not.toHaveBeenCalled()
+  })
+
+  it('shouldShowClickAffordance is true for a navigable node when nav is wired', () => {
+    var releases = [
+      makeRelease('rhoai-3.5.EA1', { displayName: 'rhoai-3.5.EA1', shortname: 'rhoai', ga: '2026-06-17' })
+    ]
+    var wrapper = mount(ReleaseTimeline, {
+      props: { releases },
+      global: { provide: { moduleNav: fakeNav() } }
+    })
+    var eaNode = nodeWithLabel(wrapper, /EA1/)
+    expect(wrapper.vm.shouldShowClickAffordance(eaNode)).toBe(true)
+  })
+
+  it('shouldShowClickAffordance is false without moduleNav (nothing to click into)', () => {
+    var releases = [
+      makeRelease('rhoai-3.6', { displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-11-19' })
+    ]
+    var wrapper = mount(ReleaseTimeline, { props: { releases } })
+    var gaNode = nodeWithLabel(wrapper, /3\.6/)
+    expect(wrapper.vm.shouldShowClickAffordance(gaNode)).toBe(false)
+  })
+
+  it('shouldShowClickAffordance is false for a node with no resolvable version', () => {
+    var wrapper = mount(ReleaseTimeline, {
+      props: { releases: [] },
+      global: { provide: { moduleNav: fakeNav() } }
+    })
+    expect(wrapper.vm.shouldShowClickAffordance({ releases: [{ displayName: 'not-a-release', id: 'x' }] })).toBe(false)
+    expect(wrapper.vm.shouldShowClickAffordance(null)).toBe(false)
+  })
+})
+
+// A deep-linked timeline card carries versionForNode(node) as the Execute pill
+// version. If a demo release exists on the timeline whose version has no matching
+// Execute tracking config (or vice-versa), the deep-link lands on an empty/wrong
+// pill. This guards the invariant that every Execute pill version (config key) is
+// reachable from the registry-derived timeline AND has a tracking-data fixture —
+// exactly the drift that the original 2.14/2.15 mismatch introduced.
+describe('demo fixture drift guard (config ⊆ timeline)', () => {
+  it('every Execute pill version is reachable from the registry-derived timeline', () => {
+    var wrapper = mount(ReleaseTimeline, { props: { releases: registryFixture.releases } })
+    var timelineVersions = new Set()
+    wrapper.vm.allNodes.forEach(function (nd) {
+      var v = wrapper.vm.versionForNode(nd)
+      if (v) timelineVersions.add(v)
+    })
+    var configVersions = Object.keys(trackingConfigFixture.releases)
+    var missing = configVersions.filter(function (v) { return !timelineVersions.has(v) })
+    expect(missing).toEqual([])
+  })
+
+  it('every Execute pill version has a tracking-data fixture file', () => {
+    var configVersions = Object.keys(trackingConfigFixture.releases)
+    var dir = path.resolve(process.cwd(), 'fixtures/releases/execution')
+    var missing = configVersions.filter(function (v) {
+      return !fs.existsSync(path.join(dir, 'tracking-data-' + v + '.json'))
+    })
+    expect(missing).toEqual([])
   })
 })

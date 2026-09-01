@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { DEFAULT_PAGE_WAIT_TIME } = require('./constants');
 const { setupErrorTracking, logCapturedErrors } = require('./helpers');
+const { unexpectedDemoResourceErrors } = require('./execute-helpers');
 
 /**
  * Integration tests for Release Timeline (Schedule view)
@@ -348,6 +349,97 @@ test.describe('Release Timeline @release-timeline @releases', () => {
     await page.waitForTimeout(1000);
 
     await expect(canvas).toBeVisible();
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('clicking a milestone card deep-links into the Execute page with its version', async ({ page }) => {
+    // ?e2e=1 opts the timeline into exposing card hit-boxes on window (inert in
+    // normal prod; the integration image is not a VITE_DEMO_MODE build).
+    await page.goto('/#/releases/schedule?e2e=1');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    var canvas = page.locator('canvas');
+    await expect(canvas).toBeVisible();
+    var box = await canvas.boundingBox();
+
+    // The component exposes card hit-boxes on window in demo mode (canvas-relative
+    // centres). Pick the first card that resolves to a version AND a product so we
+    // can assert the product is carried through to the Execute page.
+    var card = await page.evaluate(() => {
+      var tl = window.__releaseTimeline;
+      if (!tl || !tl.cards) return null;
+      return tl.cards.find(function (c) { return c.version && c.products && c.products.length; }) || null;
+    });
+    expect(card).not.toBeNull();
+
+    // Click the card centre (canvas origin + canvas-relative centre).
+    await page.mouse.click(box.x + card.cx, box.y + card.cy);
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    var url = page.url();
+    expect(url).toContain('#/releases/execute');
+    // The demo Execute tracking config (feature-tracking-config.json) is kept in
+    // sync with the Schedule timeline versions, so the card's version resolves to
+    // a real pill and is preserved (not reconciled away).
+    expect(url).toContain('version=' + encodeURIComponent(card.version));
+    // Cards deep-link straight to the Kanban board.
+    expect(url).toContain('view=board');
+    expect(url).toContain('tab=board');
+    // The card's product is carried through: the Execute page lands on the
+    // single clicked-card product rather than defaulting to ALL products of the
+    // version (which would be a comma-joined list). We assert on the URL rather
+    // than card.products[0] because each product renders as its own card and the
+    // canvas hit-test may resolve overlapping cards to a sibling product; the
+    // exact single-product mapping is pinned by the unit tests.
+    var match = /[?&]products=([^&]+)/.exec(url);
+    expect(match).not.toBeNull();
+    var selected = decodeURIComponent(match[1]).split(',').filter(Boolean);
+    expect(selected).toHaveLength(1);
+
+    // The carried product must be a real product of the clicked version.
+    var versionsRes = await page.request.get('/api/modules/releases/execution/tracking/versions');
+    expect(versionsRes.ok()).toBeTruthy();
+    var versionsBody = await versionsRes.json();
+    var row = (versionsBody.versions || []).find(function (v) { return v.version === card.version; });
+    expect(row).toBeTruthy();
+    expect(row.products).toContain(selected[0]);
+
+    // Landing on the Execute page logs expected demo resource 401/403/404s.
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
+  });
+
+  test('dragging over a milestone card pans instead of navigating', async ({ page }) => {
+    await page.goto('/#/releases/schedule?e2e=1');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    var canvas = page.locator('canvas');
+    var box = await canvas.boundingBox();
+
+    var card = await page.evaluate(() => {
+      var tl = window.__releaseTimeline;
+      if (!tl || !tl.cards) return null;
+      return tl.cards.find(function (c) { return c.version; }) || null;
+    });
+    expect(card).not.toBeNull();
+
+    // Press on the card and drag well past the 4px threshold, then release.
+    var startX = box.x + card.cx;
+    var startY = box.y + card.cy;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (var s = 1; s <= 10; s++) {
+      await page.mouse.move(startX - s * 8, startY);
+      await page.waitForTimeout(15);
+    }
+    await page.mouse.up();
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // A drag must not navigate to the Execute page.
+    expect(page.url()).toContain('#/releases/schedule');
+    expect(page.url()).not.toContain('#/releases/execute');
+
     expect(page.errors).toHaveLength(0);
   });
 

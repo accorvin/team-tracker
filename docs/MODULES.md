@@ -135,6 +135,33 @@ nav.goBack()
 const id = computed(() => nav.params.value.id)
 ```
 
+### Deep-linkable params (react to post-mount changes)
+
+When a view is a deep-link target — another view navigates to it with a param
+that pre-selects state (e.g. the releases Schedule timeline links into Execute
+with `?version=3.5.EA1`) — read the param **at mount** *and* **watch it**. A
+plain `onMounted` read is not enough: hash-only navigation to the same view
+(`navigateTo`/`updateParams` without a remount) changes `nav.params` in place,
+so a mount-only read silently ignores the new value.
+
+```javascript
+// Mount: honour an incoming deep-link param, else fall back to a default.
+onMounted(() => {
+  const requested = nav?.params.value?.version
+  selected.value = requested || defaultValue.value
+})
+
+// Post-mount: react to in-place param changes (no feedback loop — this only
+// reads params and sets local state; the writer path guards with updateParams).
+if (nav) {
+  watch(() => nav.params.value?.version, (v) => {
+    if (v && v !== selected.value) selected.value = v
+  })
+}
+```
+
+Ref: RHOAIENG-82037 (releases Schedule → Execute version deep-link).
+
 ### Hash URL Format
 
 Navigation produces URLs like: `#/<module-slug>/<view-id>?key=value`

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, inject, nextTick } from 'vue'
+import { ref, computed, onMounted, watch, inject, nextTick } from 'vue'
 import { apiRequest, getApiBase } from '@shared/client/services/api.js'
 import { useReportFilters } from '../../reports/composables/useReportFilters.js'
 import { useExecuteWorkspace } from '../composables/useExecuteWorkspace.js'
@@ -422,6 +422,40 @@ onMounted(async () => {
 })
 
 onMounted(fetchFieldOptions)
+
+// Deep-link support (RHOAIENG-82037): react to an in-place ?version= change so a
+// deep-link into the already-mounted workspace re-selects the pill without a
+// remount. onMounted handles the fresh-mount case via restoreSelection(); this
+// covers hash-only navigation. Guarded on value + validity so selectVersion's
+// param writeback cannot feed back into an update loop.
+if (nav && nav.params) {
+  watch(
+    () => nav.params.value && nav.params.value.version,
+    (version) => {
+      if (
+        version &&
+        version !== selectedVersion.value &&
+        trackingVersions.value.indexOf(version) >= 0
+      ) {
+        // A deep-link (e.g. from the Schedule timeline) may pin specific
+        // product(s) alongside the version; honour them instead of defaulting
+        // to all products. reconcileSelection drops any invalid product.
+        const productsParam = nav.params.value && nav.params.value.products
+        if (productsParam) {
+          applySelection(reconcileSelection(
+            trackingConfig.value,
+            { version: version, products: parseProductsFromParams(productsParam, null) },
+            freezeDatesByVersion.value
+          ))
+          persistSelection()
+          reload()
+        } else {
+          selectVersion(version)
+        }
+      }
+    }
+  )
+}
 
 async function handleRefresh() {
   if (refreshing.value) return

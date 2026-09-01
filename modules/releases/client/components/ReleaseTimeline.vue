@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onUnmounted, inject } from 'vue'
 import { Scatter } from 'vue-chartjs'
 import { Chart as ChartJS, LinearScale, PointElement, Tooltip } from 'chart.js'
 import { parseReleaseName, extractCycle, productLabel } from '../composables/useReleaseFamily.js'
@@ -19,6 +19,8 @@ const props = defineProps({
   // fits the view to them (GA near the right edge). Empty = no focus.
   focusReleaseIds: { type: Array, default: function () { return [] } }
 })
+
+const nav = inject('moduleNav', null)
 
 var MILESTONE_KEYS = [
   { key: 'planningFreeze', label: 'Planning Freeze' },
@@ -625,8 +627,11 @@ function onWheel(event) {
 
 // Drag-to-pan
 var _dragStart = null
+// Distinguishes a click from a drag-to-pan gesture (guards onCanvasClick).
+var _moved = false
 
 function onPointerDown(event) {
+  _moved = false
   if (event.button !== 0) return
   if (!_chartInstance) return
   var area = _chartInstance.chartArea
@@ -645,6 +650,7 @@ function onPointerMove(event) {
   var area = _chartInstance.chartArea
   if (!area) return
   var dx = event.clientX - _dragStart.clientX
+  if (Math.abs(dx) > 4) _moved = true
   var pxRange = area.right - area.left
   var dataRange = _dragStart.max - _dragStart.min
   var shift = -(dx / pxRange) * dataRange
@@ -732,6 +738,57 @@ function onCardHover(e) {
   }
 
   _setHoveredBox(null)
+}
+
+// Map a timeline node to the Execute-page version pill (e.g. "3.5.EA1" / "3.5").
+// Server pill format = version + (phase ? '.' + phase : ''); GA is stripped.
+function versionForNode(nd) {
+  if (!nd || !nd.releases) return null
+  for (var i = 0; i < nd.releases.length; i++) {
+    var parsed = parseReleaseName(nd.releases[i].displayName) || parseReleaseName(nd.releases[i].id)
+    if (parsed) {
+      var base = parsed.major + '.' + parsed.minor
+      return (parsed.milestone && parsed.milestone !== 'GA') ? base + '.' + parsed.milestone : base
+    }
+  }
+  return null
+}
+
+function openExecuteForNode(nd) {
+  if (!nav) return
+  var version = versionForNode(nd)
+  if (!version) return
+  // Land on the Kanban board (view=board&tab=board) with the version pre-selected.
+  var params = { version: version, view: 'board', tab: 'board' }
+  // Carry the card's product(s) so the Execute page lands on the matching
+  // product(s) rather than defaulting to the first one. Invalid products are
+  // dropped by reconcileSelection on the Execute side.
+  if (nd.productList && nd.productList.length) params.products = nd.productList.join(',')
+  nav.navigateTo('execute', params)
+}
+
+// A card shows the click affordance (↗) only when a click would actually
+// navigate: nav is wired and the node resolves to an Execute-page version.
+function shouldShowClickAffordance(nd) {
+  return !!(nav && versionForNode(nd))
+}
+
+// Card-only hit test (dots/stems stay hover-only). Internal — not exposed.
+function cardNodeAtPoint(cx, cy) {
+  for (var i = _cardHitBoxes.length - 1; i >= 0; i--) {
+    var b = _cardHitBoxes[i]
+    if (cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h) return b.nd
+  }
+  return null
+}
+
+function onCanvasClick(e) {
+  if (_moved) return
+  var canvas = e.currentTarget.querySelector('canvas')
+  if (!canvas) return
+  var rect = canvas.getBoundingClientRect()
+  var nd = cardNodeAtPoint(e.clientX - rect.left, e.clientY - rect.top)
+  if (nd) openExecuteForNode(nd)
 }
 
 var chartData = computed(function () {
@@ -1511,6 +1568,20 @@ var timelinePlugin = {
       }
       ctx.restore()
 
+      // Click affordance (RHOAIENG-82037): an external-link glyph in the hovered
+      // card's top-right corner signals it deep-links into the Execute page. Only
+      // drawn when the card resolves to a version (i.e. onCanvasClick will actually
+      // navigate) so the cue never appears on a non-navigable card.
+      if (shouldShowClickAffordance(_hoveredBox.nd)) {
+        ctx.save()
+        ctx.font = 'bold 12px ' + FONT
+        ctx.textAlign = 'right'
+        ctx.textBaseline = 'top'
+        ctx.fillStyle = hoverHex || (dark ? '#60a5fa' : '#3b82f6')
+        ctx.fillText('↗', _hoveredBox.x + _hoveredBox.w - 4, _hoveredBox.y + 3)
+        ctx.restore()
+      }
+
       var hoverDays = daysFromNow(_hoveredBox.nd.date)
       var hoverDaysText = hoverDays === null ? null
         : hoverDays === 0 ? 'today'
@@ -1539,6 +1610,25 @@ var timelinePlugin = {
     }
 
     ctx.restore()
+
+    // Test-only: expose card hit-boxes (canvas-relative centres) so Playwright
+    // can deterministically click a card and read its version. Inert in normal
+    // production use — activates only under demo builds OR an explicit ?e2e=1
+    // opt-in in the URL (the integration image is not a VITE_DEMO_MODE build).
+    if (typeof window !== 'undefined' &&
+        (import.meta.env.VITE_DEMO_MODE === 'true' ||
+         /[?&]e2e=1\b/.test(window.location.hash + window.location.search))) {
+      window.__releaseTimeline = {
+        cards: _cardHitBoxes.map(function (b) {
+          return {
+            version: versionForNode(b.nd),
+            products: (b.nd && b.nd.productList) || [],
+            cx: b.x + b.w / 2,
+            cy: b.y + b.h / 2
+          }
+        })
+      }
+    }
   }
 }
 </script>
@@ -1571,6 +1661,7 @@ var timelinePlugin = {
         @pointercancel="onPointerUp"
         @mousemove="onCardHover"
         @mouseleave="isOverCard = false"
+        @click="onCanvasClick"
       >
         <Scatter :data="chartData" :options="chartOptions"
                  :plugins="[timelinePlugin]" />

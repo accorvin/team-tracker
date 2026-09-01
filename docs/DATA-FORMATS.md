@@ -1388,12 +1388,13 @@ Gear settings for the Execute workspace: portfolio version names, per-product Ji
 ```json
 {
   "releases": {
-    "2.15": {
+    "3.5.EA1": {
       "products": {
-        "rhoai": "rhoai-3.5",
-        "rhelai": "rhelai-3.5"
+        "rhoai": "rhoai-3.5.EA1",
+        "rhelai": "rhelai-3.5.EA1",
+        "rhaii": "rhaii-3.5.EA1"
       },
-      "planningFreezeOverride": "2026-06-15"
+      "planningFreezeOverride": "2026-04-17"
     }
   }
 }
@@ -1403,6 +1404,7 @@ Gear settings for the Execute workspace: portfolio version names, per-product Ji
 - Keys under `releases` are portfolio versions shown as Execute version chips, ordered by planning freeze date (earliest first). User `planningFreezeOverride` wins over Product Pages.
 - `products` maps family (`rhoai` / `rhelai` / `rhaii`) to the Jira fixVersion name used for hygiene and execution lookups.
 - `planningFreezeOverride` is an optional `YYYY-MM-DD` date; when set it wins over Product Pages.
+- Per-version tracking data is cached at `data/releases/execution/tracking-data-<version>.json` (e.g. `tracking-data-3.5.EA1.json`); in demo mode these fixtures back the Execute workspace. Keep the chip versions here aligned with the Schedule-view timeline (`releases/delivery/product-pages-releases-cache.json`) so timeline card deep-links land on a populated Execute pill.
 
 ## Releases — Execution Last Enrichment (`data/releases/execution/last-enrichment.json`)
 
