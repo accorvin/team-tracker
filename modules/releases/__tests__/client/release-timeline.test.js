@@ -1,8 +1,16 @@
 import { describe, it, expect, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 
 vi.mock('@shared/client/services/api.js', () => ({
   apiRequest: vi.fn()
+}))
+
+// Stub the Chart.js canvas component: jsdom has no layout engine, so Chart.js
+// resize (triggered by prop updates via setProps) reads `ownerDocument` off a
+// detached canvas and throws. Tests assert on `vm.chartData`/`vm.xRange`
+// computeds, not on rendered chart pixels, so a no-op render is sufficient.
+vi.mock('vue-chartjs', () => ({
+  Scatter: { name: 'Scatter', props: ['data', 'options'], render: () => null }
 }))
 
 import ReleaseTimeline from '../../client/components/ReleaseTimeline.vue'
@@ -264,16 +272,175 @@ describe('ReleaseTimeline', () => {
     }
   })
 
-  it('visibleDays never exceeds MAX_VISIBLE_DAYS (90)', () => {
+  it('visibleDays never exceeds MAX_VISIBLE_DAYS (180)', () => {
     // Even with releases spanning 6+ months, defaultRange caps at 29 days
-    // and fullRange would be larger, but zoom is capped at 90 days
+    // and fullRange would be larger, but zoom is capped at 180 days
     var releases = [
       makeRelease('rhoai-3.5', { displayName: 'rhoai-3.5', shortname: 'rhoai', ga: '2090-06-17' }),
       makeRelease('rhoai-3.9', { displayName: 'rhoai-3.9', shortname: 'rhoai', ga: '2090-12-17' })
     ]
     var wrapper = mount(ReleaseTimeline, { props: { releases } })
     // Default view is 29 days
-    expect(wrapper.vm.visibleDays).toBeLessThanOrEqual(90)
+    expect(wrapper.vm.visibleDays).toBeLessThanOrEqual(180)
+  })
+
+  describe('auto-fit to focused version', () => {
+    var DAY_MS = 86400000
+    function ts(str) { return new Date(str + 'T00:00:00').getTime() }
+
+    // A released version (all milestones in the past) plus a future release so the
+    // timeline spans today. Today is faked to 2026-08-27.
+    function fitReleases() {
+      return [
+        makeRelease('rhoai-3.5-ea1', {
+          displayName: 'rhoai-3.5.EA1', shortname: 'rhoai',
+          planningFreeze: '2026-05-01', featureFreeze: '2026-06-01',
+          codeFreeze: '2026-06-20', ga: '2026-07-14'
+        }),
+        makeRelease('rhoai-3.6', {
+          displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-11-15'
+        })
+      ]
+    }
+
+    it('fits the view to a focused past version while keeping the today marker in frame', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-08-27T00:00:00'))
+      try {
+        var wrapper = mount(ReleaseTimeline, {
+          props: { releases: fitReleases(), hidePast: false, focusReleaseIds: [] }
+        })
+        // Default today-anchored window does not include the past EA1 milestones.
+        expect(wrapper.vm.isZoomed).toBe(false)
+
+        await wrapper.setProps({ focusReleaseIds: ['rhoai-3.5-ea1'] })
+        await flushPromises()
+
+        expect(wrapper.vm.isZoomed).toBe(true)
+        var r = wrapper.vm.xRange
+        var gaTs = ts('2026-07-14')
+        var planTs = ts('2026-05-01')
+        var todayTs = ts('2026-08-27')
+        // The whole past cluster is visible.
+        expect(planTs).toBeGreaterThanOrEqual(r.min)
+        expect(gaTs).toBeLessThanOrEqual(r.max)
+        // Today is still in view — it's the latest point, anchored near the right edge.
+        expect(todayTs).toBeGreaterThanOrEqual(r.min)
+        expect(todayTs).toBeLessThanOrEqual(r.max)
+        expect(r.max - todayTs).toBeLessThanOrEqual(5 * DAY_MS)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('does not move the view when a focused version already has cards visible', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-08-27T00:00:00'))
+      try {
+        var releases = [
+          makeRelease('rhoai-3.5-ea1', {
+            displayName: 'rhoai-3.5.EA1', shortname: 'rhoai',
+            codeFreeze: '2026-08-20', ga: '2026-08-25' // within the default window
+          }),
+          makeRelease('rhoai-3.6', {
+            displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-11-15'
+          })
+        ]
+        var wrapper = mount(ReleaseTimeline, {
+          props: { releases, hidePast: false, focusReleaseIds: [] }
+        })
+        await wrapper.setProps({ focusReleaseIds: ['rhoai-3.5-ea1'] })
+        await flushPromises()
+        // Cards already visible → no fit.
+        expect(wrapper.vm.isZoomed).toBe(false)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('leaves the view untouched when focus is cleared', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-08-27T00:00:00'))
+      try {
+        var wrapper = mount(ReleaseTimeline, {
+          props: { releases: fitReleases(), hidePast: false, focusReleaseIds: [] }
+        })
+        await wrapper.setProps({ focusReleaseIds: ['rhoai-3.5-ea1'] })
+        await flushPromises()
+        expect(wrapper.vm.isZoomed).toBe(true)
+        var before = wrapper.vm.xRange
+
+        await wrapper.setProps({ focusReleaseIds: [] })
+        await flushPromises()
+        // Deselect leaves the current (fitted) view as-is.
+        expect(wrapper.vm.isZoomed).toBe(true)
+        expect(wrapper.vm.xRange.min).toBe(before.min)
+        expect(wrapper.vm.xRange.max).toBe(before.max)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('does not fit on mount even if focusReleaseIds is provided', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-08-27T00:00:00'))
+      try {
+        var wrapper = mount(ReleaseTimeline, {
+          props: { releases: fitReleases(), hidePast: false, focusReleaseIds: ['rhoai-3.5-ea1'] }
+        })
+        // Flush the microtask queue: were the watcher `immediate`, its nextTick fit
+        // would have run by now. Non-immediate → the default window is preserved.
+        await flushPromises()
+        expect(wrapper.vm.isZoomed).toBe(false)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('fits the view to a focused upcoming version whose milestones are far in the future', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-08-27T00:00:00'))
+      try {
+        // 3.9 is a far-future version: all milestones months past the default window,
+        // off-screen to the RIGHT of "YOU ARE HERE".
+        var releases = [
+          makeRelease('rhoai-3.6', {
+            displayName: 'rhoai-3.6', shortname: 'rhoai', ga: '2026-09-10'
+          }),
+          makeRelease('rhoai-3.9', {
+            displayName: 'rhoai-3.9', shortname: 'rhoai',
+            planningFreeze: '2027-04-01', featureFreeze: '2027-05-01',
+            codeFreeze: '2027-05-20', ga: '2027-06-15'
+          })
+        ]
+        var wrapper = mount(ReleaseTimeline, {
+          props: { releases, hidePast: false, focusReleaseIds: [] }
+        })
+        expect(wrapper.vm.isZoomed).toBe(false)
+        var todayTs = ts('2026-08-27')
+
+        await wrapper.setProps({ focusReleaseIds: ['rhoai-3.9'] })
+        await flushPromises()
+
+        expect(wrapper.vm.isZoomed).toBe(true)
+        var r = wrapper.vm.xRange
+        var gaTs = ts('2027-06-15')
+        var planTs = ts('2027-04-01')
+        // The future cluster is fully in view, GA near the right edge.
+        expect(planTs).toBeGreaterThanOrEqual(r.min)
+        expect(gaTs).toBeGreaterThanOrEqual(r.min)
+        expect(gaTs).toBeLessThanOrEqual(r.max)
+        expect(r.max - gaTs).toBeLessThanOrEqual(5 * DAY_MS)
+        // Today stays in frame even though the version is ~10 months out — the fit
+        // widens the window rather than dropping the "YOU ARE HERE" marker. Today is
+        // the earliest point here, anchored near the left edge.
+        expect(todayTs).toBeGreaterThanOrEqual(r.min)
+        expect(todayTs).toBeLessThanOrEqual(r.max)
+        expect(todayTs - r.min).toBeLessThanOrEqual(10 * DAY_MS)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 
   it('shows zoom hint text when not zoomed', () => {

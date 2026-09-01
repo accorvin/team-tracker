@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { Scatter } from 'vue-chartjs'
 import { Chart as ChartJS, LinearScale, PointElement, Tooltip } from 'chart.js'
 import { parseReleaseName, extractCycle, productLabel } from '../composables/useReleaseFamily.js'
@@ -13,7 +13,11 @@ var FONT = 'Inter var, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFo
 
 const props = defineProps({
   releases: { type: Array, required: true },
-  hidePast: { type: Boolean, default: false }
+  hidePast: { type: Boolean, default: false },
+  // IDs of the release(s) the user just focused (newest selected version, released or upcoming).
+  // When set and none of their milestones are in the current view, the timeline
+  // fits the view to them (GA near the right edge). Empty = no focus.
+  focusReleaseIds: { type: Array, default: function () { return [] } }
 })
 
 var MILESTONE_KEYS = [
@@ -415,7 +419,15 @@ var fullRange = computed(function () {
 
 var DAY_MS = 86400000
 var DEFAULT_WINDOW_DAYS = 29
-var MAX_VISIBLE_DAYS = 90
+// Max manual zoom-out window (scroll wheel / pinch). Wide enough to comfortably
+// take in a whole release cluster (planning freeze through GA) at once. The
+// auto-fit is deliberately NOT bound by this — it must be free to widen the view
+// far enough to keep both the focused version and the today marker on screen.
+var MAX_VISIBLE_DAYS = 180
+// Padding for the auto-fit-to-focused-version window: GA sits FOCUS_FIT_RIGHT_PAD_DAYS
+// from the right edge; earlier milestones get FOCUS_FIT_LEFT_PAD_DAYS of breathing room.
+var FOCUS_FIT_RIGHT_PAD_DAYS = 3
+var FOCUS_FIT_LEFT_PAD_DAYS = 7
 
 function capRange(range, full) {
   var maxSpan = MAX_VISIBLE_DAYS * DAY_MS
@@ -492,6 +504,79 @@ function resetZoom() {
 }
 
 watch(function () { return props.hidePast }, resetZoom)
+
+// ── Auto-fit to a focused (newest selected) version ──
+// Milestone timestamps of the currently-rendered nodes that belong to a focused release.
+function focusTimestamps() {
+  var ids = props.focusReleaseIds
+  if (!ids || !ids.length) return []
+  var idSet = {}
+  for (var i = 0; i < ids.length; i++) idSet[ids[i]] = true
+  var out = []
+  var n = nodes.value
+  for (var j = 0; j < n.length; j++) {
+    var rels = n[j].releases || []
+    var match = false
+    for (var k = 0; k < rels.length; k++) {
+      if (rels[k] && idSet[rels[k].id]) { match = true; break }
+    }
+    if (!match) continue
+    var d = parseDate(n[j].date)
+    if (d) out.push(d.getTime())
+  }
+  return out
+}
+
+// How many of the focused version's milestone cards fall inside the current view.
+function focusVisibleCount() {
+  var ts = focusTimestamps()
+  var r = xRange.value
+  var count = 0
+  for (var i = 0; i < ts.length; i++) {
+    if (ts[i] >= r.min && ts[i] <= r.max) count++
+  }
+  return count
+}
+
+// Fit the view to the focused version's milestones while ALWAYS keeping the
+// "YOU ARE HERE" (today) marker in frame, so the user never loses their bearings.
+// The window spans both the focused cluster and today: for a future version today
+// anchors the left side and GA sits near the right edge; for an already-released
+// version the cluster sits on the left and today anchors the right edge. Because
+// today and a far-off cluster can be more than MAX_VISIBLE_DAYS apart, this fit is
+// NOT width-capped — capping would drop either the version or the today marker.
+function fitToFocus() {
+  var ts = focusTimestamps()
+  if (!ts.length) return
+  ts.sort(function (a, b) { return a - b })
+  var today = new Date()
+  today.setHours(0, 0, 0, 0)
+  var todayTs = today.getTime()
+  var full = fullRange.value
+  var rightPad = FOCUS_FIT_RIGHT_PAD_DAYS * DAY_MS
+  var leftPad = FOCUS_FIT_LEFT_PAD_DAYS * DAY_MS
+  var lo = Math.min(ts[0], todayTs) // earliest of the cluster and today
+  var hi = Math.max(ts[ts.length - 1], todayTs) // latest of GA and today
+  var min = lo - leftPad
+  var max = hi + rightPad
+  if (max > full.max) max = full.max
+  if (min < full.min) min = full.min
+  if (max <= min) return
+  zoomMin.value = min
+  zoomMax.value = max
+}
+
+// When the user focuses a version (released or upcoming) and none of its cards are
+// visible in the current view (default or manually zoomed/panned), fit the view to it.
+// Clearing the focus leaves the current view untouched. Runs after the reactive flush
+// so hidePast / nodes / xRange reflect the new selection first.
+watch(function () { return props.focusReleaseIds.slice().join(',') }, function (val) {
+  if (!val) return
+  nextTick(function () {
+    if (!props.focusReleaseIds.length) return
+    if (focusVisibleCount() === 0) fitToFocus()
+  })
+})
 
 var _chartInstance = null
 

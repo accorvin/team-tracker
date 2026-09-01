@@ -11,7 +11,7 @@ import ScheduleView from '../../client/views/ScheduleView.vue'
 function localDateStr(date) {
   return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0')
 }
-const ReleaseTimelineStub = { template: '<div class="timeline-stub"></div>', props: ['releases'] }
+const ReleaseTimelineStub = { template: '<div class="timeline-stub"></div>', props: ['releases', 'focusReleaseIds'] }
 
 function makeRelease(id, opts = {}) {
   return {
@@ -522,5 +522,121 @@ describe('ScheduleView', () => {
     await clearBtn.trigger('click')
     var timeline = wrapper.findComponent(ReleaseTimelineStub)
     expect(timeline.props('releases').length).toBe(2)
+  })
+
+  it('passes focusReleaseIds to the timeline when the newest selected version is released', async () => {
+    const past = new Date()
+    past.setDate(past.getDate() - 30)
+    const pastStr = localDateStr(past)
+    const future = new Date()
+    future.setDate(future.getDate() + 60)
+    const futureStr = localDateStr(future)
+
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5-ea1', {
+          displayName: '3.5 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: pastStr
+        }),
+        makeRelease('rhoai-3.6-ea1', {
+          displayName: '3.6 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: futureStr
+        })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+
+    const ea1 = wrapper.findAll('button').find(b => b.text().trim() === '3.5 EA1')
+    await ea1.trigger('click')
+    await flushPromises()
+
+    const timeline = wrapper.findComponent(ReleaseTimelineStub)
+    expect(timeline.props('focusReleaseIds')).toEqual(['rhoai-3.5-ea1'])
+  })
+
+  it('passes focusReleaseIds for an upcoming newest selected version too', async () => {
+    const past = new Date()
+    past.setDate(past.getDate() - 30)
+    const pastStr = localDateStr(past)
+    const future = new Date()
+    future.setDate(future.getDate() + 60)
+    const futureStr = localDateStr(future)
+
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5-ea1', {
+          displayName: '3.5 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: pastStr
+        }),
+        makeRelease('rhoai-3.6-ea1', {
+          displayName: '3.6 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: futureStr
+        })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+
+    // Select both: the newest selected version overall (3.6, upcoming) drives the fit —
+    // its future milestones sit off-screen to the right, so the timeline should focus it.
+    const ea1 = wrapper.findAll('button').find(b => b.text().trim() === '3.5 EA1')
+    await ea1.trigger('click')
+    const ea6 = wrapper.findAll('button').find(b => b.text().trim() === '3.6 EA1')
+    await ea6.trigger('click')
+    await flushPromises()
+
+    const timeline = wrapper.findComponent(ReleaseTimelineStub)
+    expect(timeline.props('focusReleaseIds')).toEqual(['rhoai-3.6-ea1'])
+  })
+
+  it('focusReleaseIds is empty when no version is selected', async () => {
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5-ea1', {
+          displayName: '3.5 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: '2020-06-10'
+        }),
+        makeRelease('rhoai-3.6-ea1', {
+          displayName: '3.6 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: '2028-09-15'
+        })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+
+    const timeline = wrapper.findComponent(ReleaseTimelineStub)
+    expect(timeline.props('focusReleaseIds')).toEqual([])
+  })
+
+  it('does not re-fit (clears focusReleaseIds) when the newest selected version is deselected', async () => {
+    const past1 = new Date()
+    past1.setDate(past1.getDate() - 60)
+    const past2 = new Date()
+    past2.setDate(past2.getDate() - 30)
+
+    apiRequest.mockResolvedValue({
+      releases: [
+        makeRelease('rhoai-3.5-ea1', {
+          displayName: '3.5 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: localDateStr(past1)
+        }),
+        makeRelease('rhoai-3.6-ea1', {
+          displayName: '3.6 EA1 RHOAI RELEASE', shortname: 'rhoai', ga: localDateStr(past2)
+        })
+      ]
+    })
+    const wrapper = mount(ScheduleView, { global: { stubs: { ReleaseTimeline: ReleaseTimelineStub } } })
+    await flushPromises()
+
+    // Select both released versions; newest (3.6) drives the focus.
+    const ea1 = wrapper.findAll('button').find(b => b.text().trim() === '3.5 EA1')
+    await ea1.trigger('click')
+    const ea6 = wrapper.findAll('button').find(b => b.text().trim() === '3.6 EA1')
+    await ea6.trigger('click')
+    await flushPromises()
+    const timeline = wrapper.findComponent(ReleaseTimelineStub)
+    expect(timeline.props('focusReleaseIds')).toEqual(['rhoai-3.6-ea1'])
+
+    // Deselect the newest — a deselection must NOT re-fit, even though 3.5 (older,
+    // released) is still selected. Leaves focus empty so the view stays put.
+    const ea6Again = wrapper.findAll('button').find(b => b.text().trim() === '3.6 EA1')
+    await ea6Again.trigger('click')
+    await flushPromises()
+    expect(timeline.props('focusReleaseIds')).toEqual([])
   })
 })

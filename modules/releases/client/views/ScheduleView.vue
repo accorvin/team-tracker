@@ -162,7 +162,7 @@
       </div>
 
       <!-- Release Timeline -->
-      <ReleaseTimeline v-if="allSortedReleases.length" :releases="baseFilteredReleases" :hide-past="hideReleased" />
+      <ReleaseTimeline v-if="allSortedReleases.length" :releases="baseFilteredReleases" :hide-past="hideReleased" :focus-release-ids="focusReleaseIds" />
 
       <!-- Releases table -->
       <div v-if="allSortedReleases.length" class="bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
@@ -219,7 +219,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, watch, onMounted, h } from 'vue'
 import { apiRequest } from '@shared/client/services/api.js'
 import {
   parseDate, daysFromNow, formatShort as formatShortBase,
@@ -382,6 +382,39 @@ const baseFilteredReleases = computed(() => {
     })
   }
   return list
+})
+
+// Release IDs the timeline should auto-fit into view. Populated only when the user
+// ADDS a version to the selection — then it holds the IDs of the newest selected
+// version's releases, whether that version is already released (milestones in the
+// past, off-screen to the left) or still upcoming (milestones in the future,
+// off-screen to the right). Either way the timeline shifts its window to bring the
+// cards into view. A deselection never repopulates it (set to []), so removing a
+// pill leaves the timeline view untouched.
+const focusReleaseIds = ref([])
+
+// IDs of the newest selected version's releases, or [] when nothing is selected.
+function newestSelectionIds() {
+  if (selectedVersions.value.length === 0) return []
+  let newest = null
+  for (let i = 0; i < availableVersions.value.length; i++) {
+    if (selectedVersions.value.indexOf(availableVersions.value[i]) !== -1) {
+      newest = availableVersions.value[i]
+      break
+    }
+  }
+  if (!newest) return []
+  const ids = []
+  for (let j = 0; j < baseFilteredReleases.value.length; j++) {
+    const r = baseFilteredReleases.value[j]
+    if (versionLabel(r) === newest) ids.push(r.id)
+  }
+  return ids
+}
+
+watch(selectedVersions, (curr, prev) => {
+  const added = curr.some(v => !prev || prev.indexOf(v) === -1)
+  focusReleaseIds.value = added ? newestSelectionIds() : []
 })
 
 const filteredReleases = computed(() => {
