@@ -1,7 +1,7 @@
 /**
  * Unit tests for PM Hub canonical Component Release Load grouping.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const {
   canonicalToLoadRow,
@@ -28,6 +28,17 @@ function feature(overrides) {
 }
 
 describe('canonical-load', function() {
+  // Freeze-date classification compares against "now". Pin the clock so tests
+  // that assert past-vs-future planning-freeze dates stay deterministic
+  // regardless of the calendar date the suite runs on.
+  beforeEach(function() {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-15T00:00:00Z'))
+  })
+  afterEach(function() {
+    vi.useRealTimers()
+  })
+
   it('maps canonical feature to load row', function() {
     var row = canonicalToLoadRow(feature({
       deliveryOwner: 'Alice',

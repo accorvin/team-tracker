@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const {
   normVer,
@@ -395,6 +395,17 @@ describe('extractProduct', () => {
 // ---------------------------------------------------------------------------
 
 describe('isReleaseFrozen', () => {
+  // isReleaseFrozen compares freeze/GA dates against "now". Pin the clock so the
+  // "past" (2026-06-01) / "future" (2026-09-01) fixtures stay deterministic
+  // regardless of the calendar date the suite runs on.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-15T00:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns true when planning freeze is in the past', () => {
     const releaseDates = {
       'rhoai-3.5': { planningFreezeDate: '2026-06-01', dueDate: '2026-08-01' },
@@ -448,6 +459,16 @@ describe('isReleaseFrozen', () => {
 // ---------------------------------------------------------------------------
 
 describe('categoryForLaterFixVersion', () => {
+  // Depends on isReleaseFrozen, which compares against "now". Pin the clock so
+  // the "past"/"future" freeze fixtures stay deterministic across run dates.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-15T00:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns after_requested when Fix Version freeze has not passed', () => {
     const releaseDates = {
       'rhoai-3.6': { planningFreezeDate: '2026-09-01' },
