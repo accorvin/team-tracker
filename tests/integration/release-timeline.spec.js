@@ -371,4 +371,64 @@ test.describe('Release Timeline @release-timeline @releases', () => {
 
     expect(page.errors).toHaveLength(0);
   });
+
+  // Auto-fit: selecting a version whose milestones all sit off-screen — a released
+  // version to the LEFT of "YOU ARE HERE", or a far-future version to the RIGHT —
+  // shifts the timeline window so its cards become visible. The window shift sets a
+  // zoom override, which surfaces "Reset zoom". Version pills render most-recent-first,
+  // so the LAST pill is the oldest (released, milestones well before the default
+  // today-anchored window) and the FIRST pill is the newest (in the fixtures an
+  // upcoming version whose milestones fall after the default window).
+  test('selecting a released version auto-fits the timeline into view', async ({ page }) => {
+    await page.goto('/#/releases/schedule');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Default view is not zoomed → no Reset zoom button yet.
+    var resetBtn = page.locator('text=Reset zoom');
+    await expect(resetBtn).toHaveCount(0);
+
+    var versionPills = page.locator('button').filter({ hasText: /^\d+\.\d+\s+(EA\d+|GA)$/ });
+    var pillCount = await versionPills.count();
+    expect(pillCount).toBeGreaterThan(0);
+
+    // Oldest version pill = released, milestones off-screen → should trigger a fit.
+    await versionPills.nth(pillCount - 1).click();
+    await page.waitForTimeout(800);
+
+    // The auto-fit set a zoom window, so the reset control appears.
+    await expect(resetBtn).toBeVisible();
+
+    // The "YOU ARE HERE" marker must remain in frame after the fit.
+    await expect(page.locator('.animate-ping')).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
+
+  test('selecting an upcoming version auto-fits the timeline into view', async ({ page }) => {
+    await page.goto('/#/releases/schedule');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // Default view is not zoomed → no Reset zoom button yet.
+    var resetBtn = page.locator('text=Reset zoom');
+    await expect(resetBtn).toHaveCount(0);
+
+    var versionPills = page.locator('button').filter({ hasText: /^\d+\.\d+\s+(EA\d+|GA)$/ });
+    var pillCount = await versionPills.count();
+    expect(pillCount).toBeGreaterThan(0);
+
+    // Newest version pill = upcoming in the fixtures, with milestones after the default
+    // window (off-screen to the right) → the timeline shifts forward to bring them in.
+    await versionPills.first().click();
+    await page.waitForTimeout(800);
+
+    // The auto-fit set a zoom window, so the reset control appears.
+    await expect(resetBtn).toBeVisible();
+
+    // The "YOU ARE HERE" marker must remain in frame after the fit.
+    await expect(page.locator('.animate-ping')).toBeVisible();
+
+    expect(page.errors).toHaveLength(0);
+  });
 });
