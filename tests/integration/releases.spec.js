@@ -1920,3 +1920,116 @@ test.describe('Releases AI Planner tab @releases', () => {
     expect(errors).toHaveLength(0);
   });
 });
+
+/**
+ * Execute-page version deep-link
+ *
+ * The Feature Execution workspace honors a `?version=` route param so
+ * timeline cards (and shared links) can open a specific release pre-selected.
+ * See ~/.claude/plans/releases-timeline-execute-deeplink.md (RHOAIENG-82037).
+ */
+test.describe('Releases Execute deep-link @releases', () => {
+  test.beforeEach(async ({ page }) => {
+    setupErrorTracking(page);
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    logCapturedErrors(page, testInfo);
+  });
+
+  test('?version= pre-selects the matching version pill', async ({ page }) => {
+    // Discover a real pill label from the rendered demo data (do not hardcode).
+    await page.goto('/#/releases/execute');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const pills = page.locator('button').filter({ hasText: /^\d+\.\d+(\.EA\d+)?$/ });
+    const count = await pills.count();
+    expect(count).toBeGreaterThan(0);
+
+    // Pick the last pill so the deep-link selects something other than the
+    // default (first) version — proving the param overrides the default.
+    const label = (await pills.nth(count - 1).textContent()).trim();
+
+    await page.goto('/#/releases/execute?version=' + encodeURIComponent(label));
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // The active pill uses the CHIP_ACTIVE class set (border-primary-600) in
+    // ExecuteWorkspaceView; idle pills use border-gray-300.
+    const activePill = page.getByTestId('execute-version-' + label);
+    await expect(activePill).toHaveClass(/border-primary-600/);
+
+    // Demo Execute pages log expected 401/403/404 resource loads (missing
+    // field-options fixtures, hygiene/config requiring planning-manager); ignore
+    // those and assert only on unexpected errors, as the other Execute tests do.
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
+  });
+
+  test('?products= pre-selects only the matching product', async ({ page }) => {
+    // Discover a real version that has more than one product so we can prove the
+    // product param narrows the selection rather than defaulting to all.
+    const res = await page.request.get('/api/modules/releases/execution/tracking/versions');
+    expect(res.ok()).toBeTruthy();
+    const body = await res.json();
+    const row = (body.versions || []).find((v) => v.products && v.products.length > 1);
+    expect(row).toBeTruthy();
+    const version = row.version;
+    const product = row.products[0];
+    const others = row.products.filter((p) => p !== product);
+
+    await page.goto('/#/releases/execute?version=' + encodeURIComponent(version) +
+      '&products=' + encodeURIComponent(product));
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    // The version pill is active.
+    await expect(page.getByTestId('execute-version-' + version)).toHaveClass(/border-primary-600/);
+
+    // The product param is honored: persistSelection writes the single selected
+    // product back to the URL, and none of the version's other products appear —
+    // proving it was not reconciled to "all products".
+    expect(page.url()).toContain('products=' + encodeURIComponent(product));
+    for (const other of others) {
+      expect(page.url()).not.toContain(other);
+    }
+
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
+  });
+
+  test('post-mount hash change re-selects the version and its product', async ({ page }) => {
+    // Mount the Execute workspace on its default selection first.
+    await page.goto('/#/releases/execute');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const res = await page.request.get('/api/modules/releases/execution/tracking/versions');
+    expect(res.ok()).toBeTruthy();
+    const body = await res.json();
+    const versions = body.versions || [];
+    const defaultVersion = versions[0] && versions[0].version;
+    // Pick a version different from the mount default (so the watcher's
+    // version-changed guard fires) that also has more than one product.
+    const target = versions.find(
+      (v) => v.version !== defaultVersion && v.products && v.products.length > 1
+    );
+    expect(target).toBeTruthy();
+    const product = target.products[0];
+    const others = target.products.filter((p) => p !== product);
+
+    // Change only the hash (no full navigation) — exercises the ExecuteWorkspaceView
+    // post-mount watcher rather than the mount-time restoreSelection path.
+    await page.evaluate((h) => { window.location.hash = h; },
+      '#/releases/execute?version=' + encodeURIComponent(target.version) +
+      '&products=' + encodeURIComponent(product) + '&view=board&tab=board');
+    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    await expect(page.getByTestId('execute-version-' + target.version)).toHaveClass(/border-primary-600/);
+    expect(page.url()).toContain('products=' + encodeURIComponent(product));
+    for (const other of others) {
+      expect(page.url()).not.toContain(other);
+    }
+
+    expect(unexpectedDemoResourceErrors(page)).toHaveLength(0);
+  });
+});

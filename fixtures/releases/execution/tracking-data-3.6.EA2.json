@@ -1,18 +1,18 @@
 {
-  "portfolioVersion": "3.5",
-  "planningFreezeDate": "2026-06-24",
+  "portfolioVersion": "3.6.EA2",
+  "planningFreezeDate": "2026-08-26",
   "fetchedAt": "2099-01-01T00:00:00.000Z",
   "totalUniqueFeatures": 7,
   "groups": [
     {
-      "label": "RHOAI: rhoai-3.5",
+      "label": "RHOAI: rhoai-3.6.EA2",
       "product": "rhoai",
-      "releaseNumber": "rhoai-3.5",
-      "planningFreezeDate": "2026-06-24",
+      "releaseNumber": "rhoai-3.6.EA2",
+      "planningFreezeDate": "2026-08-26",
       "featureCount": 3,
       "features": [
         {
-          "key": "TEST1-3200",
+          "key": "TEST1-3400",
           "summary": "Enable model serving autoscaling",
           "issueType": "Feature",
           "colorStatus": "Green",
@@ -30,7 +30,7 @@
           "fixVersionRemovedAt": null
         },
         {
-          "key": "TEST1-3201",
+          "key": "TEST1-3401",
           "summary": "Implement RAG pipeline improvements",
           "issueType": "Feature",
           "colorStatus": "Yellow",
@@ -48,7 +48,7 @@
           "fixVersionRemovedAt": null
         },
         {
-          "key": "TEST1-3202",
+          "key": "TEST1-3402",
           "summary": "Add GPU monitoring dashboard",
           "issueType": "Feature",
           "colorStatus": "Green",
@@ -68,14 +68,14 @@
       ]
     },
     {
-      "label": "RHELAI: rhelai-3.5",
+      "label": "RHELAI: rhelai-3.6.EA2",
       "product": "rhelai",
-      "releaseNumber": "rhelai-3.5",
-      "planningFreezeDate": "2026-06-24",
+      "releaseNumber": "rhelai-3.6.EA2",
+      "planningFreezeDate": "2026-08-26",
       "featureCount": 2,
       "features": [
         {
-          "key": "TEST1-3220",
+          "key": "TEST1-3420",
           "summary": "vLLM performance optimization",
           "issueType": "Feature",
           "colorStatus": "Green",
@@ -93,7 +93,7 @@
           "fixVersionRemovedAt": null
         },
         {
-          "key": "TEST1-3221",
+          "key": "TEST1-3421",
           "summary": "Support multi-GPU inference",
           "issueType": "Feature",
           "colorStatus": "Red",
@@ -113,14 +113,14 @@
       ]
     },
     {
-      "label": "RHAII: rhaii-3.5",
+      "label": "RHAII: rhaii-3.6.EA2",
       "product": "rhaii",
-      "releaseNumber": "rhaii-3.5",
-      "planningFreezeDate": "2026-06-24",
+      "releaseNumber": "rhaii-3.6.EA2",
+      "planningFreezeDate": "2026-08-26",
       "featureCount": 2,
       "features": [
         {
-          "key": "TEST1-3240",
+          "key": "TEST1-3440",
           "summary": "Harden inference gateway auth",
           "issueType": "Feature",
           "colorStatus": "Green",
@@ -138,7 +138,7 @@
           "fixVersionRemovedAt": null
         },
         {
-          "key": "TEST1-3241",
+          "key": "TEST1-3441",
           "summary": "Ship air-gapped install bundle",
           "issueType": "Feature",
           "colorStatus": "Yellow",

@@ -1,16 +1,52 @@
 {
   "releases": {
-    "2.15": {
+    "3.5.EA1": {
+      "products": {
+        "rhoai": "rhoai-3.5.EA1",
+        "rhelai": "rhelai-3.5.EA1",
+        "rhaii": "rhaii-3.5.EA1"
+      },
+      "planningFreezeOverride": "2026-04-17"
+    },
+    "3.5.EA2": {
+      "products": {
+        "rhoai": "rhoai-3.5.EA2",
+        "rhelai": "rhelai-3.5.EA2",
+        "rhaii": "rhaii-3.5.EA2"
+      },
+      "planningFreezeOverride": "2026-05-15"
+    },
+    "3.5": {
       "products": {
         "rhoai": "rhoai-3.5",
-        "rhelai": "rhelai-3.5"
+        "rhelai": "rhelai-3.5",
+        "rhaii": "rhaii-3.5"
       },
-      "planningFreezeOverride": "2026-06-15"
+      "planningFreezeOverride": "2026-06-24"
     },
-    "2.14": {
+    "3.6.EA1": {
       "products": {
-        "rhoai": "rhoai-2.14"
-      }
+        "rhoai": "rhoai-3.6.EA1",
+        "rhelai": "rhelai-3.6.EA1",
+        "rhaii": "rhaii-3.6.EA1"
+      },
+      "planningFreezeOverride": "2026-07-29"
+    },
+    "3.6.EA2": {
+      "products": {
+        "rhoai": "rhoai-3.6.EA2",
+        "rhelai": "rhelai-3.6.EA2",
+        "rhaii": "rhaii-3.6.EA2"
+      },
+      "planningFreezeOverride": "2026-08-26"
+    },
+    "3.6": {
+      "products": {
+        "rhoai": "rhoai-3.6",
+        "rhelai": "rhelai-3.6",
+        "rhaii": "rhaii-3.6"
+      },
+      "planningFreezeOverride": "2026-09-23"
     }
   }
 }
