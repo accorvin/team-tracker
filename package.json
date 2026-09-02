@@ -57,7 +57,7 @@
     "globals": "^17.11.0",
     "husky": "^9.1.7",
     "jsdom": "^30.0.1",
-    "lint-staged": "^17.3.0",
+    "lint-staged": "^17.4.1",
     "postcss": "^8.5.26",
     "puppeteer": "^25.8.0",
     "tailwindcss": "^4.3.3",
