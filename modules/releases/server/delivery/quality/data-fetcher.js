@@ -106,9 +106,10 @@ async function fetchBugs(project, versions, { jiraFetchAll } = {}) {
 
 /**
  * Fetch total bug count per version by querying all bugs across projects
- * and counting locally. Equivalent to: issuetype = Bug AND affectedVersion = "x"
+ * and counting locally. Only counts bugs created on or after the version's
+ * release date to stay consistent with the cumulative chart (post-release defects).
  * @param {string[]} projects - Jira project keys
- * @param {Array} versions - Version objects with name field
+ * @param {Array} versions - Version objects with name and releaseDate fields
  * @param {Object} [options]
  * @param {Function} [options.jiraFetchAll] - Injectable fetchAllJqlResults for testing
  * @returns {Promise<Map<string, number>>} - Map of version name to total bug count
@@ -116,19 +117,26 @@ async function fetchBugs(project, versions, { jiraFetchAll } = {}) {
 async function fetchBugCounts(projects, versions, { jiraFetchAll } = {}) {
   const fetchAll = jiraFetchAll || jira.fetchAllJqlResults;
   const counts = new Map();
+  const versionReleaseMap = new Map();
   for (const v of versions) {
     counts.set(v.name, 0);
+    if (v.releaseDate) {
+      versionReleaseMap.set(v.name, new Date(v.releaseDate).getTime());
+    }
   }
 
   for (const project of projects) {
     try {
       const jql = `project = ${project} AND issuetype = Bug AND affectedVersion is not EMPTY AND created >= -730d`;
-      const issues = await fetchAll(jira.jiraRequest, jql, 'versions');
+      const issues = await fetchAll(jira.jiraRequest, jql, 'versions,created');
 
       for (const issue of issues) {
         const affectedVersions = (issue.fields.versions || []).map(v => v.name);
+        const createdMs = new Date(issue.fields.created).getTime();
         for (const vName of affectedVersions) {
-          if (counts.has(vName)) {
+          if (!counts.has(vName)) continue;
+          const releaseDateMs = versionReleaseMap.get(vName);
+          if (releaseDateMs && createdMs >= releaseDateMs) {
             counts.set(vName, counts.get(vName) + 1);
           }
         }

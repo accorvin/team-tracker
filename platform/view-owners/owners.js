@@ -110,7 +110,7 @@ export const viewOwners = {
   'releases/plan/bu-feedback':                     'Saiesh Prabhu',
   'releases/plan/feature-readiness':               'Erle Marion',
   'releases/plan/outcomes':                        'Erle Marion',
-  'releases/plan/pm-hub':                          'Yuval Luria',
+  'releases/plan/pm-hub':                          'yuvalluria',
 
   // releases > registry
   'releases/registry/hygiene':                     'Alex Corvin',
@@ -138,7 +138,6 @@ export const viewOwners = {
   'releases/reports/tv-fv-delta':                  'Dimitri Saridakis',
 
   // team-tracker > reports
-  'team-tracker/reports/allocation':               'Alex Corvin',
   'team-tracker/reports/team-comparison':          'Alex Corvin',
   'team-tracker/reports/trends':                   'Alex Corvin',
 }
