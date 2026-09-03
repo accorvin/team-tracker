@@ -285,35 +285,58 @@ describe('fetchBugCounts', () => {
     { name: 'rhoai-3.4', releaseDate: '2026-03-20', project: 'RHOAIENG' }
   ]
 
-  it('queries Jira per project and counts bugs by affected version', async () => {
+  it('queries Jira per project and counts only post-release bugs by affected version', async () => {
     const mockFetchAll = vi.fn()
       .mockResolvedValueOnce([
-        { key: 'RHOAIENG-1', fields: { versions: [{ name: 'rhoai-3.3' }] } },
-        { key: 'RHOAIENG-2', fields: { versions: [{ name: 'rhoai-3.3' }, { name: 'rhoai-3.4' }] } },
-        { key: 'RHOAIENG-3', fields: { versions: [{ name: 'rhoai-3.4' }] } }
+        // Post-release for rhoai-3.3 (released 2026-01-15)
+        { key: 'RHOAIENG-1', fields: { versions: [{ name: 'rhoai-3.3' }], created: '2026-01-17T10:00:00.000Z' } },
+        // Post-release for both versions
+        { key: 'RHOAIENG-2', fields: { versions: [{ name: 'rhoai-3.3' }, { name: 'rhoai-3.4' }], created: '2026-03-22T10:00:00.000Z' } },
+        // Post-release for rhoai-3.4 (released 2026-03-20)
+        { key: 'RHOAIENG-3', fields: { versions: [{ name: 'rhoai-3.4' }], created: '2026-03-25T10:00:00.000Z' } }
       ])
       .mockResolvedValueOnce([
-        { key: 'AIPCC-1', fields: { versions: [{ name: 'rhoai-3.3' }] } }
+        // Post-release for rhoai-3.3
+        { key: 'AIPCC-1', fields: { versions: [{ name: 'rhoai-3.3' }], created: '2026-01-20T10:00:00.000Z' } }
       ])
 
     const counts = await fetchBugCounts(['RHOAIENG', 'AIPCC'], mockVersions, { jiraFetchAll: mockFetchAll })
 
     expect(mockFetchAll).toHaveBeenCalledTimes(2)
 
-    const [, jql1] = mockFetchAll.mock.calls[0]
+    const [, jql1, fields1] = mockFetchAll.mock.calls[0]
     expect(jql1).toContain('project = RHOAIENG')
     expect(jql1).toContain('issuetype = Bug')
     expect(jql1).toContain('affectedVersion is not EMPTY')
+    expect(fields1).toContain('created')
 
     expect(counts.get('rhoai-3.3')).toBe(3)
     expect(counts.get('rhoai-3.4')).toBe(2)
+  })
+
+  it('excludes bugs created before the version release date', async () => {
+    const mockFetchAll = vi.fn().mockResolvedValue([
+      // Pre-release bug for rhoai-3.3 (released 2026-01-15)
+      { key: 'RHOAIENG-1', fields: { versions: [{ name: 'rhoai-3.3' }], created: '2026-01-10T10:00:00.000Z' } },
+      // Post-release bug for rhoai-3.3
+      { key: 'RHOAIENG-2', fields: { versions: [{ name: 'rhoai-3.3' }], created: '2026-01-17T10:00:00.000Z' } },
+      // Pre-release bug for rhoai-3.4 but post-release for rhoai-3.3
+      { key: 'RHOAIENG-3', fields: { versions: [{ name: 'rhoai-3.3' }, { name: 'rhoai-3.4' }], created: '2026-02-01T10:00:00.000Z' } }
+    ])
+
+    const counts = await fetchBugCounts(['RHOAIENG'], mockVersions, { jiraFetchAll: mockFetchAll })
+
+    // rhoai-3.3: RHOAIENG-2 (post-release) + RHOAIENG-3 (post-release) = 2
+    expect(counts.get('rhoai-3.3')).toBe(2)
+    // rhoai-3.4: RHOAIENG-3 is pre-release (created 2026-02-01 < released 2026-03-20) = 0
+    expect(counts.get('rhoai-3.4')).toBe(0)
   })
 
   it('returns 0 for projects that fail to fetch', async () => {
     const mockFetchAll = vi.fn()
       .mockRejectedValueOnce(new Error('Jira timeout'))
       .mockResolvedValueOnce([
-        { key: 'AIPCC-1', fields: { versions: [{ name: 'rhoai-3.3' }] } }
+        { key: 'AIPCC-1', fields: { versions: [{ name: 'rhoai-3.3' }], created: '2026-01-20T10:00:00.000Z' } }
       ])
 
     const counts = await fetchBugCounts(['RHOAIENG', 'AIPCC'], mockVersions, { jiraFetchAll: mockFetchAll })
@@ -324,8 +347,8 @@ describe('fetchBugCounts', () => {
 
   it('ignores affected versions not in the versions list', async () => {
     const mockFetchAll = vi.fn().mockResolvedValue([
-      { key: 'RHOAIENG-1', fields: { versions: [{ name: 'rhoai-99.0' }] } },
-      { key: 'RHOAIENG-2', fields: { versions: [{ name: 'rhoai-3.3' }] } }
+      { key: 'RHOAIENG-1', fields: { versions: [{ name: 'rhoai-99.0' }], created: '2026-01-20T10:00:00.000Z' } },
+      { key: 'RHOAIENG-2', fields: { versions: [{ name: 'rhoai-3.3' }], created: '2026-01-20T10:00:00.000Z' } }
     ])
 
     const counts = await fetchBugCounts(['RHOAIENG'], mockVersions, { jiraFetchAll: mockFetchAll })
