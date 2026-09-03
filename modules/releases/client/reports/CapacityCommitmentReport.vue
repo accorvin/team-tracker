@@ -1152,8 +1152,8 @@ async function fetchFieldOptions() {
     ])
     knownComponents.value = components.values || []
     knownTeams.value = teams.values || []
-  } catch (e) {
-    error.value = e.message || 'Failed to load field options'
+  } catch {
+    // Field options are non-fatal — fall back to values found in loaded features.
   }
 }
 
