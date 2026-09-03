@@ -2336,19 +2336,22 @@ version string (spaces and special chars replaced with `_`).
     "code_freeze_date": "2026-02-24",
     "build_milestones": [
       {
-        "name": "RC1",
+        "name": "RC1 Builds Testing",
+        "epic_key": "RHOAIENG-68791",
         "build_complete_date": "2026-03-03",
         "days_since_code_freeze": 5
       },
       {
-        "name": "RC2",
+        "name": "RC2 Builds Testing",
+        "epic_key": "RHOAIENG-68813",
         "build_complete_date": "2026-03-17",
         "days_since_code_freeze": 15
       }
     ],
     "test_execution_timelines": [
       {
-        "phase": "RC1",
+        "phase": "RC1 Builds Testing",
+        "epic_key": "RHOAIENG-68791",
         "build_ready_date": "2026-03-03",
         "test_started_date": "2026-03-04",
         "days_to_test_started": 1,
@@ -2362,7 +2365,8 @@ version string (spaces and special chars replaced with `_`).
         "days_to_blockers_resolved": 7
       },
       {
-        "phase": "RC2",
+        "phase": "RC2 Builds Testing",
+        "epic_key": "RHOAIENG-68813",
         "build_ready_date": "2026-03-17",
         "test_started_date": "2026-03-18",
         "days_to_test_started": 1,
@@ -2384,10 +2388,12 @@ version string (spaces and special chars replaced with `_`).
 | Field | Type | Description |
 |-------|------|-------------|
 | `release_cycle_metrics.code_freeze_date` | `string \| null` | `YYYY-MM-DD` from Product Pages |
-| `release_cycle_metrics.build_milestones[].name` | `string` | `"RC1"` or `"RC2"` |
+| `release_cycle_metrics.build_milestones[].name` | `string` | Test-phase Epic summary from Jira (e.g. `"RC1 Builds Testing"`, `"Nightly Build Wk2 - Jun 22"`) |
+| `release_cycle_metrics.build_milestones[].epic_key` | `string` | Jira Epic key (e.g. `"RHOAIENG-68791"`) |
 | `release_cycle_metrics.build_milestones[].build_complete_date` | `string \| null` | `YYYY-MM-DD`; source: PP schedule task matching the RC label, or Jira epic Done date |
 | `release_cycle_metrics.build_milestones[].days_since_code_freeze` | `number \| null` | Working days (Mon–Fri) between `code_freeze_date` and `build_complete_date`; `null` if either is unknown |
-| `release_cycle_metrics.test_execution_timelines[].phase` | `string` | `"RC1"` or `"RC2"` |
+| `release_cycle_metrics.test_execution_timelines[].phase` | `string` | Test-phase Epic summary from Jira (e.g. `"RC1 Builds Testing"`, `"Nightly Build Wk2 - Jun 22"`) |
+| `release_cycle_metrics.test_execution_timelines[].epic_key` | `string` | Jira Epic key (e.g. `"RHOAIENG-68791"`) |
 | `release_cycle_metrics.test_execution_timelines[].build_ready_date` | `string \| null` | Same as `build_milestones` entry for this phase |
 | `release_cycle_metrics.test_execution_timelines[].test_started_date` | `string \| null` | Jira test-phase epic first became active (proxy: `updated` timestamp) |
 | `release_cycle_metrics.test_execution_timelines[].days_to_test_started` | `number \| null` | Working days from `build_ready_date` to `test_started_date` |
