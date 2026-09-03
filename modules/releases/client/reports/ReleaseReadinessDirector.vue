@@ -239,7 +239,7 @@
               </div>
               <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-500 dark:text-gray-400">Phase:</span>
-                <div class="flex gap-1">
+                <div class="flex flex-wrap gap-1">
                   <button
                     v-for="phase in availablePhases"
                     :key="phase"
@@ -477,52 +477,32 @@
 
           <!-- Test Execution Timelines -->
           <div v-if="releaseCycleMetrics.test_execution_timelines?.length">
-            <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Test Execution Timelines — working days since build ready</p>
-            <div class="space-y-4">
-              <div v-for="timeline in releaseCycleMetrics.test_execution_timelines" :key="timeline.phase">
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide">{{ timeline.phase }}</span>
-                  <span class="text-xs text-gray-400">build ready: {{ formatMetricDate(timeline.build_ready_date) }}</span>
-                </div>
-                <div class="overflow-x-auto">
-                  <table class="w-full text-xs border-collapse">
-                    <thead>
-                      <tr class="bg-gray-50 dark:bg-gray-900">
-                        <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Milestone</th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Date</th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Working Days from Build Ready</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
-                        <td class="px-3 py-2 text-gray-700 dark:text-gray-300">Test Run Started</td>
-                        <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ formatMetricDate(timeline.test_started_date) }}</td>
-                        <td class="px-3 py-2" :class="daysClass(timeline.days_to_test_started, 3, 7)">{{ daysLabel(timeline.days_to_test_started) }}</td>
-                      </tr>
-                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
-                        <td class="px-3 py-2 text-gray-700 dark:text-gray-300">Test Run Finished</td>
-                        <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ formatMetricDate(timeline.test_finished_date) }}</td>
-                        <td class="px-3 py-2" :class="daysClass(timeline.days_to_test_finished, 8, 15)">{{ daysLabel(timeline.days_to_test_finished) }}</td>
-                      </tr>
-                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
-                        <td class="px-3 py-2 text-gray-700 dark:text-gray-300">All TFAs Passed to Teams</td>
-                        <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ formatMetricDate(timeline.tfas_passed_date) }}</td>
-                        <td class="px-3 py-2" :class="daysClass(timeline.days_to_tfas_passed, 3, 7)">{{ daysLabel(timeline.days_to_tfas_passed) }}</td>
-                      </tr>
-                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
-                        <td class="px-3 py-2 text-gray-700 dark:text-gray-300">All TFAs Fully Triaged</td>
-                        <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ formatMetricDate(timeline.tfas_triaged_date) }}</td>
-                        <td class="px-3 py-2" :class="daysClass(timeline.days_to_tfas_triaged, 5, 10)">{{ daysLabel(timeline.days_to_tfas_triaged) }}</td>
-                      </tr>
-                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
-                        <td class="px-3 py-2 text-gray-700 dark:text-gray-300">All Blocker Bugs Resolved</td>
-                        <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ formatMetricDate(timeline.blockers_resolved_date) }}</td>
-                        <td class="px-3 py-2" :class="daysClass(timeline.days_to_blockers_resolved, 5, 12)">{{ daysLabel(timeline.days_to_blockers_resolved) }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+            <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Test Execution Timelines — working days since build complete</p>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs border-collapse">
+                <thead>
+                  <tr class="bg-gray-50 dark:bg-gray-900">
+                    <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Phase</th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Build Complete</th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Test Started</th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Test Finished</th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">TFAs Passed</th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">TFAs Triaged</th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Blockers Resolved</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                  <tr v-for="timeline in releaseCycleMetrics.test_execution_timelines" :key="timeline.epic_key || timeline.phase" class="hover:bg-gray-50 dark:hover:bg-gray-750">
+                    <td class="px-3 py-2 font-medium text-gray-800 dark:text-gray-200">{{ timeline.phase }}</td>
+                    <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ formatMetricDate(timeline.build_ready_date) }}</td>
+                    <td class="px-3 py-2" :class="daysClass(timeline.days_to_test_started, 3, 7)">{{ formatMetricDate(timeline.test_started_date) }} {{ daysLabel(timeline.days_to_test_started) }}</td>
+                    <td class="px-3 py-2" :class="daysClass(timeline.days_to_test_finished, 8, 15)">{{ formatMetricDate(timeline.test_finished_date) }} {{ daysLabel(timeline.days_to_test_finished) }}</td>
+                    <td class="px-3 py-2" :class="daysClass(timeline.days_to_tfas_passed, 3, 7)">{{ formatMetricDate(timeline.tfas_passed_date) }} {{ daysLabel(timeline.days_to_tfas_passed) }}</td>
+                    <td class="px-3 py-2" :class="daysClass(timeline.days_to_tfas_triaged, 5, 10)">{{ formatMetricDate(timeline.tfas_triaged_date) }} {{ daysLabel(timeline.days_to_tfas_triaged) }}</td>
+                    <td class="px-3 py-2" :class="daysClass(timeline.days_to_blockers_resolved, 5, 12)">{{ formatMetricDate(timeline.blockers_resolved_date) }} {{ daysLabel(timeline.days_to_blockers_resolved) }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -560,7 +540,7 @@ onMounted(async () => {
     await loadMetrics(initial)
     if (data.value && data.value.component_readiness) {
       selectedComponents.value = [...(data.value.component_readiness.all_components || [])]
-      selectedPhases.value = [...(data.value.component_readiness.phases || []).map(p => p.phase)]
+      selectedPhases.value = [...availablePhases.value]
     }
   }
 })
@@ -574,7 +554,7 @@ async function handleVersionChange() {
     await loadMetrics(selectedVersion.value)
     if (data.value && data.value.component_readiness) {
       selectedComponents.value = [...(data.value.component_readiness.all_components || [])]
-      selectedPhases.value = [...(data.value.component_readiness.phases || []).map(p => p.phase)]
+      selectedPhases.value = [...availablePhases.value]
     }
   }
 }
@@ -672,18 +652,15 @@ const testSignOffRag = computed(() => {
 
 const availablePhases = computed(() => {
   if (!data.value || !data.value.component_readiness) return []
-  return data.value.component_readiness.phases.map(p => p.phase)
+  return data.value.component_readiness.phases.map(phase => phase.phase)
 })
 
 const selectedPhases = ref([])
 
 function togglePhaseFilter(phase) {
-  const idx = selectedPhases.value.indexOf(phase)
-  if (idx >= 0) {
-    selectedPhases.value.splice(idx, 1)
-  } else {
-    selectedPhases.value.push(phase)
-  }
+  const index = selectedPhases.value.indexOf(phase)
+  if (index >= 0) selectedPhases.value.splice(index, 1)
+  else selectedPhases.value.push(phase)
 }
 
 const readinessPhases = computed(() => {
@@ -693,7 +670,7 @@ const readinessPhases = computed(() => {
 
 const visiblePhases = computed(() => {
   if (!readinessPhases.value.length || !selectedPhases.value.length) return []
-  return readinessPhases.value.filter(p => selectedPhases.value.includes(p.phase))
+  return readinessPhases.value.filter(phase => selectedPhases.value.includes(phase.phase))
 })
 
 // --- TFA progress helpers ---
@@ -812,7 +789,7 @@ function filteredPhaseTiles(phase) {
   if (!selectedComponents.value.length || selectedComponents.value.length === allComponents.value.length) {
     return phase.tiles
   }
-  return phase.tiles.filter(t => selectedComponents.value.includes(t.component))
+  return phase.tiles.filter(tile => selectedComponents.value.includes(tile.component))
 }
 
 function componentStatusClass(comp) {
