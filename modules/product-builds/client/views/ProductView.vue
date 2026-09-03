@@ -9,10 +9,10 @@ import TestsSummary from '../components/TestsSummary.vue'
 import PersistentSearchBar from '../components/PersistentSearchBar.vue'
 
 const PRODUCT_CONFIGS = {
-  'rhaiis':            { key: 'rhaiis',        artifactType: 'containers' },
-  'rhel-ai':           { key: 'rhel-ai',       artifactType: 'containers' },
-  'base-images':       { key: 'base-images',   artifactType: 'containers' },
-  'builder-images':    { key: 'builder-images', artifactType: 'containers' },
+  'rhaiis':            { key: 'rhaiis',        artifactType: 'containers',  hasSeriesTimeline: true },
+  'rhel-ai':           { key: 'rhel-ai',       artifactType: 'containers',  hasSeriesTimeline: true },
+  'base-images':       { key: 'base-images',   artifactType: 'base-images', hasSeriesTimeline: true },
+  'builder-images':    { key: 'builder-images', artifactType: 'containers',  hasSeriesTimeline: true },
   'wheel-collections': { key: 'rhai',          artifactType: 'wheels-collections', label: 'Wheel Collections' },
 }
 function getConfigFromHash() {
@@ -34,13 +34,14 @@ const selectedSeries = ref('')
 const productConfig = ref(getConfigFromHash())
 const productKey = computed(() => productConfig.value.key)
 const artifactTypeFilter = computed(() => productConfig.value.artifactType)
+const dropArtifactTypeFilter = computed(() => productKey.value === 'base-images' ? undefined : artifactTypeFilter.value)
 
 async function load() {
   activeTab.value = 'series'
   selectedSeries.value = ''
   resetArtifacts()
   artifactOffset.value = 0
-  const filters = { limit: 1000, artifact_type: artifactTypeFilter.value }
+  const filters = { limit: 1000, artifact_type: dropArtifactTypeFilter.value }
   await Promise.all([
     loadProduct(productKey.value),
     loadDrops(productKey.value, filters),
@@ -64,7 +65,7 @@ onUnmounted(() => window.removeEventListener('hashchange', onHashChange))
 watch(productConfig, () => load())
 
 watch(selectedSeries, (val) => {
-  const filters = { series: val || undefined, limit: 1000, artifact_type: artifactTypeFilter.value }
+  const filters = { series: val || undefined, limit: 1000, artifact_type: dropArtifactTypeFilter.value }
   loadDrops(productKey.value, filters)
 })
 
@@ -95,7 +96,7 @@ watch(activeTab, (tab) => {
   }
 })
 
-const hasSeriesTimeline = computed(() => productConfig.value.artifactType === 'containers')
+const hasSeriesTimeline = computed(() => productConfig.value.hasSeriesTimeline === true)
 
 function navigateToSeries(seriesName) {
   if (!hasSeriesTimeline.value) return
