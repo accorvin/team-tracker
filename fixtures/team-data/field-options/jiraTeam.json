@@ -1,0 +1,13 @@
+{
+  "name": "jiraTeam",
+  "label": "Jira Team",
+  "values": [
+    "AI Platform Core",
+    "Model Serving",
+    "Data Science Pipelines",
+    "Dashboard",
+    "ODH Operator"
+  ],
+  "updatedAt": "2026-03-24T12:00:00Z",
+  "updatedBy": "admin@example.com"
+}
