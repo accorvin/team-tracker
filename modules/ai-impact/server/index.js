@@ -23,7 +23,12 @@ module.exports = function registerRoutes(router, context) {
   const { resolveLinkedFeatures } = require('./jira/link-resolver');
   const { getConfig, saveConfig } = require('./config');
   const { computeAllMetrics } = require('./metrics');
-  const { fetchAutofixData, computeAutofixMetrics, buildTrendData: buildAutofixTrend } = require('./jira/autofix-fetcher');
+  const {
+    fetchAutofixData,
+    computeAutofixMetrics,
+    buildTrendData: buildAutofixTrend,
+    buildForgeEvidence
+  } = require('./jira/autofix-fetcher');
   const { fetchDocData, fetchDocActivityEvents, fetchDocCumulativeStats, fetchDocCompletedData, computeDocMetrics, buildDocTrendData, resolveMRLinksFromKpiData } = require('./jira/doc-fetcher');
   const mrStatus = require('./mr-status');
   const { enrichMRStatuses } = mrStatus;
@@ -142,8 +147,30 @@ module.exports = function registerRoutes(router, context) {
         ...i,
         created: shift(i.created),
         updated: shift(i.updated),
+        terminalAt: shift(i.terminalAt),
+        mrLinks: i.mrLinks || [],
+        mrStatuses: i.mrStatuses || {}
+      })),
+      policyEligibleIssues: (data.policyEligibleIssues || []).map(i => ({
+        ...i,
+        created: shift(i.created),
+        updated: shift(i.updated),
         terminalAt: shift(i.terminalAt)
-      }))
+      })),
+      currentPolicyEligibleIssues: (data.currentPolicyEligibleIssues || []).map(i => ({
+        ...i,
+        created: shift(i.created),
+        updated: shift(i.updated),
+        terminalAt: shift(i.terminalAt)
+      })),
+      outcomeEvents: (data.outcomeEvents || []).map(event => ({
+        ...event,
+        cohort_timestamp: shift(event.cohort_timestamp),
+        transition_timestamp: shift(event.transition_timestamp)
+      })),
+      outcomeEventsComplete: data.outcomeEventsComplete === true,
+      evidence: data.evidence,
+      queries: data.queries
     };
   }
 
@@ -173,7 +200,8 @@ module.exports = function registerRoutes(router, context) {
       assignee: issue.assignee,
       pipelineState: issue.pipelineState,
       effortScore: issue.effortScore ?? null,
-      effortTier: issue.effortTier ?? null
+      effortTier: issue.effortTier ?? null,
+      forgeEvidence: buildForgeEvidence(issue)
     };
   }
 
@@ -181,7 +209,7 @@ module.exports = function registerRoutes(router, context) {
    * @openapi
    * /modules/ai-impact/autofix-data:
    *   get:
-   *     summary: Autofix pipeline data with computed metrics and trend
+   *     summary: Jira Autofix cohorts, lifecycle funnel, and trend data
    *     tags: [ai-impact]
    *     parameters:
    *       - in: query
@@ -198,7 +226,7 @@ module.exports = function registerRoutes(router, context) {
    *         description: Comma-separated Jira component names to filter issues by
    *     responses:
    *       200:
-   *         description: Autofix dataset with metrics, trend data, and issues
+   *         description: Autofix dataset with separate policy and pipeline cohorts. Lifecycle stage conversions are authoritative only when immutable Autofix outcome events are present.
    */
   router.get('/autofix-data', requireScope('ai-impact:read'), async function(req, res) {
     const timeWindow = VALID_AUTOFIX_TIME_WINDOWS.includes(req.query.timeWindow)
@@ -210,13 +238,31 @@ module.exports = function registerRoutes(router, context) {
       return res.json({
         fetchedAt: null,
         jiraHost: JIRA_HOST,
-        metrics: { triageTotal: 0, triageVerdicts: {}, autofixStates: {}, autofixTotal: 0, successRate: 0, windowTotal: 0, totalIssues: 0, priorityBreakdown: {}, medianTimeToFixDays: null, effortBreakdown: { quickWin: 0, standardFix: 0, complexFix: 0 }, totalImpactScore: 0 },
+        metrics: {
+          triageTotal: 0,
+          triageVerdicts: {},
+          autofixStates: {},
+          autofixTotal: 0,
+          successRate: 0,
+          windowTotal: 0,
+          totalIssues: 0,
+          priorityBreakdown: {},
+          medianTimeToFixDays: null,
+          effortBreakdown: { quickWin: 0, standardFix: 0, complexFix: 0 },
+          totalImpactScore: 0,
+          pipelineCohort: { denominator: 0, ready: 0, source: 'jira-pipeline-label-query', authoritative: false },
+          pipelineReadyShare: { numerator: 0, denominator: 0, rate: null },
+          policyEligibleCohort: { available: false, denominator: null },
+          stageFunnel: null
+        },
         trendData: [],
         issues: []
       });
     }
 
     let issues = data.issues;
+    let policyEligibleIssues = data.policyEligibleIssues;
+    let currentPolicyEligibleIssues = data.currentPolicyEligibleIssues;
     if (req.query.components) {
       const componentSet = new Set(
         req.query.components.split(',').map(function(c) { return c.trim(); }).filter(Boolean)
@@ -225,10 +271,26 @@ module.exports = function registerRoutes(router, context) {
         issues = issues.filter(function(issue) {
           return (issue.components || []).some(function(c) { return componentSet.has(c); });
         });
+        if (Array.isArray(policyEligibleIssues)) {
+          policyEligibleIssues = policyEligibleIssues.filter(function(issue) {
+            return (issue.components || []).some(function(c) { return componentSet.has(c); });
+          });
+        }
+        if (Array.isArray(currentPolicyEligibleIssues)) {
+          currentPolicyEligibleIssues = currentPolicyEligibleIssues.filter(function(issue) {
+            return (issue.components || []).some(function(c) { return componentSet.has(c); });
+          });
+        }
       }
     }
 
-    const metrics = computeAutofixMetrics(issues, timeWindow);
+    const metrics = computeAutofixMetrics(issues, timeWindow, {
+      policyEligibleIssues,
+      currentPolicyEligibleIssues,
+      outcomeEvents: data.outcomeEvents || [],
+      outcomeEventsComplete: data.outcomeEventsComplete === true,
+      policyScope: data.evidence?.policyScope
+    });
     const trendData = buildAutofixTrend(issues, timeWindow);
 
     res.json({
@@ -236,7 +298,12 @@ module.exports = function registerRoutes(router, context) {
       jiraHost: JIRA_HOST,
       metrics,
       trendData,
-      issues: issues.map(stripIssueFields)
+      issues: issues.map(stripIssueFields),
+      evidence: data.evidence || {
+        pipeline: 'Jira labels',
+        policyEligible: 'Jira JQL policy query unavailable in this snapshot',
+        stageContract: 'AIPCC-31384 lifecycle outcome contract dependency'
+      }
     });
   });
 
@@ -359,13 +426,28 @@ module.exports = function registerRoutes(router, context) {
 
     let autofixCount = 0;
     try {
-      const autofixIssues = await fetchAutofixData(jiraRequest, config);
+      const autofixReport = await fetchAutofixData(jiraRequest, config);
+      const allAutofixIssues = [
+        ...(autofixReport.issues || []),
+        ...(autofixReport.policyEligibleIssues || [])
+      ];
+      const uniqueAutofixMap = new Map();
+      for (const issue of allAutofixIssues) {
+        if (!uniqueAutofixMap.has(issue.key)) uniqueAutofixMap.set(issue.key, issue);
+      }
+      const uniqueAutofixIssues = [...uniqueAutofixMap.values()];
+      await enrichMRStatuses(uniqueAutofixIssues);
+      const pipelineByKey = new Map((autofixReport.issues || []).map(issue => [issue.key, issue]));
+      for (const issue of autofixReport.policyEligibleIssues || []) {
+        const pipelineIssue = pipelineByKey.get(issue.key);
+        if (pipelineIssue) issue.mrStatuses = pipelineIssue.mrStatuses || {};
+      }
       await writeToStorage('ai-impact/autofix-data.json', {
         fetchedAt: new Date().toISOString(),
-        issues: autofixIssues
+        ...autofixReport
       });
       invalidateAutofixCache();
-      autofixCount = autofixIssues.length;
+      autofixCount = (autofixReport.issues || []).length;
     } catch (autofixErr) {
       console.error('[ai-impact] Autofix data refresh failed:', autofixErr.message);
     }

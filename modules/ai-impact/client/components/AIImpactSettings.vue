@@ -261,6 +261,14 @@ function getAutofixProjectsDisplay() {
   }
   return config.value.autofixProjects || ''
 }
+
+function getAutofixComponentsDisplay() {
+  if (!config.value) return ''
+  if (Array.isArray(config.value.autofixComponents)) {
+    return config.value.autofixComponents.join(', ')
+  }
+  return config.value.autofixComponents || ''
+}
 </script>
 
 <template>
@@ -397,6 +405,18 @@ function getAutofixProjectsDisplay() {
             class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500"
           />
           <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Only include issues created on or after this date (YYYY-MM-DD)</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Policy Components (optional)</label>
+          <input
+            :value="getAutofixComponentsDisplay()"
+            @input="config.autofixComponents = $event.target.value.split(',').map(s => s.trim()).filter(Boolean)"
+            type="text"
+            placeholder="Model Server, Notebooks"
+            class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500"
+          />
+          <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Scopes gross policy cohort. Empty means project-wide non-authoritative fallback.</p>
         </div>
       </div>
     </div>

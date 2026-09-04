@@ -1,5 +1,19 @@
 {
   "fetchedAt": "2026-04-22T05:17:38.418Z",
+  "policyEligibleIssues": [],
+  "currentPolicyEligibleIssues": [],
+  "outcomeEvents": [],
+  "outcomeEventsComplete": false,
+  "evidence": {
+    "pipeline": "Jira labels",
+    "policyEligible": "Demo fixture does not include live gross Bug cohort",
+    "stageContract": "AIPCC-31384 lifecycle outcome contract dependency",
+    "policyScope": "project-wide fallback; component scope not configured"
+  },
+  "queries": {
+    "pipeline": null,
+    "policyEligible": null
+  },
   "issues": [
     {
       "key": "RHOAIENG-59199",

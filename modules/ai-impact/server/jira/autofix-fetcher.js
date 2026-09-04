@@ -4,12 +4,34 @@ const { validateJqlSafeString } = require('../config');
 const TERMINAL_LABELS = [
   'jira-autofix-merged',
   'jira-autofix-rejected',
-  'jira-autofix-max-retries'
+  'jira-autofix-max-retries',
+  'jira-autofix-stale'
 ];
 
 const TERMINAL_STATES = new Set([
-  'autofix-merged', 'autofix-rejected', 'autofix-max-retries'
+  'autofix-merged', 'autofix-rejected', 'autofix-max-retries', 'autofix-stale'
 ]);
+
+// Gross cohort excludes only immutable issue content markers. Mutable labels
+// and status changes remain in the cohort so closed-before-pickup is visible.
+const GROSS_POLICY_EXCLUSION_LABELS = ['CVE'];
+const CURRENT_POLICY_EXCLUSION_LABELS = ['no-autofix', 'auto-created', 'CVE'];
+const POLICY_PROPOSAL_STATES = new Set([
+  'autofix-review',
+  'autofix-ci-failing',
+  'autofix-merged',
+  'autofix-rejected',
+  'autofix-max-retries',
+  'autofix-stale'
+]);
+const POLICY_ABANDONMENT_STATES = new Set([
+  'autofix-rejected',
+  'autofix-max-retries',
+  'autofix-stale'
+]);
+const POLICY_BLOCKED_STATES = new Set(['autofix-blocked']);
+const OUTCOME_EVENT_TYPE = 'jira_autofix.lifecycle.outcome';
+const AUTOFIX_BOT_SENTINEL = 'jira-autofix bot';
 
 // All labels from the jira-autofix triage + autofix pipelines
 const TRIAGE_LABELS = [
@@ -29,7 +51,8 @@ const AUTOFIX_LABELS = [
   'jira-autofix-merged',
   'jira-autofix-rejected',
   'jira-autofix-max-retries',
-  'jira-autofix-blocked'
+  'jira-autofix-blocked',
+  'jira-autofix-stale'
 ];
 
 const ALL_PIPELINE_LABELS = [...TRIAGE_LABELS, ...AUTOFIX_LABELS];
@@ -41,6 +64,7 @@ function classifyIssue(labels) {
   if (labelSet.has('jira-autofix-merged')) return 'autofix-merged';
   if (labelSet.has('jira-autofix-rejected')) return 'autofix-rejected';
   if (labelSet.has('jira-autofix-max-retries')) return 'autofix-max-retries';
+  if (labelSet.has('jira-autofix-stale')) return 'autofix-stale';
   // Active autofix states (blocked before pending — blocked is added when
   // the bot gets stuck after starting, but pending may not be removed)
   if (labelSet.has('jira-autofix-blocked')) return 'autofix-blocked';
@@ -76,8 +100,38 @@ function processIssue(issue) {
     labels,
     components,
     assignee: issue.fields.assignee?.displayName || null,
-    pipelineState: classifyIssue(labels)
+    securityLevel: issue.fields.security?.name || null,
+    pipelineState: classifyIssue(labels),
+    mrLinks: extractForgeLinks(issue.fields.comment)
   };
+}
+
+function extractForgeLinks(commentField) {
+  const comments = commentField?.comments || (Array.isArray(commentField) ? commentField : []);
+  const text = comments
+    .map(comment => collectJiraText(comment.body || comment))
+    .filter(commentText => new RegExp(`(^|\\n)\\s*(?:#{1,6}\\s*)?${AUTOFIX_BOT_SENTINEL}`, 'i').test(commentText))
+    .join(' ');
+  const matches = text.match(/https?:\/\/[^\s"'<>]+/g) || [];
+  const links = new Set();
+  for (const match of matches) {
+    const link = match.replace(/[),.;]+$/, '');
+    if (/github\.com\/[^/]+\/[^/]+\/pull\/\d+/.test(link) ||
+        /\/merge_requests\/\d+/.test(link)) {
+      links.add(link);
+    }
+  }
+  return [...links];
+}
+
+function collectJiraText(value) {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(collectJiraText).join(' ');
+  if (!value || typeof value !== 'object') return '';
+  return Object.entries(value).map(([key, item]) => {
+    if (key === 'attrs' && item && typeof item === 'object' && item.href) return item.href;
+    return collectJiraText(item);
+  }).join(' ');
 }
 
 function extractPipelineHistory(changelog, pipelineState) {
@@ -236,7 +290,313 @@ function issueInWindow(issue, windowStart, windowEnd, useTerminalDate) {
   return c >= windowStart && c < windowEnd;
 }
 
-function computeAutofixMetrics(issues, timeWindow) {
+function issueCreatedInWindow(issue, windowStart, windowEnd) {
+  const created = new Date(issue.created).getTime();
+  return created >= windowStart && created < windowEnd;
+}
+
+function getPolicyExclusionReasons(issue) {
+  const labels = new Set(issue.labels || []);
+  const reasons = [];
+
+  if (issue.issueType && issue.issueType !== 'Bug') reasons.push('not_bug');
+  if (labels.has('CVE')) reasons.push('cve_label');
+  if (/CVE-/i.test(issue.summary || '')) reasons.push('cve_summary');
+  if (/EMBARGOED/i.test(issue.summary || '') ||
+      issue.securityLevel === 'Embargoed Security Issue') {
+    reasons.push('embargoed');
+  }
+
+  return reasons;
+}
+
+function isPolicyEligibleIssue(issue) {
+  return getPolicyExclusionReasons(issue).length === 0;
+}
+
+function isCurrentPolicyEligibleIssue(issue) {
+  if (!isPolicyEligibleIssue(issue)) return false;
+  const labels = new Set(issue.labels || []);
+  return !CURRENT_POLICY_EXCLUSION_LABELS.some(label => labels.has(label));
+}
+
+function buildProjectClause(projects) {
+  return projects.map(project => `"${project}"`).join(', ');
+}
+
+function buildCreatedAfterClause(createdAfter) {
+  return createdAfter ? ` AND created >= "${createdAfter}"` : '';
+}
+
+function buildPipelineJql(config) {
+  const projectClause = buildProjectClause(config.autofixProjects);
+  const labelClause = ALL_PIPELINE_LABELS.map(label => `"${label}"`).join(', ');
+  return `project IN (${projectClause}) AND labels IN (${labelClause})` +
+    buildCreatedAfterClause(config.autofixCreatedAfter) + ' ORDER BY created DESC';
+}
+
+function buildPolicyEligibleJql(config) {
+  const projectClause = buildProjectClause(config.autofixProjects);
+  const excludedLabels = GROSS_POLICY_EXCLUSION_LABELS.map(label => `"${label}"`).join(', ');
+  const clauses = [
+    `project IN (${projectClause})`,
+    'type = Bug',
+    `(labels IS EMPTY OR labels NOT IN (${excludedLabels}))`,
+    'summary !~ "EMBARGOED"',
+    '(level IS EMPTY OR level != "Embargoed Security Issue")',
+    'summary !~ "CVE-"'
+  ];
+  if (Array.isArray(config.autofixComponents) && config.autofixComponents.length > 0) {
+    const components = config.autofixComponents.map(component => `"${component}"`).join(', ');
+    clauses.push(`component IN (${components})`);
+  }
+  return clauses.join(' AND ') + buildCreatedAfterClause(config.autofixCreatedAfter) + ' ORDER BY created DESC';
+}
+
+function buildForgeEvidence(issue) {
+  const links = issue.mrLinks || [];
+  const statuses = links.length > 0 ? Object.values(issue.mrStatuses || {}) : [];
+  const proposalVerified = statuses.some(status => ['opened', 'merged', 'closed'].includes(status));
+  const mergeVerified = statuses.includes('merged');
+  return {
+    available: links.length > 0,
+    proposalVerified,
+    mergeVerified,
+    statusCount: statuses.length,
+    source: statuses.length > 0 ? 'forge-api' : links.length > 0 ? 'forge-link-unverified' : 'none'
+  };
+}
+
+const VALID_OUTCOME_STAGES = new Set([
+  'policy_eligibility',
+  'analysis',
+  'proposal',
+  'iteration',
+  'blocked',
+  'rejected',
+  'abandoned',
+  'stale',
+  'merged',
+  'reconciliation',
+  'failed'
+]);
+
+function normalizeOutcomeEvent(event) {
+  if (!event || typeof event !== 'object') return null;
+  if (event.event_type !== OUTCOME_EVENT_TYPE ||
+      typeof event.event_id !== 'string' ||
+      !/^outcome-v1-[0-9a-f]{64}$/.test(event.event_id)) return null;
+  if (typeof event.schema_version !== 'string' || !/^1\.[0-9]+$/.test(event.schema_version)) return null;
+  if (typeof event.correlation_id !== 'string' || !event.correlation_id ||
+      typeof event.final_outcome !== 'string' ||
+      !Number.isInteger(event.attempt) || event.attempt < 1 ||
+      !event.metrics || typeof event.metrics !== 'object' ||
+      !event.metadata || typeof event.metadata !== 'object') return null;
+  if (event.metadata?.synthetic === true || event.metadata?.excluded === true) return null;
+
+  const key = event.correlation?.jira_key;
+  const stage = event.stage;
+  if (!key || typeof key !== 'string' || !VALID_OUTCOME_STAGES.has(stage)) return null;
+  const cohortTimestamp = event.cohort_timestamp;
+  const transitionTimestamp = event.transition_timestamp;
+  if (!cohortTimestamp || Number.isNaN(new Date(cohortTimestamp).getTime()) ||
+      !transitionTimestamp || Number.isNaN(new Date(transitionTimestamp).getTime())) return null;
+  if (new Date(transitionTimestamp).getTime() < new Date(cohortTimestamp).getTime()) return null;
+  return { ...event, stage, jiraKey: key, cohortTimestamp };
+}
+
+function conversion(numerator, denominator) {
+  return {
+    numerator,
+    denominator,
+    rate: denominator > 0 ? Math.round((numerator / denominator) * 1000) / 10 : null
+  };
+}
+
+function computePolicyEligibleCohort(
+  policyEligibleIssues,
+  timeWindow,
+  scope = null,
+  currentPolicyEligibleIssues = null
+) {
+  if (!Array.isArray(policyEligibleIssues)) {
+    return {
+      available: false,
+      denominator: null,
+      candidateCount: null,
+      currentSnapshot: null,
+      exclusions: GROSS_POLICY_EXCLUSION_LABELS.concat(['cve_summary', 'embargoed'])
+    };
+  }
+
+  const { start: windowStart, end: windowEnd } = getWindowBounds(timeWindow);
+  const candidates = policyEligibleIssues.filter(issue =>
+    issueCreatedInWindow(issue, windowStart, windowEnd)
+  );
+  const eligible = candidates.filter(isPolicyEligibleIssue);
+  const currentEligible = Array.isArray(currentPolicyEligibleIssues)
+    ? currentPolicyEligibleIssues.filter(issue => issueCreatedInWindow(issue, windowStart, windowEnd))
+    : candidates.filter(isCurrentPolicyEligibleIssue);
+  const observedMutableExclusionCounts = {};
+  for (const issue of candidates) {
+    const labels = new Set(issue.labels || []);
+    if (labels.has('no-autofix')) {
+      observedMutableExclusionCounts.no_autofix = (observedMutableExclusionCounts.no_autofix || 0) + 1;
+    }
+    if (labels.has('auto-created')) {
+      observedMutableExclusionCounts.auto_created = (observedMutableExclusionCounts.auto_created || 0) + 1;
+    }
+  }
+
+  return {
+    available: true,
+    denominator: eligible.length,
+    currentSnapshot: currentEligible.length,
+    candidateCount: candidates.length,
+    total: policyEligibleIssues.length,
+    exclusionCounts: null,
+    exclusionCountsAvailable: false,
+    exclusionCountsNote: 'CVE and embargo exclusions are applied in Jira JQL and are not counted by this snapshot.',
+    observedMutableExclusionCounts,
+    exclusions: GROSS_POLICY_EXCLUSION_LABELS.concat(['cve_summary', 'embargoed']),
+    currentSnapshotExclusions: CURRENT_POLICY_EXCLUSION_LABELS,
+    source: 'jira-policy-query',
+    scope: scope || 'project-wide fallback; component scope not configured',
+    authoritative: false
+  };
+}
+
+function computeStageFunnel(issues, policyEligibleIssues, outcomeEvents, timeWindow, options = {}) {
+  const { start: windowStart, end: windowEnd } = getWindowBounds(timeWindow);
+  const rawEvents = Array.isArray(outcomeEvents) ? outcomeEvents : [];
+  const parsedEvents = rawEvents.map(normalizeOutcomeEvent).filter(Boolean);
+  const validEvents = parsedEvents.filter(event =>
+    new Date(event.cohortTimestamp).getTime() >= windowStart &&
+    new Date(event.cohortTimestamp).getTime() < windowEnd
+  );
+  const deduplicatedEvents = [...new Map(validEvents.map(event => [event.event_id, event])).values()];
+
+  function eventKeys(stage, predicate = () => true) {
+    return new Set(deduplicatedEvents
+      .filter(event => event.stage === stage && predicate(event))
+      .map(event => event.jiraKey));
+  }
+
+  function intersect(left, right) {
+    return new Set([...left].filter(key => right.has(key)));
+  }
+
+  if (deduplicatedEvents.length > 0 && options.outcomeEventsComplete === true) {
+    const eligible = eventKeys('policy_eligibility', event => event.final_outcome === 'eligible');
+    const analyzed = intersect(eligible, eventKeys('analysis'));
+    const proposed = intersect(analyzed, eventKeys('proposal'));
+    const merged = intersect(proposed, eventKeys('merged'));
+    const abandonment = new Set(
+      deduplicatedEvents
+        .filter(event => ['abandoned', 'stale', 'rejected'].includes(event.stage))
+        .map(event => event.jiraKey)
+        .filter(key => eligible.has(key))
+    );
+    const blocked = intersect(eligible, eventKeys('blocked'));
+    return {
+      source: 'autofix-outcome-events',
+      authoritative: true,
+      contract: 'AIPCC-31384 lifecycle outcome contract',
+      stages: {
+        eligible: eligible.size,
+        analyzed: analyzed.size,
+        prProposed: proposed.size,
+        prMerged: merged.size
+      },
+      abandonment: {
+        total: abandonment.size,
+        stale: eventKeys('stale').size,
+        rejected: eventKeys('rejected').size,
+        abandoned: eventKeys('abandoned').size
+      },
+      blocked: blocked.size,
+      conversions: {
+        eligibleToAnalyzed: conversion(analyzed.size, eligible.size),
+        analyzedToPrProposed: conversion(proposed.size, analyzed.size),
+        prProposedToPrMerged: conversion(merged.size, proposed.size),
+        eligibleToPrMerged: conversion(merged.size, eligible.size)
+      },
+      eventStats: {
+        valid: deduplicatedEvents.length,
+        duplicate: validEvents.length - deduplicatedEvents.length,
+        invalid: rawEvents.length - parsedEvents.length,
+        outsideWindow: parsedEvents.length - validEvents.length
+      },
+      limitations: []
+    };
+  }
+
+  const policyWindow = Array.isArray(policyEligibleIssues)
+    ? policyEligibleIssues
+      .filter(issue => issueCreatedInWindow(issue, windowStart, windowEnd))
+      .map((issue, index) => ({ ...issue, key: issue.key || `__policy-${index}` }))
+    : [];
+  const policyKeys = new Set(policyWindow.filter(isPolicyEligibleIssue).map(issue => issue.key));
+  const pipelineWindow = issues
+    .filter(issue => issueCreatedInWindow(issue, windowStart, windowEnd))
+    .map((issue, index) => ({ ...issue, key: issue.key || `__pipeline-${index}` }));
+  const cohortKeys = policyKeys.size > 0 ? policyKeys : new Set(pipelineWindow.map(issue => issue.key));
+  const pipelineByKey = new Map(pipelineWindow.map(issue => [issue.key, issue]));
+  const analyzedKeys = new Set(pipelineWindow.filter(issue => cohortKeys.has(issue.key)).map(issue => issue.key));
+  const proposedKeys = new Set();
+  const mergedKeys = new Set();
+  const abandonmentKeys = new Set();
+  const blockedKeys = new Set();
+  const abandonment = { stale: 0, rejected: 0, maxRetries: 0 };
+
+  for (const key of cohortKeys) {
+    const issue = pipelineByKey.get(key);
+    if (!issue) continue;
+    const forge = buildForgeEvidence(issue);
+    if (POLICY_PROPOSAL_STATES.has(issue.pipelineState) || forge.proposalVerified) proposedKeys.add(key);
+    if (issue.pipelineState === 'autofix-merged' || forge.mergeVerified) mergedKeys.add(key);
+    if (POLICY_ABANDONMENT_STATES.has(issue.pipelineState)) {
+      abandonmentKeys.add(key);
+      if (issue.pipelineState === 'autofix-stale') abandonment.stale++;
+      if (issue.pipelineState === 'autofix-rejected') abandonment.rejected++;
+      if (issue.pipelineState === 'autofix-max-retries') abandonment.maxRetries++;
+    }
+    if (POLICY_BLOCKED_STATES.has(issue.pipelineState)) blockedKeys.add(key);
+  }
+
+  return {
+    source: 'jira-labels-and-forge-status-proxy',
+    authoritative: false,
+    contract: 'AIPCC-31384 lifecycle outcome contract (pending producer dependency)',
+    stages: {
+      eligible: cohortKeys.size,
+      analyzed: analyzedKeys.size,
+      prProposed: proposedKeys.size,
+      prMerged: mergedKeys.size
+    },
+    abandonment: { total: abandonmentKeys.size, ...abandonment },
+    blocked: blockedKeys.size,
+    conversions: {
+      eligibleToAnalyzed: conversion(analyzedKeys.size, cohortKeys.size),
+      analyzedToPrProposed: conversion(proposedKeys.size, analyzedKeys.size),
+      prProposedToPrMerged: conversion(mergedKeys.size, proposedKeys.size),
+      eligibleToPrMerged: conversion(mergedKeys.size, cohortKeys.size)
+    },
+    eventStats: {
+      valid: validEvents.length,
+      duplicate: validEvents.length - deduplicatedEvents.length,
+      invalid: rawEvents.length - parsedEvents.length,
+      outsideWindow: parsedEvents.length - validEvents.length
+    },
+    limitations: [
+      'Jira labels are mutable and do not prove historical stage transitions.',
+      'Forge verification requires a URL in a Jira Autofix bot comment and API credentials.',
+      'Use immutable Autofix lifecycle events for authoritative cohort conversion reporting.'
+    ]
+  };
+}
+
+function computeAutofixMetrics(issues, timeWindow, options = {}) {
   const { start: windowStart, end: windowEnd, useTerminalDate } = getWindowBounds(timeWindow);
 
   const counts = {};
@@ -258,6 +618,7 @@ function computeAutofixMetrics(issues, timeWindow) {
     merged: get('autofix-merged'),
     rejected: get('autofix-rejected'),
     maxRetries: get('autofix-max-retries'),
+    stale: get('autofix-stale'),
     blocked: get('autofix-blocked')
   };
 
@@ -277,7 +638,8 @@ function computeAutofixMetrics(issues, timeWindow) {
     triageVerdicts.notFixable + triageVerdicts.stale + triageVerdicts.pending +
     triageVerdicts.external + triageVerdicts.securityReview;
 
-  const terminalTotal = autofixStates.merged + autofixStates.rejected + autofixStates.maxRetries;
+  const terminalTotal = autofixStates.merged + autofixStates.rejected +
+    autofixStates.maxRetries + autofixStates.stale;
   const successRate = terminalTotal > 0
     ? Math.round((autofixStates.merged / terminalTotal) * 100)
     : 0;
@@ -302,6 +664,20 @@ function computeAutofixMetrics(issues, timeWindow) {
     totalImpactScore += (mergedWindowIssues[j].effortScore || 0);
   }
 
+  const policyEligibleCohort = computePolicyEligibleCohort(
+    options.policyEligibleIssues,
+    timeWindow,
+    options.policyScope,
+    options.currentPolicyEligibleIssues
+  );
+  const stageFunnel = computeStageFunnel(
+    issues,
+    options.policyEligibleIssues,
+    options.outcomeEvents,
+    timeWindow,
+    { outcomeEventsComplete: options.outcomeEventsComplete === true }
+  );
+
   return {
     triageTotal,
     triageVerdicts,
@@ -314,7 +690,16 @@ function computeAutofixMetrics(issues, timeWindow) {
     priorityBreakdown,
     medianTimeToFixDays,
     effortBreakdown,
-    totalImpactScore
+    totalImpactScore,
+    pipelineCohort: {
+      denominator: windowTotal,
+      ready: triageVerdicts.ready,
+      source: 'jira-pipeline-label-query',
+      authoritative: false
+    },
+    pipelineReadyShare: conversion(triageVerdicts.ready, windowTotal),
+    policyEligibleCohort,
+    stageFunnel
   };
 }
 
@@ -356,7 +741,7 @@ function buildTrendData(issues, timeWindow) {
       weekStart: weekEnd.getTime() - MS_PER_WEEK,
       weekEnd: weekEnd.getTime(),
       triaged: 0, autofixed: 0, merged: 0, total: 0,
-      review: 0, ciFailing: 0, blocked: 0, maxRetries: 0,
+      review: 0, ciFailing: 0, blocked: 0, maxRetries: 0, autofixStale: 0,
       missingInfo: 0, stale: 0, external: 0, securityReview: 0
     });
   }
@@ -390,6 +775,7 @@ function buildTrendData(issues, timeWindow) {
     else if (state === 'autofix-ci-failing') bucket.ciFailing++;
     else if (state === 'autofix-blocked') bucket.blocked++;
     else if (state === 'autofix-max-retries') bucket.maxRetries++;
+    else if (state === 'autofix-stale') bucket.autofixStale++;
     else if (state === 'triage-missing-info') bucket.missingInfo++;
     else if (state === 'triage-stale') bucket.stale++;
     else if (state === 'triage-external') bucket.external++;
@@ -401,6 +787,7 @@ function buildTrendData(issues, timeWindow) {
       date: b.date, triaged: b.triaged, autofixed: b.autofixed,
       merged: b.merged, total: b.total, review: b.review,
       ciFailing: b.ciFailing, blocked: b.blocked, maxRetries: b.maxRetries,
+      autofixStale: b.autofixStale,
       missingInfo: b.missingInfo, stale: b.stale,
       external: b.external, securityReview: b.securityReview
     };
@@ -408,28 +795,30 @@ function buildTrendData(issues, timeWindow) {
 }
 
 async function fetchAutofixData(jiraRequest, config) {
-  const { autofixProjects, autofixCreatedAfter } = config;
+  const { autofixProjects, autofixComponents, autofixCreatedAfter } = config;
 
   for (const p of autofixProjects) {
     validateJqlSafeString(p, 'autofixProjects entry');
+  }
+  if (Array.isArray(autofixComponents)) {
+    for (const component of autofixComponents) {
+      validateJqlSafeString(component, 'autofixComponents entry');
+    }
   }
   if (autofixCreatedAfter) {
     validateJqlSafeString(autofixCreatedAfter, 'autofixCreatedAfter');
   }
 
-  const projectClause = autofixProjects.map(p => `"${p}"`).join(', ');
-  const labelClause = ALL_PIPELINE_LABELS.map(l => `"${l}"`).join(', ');
-
-  let jql = `project IN (${projectClause}) AND labels IN (${labelClause})`;
-  if (autofixCreatedAfter) {
-    jql += ` AND created >= "${autofixCreatedAfter}"`;
-  }
-  jql += ' ORDER BY created DESC';
-
-  const fields = 'summary,status,issuetype,priority,created,updated,labels,components,assignee';
-  const rawIssues = await fetchAllJqlResults(jiraRequest, jql, fields);
+  const pipelineJql = buildPipelineJql({ autofixProjects, autofixCreatedAfter });
+  const policyEligibleJql = buildPolicyEligibleJql({ autofixProjects, autofixComponents, autofixCreatedAfter });
+  const fields = 'summary,status,issuetype,priority,created,updated,labels,components,assignee,security,comment';
+  const [rawIssues, rawPolicyEligibleIssues] = await Promise.all([
+    fetchAllJqlResults(jiraRequest, pipelineJql, fields),
+    fetchAllJqlResults(jiraRequest, policyEligibleJql, fields)
+  ]);
 
   const processed = rawIssues.map(processIssue);
+  const policyEligibleIssues = rawPolicyEligibleIssues.map(processIssue);
 
   const terminalIssues = processed.filter(i => TERMINAL_STATES.has(i.pipelineState));
   const BATCH = 10;
@@ -459,11 +848,48 @@ async function fetchAutofixData(jiraRequest, config) {
     processed[i].effortTier = scoring.effortTier;
   }
 
-  return processed;
+  const processedByKey = new Map(processed.map(issue => [issue.key, issue]));
+  for (const issue of policyEligibleIssues) {
+    const pipelineIssue = processedByKey.get(issue.key);
+    if (!pipelineIssue) continue;
+    issue.pipelineState = pipelineIssue.pipelineState;
+    issue.terminalAt = pipelineIssue.terminalAt;
+    issue.ciFailureCount = pipelineIssue.ciFailureCount;
+    issue.reviewRoundCount = pipelineIssue.reviewRoundCount;
+    issue.wasBlocked = pipelineIssue.wasBlocked;
+    issue.mrLinks = pipelineIssue.mrLinks;
+  }
+
+  return {
+    issues: processed,
+    policyEligibleIssues,
+    currentPolicyEligibleIssues: policyEligibleIssues.filter(isCurrentPolicyEligibleIssue),
+    outcomeEvents: [],
+    outcomeEventsComplete: false,
+    evidence: {
+      pipeline: 'Jira labels',
+      policyEligible: 'Jira JQL policy query',
+      stageContract: 'AIPCC-31384 lifecycle outcome contract dependency',
+      policyScope: Array.isArray(autofixComponents) && autofixComponents.length > 0
+        ? `configured components: ${autofixComponents.join(', ')}`
+        : 'project-wide fallback; component scope not configured'
+    },
+    queries: { pipeline: pipelineJql, policyEligible: policyEligibleJql }
+  };
 }
 
 module.exports = {
   fetchAutofixData,
+  buildPipelineJql,
+  buildPolicyEligibleJql,
+  getPolicyExclusionReasons,
+  isPolicyEligibleIssue,
+  isCurrentPolicyEligibleIssue,
+  computePolicyEligibleCohort,
+  computeStageFunnel,
+  normalizeOutcomeEvent,
+  buildForgeEvidence,
+  extractForgeLinks,
   processIssue,
   classifyIssue,
   extractTerminalAt,
@@ -479,5 +905,8 @@ module.exports = {
   TRIAGE_LABELS,
   AUTOFIX_LABELS,
   TERMINAL_LABELS,
-  TERMINAL_STATES
+  TERMINAL_STATES,
+  GROSS_POLICY_EXCLUSION_LABELS,
+  CURRENT_POLICY_EXCLUSION_LABELS,
+  POLICY_PROPOSAL_STATES
 };

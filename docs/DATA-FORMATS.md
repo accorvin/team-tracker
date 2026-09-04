@@ -2,6 +2,21 @@
 
 This document describes the JSON structure of all files stored in the `data/` directory (production) and `fixtures/` directory (demo mode). **Demo fixtures must always match production format** — see [Fixture Rules](#fixture-rules) below.
 
+## Jira Autofix — `data/ai-impact/autofix-data.json`
+
+The Autofix snapshot keeps the existing `issues` pipeline-labeled cohort and
+adds `policyEligibleIssues`, the gross Bug cohort returned by the separate
+policy query. The gross query excludes CVE summary or label markers and
+embargoed issues. It does not exclude closed status or mutable opt-out labels.
+`currentPolicyEligibleIssues` is a separate current non-excluded snapshot that
+removes current `no-autofix`, `auto-created`, and `CVE` labels. It is a
+diagnostic snapshot, not a historical eligibility denominator.
+
+`metrics.stageFunnel` reports eligible, analyzed, PR proposed, PR merged,
+abandonment, and conversions. Its `authoritative` flag is true only when
+canonical immutable events from the AIPCC-31384 Autofix outcome contract are
+available. Jira label and Forge-link fallbacks are explicitly non-authoritative.
+
 ## Person Metrics — `data/people/{name}.json`
 
 Filename is the person's display name lowercased with non-alphanumeric chars replaced by `_`.
