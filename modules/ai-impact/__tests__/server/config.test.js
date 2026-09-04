@@ -92,6 +92,14 @@ describe('saveConfig', () => {
     await saveConfig(writeToStorage, { trendThresholdPp: 0 });
     await saveConfig(writeToStorage, { trendThresholdPp: 50 });
   });
+
+  it('validates optional Autofix component scope', async () => {
+    const writeToStorage = vi.fn().mockResolvedValue(undefined);
+    await saveConfig(writeToStorage, { autofixComponents: ['Model Server'] });
+    expect(writeToStorage.mock.calls[0][1]).toEqual({ autofixComponents: ['Model Server'] });
+    await expect(saveConfig(writeToStorage, { autofixComponents: 'Model Server' })).rejects.toThrow('array or null');
+    await expect(saveConfig(writeToStorage, { autofixComponents: ['Bad"Component'] })).rejects.toThrow('unsafe characters');
+  });
 });
 
 describe('validateJqlSafeString', () => {

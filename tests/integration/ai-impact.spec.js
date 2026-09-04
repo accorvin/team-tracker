@@ -243,9 +243,20 @@ test.describe('AI Impact Views @ai-impact', () => {
   });
 
   test('Jira AutoFix view renders impact metrics sections', async ({ page }) => {
+    const autofixResponsePromise = page.waitForResponse(response =>
+      response.url().includes('/api/modules/ai-impact/autofix-data') && response.status() === 200
+    );
     await page.goto('/#/ai-impact/autofix');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
+
+    const autofixResponse = await autofixResponsePromise;
+    const autofixPayload = await autofixResponse.json();
+    expect(autofixPayload.metrics).toHaveProperty('pipelineCohort');
+    expect(autofixPayload.metrics).toHaveProperty('stageFunnel');
+    expect(autofixPayload.metrics.stageFunnel).toHaveProperty('conversions');
+    expect(autofixPayload.metrics.stageFunnel.authoritative).toBe(false);
+    expect(autofixPayload.evidence.stageContract).toContain('AIPCC-31384');
 
     const priorityHeading = page.locator('text=Priority Distribution');
     await expect(priorityHeading).toBeVisible();
@@ -258,6 +269,11 @@ test.describe('AI Impact Views @ai-impact', () => {
 
     const effortColumn = page.locator('th:has-text("Effort")');
     await expect(effortColumn).toBeVisible();
+
+    await expect(page.getByText('Autofix lifecycle funnel')).toBeVisible();
+    await expect(page.getByText('Proxy evidence')).toBeVisible();
+    await expect(page.getByText('Pipeline-ready Share')).toBeVisible();
+    await expect(page.getByText('Eligibility Rate')).toHaveCount(0);
 
     expect(page.errors).toHaveLength(0);
   });

@@ -11,7 +11,16 @@ const {
   getLastWeekBounds,
   getWindowBounds,
   computeAutofixMetrics,
-  buildTrendData
+  buildTrendData,
+  buildPolicyEligibleJql,
+  getPolicyExclusionReasons,
+  isPolicyEligibleIssue,
+  isCurrentPolicyEligibleIssue,
+  computePolicyEligibleCohort,
+  computeStageFunnel,
+  normalizeOutcomeEvent,
+  extractForgeLinks,
+  buildForgeEvidence
 } = require('../../server/jira/autofix-fetcher')
 
 describe('classifyIssue', () => {
@@ -25,6 +34,10 @@ describe('classifyIssue', () => {
 
   it('returns autofix-max-retries for jira-autofix-max-retries', () => {
     expect(classifyIssue(['jira-autofix-max-retries'])).toBe('autofix-max-retries')
+  })
+
+  it('returns autofix-stale for jira-autofix-stale', () => {
+    expect(classifyIssue(['jira-autofix-stale'])).toBe('autofix-stale')
   })
 
   it('returns autofix-ci-failing for jira-autofix-ci-failing', () => {
@@ -174,9 +187,209 @@ describe('computeAutofixMetrics', () => {
     expect(m.successRate).toBe(50)
   })
 
+  it('includes stale in terminal outcomes and abandonment', () => {
+    const m = computeAutofixMetrics([
+      { created: recent, pipelineState: 'autofix-stale', components: [] },
+      { created: recent, pipelineState: 'autofix-merged', components: [] }
+    ], 'last7')
+    expect(m.autofixStates.stale).toBe(1)
+    expect(m.terminalTotal).toBe(2)
+    expect(m.stageFunnel.abandonment.stale).toBe(1)
+  })
+
   it('returns zero success rate when no terminal autofix issues in window', () => {
     const m = computeAutofixMetrics([], 'last7')
     expect(m.successRate).toBe(0)
+  })
+})
+
+describe('policy cohort methodology', () => {
+  const base = {
+    issueType: 'Bug',
+    status: 'New',
+    labels: [],
+    summary: 'A normal bug',
+    created: new Date().toISOString(),
+    pipelineState: 'unknown',
+    components: []
+  }
+
+  it('builds gross policy query with explicit immutable exclusions and no status exclusion', () => {
+    const jql = buildPolicyEligibleJql({
+      autofixProjects: ['AIPCC'],
+      autofixComponents: ['Model Server'],
+      autofixCreatedAfter: '2026-01-01'
+    })
+    expect(jql).toContain('type = Bug')
+    expect(jql).toContain('labels NOT IN ("CVE")')
+    expect(jql).toContain('summary !~ "CVE-"')
+    expect(jql).toContain('Embargoed Security Issue')
+    expect(jql).toContain('component IN ("Model Server")')
+    expect(jql).not.toContain('status NOT IN')
+    expect(jql).not.toContain('no-autofix')
+  })
+
+  it('keeps mutable opt-out labels in gross cohort but removes them from current snapshot', () => {
+    const closed = { ...base, status: 'Closed', labels: ['no-autofix'] }
+    expect(isPolicyEligibleIssue(closed)).toBe(true)
+    expect(isCurrentPolicyEligibleIssue(closed)).toBe(false)
+    expect(getPolicyExclusionReasons({ ...base, labels: ['CVE'] })).toContain('cve_label')
+    expect(isPolicyEligibleIssue({ ...base, summary: 'CVE-2026-1234' })).toBe(false)
+    expect(isPolicyEligibleIssue({ ...base, securityLevel: 'Embargoed Security Issue' })).toBe(false)
+  })
+
+  it('returns gross denominator and current non-excluded snapshot separately', () => {
+    const cohort = computePolicyEligibleCohort([
+      { ...base },
+      { ...base, key: 'AIPCC-2', labels: ['no-autofix'] },
+      { ...base, key: 'AIPCC-3', summary: 'CVE-2026-1234' }
+    ], 'last7', 'project-wide fallback')
+    expect(cohort.denominator).toBe(2)
+    expect(cohort.currentSnapshot).toBe(1)
+    expect(cohort.exclusionCounts).toBeNull()
+    expect(cohort.exclusionCountsAvailable).toBe(false)
+    expect(cohort.scope).toBe('project-wide fallback')
+  })
+
+  it('uses issue creation time for gross cohort windows, not terminal time', () => {
+    const oldCreated = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    const recentTerminal = new Date().toISOString()
+    const cohort = computePolicyEligibleCohort([
+      { ...base, created: oldCreated, terminalAt: recentTerminal, pipelineState: 'autofix-merged' }
+    ], 'last7')
+    expect(cohort.candidateCount).toBe(0)
+  })
+})
+
+describe('lifecycle funnel evidence', () => {
+  const recent = new Date().toISOString()
+
+  it('reports stage conversions and abandonment from Jira and Forge proxy evidence', () => {
+    const policy = [
+      { key: 'AIPCC-1', issueType: 'Bug', status: 'New', labels: [], summary: 'One', created: recent },
+      { key: 'AIPCC-2', issueType: 'Bug', status: 'New', labels: [], summary: 'Two', created: recent },
+      { key: 'AIPCC-3', issueType: 'Bug', status: 'New', labels: [], summary: 'Three', created: recent }
+    ]
+    const pipeline = [
+      { key: 'AIPCC-1', created: recent, pipelineState: 'autofix-review', components: [], mrLinks: [], mrStatuses: {} },
+      { key: 'AIPCC-2', created: recent, pipelineState: 'autofix-stale', components: [], mrLinks: [], mrStatuses: {} },
+      { key: 'AIPCC-3', created: recent, pipelineState: 'autofix-blocked', components: [], mrLinks: [], mrStatuses: {} }
+    ]
+    const funnel = computeStageFunnel(pipeline, policy, [], 'last7')
+    expect(funnel.authoritative).toBe(false)
+    expect(funnel.stages).toEqual({ eligible: 3, analyzed: 3, prProposed: 2, prMerged: 0 })
+    expect(funnel.abandonment.stale).toBe(1)
+    expect(funnel.abandonment.total).toBe(1)
+    expect(funnel.blocked).toBe(1)
+    expect(funnel.conversions.eligibleToAnalyzed.rate).toBe(100)
+  })
+
+  it('accepts canonical contract events and rejects aliases or legacy timestamps', () => {
+    const event = {
+      schema_version: '1.0',
+      event_type: 'jira_autofix.lifecycle.outcome',
+      event_id: `outcome-v1-${'a'.repeat(64)}`,
+      correlation_id: 'run-1',
+      attempt: 1,
+      stage: 'proposal',
+      final_outcome: 'proposed',
+      cohort_timestamp: recent,
+      transition_timestamp: recent,
+      correlation: { jira_key: 'AIPCC-1' },
+      metrics: {},
+      metadata: {}
+    }
+    expect(normalizeOutcomeEvent(event)).not.toBeNull()
+    expect(normalizeOutcomeEvent({ ...event, stage: 'proposed' })).toBeNull()
+    expect(normalizeOutcomeEvent({ ...event, cohort_timestamp: undefined, event_timestamp: recent })).toBeNull()
+    expect(normalizeOutcomeEvent({ ...event, event_id: `outcome-v2-${'a'.repeat(64)}` })).toBeNull()
+    expect(normalizeOutcomeEvent({
+      ...event,
+      cohort_timestamp: '2026-09-04T12:00:00Z',
+      transition_timestamp: '2026-09-04T11:59:59Z'
+    })).toBeNull()
+  })
+
+  it('separates malformed events from valid events outside the reporting window', () => {
+    const event = {
+      schema_version: '1.0',
+      event_type: 'jira_autofix.lifecycle.outcome',
+      event_id: `outcome-v1-${'b'.repeat(64)}`,
+      correlation_id: 'run-2',
+      attempt: 1,
+      stage: 'policy_eligibility',
+      final_outcome: 'eligible',
+      cohort_timestamp: '2020-01-01T00:00:00Z',
+      transition_timestamp: '2020-01-01T00:00:00Z',
+      correlation: { jira_key: 'AIPCC-2' },
+      metrics: {},
+      metadata: {}
+    }
+    const funnel = computeStageFunnel([], [], [event, { invalid: true }], 'last7')
+    expect(funnel.eventStats.invalid).toBe(1)
+    expect(funnel.eventStats.outsideWindow).toBe(1)
+  })
+
+  it('uses complete canonical events, filters ineligible eligibility events, and keeps blocked separate', () => {
+    const event = {
+      schema_version: '1.0',
+      event_type: 'jira_autofix.lifecycle.outcome',
+      correlation_id: 'run-3',
+      attempt: 1,
+      cohort_timestamp: recent,
+      transition_timestamp: recent,
+      correlation: { jira_key: 'AIPCC-3' },
+      metrics: {},
+      metadata: {}
+    }
+    const events = [
+      { ...event, event_id: `outcome-v1-${'c'.repeat(64)}`, stage: 'policy_eligibility', final_outcome: 'eligible' },
+      { ...event, event_id: `outcome-v1-${'d'.repeat(64)}`, stage: 'policy_eligibility', final_outcome: 'ineligible' },
+      { ...event, event_id: `outcome-v1-${'e'.repeat(64)}`, stage: 'blocked', final_outcome: 'blocked' }
+    ]
+    const funnel = computeStageFunnel([], [], events, 'last7', { outcomeEventsComplete: true })
+    expect(funnel.authoritative).toBe(true)
+    expect(funnel.stages.eligible).toBe(1)
+    expect(funnel.abandonment.total).toBe(0)
+    expect(funnel.blocked).toBe(1)
+  })
+
+  it('keeps complete event stages nested within the eligible cohort', () => {
+    const base = {
+      schema_version: '1.0',
+      event_type: 'jira_autofix.lifecycle.outcome',
+      correlation_id: 'run-4',
+      attempt: 1,
+      cohort_timestamp: recent,
+      transition_timestamp: recent,
+      metrics: {},
+      metadata: {}
+    }
+    const events = [
+      { ...base, event_id: `outcome-v1-${'1'.repeat(64)}`, stage: 'policy_eligibility', final_outcome: 'eligible', correlation: { jira_key: 'AIPCC-1' } },
+      { ...base, event_id: `outcome-v1-${'2'.repeat(64)}`, stage: 'analysis', final_outcome: 'analyzed', correlation: { jira_key: 'AIPCC-1' } },
+      { ...base, event_id: `outcome-v1-${'3'.repeat(64)}`, stage: 'proposal', final_outcome: 'proposed', correlation: { jira_key: 'AIPCC-2' } },
+      { ...base, event_id: `outcome-v1-${'4'.repeat(64)}`, stage: 'merged', final_outcome: 'merged', correlation: { jira_key: 'AIPCC-3' } }
+    ]
+
+    const funnel = computeStageFunnel([], [], events, 'last7', { outcomeEventsComplete: true })
+
+    expect(funnel.stages).toEqual({ eligible: 1, analyzed: 1, prProposed: 0, prMerged: 0 })
+    expect(funnel.conversions.eligibleToAnalyzed.rate).toBe(100)
+  })
+
+  it('extracts Forge links only from canonical Autofix bot comments', () => {
+    const link = 'https://github.com/org/repo/pull/7'
+    expect(extractForgeLinks({ comments: [
+      { body: `Human comment ${link}` },
+      { body: `### jira-autofix bot\n\nA merge/pull request was created: ${link}` }
+    ] })).toEqual([link])
+    expect(buildForgeEvidence({ mrLinks: [link], mrStatuses: {} })).toMatchObject({
+      available: true,
+      proposalVerified: false,
+      mergeVerified: false,
+      source: 'forge-link-unverified'
+    })
   })
 })
 

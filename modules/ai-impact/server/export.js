@@ -81,6 +81,21 @@ async function exportAutofixData(addFile, readFromStorage, mapping) {
   if (Array.isArray(anonymized.issues)) {
     anonymized.issues = anonymized.issues.map(issue => anonymizeIssue(issue, mapping));
   }
+  if (Array.isArray(anonymized.policyEligibleIssues)) {
+    anonymized.policyEligibleIssues = anonymized.policyEligibleIssues.map(issue => anonymizeIssue(issue, mapping));
+  }
+  if (Array.isArray(anonymized.currentPolicyEligibleIssues)) {
+    anonymized.currentPolicyEligibleIssues = anonymized.currentPolicyEligibleIssues.map(issue => anonymizeIssue(issue, mapping));
+  }
+  if (Array.isArray(anonymized.outcomeEvents)) {
+    anonymized.outcomeEvents = anonymized.outcomeEvents.map(event => ({
+      ...event,
+      correlation: event.correlation
+        ? { ...event.correlation, jira_key: event.correlation.jira_key
+          ? mapping.anonymizeJiraKey(event.correlation.jira_key) : event.correlation.jira_key }
+        : event.correlation
+    }));
+  }
   addFile(`${PREFIX}/autofix-data.json`, anonymized);
 }
 

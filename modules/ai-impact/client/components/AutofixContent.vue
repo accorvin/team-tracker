@@ -274,10 +274,11 @@ const metrics = computed(() => {
     merged: windowIssues.filter(i => i.pipelineState === 'autofix-merged').length,
     rejected: windowIssues.filter(i => i.pipelineState === 'autofix-rejected').length,
     maxRetries: windowIssues.filter(i => i.pipelineState === 'autofix-max-retries').length,
+    stale: windowIssues.filter(i => i.pipelineState === 'autofix-stale').length,
     blocked: windowIssues.filter(i => i.pipelineState === 'autofix-blocked').length
   }
 
-  const terminalTotal = autofixStates.merged + autofixStates.rejected + autofixStates.maxRetries
+  const terminalTotal = autofixStates.merged + autofixStates.rejected + autofixStates.maxRetries + autofixStates.stale
   const successRate = terminalTotal > 0 ? Math.round((autofixStates.merged / terminalTotal) * 100) : 0
 
   const priorityBreakdown = {}
@@ -307,7 +308,14 @@ const metrics = computed(() => {
     totalImpactScore += (issue.effortScore || 0)
   }
 
-  return { triageTotal, triageVerdicts, autofixStates, autofixTotal: triageVerdicts.ready, successRate, windowTotal: windowIssues.length, totalIssues: issues.length, priorityBreakdown, medianTimeToFixDays, effortBreakdown, totalImpactScore }
+  return {
+    ...props.autofixData.metrics,
+    triageTotal, triageVerdicts, autofixStates, autofixTotal: triageVerdicts.ready,
+    successRate, windowTotal: windowIssues.length, totalIssues: issues.length,
+    priorityBreakdown, medianTimeToFixDays, effortBreakdown, totalImpactScore,
+    pipelineCohort: { denominator: windowIssues.length, ready: triageVerdicts.ready, source: 'jira-pipeline-label-query', authoritative: false },
+    pipelineReadyShare: { numerator: triageVerdicts.ready, denominator: windowIssues.length, rate: windowIssues.length > 0 ? Math.round((triageVerdicts.ready / windowIssues.length) * 1000) / 10 : null }
+  }
 })
 
 const trendData = computed(() => {
@@ -342,13 +350,14 @@ const trendData = computed(() => {
     const ciFailing = weekIssues.filter(i => i.pipelineState === 'autofix-ci-failing').length
     const blocked = weekIssues.filter(i => i.pipelineState === 'autofix-blocked').length
     const maxRetries = weekIssues.filter(i => i.pipelineState === 'autofix-max-retries').length
+    const autofixStale = weekIssues.filter(i => i.pipelineState === 'autofix-stale').length
     const missingInfo = weekIssues.filter(i => i.pipelineState === 'triage-missing-info').length
     const stale = weekIssues.filter(i => i.pipelineState === 'triage-stale').length
     const external = weekIssues.filter(i => i.pipelineState === 'triage-external').length
     const securityReview = weekIssues.filter(i => i.pipelineState === 'triage-security-review').length
     points.push({
       date: weekEnd.toISOString().slice(0, 10), triaged, autofixed, merged, total: weekIssues.length,
-      review, ciFailing, blocked, maxRetries, missingInfo, stale, external, securityReview
+      review, ciFailing, blocked, maxRetries, autofixStale, missingInfo, stale, external, securityReview
     })
   }
   return points
@@ -369,7 +378,8 @@ const STATE_OPTIONS = [
   { value: 'autofix-merged', label: 'AI Fix Merged' },
   { value: 'autofix-rejected', label: 'AI Fix Rejected' },
   { value: 'autofix-max-retries', label: 'AI Max Retries' },
-  { value: 'autofix-blocked', label: 'AI Blocked' }
+  { value: 'autofix-blocked', label: 'AI Blocked' },
+  { value: 'autofix-stale', label: 'AI Stale' }
 ]
 
 const stateFilterOptions = STATE_OPTIONS.filter(o => o.value !== 'all')
@@ -425,11 +435,32 @@ const hasTrendActivity = computed(() => {
   return trendData.value.some(p => p.triaged > 0)
 })
 
+// The API computes the gross cohort before client-side filters are applied.
+// Hiding it under local filters avoids presenting global counts as team-level data.
+const stageFunnel = computed(() => hasActiveFilter.value ? null : metrics.value?.stageFunnel || null)
+
+const stageFunnelRows = computed(() => {
+  const stages = stageFunnel.value?.stages || {}
+  const eligibleLabel = stageFunnel.value?.authoritative
+    ? 'Gross policy-eligible Bugs'
+    : 'Eligible (Jira proxy)'
+  return [
+    { key: 'eligible', label: eligibleLabel, color: 'bg-indigo-500' },
+    { key: 'analyzed', label: 'Analyzed', color: 'bg-blue-500' },
+    { key: 'prProposed', label: 'PR proposed', color: 'bg-purple-500' },
+    { key: 'prMerged', label: 'PR merged', color: 'bg-green-500' }
+  ].map(stage => ({ ...stage, count: stages[stage.key] ?? null }))
+})
+
+function formatConversion(conversion) {
+  return conversion?.rate === null || conversion?.rate === undefined ? 'N/A' : `${conversion.rate}%`
+}
+
 const funnelChartData = computed(() => ({
   labels: trendData.value.map(p => p.date),
   datasets: [
     {
-      label: 'Eligible for Autofix',
+      label: 'Pipeline analyzed',
       data: trendData.value.map(p => p.autofixed),
       borderColor: '#10b981',
       backgroundColor: 'rgba(16, 185, 129, 0.1)',
@@ -480,7 +511,8 @@ const waitingChartData = computed(() => ({
     { label: 'Under Review', data: trendData.value.map(p => p.review || 0), backgroundColor: 'rgba(59, 130, 246, 0.6)' },
     { label: 'CI Failing', data: trendData.value.map(p => p.ciFailing || 0), backgroundColor: 'rgba(249, 115, 22, 0.6)' },
     { label: 'Blocked', data: trendData.value.map(p => p.blocked || 0), backgroundColor: 'rgba(234, 179, 8, 0.6)' },
-    { label: 'Max Retries', data: trendData.value.map(p => p.maxRetries || 0), backgroundColor: 'rgba(239, 68, 68, 0.6)' }
+    { label: 'Max Retries', data: trendData.value.map(p => p.maxRetries || 0), backgroundColor: 'rgba(239, 68, 68, 0.6)' },
+    { label: 'Autofix Stale', data: trendData.value.map(p => p.autofixStale || 0), backgroundColor: 'rgba(156, 163, 175, 0.6)' }
   ]
 }))
 
@@ -530,6 +562,7 @@ function stateColorClass(state) {
   if (state === 'autofix-pending' || state === 'autofix-ready') return 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400'
   if (state === 'autofix-rejected') return 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
   if (state === 'autofix-max-retries') return 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400'
+  if (state === 'autofix-stale') return 'bg-gray-100 dark:bg-gray-600/20 text-gray-600 dark:text-gray-400'
   if (state === 'autofix-blocked' || state === 'triage-missing-info') return 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400'
   if (state === 'triage-not-fixable') return 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
   if (state === 'triage-stale') return 'bg-gray-100 dark:bg-gray-600/20 text-gray-600 dark:text-gray-400'
@@ -554,7 +587,7 @@ const triageSegments = computed(() => {
   if (!metrics.value) return []
   const v = metrics.value.triageVerdicts
   return [
-    { label: 'Ready for AI', count: v.ready || 0, color: 'bg-green-500', textClass: 'text-green-600 dark:text-green-400', jiraLabels: ['jira-autofix', 'jira-autofix-pending', 'jira-autofix-review', 'jira-autofix-ci-failing', 'jira-autofix-merged', 'jira-autofix-rejected', 'jira-autofix-max-retries', 'jira-autofix-blocked'] },
+    { label: 'Ready for AI', count: v.ready || 0, color: 'bg-green-500', textClass: 'text-green-600 dark:text-green-400', jiraLabels: ['jira-autofix', 'jira-autofix-pending', 'jira-autofix-review', 'jira-autofix-ci-failing', 'jira-autofix-merged', 'jira-autofix-rejected', 'jira-autofix-max-retries', 'jira-autofix-blocked', 'jira-autofix-stale'] },
     { label: 'Missing Info', count: v.missingInfo || 0, color: 'bg-yellow-500', textClass: 'text-yellow-600 dark:text-yellow-400', jiraLabels: ['jira-triage-missing-info'] },
     { label: 'Not AI-Fixable', count: v.notFixable || 0, color: 'bg-red-500', textClass: 'text-red-600 dark:text-red-400', jiraLabels: ['jira-triage-not-fixable'] },
     { label: 'External Reporter', count: v.external || 0, color: 'bg-purple-500', textClass: 'text-purple-600 dark:text-purple-400', jiraLabels: ['jira-triage-external'] },
@@ -577,6 +610,7 @@ const autofixSegments = computed(() => {
     { label: 'Queued for AI', count: a.ready || 0, color: 'bg-gray-400', textClass: 'text-gray-500 dark:text-gray-400', jiraLabels: ['jira-autofix'], excludeLabels: ['jira-autofix-pending', 'jira-autofix-review', 'jira-autofix-ci-failing', 'jira-autofix-merged', 'jira-autofix-rejected', 'jira-autofix-max-retries', 'jira-autofix-blocked'] },
     { label: 'AI Fix Rejected', count: a.rejected || 0, color: 'bg-red-500', textClass: 'text-red-600 dark:text-red-400', jiraLabels: ['jira-autofix-rejected'] },
     { label: 'AI Max Retries', count: a.maxRetries || 0, color: 'bg-orange-500', textClass: 'text-orange-600 dark:text-orange-400', jiraLabels: ['jira-autofix-max-retries'] },
+    { label: 'AI Stale', count: a.stale || 0, color: 'bg-gray-400', textClass: 'text-gray-500 dark:text-gray-400', jiraLabels: ['jira-autofix-stale'] },
     { label: 'AI Blocked', count: a.blocked || 0, color: 'bg-yellow-500', textClass: 'text-yellow-600 dark:text-yellow-400', jiraLabels: ['jira-autofix-blocked'] }
   ].filter(s => s.count > 0)
 })
@@ -628,7 +662,7 @@ function buildJiraLabelUrl(jiraLabels, excludeLabels) {
   if (useTerminalDate) {
     const isTerminalLabel = jiraLabels.some(l =>
       l === 'jira-autofix-merged' || l === 'jira-autofix-rejected' ||
-      l === 'jira-autofix-max-retries'
+      l === 'jira-autofix-max-retries' || l === 'jira-autofix-stale'
     )
     if (isTerminalLabel) {
       const matchingStates = new Set()
@@ -825,14 +859,14 @@ function buildJiraLabelUrl(jiraLabels, excludeLabels) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div class="absolute right-0 top-6 z-20 hidden group-hover:block w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg dark:shadow-gray-900/50 p-3 text-xs text-gray-700 dark:text-gray-300 text-left">
-                Percentage of triaged issues that qualified for autofix. Calculated as: <span class="font-medium">eligible ÷ total triaged × 100</span>. The AI triage bot evaluates each issue and labels it as fixable or not.
+                Share of the current Jira pipeline-labeled cohort carrying an Autofix-ready state. This is not the gross policy denominator.
               </div>
             </div>
             <div class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-              {{ metrics.triageTotal > 0 ? Math.round((metrics.triageVerdicts.ready || 0) / metrics.triageTotal * 100) : 0 }}%
+              {{ metrics.pipelineReadyShare?.rate ?? (metrics.triageTotal > 0 ? Math.round((metrics.triageVerdicts.ready || 0) / metrics.triageTotal * 100) : 0) }}%
             </div>
-            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Eligibility Rate</div>
-            <div class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{{ metrics.triageVerdicts.ready || 0 }} of {{ metrics.triageTotal }} triaged</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Pipeline-ready Share</div>
+            <div class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{{ metrics.pipelineReadyShare?.numerator ?? metrics.triageVerdicts.ready ?? 0 }} of {{ metrics.pipelineReadyShare?.denominator ?? metrics.triageTotal ?? 0 }} labeled</div>
           </div>
           <div class="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
             <div class="absolute top-2 right-2 group">
@@ -840,14 +874,14 @@ function buildJiraLabelUrl(jiraLabels, excludeLabels) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div class="absolute right-0 top-6 z-20 hidden group-hover:block w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg dark:shadow-gray-900/50 p-3 text-xs text-gray-700 dark:text-gray-300 text-left">
-                Percentage of successfully merged autofixes out of all terminal outcomes. Calculated as: <span class="font-medium">merged ÷ (merged + rejected + max-retries) × 100</span>. In-progress issues are excluded since they haven't reached a final outcome.
+                Percentage of successfully merged autofixes out of all terminal outcomes. Calculated as: <span class="font-medium">merged ÷ (merged + rejected + max-retries + stale) × 100</span>. In-progress issues are excluded since they haven't reached a final outcome.
               </div>
             </div>
             <div class="text-2xl font-bold" :class="metrics.successRate >= 50 ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'">
               {{ metrics.successRate }}%
             </div>
             <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Success Rate</div>
-            <div class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{{ metrics.autofixStates.merged || 0 }} of {{ (metrics.autofixStates.merged || 0) + (metrics.autofixStates.rejected || 0) + (metrics.autofixStates.maxRetries || 0) }} resolved</div>
+            <div class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{{ metrics.autofixStates.merged || 0 }} of {{ (metrics.autofixStates.merged || 0) + (metrics.autofixStates.rejected || 0) + (metrics.autofixStates.maxRetries || 0) + (metrics.autofixStates.stale || 0) }} resolved</div>
           </div>
           <div class="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
             <div class="absolute top-2 right-2 group">
@@ -904,6 +938,54 @@ function buildJiraLabelUrl(jiraLabels, excludeLabels) {
           </div>
         </div>
 
+        <!-- Lifecycle funnel -->
+        <div class="px-6 pb-6">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Autofix lifecycle funnel</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Eligible to analyzed to PR proposed to PR merged. Counts use one issue per stage.
+                </p>
+              </div>
+              <span
+                v-if="stageFunnel"
+                class="text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded"
+                :class="stageFunnel.authoritative ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400'"
+              >{{ stageFunnel.authoritative ? 'Immutable events' : 'Proxy evidence' }}</span>
+            </div>
+            <div v-if="stageFunnel" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div v-for="stage in stageFunnelRows" :key="stage.key" class="rounded border border-gray-100 dark:border-gray-700 p-3">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-sm" :class="stage.color" />
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ stage.label }}</span>
+                </div>
+                <div class="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-2">{{ stage.count ?? 'N/A' }}</div>
+              </div>
+            </div>
+            <p v-else-if="hasActiveFilter" class="text-xs text-yellow-700 dark:text-yellow-400">
+              Clear project, issue-type, and component filters to view the gross cohort funnel. The current API does not return a filterable gross cohort to the browser.
+            </p>
+            <div v-if="stageFunnel" class="mt-4 grid grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+              <div><span class="text-gray-400">Eligible to analyzed</span><div class="font-semibold text-gray-700 dark:text-gray-200">{{ formatConversion(stageFunnel.conversions.eligibleToAnalyzed) }}</div></div>
+              <div><span class="text-gray-400">Analyzed to proposed</span><div class="font-semibold text-gray-700 dark:text-gray-200">{{ formatConversion(stageFunnel.conversions.analyzedToPrProposed) }}</div></div>
+              <div><span class="text-gray-400">Proposed to merged</span><div class="font-semibold text-gray-700 dark:text-gray-200">{{ formatConversion(stageFunnel.conversions.prProposedToPrMerged) }}</div></div>
+              <div><span class="text-gray-400">Eligible to merged</span><div class="font-semibold text-gray-700 dark:text-gray-200">{{ formatConversion(stageFunnel.conversions.eligibleToPrMerged) }}</div></div>
+              <div><span class="text-gray-400">Abandoned</span><div class="font-semibold text-gray-700 dark:text-gray-200">{{ stageFunnel.abandonment.total }}</div></div>
+              <div><span class="text-gray-400">Blocked</span><div class="font-semibold text-gray-700 dark:text-gray-200">{{ stageFunnel.blocked }}</div></div>
+            </div>
+            <p v-if="stageFunnel?.limitations?.length" class="text-[10px] text-yellow-700 dark:text-yellow-400 mt-4">
+              {{ stageFunnel.limitations[0] }}
+            </p>
+            <p v-if="stageFunnel?.eventStats?.valid || stageFunnel?.eventStats?.outsideWindow || stageFunnel?.eventStats?.invalid" class="text-[10px] text-gray-400 dark:text-gray-500 mt-2">
+              Lifecycle event coverage: {{ stageFunnel.eventStats.valid }} in window, {{ stageFunnel.eventStats.outsideWindow }} outside window, {{ stageFunnel.eventStats.invalid }} malformed.
+            </p>
+            <p v-if="metrics.policyEligibleCohort?.available" class="text-[10px] text-gray-400 dark:text-gray-500 mt-2">
+              Gross Bug denominator: {{ metrics.policyEligibleCohort.denominator }}. Current non-excluded snapshot: {{ metrics.policyEligibleCohort.currentSnapshot }}. Scope: {{ metrics.policyEligibleCohort.scope }}.
+            </p>
+          </div>
+        </div>
+
         <!-- Status Snapshot -->
         <div class="px-6 pb-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
           <!-- Triage Outcomes -->
@@ -917,7 +999,7 @@ function buildJiraLabelUrl(jiraLabels, excludeLabels) {
                   </svg>
                   <div class="absolute left-0 top-6 z-20 hidden group-hover:block w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg dark:shadow-gray-900/50 p-3 text-xs text-gray-700 dark:text-gray-300">
                     <div class="space-y-1">
-                      <div class="flex justify-between"><span class="font-medium">Ready for AI</span><span class="text-gray-400">Qualified for autofix</span></div>
+                      <div class="flex justify-between"><span class="font-medium">Pipeline Ready</span><span class="text-gray-400">Carries an Autofix-ready label</span></div>
                       <div class="flex justify-between"><span class="font-medium">Missing Info</span><span class="text-gray-400">Waiting on reporter</span></div>
                       <div class="flex justify-between"><span class="font-medium">Not AI-Fixable</span><span class="text-gray-400">Not suitable for AI</span></div>
                       <div class="flex justify-between"><span class="font-medium">External Reporter</span><span class="text-gray-400">Needs RH approval</span></div>
@@ -1193,7 +1275,7 @@ function buildJiraLabelUrl(jiraLabels, excludeLabels) {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div class="absolute right-0 top-6 z-10 hidden group-hover:block w-64 p-2 text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg dark:shadow-gray-900/50">
-                    Green line: issues that qualified for autofix. Blue line: AI created an MR waiting for human code review. Bars: fixes that humans approved and merged. The gap between lines shows conversion at each stage.
+                    Green line: issues carrying an Autofix pipeline state. Blue line: Jira issues with a PR review state. Bars: fixes marked merged. These are proxy trends until immutable lifecycle events are available.
                   </div>
                 </div>
               </div>

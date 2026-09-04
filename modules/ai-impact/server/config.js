@@ -9,6 +9,8 @@ const DEFAULT_CONFIG = {
   lookbackMonths: 0,
   trendThresholdPp: 2,
   autofixProjects: ['AIPCC', 'RHOAIENG', 'RHAIENG', 'RHAIFIRST', 'INFERENG', 'JN'],
+  // Null means project-wide policy cohort. Set to component names to scope it.
+  autofixComponents: null,
   autofixCreatedAfter: null,
   docProject: 'RHAISTRAT',
   docRequiredStatuses: ['Review', 'Release Pending'],
@@ -126,6 +128,18 @@ async function saveConfig(writeToStorage, config) {
       validateJqlSafeString(p, 'autofixProjects entry');
     }
     merged.autofixProjects = config.autofixProjects;
+  }
+
+  if (config.autofixComponents !== undefined) {
+    if (config.autofixComponents !== null && !Array.isArray(config.autofixComponents)) {
+      throw new Error('autofixComponents must be an array or null');
+    }
+    if (Array.isArray(config.autofixComponents)) {
+      for (const component of config.autofixComponents) {
+        validateJqlSafeString(component, 'autofixComponents entry');
+      }
+    }
+    merged.autofixComponents = config.autofixComponents;
   }
 
   // Only persist fields that differ from defaults so that future default
