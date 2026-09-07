@@ -468,9 +468,11 @@ const JIRA_HOST = 'https://redhat.atlassian.net'
 const expandedPhases = reactive({})
 
 onMounted(async () => {
+  data.value = null
+  error.value = null
   await loadVersions()
-  if (versions.value.length > 0) {
-    const initial = defaultVersion.value || versions.value[0]
+  if (defaultVersion.value && versions.value.includes(defaultVersion.value)) {
+    const initial = defaultVersion.value
     selectedVersion.value = initial
     await loadMetrics(initial)
     if (data.value && data.value.component_readiness) {

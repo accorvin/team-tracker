@@ -1033,6 +1033,39 @@ test.describe('Releases Release Readiness @releases', () => {
     expect(Array.isArray(body.versions)).toBe(true);
   });
 
+  test('release readiness opens on the current release and allows manual switching', async ({ page }) => {
+    const current = 'rhoai-3.5.EA1';
+    const future = 'rhoai-3.6.EA1';
+    await page.route('**/api/modules/releases/release-readiness/versions', route => route.fulfill({
+      json: { versions: [future, 'rhoai-3.5.EA2', current], default_version: current }
+    }));
+
+    await page.goto('/#/releases/reports?report=release-readiness');
+    const selector = page.locator('select').filter({ has: page.locator(`option[value="${current}"]`) });
+    await expect(selector).toHaveValue(current);
+    await expect(page.getByRole('heading', { name: current, exact: true })).toBeVisible();
+
+    await selector.selectOption(future);
+    await expect(page.getByRole('heading', { name: future, exact: true })).toBeVisible();
+
+    await page.getByTitle('Back to Reports').click();
+    await page.getByText('RHOAI Release Readiness', { exact: true }).click();
+    await expect(selector).toHaveValue(current);
+    await expect(page.getByRole('heading', { name: current, exact: true })).toBeVisible();
+  });
+
+  test('release readiness leaves selection empty when no current release is available', async ({ page }) => {
+    await page.route('**/api/modules/releases/release-readiness/versions', route => route.fulfill({
+      json: { versions: ['rhoai-3.6.EA1'], default_version: null }
+    }));
+    await page.goto('/#/releases/reports?report=release-readiness');
+    const selector = page.locator('select').filter({ has: page.locator('option[value="rhoai-3.6.EA1"]') });
+    await expect(selector).toHaveValue('');
+    await expect(page.getByText('Select a release version to view readiness status')).toBeVisible();
+    await selector.selectOption('rhoai-3.6.EA1');
+    await expect(page.getByRole('heading', { name: 'rhoai-3.6.EA1', exact: true })).toBeVisible();
+  });
+
   test('release readiness metrics API returns data for fixture version', async ({ request }) => {
     const res = await request.get('/api/modules/releases/release-readiness?version=rhoai-3.5.EA2');
     if (res.status() === 404) {

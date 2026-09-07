@@ -1740,6 +1740,11 @@ this file — the payload itself is produced outside this repo by the external
 `fetch_release_metrics.py` script and pushed via its `POST /upload` endpoint.
 Rendered by `modules/releases/client/reports/ReleaseReadinessDirector.vue`.
 
+The dashboard defaults to the available release with the latest valid
+`release_schedule.ga_date` on or before the current UTC date. Future releases
+and version views without a schedule are available for manual selection but
+are not selected on open. If no release qualifies, no version is selected.
+
 ```json
 {
   "version": "rhoai-3.5.EA2",
