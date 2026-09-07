@@ -31,9 +31,11 @@
             <span class="text-sm font-bold">{{ formatScheduleDate(releaseSchedule.ga_date) }}</span>
           </div>
           <div class="flex flex-col items-center rounded-xl px-5 py-2.5 min-w-[90px]"
-            :class="releaseSchedule.status === 'Released' ? 'bg-emerald-500/30' : 'bg-amber-500/30'">
+            :class="releaseDisplayStatus(data) === 'Released with Open Tasks'
+              ? 'bg-red-500/30'
+              : isReleasedStatus(releaseSchedule.status) ? 'bg-emerald-500/30' : 'bg-amber-500/30'">
             <span class="text-[10px] font-semibold uppercase tracking-wider text-blue-200 mb-0.5">Status</span>
-            <span class="text-sm font-bold">{{ releaseSchedule.status }}</span>
+            <span class="text-sm font-bold">{{ releaseDisplayStatus(data) }}</span>
           </div>
         </div>
       </div>
@@ -451,6 +453,7 @@
 import { ref, reactive, computed, inject, onMounted } from 'vue'
 import { ArrowLeft, Shield } from 'lucide-vue-next'
 import { useReleaseReadiness } from './composables/useReleaseReadiness'
+import { isNoWorkResolution, isReleasedStatus, releaseDisplayStatus } from './release-readiness-status'
 
 const moduleNav = inject('moduleNav')
 const {
@@ -794,12 +797,6 @@ function ragBarClass(rag) {
 
 // Resolutions that mean the item was closed without completing the work
 // (mirrors the no-work resolutions excluded from person-metrics, see docs/DATA-FORMATS.md)
-const NO_WORK_RESOLUTIONS = ["Won't Do", "Can't Do", 'Obsolete', 'Duplicate', 'Cannot Reproduce']
-
-function isNoWorkResolution(resolution) {
-  return !!resolution && NO_WORK_RESOLUTIONS.includes(resolution)
-}
-
 function statusResolutionLabel(status, resolution) {
   return resolution ? `${status} - ${resolution}` : status
 }
