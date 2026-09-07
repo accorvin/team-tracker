@@ -795,8 +795,6 @@ function ragBarClass(rag) {
   return 'bg-gray-400'
 }
 
-// Resolutions that mean the item was closed without completing the work
-// (mirrors the no-work resolutions excluded from person-metrics, see docs/DATA-FORMATS.md)
 function statusResolutionLabel(status, resolution) {
   return resolution ? `${status} - ${resolution}` : status
 }
